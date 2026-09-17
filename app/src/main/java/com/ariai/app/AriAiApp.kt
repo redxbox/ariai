@@ -9,19 +9,12 @@ import com.ariai.app.data.remote.SearchClient
 import com.ariai.app.data.repository.ChatRepository
 
 class AriAiApp : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        com.ariai.app.util.CrashHandler.init(this)
-    }
-
     val database by lazy {
         Room.databaseBuilder(
             this,
             AppDatabase::class.java,
             "ariai_db"
-        ).fallbackToDestructiveMigration()
-         .fallbackToDestructiveMigrationOnDowngrade()
-         .build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     val preferencesManager by lazy {
