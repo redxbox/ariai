@@ -32,7 +32,7 @@ import com.ariai.app.util.LocalStrings
 import com.ariai.app.util.VoiceManager
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     chat: Chat?,
