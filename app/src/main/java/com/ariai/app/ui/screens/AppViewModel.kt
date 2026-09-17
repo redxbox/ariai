@@ -24,6 +24,34 @@ class AppViewModel(
     val chats = repository.getChats().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val agents = repository.getAgents().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    init {
+        // Auto-add free demo provider on first launch
+        viewModelScope.launch {
+            // Wait a bit for providers to load
+            kotlinx.coroutines.delay(500)
+            if (providers.value.isEmpty()) {
+                val freeDemo = getFreeProviders().find { it.id == "pollinations" }
+                freeDemo?.let {
+                    val demoProvider = Provider(
+                        id = "demo_pollinations",
+                        name = "AriAi Free Demo",
+                        type = ProviderType.OPENAI_COMPATIBLE,
+                        baseUrl = it.baseUrl,
+                        apiKey = "",
+                        models = listOf(
+                            AIModel("openai", "Pollinations OpenAI", "demo_pollinations", true, true, false, 32000),
+                            AIModel("openai-large", "Pollinations Large", "demo_pollinations", true, true, false, 32000),
+                            AIModel("mistral", "Mistral Free", "demo_pollinations", true, true, false, 32000)
+                        ),
+                        enabled = true
+                    )
+                    repository.saveProvider(demoProvider)
+                }
+                // Also add Groq as second demo if user wants speed (without key it will fail but we show it)
+            }
+        }
+    }
+
     // Chat state
     private val _currentChatId = MutableStateFlow<String?>(null)
     val currentChatId = _currentChatId.asStateFlow()

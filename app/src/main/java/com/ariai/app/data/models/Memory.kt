@@ -1,7 +1,7 @@
 package com.ariai.app.data.models
 
 /**
- * Memory system like ChatGPT and RikkaHub
+ * Memory system like ChatGPT
  * Stores user preferences, facts, and conversation summaries
  */
 data class Memory(

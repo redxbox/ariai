@@ -63,7 +63,10 @@ data class AppStrings(
     val systemPrompt: String,
     val about: String,
     val version: String,
-    val rikkaHubInspired: String
+    val tagline: String,
+    val freeDemo: String,
+    val premium: String,
+    val free: String
 )
 
 val LocalStrings = compositionLocalOf { englishStrings }
@@ -122,14 +125,17 @@ val englishStrings = AppStrings(
     noProviders = "No providers configured",
     addFirstProvider = "Add your first AI provider to start chatting",
     welcomeTitle = "Welcome to AriAi",
-    welcomeDesc = "Powerful AI client like RikkaHub - Connect your own API keys and chat with any model",
+    welcomeDesc = "The ultimate AI client - Connect your own API keys and chat with any model. Fast, private, and powerful.",
     continueStr = "Continue",
     temperature = "Temperature",
     topP = "Top P",
     systemPrompt = "System Prompt",
     about = "About",
     version = "Version",
-    rikkaHubInspired = "Inspired by RikkaHub - The ultimate AI client"
+    tagline = "Ultimate AI Client - Fast, Private, Powerful",
+    freeDemo = "Free Demo",
+    premium = "Premium",
+    free = "Free"
 )
 
 val persianStrings = AppStrings(
@@ -186,14 +192,17 @@ val persianStrings = AppStrings(
     noProviders = "ارائه‌دهنده‌ای تنظیم نشده",
     addFirstProvider = "اولین ارائه‌دهنده هوش مصنوعی خود را اضافه کنید",
     welcomeTitle = "به آریاای خوش آمدید",
-    welcomeDesc = "کلاینت قدرتمند هوش مصنوعی مثل RikkaHub - با API خودتان به هر مدلی متصل شوید",
+    welcomeDesc = "بهترین کلاینت هوش مصنوعی - با API خودتان به هر مدلی متصل شوید. سریع، خصوصی و قدرتمند.",
     continueStr = "ادامه",
     temperature = "خلاقیت",
     topP = "تنوع",
     systemPrompt = "دستورالعمل سیستم",
     about = "درباره",
     version = "نسخه",
-    rikkaHubInspired = "الهام گرفته از RikkaHub - بهترین کلاینت هوش مصنوعی"
+    tagline = "بهترین کلاینت هوش مصنوعی - سریع، خصوصی، قدرتمند",
+    freeDemo = "دموی رایگان",
+    premium = "حرفه‌ای",
+    free = "رایگان"
 )
 
 val arabicStrings = AppStrings(
@@ -250,14 +259,17 @@ val arabicStrings = AppStrings(
     noProviders = "لم يتم تكوين أي مزود",
     addFirstProvider = "أضف أول مزود ذكاء اصطناعي لبدء الدردشة",
     welcomeTitle = "مرحبا بكم في آريا آي",
-    welcomeDesc = "عميل ذكاء اصطناعي قوي مثل RikkaHub",
+    welcomeDesc = "أفضل عميل ذكاء اصطناعي - سريع وخاص وقوي",
     continueStr = "متابعة",
     temperature = "الإبداع",
     topP = "التنوع",
     systemPrompt = "موجه النظام",
     about = "حول",
     version = "الإصدار",
-    rikkaHubInspired = "مستوحى من RikkaHub"
+    tagline = "أفضل عميل ذكاء اصطناعي",
+    freeDemo = "عرض مجاني",
+    premium = "مميز",
+    free = "مجاني"
 )
 
 val turkishStrings = AppStrings(
@@ -314,14 +326,17 @@ val turkishStrings = AppStrings(
     noProviders = "Yapılandırılmış sağlayıcı yok",
     addFirstProvider = "Sohbete başlamak için ilk AI sağlayıcınızı ekleyin",
     welcomeTitle = "AriAi'ye Hoş Geldiniz",
-    welcomeDesc = "RikkaHub gibi güçlü AI istemcisi",
+    welcomeDesc = "En iyi AI istemcisi - Hızlı, özel ve güçlü",
     continueStr = "Devam",
     temperature = "Yaratıcılık",
     topP = "Çeşitlilik",
     systemPrompt = "Sistem İstemİ",
     about = "Hakkında",
     version = "Versiyon",
-    rikkaHubInspired = "RikkaHub'dan ilham alındı"
+    tagline = "En iyi AI istemcisi",
+    freeDemo = "Ücretsiz Demo",
+    premium = "Premium",
+    free = "Ücretsiz"
 )
 
 val germanStrings = AppStrings(
@@ -378,14 +393,17 @@ val germanStrings = AppStrings(
     noProviders = "Keine Anbieter konfiguriert",
     addFirstProvider = "Fügen Sie Ihren ersten KI-Anbieter hinzu",
     welcomeTitle = "Willkommen bei AriAi",
-    welcomeDesc = "Leistungsstarker KI-Client wie RikkaHub",
+    welcomeDesc = "Der beste KI-Client - Schnell, privat und leistungsstark",
     continueStr = "Weiter",
     temperature = "Kreativität",
     topP = "Vielfalt",
     systemPrompt = "System-Prompt",
     about = "Über",
     version = "Version",
-    rikkaHubInspired = "Inspiriert von RikkaHub"
+    tagline = "Bester KI-Client",
+    freeDemo = "Kostenlose Demo",
+    premium = "Premium",
+    free = "Kostenlos"
 )
 
 val frenchStrings = AppStrings(
@@ -442,14 +460,17 @@ val frenchStrings = AppStrings(
     noProviders = "Aucun fournisseur configuré",
     addFirstProvider = "Ajoutez votre premier fournisseur IA",
     welcomeTitle = "Bienvenue sur AriAi",
-    welcomeDesc = "Client IA puissant comme RikkaHub",
+    welcomeDesc = "Le meilleur client IA - Rapide, privé et puissant",
     continueStr = "Continuer",
     temperature = "Créativité",
     topP = "Diversité",
     systemPrompt = "Prompt système",
     about = "À propos",
     version = "Version",
-    rikkaHubInspired = "Inspiré par RikkaHub"
+    tagline = "Meilleur client IA",
+    freeDemo = "Démo gratuite",
+    premium = "Premium",
+    free = "Gratuit"
 )
 
 fun getStringsForLanguage(lang: String): AppStrings {

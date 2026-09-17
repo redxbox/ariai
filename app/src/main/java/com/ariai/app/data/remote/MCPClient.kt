@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
- * MCP (Model Context Protocol) Client - RikkaHub style
+ * MCP (Model Context Protocol) Client
  * Allows AI to call external tools via MCP servers
  * This is a placeholder for full MCP implementation
  */
