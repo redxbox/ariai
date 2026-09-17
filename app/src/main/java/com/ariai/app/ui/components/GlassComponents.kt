@@ -8,10 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -40,7 +37,7 @@ fun GlassCard(
                 .padding(1.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape((shape.topStart.value - 1).dp),
+                shape = RoundedCornerShape(19.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                 modifier = Modifier
             ) {
