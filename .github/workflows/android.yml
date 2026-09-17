@@ -32,20 +32,9 @@ jobs:
       continue-on-error: true
     
     - name: Build Debug APK
-      id: build
-      run: ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee build.log
-      continue-on-error: true
-    
-    - name: Show build log on failure
-      if: steps.build.outcome == 'failure'
       run: |
-        echo "=== BUILD FAILED - LOG ==="
-        cat build.log | tail -n 500
-        echo "=== END LOG ==="
-        echo "=== Checking for common errors ==="
-        grep -i "error" build.log | tail -n 100 || true
-        echo "=== Kotlin errors ==="
-        grep -i "e:" build.log | tail -n 100 || true
+        set -o pipefail
+        ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee build.log
     
     - name: Upload build log
       if: always()
@@ -66,7 +55,6 @@ jobs:
         retention-days: 3
     
     - name: Upload APK
-      if: steps.build.outcome == 'success'
       uses: actions/upload-artifact@v4
       with:
         name: AriAi-debug-APK
