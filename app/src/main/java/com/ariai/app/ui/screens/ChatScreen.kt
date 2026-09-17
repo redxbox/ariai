@@ -3,6 +3,7 @@ package com.ariai.app.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -177,7 +178,7 @@ fun ChatScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.SmartToy, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Default.Face, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                                 Text(
                                     "Provider",
                                     style = MaterialTheme.typography.labelSmall,
@@ -187,7 +188,7 @@ fun ChatScreen(
                             }
                         }
                         IconButton(onClick = { showProviderSheet = true }) {
-                            Icon(Icons.Default.Tune, contentDescription = "Provider Settings")
+                            Icon(Icons.Default.Settings, contentDescription = "Provider Settings")
                         }
                         IconButton(onClick = { 
                             if (isSpeaking) voiceManager.stopSpeaking()

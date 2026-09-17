@@ -143,7 +143,7 @@ fun VoiceChatScreen(
                                 isListening -> Icons.Default.Mic
                                 isSpeaking -> Icons.Default.VolumeUp
                                 isProcessing -> Icons.Default.HourglassEmpty
-                                else -> Icons.Default.MicNone
+                                else -> Icons.Default.MicOff
                             },
                             contentDescription = null,
                             modifier = Modifier.size(56.dp),
