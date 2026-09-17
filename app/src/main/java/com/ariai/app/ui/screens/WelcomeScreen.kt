@@ -57,7 +57,7 @@ fun WelcomeScreen(
                     FeatureRow(icon = Icons.Default.Cloud, title = "Multi-Provider", desc = "OpenAI, Gemini, Claude, Ollama, Custom APIs")
                     FeatureRow(icon = Icons.Default.Search, title = "Real Web Search", desc = "Tavily, Brave, Exa, Serper integration")
                     FeatureRow(icon = Icons.Default.Image, title = "Image Generation", desc = "DALL·E 3, Imagen 3, Flux, etc.")
-                    FeatureRow(icon = Icons.Default.SmartToy, title = "Custom Agents", desc = "Create personas with tools & memory")
+                    FeatureRow(icon = Icons.Default.Face, title = "Custom Agents", desc = "Create personas with tools & memory")
                     FeatureRow(icon = Icons.Default.Language, title = "6 Languages", desc = "English, فارسی, العربية, Türkçe, Deutsch, Français")
                     FeatureRow(icon = Icons.Default.Palette, title = "Material You", desc = "Dynamic colors, dark/light themes")
                 }

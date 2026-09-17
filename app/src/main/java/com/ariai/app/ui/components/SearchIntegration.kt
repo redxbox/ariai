@@ -77,7 +77,7 @@ fun WebSearchToggle(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            Icons.Default.TravelExplore,
+            Icons.Default.Search,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
             tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant

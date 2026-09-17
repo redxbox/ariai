@@ -325,7 +325,7 @@ fun SearchProviderItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                if (enabled) Icons.Default.CheckCircle else Icons.Default.Circle,
+                if (enabled) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                 contentDescription = null,
                 tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )

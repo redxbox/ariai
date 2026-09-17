@@ -230,7 +230,7 @@ fun MessageItem(
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        Icons.Default.CallSplit,
+                        Icons.Default.Share,
                         contentDescription = strings.branch,
                         modifier = Modifier.size(16.dp)
                     )

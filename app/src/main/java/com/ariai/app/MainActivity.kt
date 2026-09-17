@@ -89,7 +89,7 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                         onClick = { navController.navigate("chats") { launchSingleTop = true } }
                     )
                     NavigationBarItem(
-                        icon = { Icon(Icons.Default.SmartToy, contentDescription = null) },
+                        icon = { Icon(Icons.Default.Face, contentDescription = null) },
                         label = { Text(strings.agents) },
                         selected = currentRoute == "agents",
                         onClick = { navController.navigate("agents") { launchSingleTop = true } }

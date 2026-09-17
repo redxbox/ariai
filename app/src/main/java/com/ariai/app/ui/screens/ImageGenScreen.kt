@@ -211,7 +211,7 @@ fun ImageGenScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Generating...")
                     } else {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                        Icon(Icons.Default.Star, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(strings.generate)
                     }
