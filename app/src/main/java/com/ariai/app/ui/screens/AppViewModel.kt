@@ -150,90 +150,139 @@ class AppViewModel(
 
     fun sendMessage(content: String, useWebSearch: Boolean = false) {
         val chatId = _currentChatId.value ?: return
-        val provider = providers.value.find { it.id == getCurrentChat()?.providerId } ?: providers.value.firstOrNull()
-        if (provider == null) return
-
-        viewModelScope.launch {
-            val userMessage = ChatMessage(
-                chatId = chatId,
-                role = MessageRole.USER,
-                content = content
-            )
-            repository.saveMessage(userMessage)
-            _messages.value = _messages.value + userMessage
-
-            // Check if web search needed
-            var searchContext: String? = null
-            if (useWebSearch || content.contains(Regex("search|اخبار|جستجو|what's latest|current", RegexOption.IGNORE_CASE))) {
-                val searchProviderKey = searchKeys.value.entries.firstOrNull { it.value.isNotBlank() }
-                if (searchProviderKey != null) {
-                    try {
-                        val sp = SearchProvider(
-                            name = searchProviderKey.key,
-                            type = when (searchProviderKey.key) {
-                                "tavily" -> SearchProviderType.TAVILY
-                                "brave" -> SearchProviderType.BRAVE
-                                "exa" -> SearchProviderType.EXA
-                                "serper" -> SearchProviderType.SERPER
-                                else -> SearchProviderType.CUSTOM
-                            },
-                            apiKey = searchProviderKey.value
-                        )
-                        val result = repository.searchWeb(content, sp)
-                        searchContext = repository.formatSearchForLLM(result)
-                    } catch (e: Exception) {
-                        // Search failed, continue without
-                    }
-                }
-            }
-
-            _isStreaming.value = true
-            _streamingContent.value = ""
-
-            try {
-                val allMessages = _messages.value
-                val systemPrompt = getCurrentChat()?.systemPrompt ?: getAgentSystemPrompt()
-
-                var fullResponse = ""
-                repository.streamChat(
-                    provider = provider,
-                    messages = allMessages,
-                    modelId = getCurrentChat()?.modelId ?: provider.models.firstOrNull()?.id ?: "gpt-4o-mini",
-                    systemPrompt = systemPrompt,
-                    searchContext = searchContext
-                ).collect { chunk ->
-                    fullResponse += chunk
-                    _streamingContent.value = fullResponse
-                }
-
-                val assistantMessage = ChatMessage(
-                    chatId = chatId,
-                    role = MessageRole.ASSISTANT,
-                    content = fullResponse,
-                    modelId = getCurrentChat()?.modelId,
-                    providerId = provider.id
-                )
-                repository.saveMessage(assistantMessage)
-                _messages.value = _messages.value + assistantMessage
-
-                // Auto title generation for first message
-                if (_messages.value.size <= 2) {
-                    updateChatTitle(chatId, content.take(30))
-                }
-
-            } catch (e: Exception) {
+        if (content.isBlank()) return
+        
+        val provider = try {
+            providers.value.find { it.id == getCurrentChat()?.providerId } ?: providers.value.firstOrNull()
+        } catch (e: Exception) {
+            null
+        }
+        
+        if (provider == null) {
+            viewModelScope.launch {
                 val errorMessage = ChatMessage(
                     chatId = chatId,
                     role = MessageRole.ASSISTANT,
-                    content = "❌ Error: ${e.message}\n\nPlease check your API key and provider settings.",
+                    content = "⚠️ No provider configured. Please add a provider in Settings > Providers. Free demo (Pollinations) should be auto-added. If not, add manually: https://text.pollinations.ai/openai",
                     status = MessageStatus.ERROR
                 )
-                repository.saveMessage(errorMessage)
-                _messages.value = _messages.value + errorMessage
-            } finally {
+                try {
+                    repository.saveMessage(errorMessage)
+                    _messages.value = _messages.value + errorMessage
+                } catch (e: Exception) {}
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val userMessage = ChatMessage(
+                    chatId = chatId,
+                    role = MessageRole.USER,
+                    content = content
+                )
+                repository.saveMessage(userMessage)
+                _messages.value = _messages.value + userMessage
+
+                // Check if web search needed
+                var searchContext: String? = null
+                if (useWebSearch || content.contains(Regex("search|اخبار|جستجو|what's latest|current", RegexOption.IGNORE_CASE))) {
+                    val searchProviderKey = searchKeys.value.entries.firstOrNull { it.value.isNotBlank() }
+                    if (searchProviderKey != null) {
+                        try {
+                            val sp = SearchProvider(
+                                name = searchProviderKey.key,
+                                type = when (searchProviderKey.key) {
+                                    "tavily" -> SearchProviderType.TAVILY
+                                    "brave" -> SearchProviderType.BRAVE
+                                    "exa" -> SearchProviderType.EXA
+                                    "serper" -> SearchProviderType.SERPER
+                                    else -> SearchProviderType.CUSTOM
+                                },
+                                apiKey = searchProviderKey.value
+                            )
+                            val result = repository.searchWeb(content, sp)
+                            searchContext = repository.formatSearchForLLM(result)
+                        } catch (e: Exception) {
+                            // Search failed, continue without
+                        }
+                    }
+                }
+
+                _isStreaming.value = true
+                _streamingContent.value = ""
+
+                try {
+                    val allMessages = _messages.value.toList()
+                    val systemPrompt = getCurrentChat()?.systemPrompt ?: getAgentSystemPrompt()
+
+                    var fullResponse = ""
+                    repository.streamChat(
+                        provider = provider,
+                        messages = allMessages,
+                        modelId = getCurrentChat()?.modelId ?: provider.models.firstOrNull()?.id ?: "openai",
+                        systemPrompt = systemPrompt,
+                        searchContext = searchContext
+                    ).collect { chunk ->
+                        fullResponse += chunk
+                        _streamingContent.value = fullResponse
+                    }
+
+                    if (fullResponse.isBlank()) {
+                        throw Exception("Empty response from API")
+                    }
+
+                    val assistantMessage = ChatMessage(
+                        chatId = chatId,
+                        role = MessageRole.ASSISTANT,
+                        content = fullResponse,
+                        modelId = getCurrentChat()?.modelId,
+                        providerId = provider.id
+                    )
+                    repository.saveMessage(assistantMessage)
+                    _messages.value = _messages.value + assistantMessage
+
+                    // Auto title generation for first message
+                    if (_messages.value.size <= 3) {
+                        updateChatTitle(chatId, content.take(30))
+                    }
+
+                } catch (e: Exception) {
+                    val errorMsg = when {
+                        e.message?.contains("API Error 401") == true -> "🔑 Invalid API key. Please check your provider settings.\n\nFor free demo, use Pollinations (no key) or get free Groq key at console.groq.com"
+                        e.message?.contains("API Error 429") == true -> "⏳ Rate limit exceeded. Please wait a moment or try another provider.\n\nFree providers have limits: Groq 14.4K/day, Gemini 1500/day"
+                        e.message?.contains("Unable to resolve host") == true -> "🌐 No internet connection. Please check your network."
+                        else -> "❌ Error: ${e.message?.take(300)}\n\nPlease check your API key and provider settings. Try free demo: Pollinations (no key needed)"
+                    }
+                    
+                    val errorMessage = ChatMessage(
+                        chatId = chatId,
+                        role = MessageRole.ASSISTANT,
+                        content = errorMsg,
+                        status = MessageStatus.ERROR
+                    )
+                    try {
+                        repository.saveMessage(errorMessage)
+                        _messages.value = _messages.value + errorMessage
+                    } catch (e2: Exception) {}
+                } finally {
+                    _isStreaming.value = false
+                    _streamingContent.value = ""
+                }
+            } catch (e: Exception) {
+                // Ultimate crash prevention
                 _isStreaming.value = false
                 _streamingContent.value = ""
             }
+        }
+    }
+
+    fun updateChatProvider(chatId: String, providerId: String, modelId: String) {
+        viewModelScope.launch {
+            try {
+                val chat = repository.getChatById(chatId) ?: return@launch
+                repository.saveChat(chat.copy(providerId = providerId, modelId = modelId))
+            } catch (e: Exception) {}
         }
     }
 

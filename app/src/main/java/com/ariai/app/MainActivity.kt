@@ -3,13 +3,25 @@ package com.ariai.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -17,7 +29,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.ariai.app.data.models.Provider
 import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
 import com.ariai.app.util.LocalStrings
@@ -77,35 +88,99 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
 
     val bottomNavRoutes = listOf("chats", "agents", "imagegen", "settings")
     val showBottomBar = currentRoute in bottomNavRoutes
+    val context = LocalContext.current
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasAudioPermission = isGranted
+    }
 
     Scaffold(
         bottomBar = {
-            if (showBottomBar) {
-                NavigationBar {
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Chat, contentDescription = null) },
-                        label = { Text(strings.chats) },
-                        selected = currentRoute == "chats",
-                        onClick = { navController.navigate("chats") { launchSingleTop = true } }
-                    )
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Face, contentDescription = null) },
-                        label = { Text(strings.agents) },
-                        selected = currentRoute == "agents",
-                        onClick = { navController.navigate("agents") { launchSingleTop = true } }
-                    )
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Image, contentDescription = null) },
-                        label = { Text(strings.imageGen) },
-                        selected = currentRoute == "imagegen",
-                        onClick = { navController.navigate("imagegen") { launchSingleTop = true } }
-                    )
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                        label = { Text(strings.settings) },
-                        selected = currentRoute == "settings",
-                        onClick = { navController.navigate("settings") { launchSingleTop = true } }
-                    )
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
+                // Glassmorphism Bottom Navigation
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding(),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    tonalElevation = 0.dp,
+                    shadowElevation = 12.dp,
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+                                    )
+                                )
+                            )
+                    ) {
+                        NavigationBar(
+                            containerColor = Color.Transparent,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            tonalElevation = 0.dp,
+                            modifier = Modifier.clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        ) {
+                            NavigationBarItem(
+                                icon = { 
+                                    BadgedBox(badge = { if (chats.isNotEmpty()) Badge { Text("${chats.size}") } }) {
+                                        Icon(Icons.Default.Chat, contentDescription = null) 
+                                    }
+                                },
+                                label = { Text(strings.chats) },
+                                selected = currentRoute == "chats",
+                                onClick = { 
+                                    try {
+                                        navController.navigate("chats") { launchSingleTop = true }
+                                    } catch (e: Exception) {}
+                                }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Default.Face, contentDescription = null) },
+                                label = { Text(strings.agents) },
+                                selected = currentRoute == "agents",
+                                onClick = { 
+                                    try {
+                                        navController.navigate("agents") { launchSingleTop = true }
+                                    } catch (e: Exception) {}
+                                }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                label = { Text(strings.imageGen) },
+                                selected = currentRoute == "imagegen",
+                                onClick = { 
+                                    try {
+                                        navController.navigate("imagegen") { launchSingleTop = true }
+                                    } catch (e: Exception) {}
+                                }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                label = { Text(strings.settings) },
+                                selected = currentRoute == "settings",
+                                onClick = { 
+                                    try {
+                                        navController.navigate("settings") { launchSingleTop = true }
+                                    } catch (e: Exception) {}
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -113,27 +188,73 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
         NavHost(
             navController = navController,
             startDestination = if (providers.isEmpty()) "welcome" else "chats",
-            modifier = Modifier.padding(padding)
+            modifier = Modifier.padding(padding),
+            enterTransition = { slideInHorizontally(initialOffsetX = { it / 3 }) + fadeIn() },
+            exitTransition = { slideOutHorizontally(targetOffsetX = { -it / 3 }) + fadeOut() },
+            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it / 3 }) + fadeIn() },
+            popExitTransition = { slideOutHorizontally(targetOffsetX = { it / 3 }) + fadeOut() }
         ) {
             composable("welcome") {
                 WelcomeScreen(
-                    onContinue = { navController.navigate("chats") { popUpTo("welcome") { inclusive = true } } },
-                    onAddProvider = { navController.navigate("add_provider") }
+                    onContinue = { 
+                        try {
+                            navController.navigate("chats") { popUpTo("welcome") { inclusive = true } }
+                        } catch (e: Exception) {}
+                    },
+                    onAddProvider = { 
+                        try {
+                            navController.navigate("add_provider")
+                        } catch (e: Exception) {}
+                    }
                 )
             }
             composable("chats") {
                 ChatListScreen(
                     chats = chats,
                     onChatClick = { chat ->
-                        viewModel.loadChat(chat.id)
-                        navController.navigate("chat/${chat.id}")
+                        try {
+                            viewModel.loadChat(chat.id)
+                            navController.navigate("chat/${chat.id}")
+                        } catch (e: Exception) {}
                     },
                     onNewChat = {
-                        val newId = viewModel.createNewChat()
-                        navController.navigate("chat/$newId")
+                        try {
+                            val newId = viewModel.createNewChat()
+                            navController.navigate("chat/$newId")
+                        } catch (e: Exception) {}
                     },
-                    onDeleteChat = { viewModel.deleteChat(it.id) },
-                    onPinChat = { viewModel.pinChat(it) }
+                    onDeleteChat = { 
+                        try { viewModel.deleteChat(it.id) } catch (e: Exception) {}
+                    },
+                    onPinChat = { 
+                        try { viewModel.pinChat(it) } catch (e: Exception) {}
+                    },
+                    onVoiceClick = {
+                        if (!hasAudioPermission) {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        } else {
+                            try { navController.navigate("voice") } catch (e: Exception) {}
+                        }
+                    }
+                )
+            }
+
+            composable("voice") {
+                VoiceChatScreen(
+                    onBack = { 
+                        try { navController.popBackStack() } catch (e: Exception) {}
+                    },
+                    onSendVoiceMessage = { text ->
+                        try {
+                            // Create new chat with voice input
+                            val newId = viewModel.createNewChat()
+                            viewModel.loadChat(newId)
+                            viewModel.sendMessage(text)
+                            navController.navigate("chat/$newId") {
+                                popUpTo("voice") { inclusive = true }
+                            }
+                        } catch (e: Exception) {}
+                    }
                 )
             }
 
@@ -144,24 +265,35 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                 val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
                 val currentChat = chats.find { it.id == chatId }
 
-                // Load chat when entering
                 LaunchedEffect(chatId) {
-                    viewModel.loadChat(chatId)
+                    try {
+                        viewModel.loadChat(chatId)
+                    } catch (e: Exception) {}
                 }
 
                 ChatScreen(
                     chat = currentChat,
                     messages = messages,
+                    providers = providers,
                     isStreaming = isStreaming,
                     currentStreamingContent = streamingContent,
                     selectedModel = currentChat?.modelId,
                     onSendMessage = { content ->
-                        viewModel.sendMessage(content)
+                        try { viewModel.sendMessage(content) } catch (e: Exception) {}
                     },
-                    onBack = { navController.popBackStack() },
-                    onBranchMessage = { viewModel.branchMessage(it) },
-                    onRegenerate = { viewModel.regenerateMessage(it) },
-                    onCopyMessage = { /* copy to clipboard */ }
+                    onBack = { 
+                        try { navController.popBackStack() } catch (e: Exception) {}
+                    },
+                    onBranchMessage = { 
+                        try { viewModel.branchMessage(it) } catch (e: Exception) {}
+                    },
+                    onRegenerate = { 
+                        try { viewModel.regenerateMessage(it) } catch (e: Exception) {}
+                    },
+                    onCopyMessage = { },
+                    onProviderChange = { providerId, modelId ->
+                        try { viewModel.updateChatProvider(chatId, providerId, modelId) } catch (e: Exception) {}
+                    }
                 )
             }
 
@@ -169,21 +301,31 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                 AgentListScreen(
                     agents = agents,
                     onAgentClick = { agent ->
-                        val newId = viewModel.createNewChat(agentId = agent.id)
-                        navController.navigate("chat/$newId")
+                        try {
+                            val newId = viewModel.createNewChat(agentId = agent.id)
+                            navController.navigate("chat/$newId")
+                        } catch (e: Exception) {}
                     },
-                    onAddAgent = { navController.navigate("add_agent") },
-                    onDeleteAgent = { viewModel.deleteAgent(it.id) }
+                    onAddAgent = { 
+                        try { navController.navigate("add_agent") } catch (e: Exception) {}
+                    },
+                    onDeleteAgent = { 
+                        try { viewModel.deleteAgent(it.id) } catch (e: Exception) {}
+                    }
                 )
             }
 
             composable("add_agent") {
                 AddAgentScreen(
                     onSave = { agent ->
-                        viewModel.saveAgent(agent)
-                        navController.popBackStack()
+                        try {
+                            viewModel.saveAgent(agent)
+                            navController.popBackStack()
+                        } catch (e: Exception) {}
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { 
+                        try { navController.popBackStack() } catch (e: Exception) {}
+                    }
                 )
             }
 
@@ -193,9 +335,11 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                     generatedImages = generatedImages,
                     isGenerating = isGeneratingImage,
                     onGenerate = { prompt, model, size ->
-                        viewModel.generateImage(prompt, model, size)
+                        try { viewModel.generateImage(prompt, model, size) } catch (e: Exception) {}
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { 
+                        try { navController.popBackStack() } catch (e: Exception) {}
+                    }
                 )
             }
 
@@ -205,33 +349,51 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                     currentTheme = theme,
                     dynamicColor = dynamicColor,
                     searchKeys = searchKeys,
-                    onLanguageChange = { viewModel.setLanguage(it) },
-                    onThemeChange = { viewModel.setTheme(it) },
-                    onDynamicColorChange = { viewModel.setDynamicColor(it) },
-                    onSearchKeyChange = { provider, key -> viewModel.setSearchKey(provider, key) },
-                    onProvidersClick = { navController.navigate("providers") }
+                    onLanguageChange = { 
+                        try { viewModel.setLanguage(it) } catch (e: Exception) {}
+                    },
+                    onThemeChange = { 
+                        try { viewModel.setTheme(it) } catch (e: Exception) {}
+                    },
+                    onDynamicColorChange = { 
+                        try { viewModel.setDynamicColor(it) } catch (e: Exception) {}
+                    },
+                    onSearchKeyChange = { provider, key -> 
+                        try { viewModel.setSearchKey(provider, key) } catch (e: Exception) {}
+                    },
+                    onProvidersClick = { 
+                        try { navController.navigate("providers") } catch (e: Exception) {}
+                    }
                 )
             }
 
             composable("providers") {
                 ProviderListScreen(
                     providers = providers,
-                    onAddProvider = { navController.navigate("add_provider") },
-                    onEditProvider = { provider ->
-                        navController.navigate("edit_provider/${provider.id}")
+                    onAddProvider = { 
+                        try { navController.navigate("add_provider") } catch (e: Exception) {}
                     },
-                    onDeleteProvider = { viewModel.deleteProvider(it.id) },
-                    onTestProvider = { /* test */ }
+                    onEditProvider = { provider ->
+                        try { navController.navigate("edit_provider/${provider.id}") } catch (e: Exception) {}
+                    },
+                    onDeleteProvider = { 
+                        try { viewModel.deleteProvider(it.id) } catch (e: Exception) {}
+                    },
+                    onTestProvider = { }
                 )
             }
 
             composable("add_provider") {
                 AddProviderScreen(
                     onSave = { provider ->
-                        viewModel.saveProvider(provider)
-                        navController.popBackStack()
+                        try {
+                            viewModel.saveProvider(provider)
+                            navController.popBackStack()
+                        } catch (e: Exception) {}
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { 
+                        try { navController.popBackStack() } catch (e: Exception) {}
+                    }
                 )
             }
 
@@ -244,17 +406,20 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                 AddProviderScreen(
                     initialProvider = provider,
                     onSave = { updated ->
-                        viewModel.saveProvider(updated)
-                        navController.popBackStack()
+                        try {
+                            viewModel.saveProvider(updated)
+                            navController.popBackStack()
+                        } catch (e: Exception) {}
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { 
+                        try { navController.popBackStack() } catch (e: Exception) {}
+                    }
                 )
             }
         }
     }
 }
 
-// ViewModel Factory
 class AppViewModelFactory(
     private val repository: com.ariai.app.data.repository.ChatRepository,
     private val prefs: com.ariai.app.data.local.PreferencesManager

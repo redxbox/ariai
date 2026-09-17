@@ -33,6 +33,7 @@ fun ChatListScreen(
     onNewChat: () -> Unit,
     onDeleteChat: (Chat) -> Unit,
     onPinChat: (Chat) -> Unit,
+    onVoiceClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val strings = LocalStrings.current
@@ -47,9 +48,19 @@ fun ChatListScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                 ),
                 actions = {
+                    // Voice chat button - glass
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        IconButton(onClick = onVoiceClick, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.Mic, contentDescription = "Voice Chat", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                     IconButton(onClick = { /* search */ }) {
                         Icon(Icons.Default.Search, contentDescription = null)
                     }
