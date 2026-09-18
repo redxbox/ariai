@@ -146,7 +146,7 @@ fun ChatScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    val model = provider.models.firstOrNull()?.id ?: provider.model
+                                    val model = provider.models.firstOrNull()?.id ?: ""
                                     onProviderChange(provider.id, model)
                                     showProviders = false
                                 },
