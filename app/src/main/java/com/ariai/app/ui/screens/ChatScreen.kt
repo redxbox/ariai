@@ -45,6 +45,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var showProviders by remember { mutableStateOf(false) }
+    var showAttachments by remember { mutableStateOf(false) }
 
     LaunchedEffect(messages.size, currentStreamingContent) {
         if (messages.isNotEmpty() || currentStreamingContent.isNotEmpty()) {
@@ -93,36 +94,101 @@ fun ChatScreen(
                 tonalElevation = 3.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp)
-                        .navigationBarsPadding(),
-                    verticalAlignment = androidx.compose.ui.Alignment.Bottom
-                ) {
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        placeholder = { Text(strings.typeMessage) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        maxLines = 5,
-                        enabled = !isStreaming
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    FilledIconButton(
-                        onClick = {
-                            if (inputText.isNotBlank()) {
-                                onSendMessage(inputText)
-                                inputText = ""
+                Column {
+                    if (showAttachments) {
+                        // Attachment options - inspired by RikkaHub screenshots
+                        Surface(
+                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    AttachmentOption(icon = Icons.Default.UploadFile, label = "Upload File", onClick = { showAttachments = false })
+                                    AttachmentOption(icon = Icons.Default.Image, label = "Photo", onClick = { showAttachments = false })
+                                    AttachmentOption(icon = Icons.Default.PhotoCamera, label = "Take Picture", onClick = { showAttachments = false })
+                                }
+                                Divider()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MaterialTheme.colorScheme.surface,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { showAttachments = false }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Icon(Icons.Default.Extension, contentDescription = null)
+                                            Text("Extensions", style = MaterialTheme.typography.titleSmall)
+                                        }
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MaterialTheme.colorScheme.surface,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { showAttachments = false }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Icon(Icons.Default.Compress, contentDescription = null)
+                                            Text("Compress History", style = MaterialTheme.typography.titleSmall)
+                                        }
+                                    }
+                                }
                             }
-                        },
-                        enabled = inputText.isNotBlank() && !isStreaming
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                            .navigationBarsPadding(),
+                        verticalAlignment = androidx.compose.ui.Alignment.Bottom
                     ) {
-                        Icon(
-                            if (isStreaming) Icons.Default.Stop else Icons.Default.Send,
-                            contentDescription = strings.send
+                        IconButton(onClick = { showAttachments = !showAttachments }) {
+                            Icon(Icons.Default.Add, contentDescription = "Attachments")
+                        }
+                        OutlinedTextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            placeholder = { Text(strings.typeMessage) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(24.dp),
+                            maxLines = 5,
+                            enabled = !isStreaming
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        FilledIconButton(
+                            onClick = {
+                                if (inputText.isNotBlank()) {
+                                    onSendMessage(inputText)
+                                    inputText = ""
+                                }
+                            },
+                            enabled = inputText.isNotBlank() && !isStreaming
+                        ) {
+                            Icon(
+                                if (isStreaming) Icons.Default.Stop else Icons.Default.Send,
+                                contentDescription = strings.send
+                            )
+                        }
                     }
                 }
             }
@@ -225,6 +291,31 @@ fun ChatScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun AttachmentOption(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.size(56.dp)
+        ) {
+            Box(contentAlignment = androidx.compose.ui.Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(icon, contentDescription = label, modifier = Modifier.size(24.dp))
+            }
+        }
+        Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
 
