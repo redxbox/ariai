@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
+import com.ariai.app.data.models.Provider
 import com.ariai.app.ui.components.MessageBubble
 import com.ariai.app.util.LocalStrings
 import kotlinx.coroutines.launch
@@ -27,11 +28,16 @@ fun ChatScreen(
     isStreaming: Boolean,
     currentStreamingContent: String,
     selectedModel: String?,
+    providers: List<Provider> = emptyList(),
     onSendMessage: (String) -> Unit,
     onBack: () -> Unit,
     onBranchMessage: (ChatMessage) -> Unit,
     onRegenerate: (ChatMessage) -> Unit,
     onCopyMessage: (String) -> Unit,
+    onProviderChange: (String, String) -> Unit = { _, _ -> },
+    onVoiceClick: () -> Unit = {},
+    voiceManager: com.ariai.app.util.VoiceManager? = null,
+    hasAudioPermission: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val strings = LocalStrings.current
@@ -72,8 +78,8 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* settings */ }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    IconButton(onClick = onVoiceClick) {
+                        Icon(Icons.Default.Mic, contentDescription = "Voice")
                     }
                 }
             )
@@ -200,7 +206,6 @@ fun MessageItem(
     modifier: Modifier = Modifier
 ) {
     val strings = LocalStrings.current
-    var showActions by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         MessageBubble(
