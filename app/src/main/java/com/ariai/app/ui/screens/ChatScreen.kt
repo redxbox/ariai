@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.Chat
@@ -44,6 +43,7 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    var showProviders by remember { mutableStateOf(false) }
 
     LaunchedEffect(messages.size, currentStreamingContent) {
         if (messages.isNotEmpty() || currentStreamingContent.isNotEmpty()) {
@@ -78,6 +78,9 @@ fun ChatScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showProviders = !showProviders }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Provider")
+                    }
                     IconButton(onClick = onVoiceClick) {
                         Icon(Icons.Default.Mic, contentDescription = "Voice")
                     }
@@ -94,7 +97,7 @@ fun ChatScreen(
                         .fillMaxWidth()
                         .padding(12.dp)
                         .navigationBarsPadding(),
-                    verticalAlignment = Alignment.Bottom
+                    verticalAlignment = androidx.compose.ui.Alignment.Bottom
                 ) {
                     OutlinedTextField(
                         value = inputText,
@@ -124,72 +127,81 @@ fun ChatScreen(
             }
         }
     ) { padding ->
-        LazyColumn(
-            state = listState,
-            modifier = modifier
+        Column(
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(padding)
         ) {
-            if (messages.isEmpty() && currentStreamingContent.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 100.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = "🤖",
-                                style = MaterialTheme.typography.displayLarge
-                            )
-                            Text(
-                                text = strings.welcomeTitle,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            Text(
-                                text = "Ask anything, attach images, search web, generate images",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            SuggestionChips(
-                                onSuggestionClick = { suggestion ->
-                                    inputText = suggestion
-                                }
-                            )
-                        }
+            if (showProviders) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Providers:", style = MaterialTheme.typography.titleSmall)
+                    providers.forEach { provider ->
+                        Text(provider.name, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
 
-            items(messages, key = { it.id }) { message ->
-                MessageItem(
-                    message = message,
-                    onBranch = { onBranchMessage(message) },
-                    onRegenerate = { onRegenerate(message) },
-                    onCopy = { onCopyMessage(message.content) }
-                )
-            }
-
-            if (currentStreamingContent.isNotEmpty()) {
-                item {
-                    MessageBubble(
-                        content = currentStreamingContent,
-                        isUser = false,
-                        modelName = selectedModel
-                    )
-                    if (isStreaming) {
-                        LinearProgressIndicator(
+            LazyColumn(
+                state = listState,
+                modifier = modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (messages.isEmpty() && currentStreamingContent.isEmpty()) {
+                    item {
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 8.dp)
+                                .padding(top = 100.dp),
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = "🤖",
+                                    style = MaterialTheme.typography.displayLarge
+                                )
+                                Text(
+                                    text = strings.welcomeTitle,
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                        }
+                    }
+                }
+
+                items(messages, key = { it.id }) { message ->
+                    MessageItem(
+                        message = message,
+                        onBranch = { onBranchMessage(message) },
+                        onRegenerate = { onRegenerate(message) },
+                        onCopy = { onCopyMessage(message.content) }
+                    )
+                }
+
+                if (currentStreamingContent.isNotEmpty()) {
+                    item {
+                        MessageBubble(
+                            content = currentStreamingContent,
+                            isUser = false,
+                            modelName = selectedModel
                         )
+                        if (isStreaming) {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -263,13 +275,11 @@ fun SuggestionChips(
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
     ) {
         val suggestions = listOf(
             "Explain quantum computing simply",
-            "Write a Python function to sort list",
-            "Search latest AI news",
-            "Generate image of futuristic city"
+            "Write a Python function"
         )
         suggestions.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
