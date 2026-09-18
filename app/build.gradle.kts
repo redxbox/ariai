@@ -13,8 +13,8 @@ android {
         applicationId = "com.ariai.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "2.1.0-premium"
+        versionCode = 4
+        versionName = "2.2.1-stable"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
