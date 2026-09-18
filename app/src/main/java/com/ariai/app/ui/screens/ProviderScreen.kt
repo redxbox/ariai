@@ -82,7 +82,11 @@ fun ProviderListScreen(
                 )
             }
 
-            items(freeProviders.filter { it.isRecommended }) { freeProvider ->
+            items(
+                count = freeProviders.filter { it.isRecommended }.size,
+                key = { index -> "free_rec_${freeProviders.filter { it.isRecommended }[index].id}_$index" }
+            ) { index ->
+                val freeProvider = freeProviders.filter { it.isRecommended }[index]
                 FreeProviderCard(
                     freeProvider = freeProvider,
                     isConfigured = providers.any { it.baseUrl.contains(freeProvider.baseUrl.take(20)) || it.name == freeProvider.name },
@@ -116,7 +120,11 @@ fun ProviderListScreen(
                 }
             }
 
-            items(freeProviders.filter { !it.isRecommended }) { freeProvider ->
+            items(
+                count = freeProviders.filter { !it.isRecommended }.size,
+                key = { index -> "free_compact_${freeProviders.filter { !it.isRecommended }[index].id}_$index" }
+            ) { index ->
+                val freeProvider = freeProviders.filter { !it.isRecommended }[index]
                 CompactFreeProviderCard(
                     freeProvider = freeProvider,
                     isConfigured = providers.any { it.name == freeProvider.name },
@@ -187,7 +195,11 @@ fun ProviderListScreen(
                 }
             }
 
-            items(providers, key = { it.id }) { provider ->
+            items(
+                count = providers.size,
+                key = { index -> "${providers[index].id}_${providers[index].createdAt}_$index" }
+            ) { index ->
+                val provider = providers[index]
                 PremiumProviderCard(
                     provider = provider,
                     onEdit = { onEditProvider(provider) },

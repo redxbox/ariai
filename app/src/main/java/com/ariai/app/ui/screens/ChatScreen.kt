@@ -194,7 +194,11 @@ fun ChatScreen(
                     }
                 }
 
-                items(messages, key = { it.id }) { message ->
+                items(
+                    count = messages.size,
+                    key = { index -> "${messages[index].id}_${messages[index].timestamp}_$index" }
+                ) { index ->
+                    val message = messages[index]
                     MessageItem(
                         message = message,
                         onBranch = { onBranchMessage(message) },

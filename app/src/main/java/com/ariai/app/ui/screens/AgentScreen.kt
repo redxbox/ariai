@@ -48,7 +48,11 @@ fun AgentListScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(agents, key = { it.id }) { agent ->
+            items(
+                count = agents.size,
+                key = { index -> "${agents[index].id}_${agents[index].hashCode()}_$index" }
+            ) { index ->
+                val agent = agents[index]
                 AgentCard(
                     agent = agent,
                     onClick = { onAgentClick(agent) },

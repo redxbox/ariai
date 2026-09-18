@@ -153,7 +153,11 @@ fun ChatListScreen(
                             Text("Pinned", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    items(pinned, key = { it.id }) { chat ->
+                    items(
+                        count = pinned.size,
+                        key = { index -> "${pinned[index].id}_${pinned[index].updatedAt}_pinned_$index" }
+                    ) { index ->
+                        val chat = pinned[index]
                         ChatItem(
                             chat = chat,
                             onClick = { onChatClick(chat) },
@@ -167,7 +171,11 @@ fun ChatListScreen(
                     }
                 }
 
-                items(unpinned, key = { it.id }) { chat ->
+                items(
+                    count = unpinned.size,
+                    key = { index -> "${unpinned[index].id}_${unpinned[index].updatedAt}_$index" }
+                ) { index ->
+                    val chat = unpinned[index]
                     ChatItem(
                         chat = chat,
                         onClick = { onChatClick(chat) },
