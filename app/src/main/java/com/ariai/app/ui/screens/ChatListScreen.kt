@@ -1,6 +1,5 @@
 package com.ariai.app.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -33,28 +32,38 @@ fun ChatListScreen(
     onNewChat: () -> Unit,
     onDeleteChat: (Chat) -> Unit,
     onPinChat: (Chat) -> Unit,
+    onVoiceClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val strings = LocalStrings.current
     
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { 
-                    Column {
-                        Text(strings.chats, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text("${chats.size} conversations", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                tonalElevation = 0.dp,
+                shadowElevation = 2.dp
+            ) {
+                TopAppBar(
+                    title = { 
+                        Column {
+                            Text(strings.chats, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                            Text("${chats.size} conversations", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
+                    ),
+                    actions = {
+                        IconButton(onClick = onVoiceClick) {
+                            Icon(Icons.Default.Mic, contentDescription = "Voice", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = { /* search */ }) {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                actions = {
-                    IconButton(onClick = { /* search */ }) {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                    }
-                }
-            )
+                )
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -134,7 +143,6 @@ fun ChatListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Pinned chats first
                 val pinned = chats.filter { it.isPinned }
                 val unpinned = chats.filter { !it.isPinned }
                 
