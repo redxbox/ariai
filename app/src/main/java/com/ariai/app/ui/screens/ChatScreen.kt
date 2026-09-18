@@ -1,5 +1,6 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -141,7 +142,21 @@ fun ChatScreen(
                 ) {
                     Text("Providers:", style = MaterialTheme.typography.titleSmall)
                     providers.forEach { provider ->
-                        Text(provider.name, style = MaterialTheme.typography.bodySmall)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val model = provider.models.firstOrNull()?.id ?: provider.model
+                                    onProviderChange(provider.id, model)
+                                    showProviders = false
+                                },
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(provider.name, style = MaterialTheme.typography.titleMedium)
+                                Text(provider.baseUrl.take(40), style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                 }
             }
