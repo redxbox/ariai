@@ -153,17 +153,8 @@ class ChatRepository(
         searchContext: String? = null
     ) = aiClient.chatCompletionStream(provider, messages, modelId, systemPrompt, temperature, searchContext != null, searchContext)
 
-    suspend fun generateImage(provider: Provider, request: ImageGenRequest) = try {
+    suspend fun generateImage(provider: Provider, request: ImageGenRequest) = 
         aiClient.generateImage(provider, request)
-    } catch (e: Exception) {
-        // Fallback to Pollinations
-        val encodedPrompt = java.net.URLEncoder.encode(request.prompt, "UTF-8")
-        val imageUrl = "https://image.pollinations.ai/prompt/$encodedPrompt?width=1024&height=1024&model=flux&nologo=true"
-        ImageGenResponse(
-            images = listOf(GeneratedImage(url = imageUrl, revisedPrompt = request.prompt)),
-            model = "pollinations-fallback"
-        )
-    }
 
     suspend fun searchWeb(query: String, searchProvider: SearchProvider): SearchResponse = try {
         searchClient.search(query, searchProvider)
@@ -191,7 +182,7 @@ class ChatRepository(
             createdAt = createdAt
         )
     } catch (e: Exception) {
-        Provider(id = id, name = name.ifBlank { "Unknown" }, type = ProviderType.OPENAI_COMPATIBLE, baseUrl = baseUrl.ifBlank { "https://text.pollinations.ai/openai" }, apiKey = apiKey)
+        Provider(id = id, name = name.ifBlank { "Unknown" }, type = ProviderType.OPENAI_COMPATIBLE, baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" }, apiKey = apiKey)
     }
 
     private fun Provider.toEntity() = ProviderEntity(

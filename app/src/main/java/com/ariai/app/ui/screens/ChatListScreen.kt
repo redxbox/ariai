@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,31 +38,22 @@ fun ChatListScreen(
     
     Scaffold(
         topBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                tonalElevation = 0.dp,
-                shadowElevation = 2.dp
-            ) {
-                TopAppBar(
-                    title = { 
-                        Column {
-                            Text(strings.chats, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                            Text("${chats.size} conversations", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    ),
-                    actions = {
-                        IconButton(onClick = onVoiceClick) {
-                            Icon(Icons.Default.Mic, contentDescription = "Voice", tint = MaterialTheme.colorScheme.primary)
-                        }
-                        IconButton(onClick = { /* search */ }) {
-                            Icon(Icons.Default.Search, contentDescription = null)
-                        }
+            TopAppBar(
+                title = { 
+                    Text("Chats", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                },
+                actions = {
+                    IconButton(onClick = onVoiceClick) {
+                        Icon(Icons.Default.Mic, contentDescription = "Voice", tint = MaterialTheme.colorScheme.primary)
                     }
-                )
-            }
+                    IconButton(onClick = { }) {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    }
+                    IconButton(onClick = { }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = null)
+                    }
+                }
+            )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -77,62 +67,118 @@ fun ChatListScreen(
         }
     ) { padding ->
         if (chats.isEmpty()) {
-            Box(
+            // Glass home empty - Good morning design
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentAlignment = Alignment.Center
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(32.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("💬", style = MaterialTheme.typography.displayMedium)
+                        Text(
+                            "Good morning",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "What shall we explore today?",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    Text(
-                        text = strings.noChats,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = strings.addFirstProvider,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                item {
+                    // Glass ask anything input
                     Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF00C853).copy(alpha = 0.1f))
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("🎉", style = MaterialTheme.typography.titleMedium)
-                            Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                "Free demo ready! Tap New Chat to start",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF00C853),
-                                fontWeight = FontWeight.Medium
+                                "Ask anything...",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Icon(Icons.Default.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Icon(Icons.Default.Mic, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFF6C4DFF),
+                                    modifier = Modifier.size(40.dp).clickable { onNewChat() }
+                                ) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.White)
+                                    }
+                                }
+                            }
                         }
                     }
+                }
+
+                item {
+                    // Glass triangles Explain / Write / Code
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        GlassActionCard(
+                            title = "Explain",
+                            icon = Icons.Default.Lightbulb,
+                            colors = listOf(Color(0xFFE0E0E0), Color(0xFFF5F5F5)),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNewChat
+                        )
+                        GlassActionCard(
+                            title = "Write",
+                            icon = Icons.Default.Edit,
+                            colors = listOf(Color(0xFF6C4DFF), Color(0xFF8B5CF6)),
+                            isPrimary = true,
+                            modifier = Modifier.weight(1f),
+                            onClick = onNewChat
+                        )
+                        GlassActionCard(
+                            title = "Code",
+                            icon = Icons.Default.Code,
+                            colors = listOf(Color(0xFFE0E0E0), Color(0xFFF5F5F5)),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNewChat
+                        )
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        GlassSmallCard(title = "Quick Chat", subtitle = "Start a new conversation", icon = Icons.Default.Chat, modifier = Modifier.weight(1f), onClick = onNewChat)
+                        GlassSmallCard(title = "Choose a Model", subtitle = "Find the best AI for your task", icon = Icons.Default.Category, modifier = Modifier.weight(1f), onClick = onNewChat)
+                        GlassSmallCard(title = "Explore Tools", subtitle = "Unlock more possibilities", icon = Icons.Default.Apps, modifier = Modifier.weight(1f), onClick = onNewChat)
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(80.dp))
                 }
             }
         } else {
@@ -158,7 +204,7 @@ fun ChatListScreen(
                         key = { index -> "${pinned[index].id}_${pinned[index].updatedAt}_pinned_$index" }
                     ) { index ->
                         val chat = pinned[index]
-                        ChatItem(
+                        GlassChatItem(
                             chat = chat,
                             onClick = { onChatClick(chat) },
                             onDelete = { onDeleteChat(chat) },
@@ -167,7 +213,11 @@ fun ChatListScreen(
                     }
                     item {
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
-                        Text("Recent", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Today", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    item {
+                        Text("Today", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -176,7 +226,7 @@ fun ChatListScreen(
                     key = { index -> "${unpinned[index].id}_${unpinned[index].updatedAt}_$index" }
                 ) { index ->
                     val chat = unpinned[index]
-                    ChatItem(
+                    GlassChatItem(
                         chat = chat,
                         onClick = { onChatClick(chat) },
                         onDelete = { onDeleteChat(chat) },
@@ -192,9 +242,71 @@ fun ChatListScreen(
     }
 }
 
+@Composable
+fun GlassActionCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    colors: List<Color>,
+    isPrimary: Boolean = false,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPrimary) Color(0xFF6C4DFF) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = if (isPrimary) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(icon, contentDescription = null, tint = if (isPrimary) Color.White else MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = if (isPrimary) Color.White else MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+@Composable
+fun GlassSmallCard(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatItem(
+fun GlassChatItem(
     chat: Chat,
     onClick: () -> Unit,
     onDelete: () -> Unit,
@@ -209,11 +321,9 @@ fun ChatItem(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (chat.isPinned) 
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) 
-            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (chat.isPinned) 2.dp else 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -223,93 +333,54 @@ fun ChatItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(
-                        if (chat.isPinned) Brush.linearGradient(listOf(Color(0xFFFFD700), Color(0xFFFFA000)))
-                        else Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f)))
+                        Brush.linearGradient(listOf(Color(0xFF6C4DFF).copy(alpha = 0.8f), Color(0xFF00D4AA).copy(alpha = 0.8f)))
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (chat.isPinned) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                } else {
-                    Text(
-                        chat.title.firstOrNull()?.uppercase() ?: "C",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    chat.title.firstOrNull()?.uppercase() ?: "C",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
             }
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = chat.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (chat.isPinned) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFFFD700).copy(alpha = 0.2f)) {
-                            Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(12.dp).padding(2.dp), tint = Color(0xFFB8860B))
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    chat.modelId?.let {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                        ) {
-                            Text(
-                                text = it.take(18),
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                    Text(
-                        text = formatTime(chat.updatedAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (chat.agentId != null) {
-                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer) {
-                            Text("🤖", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(2.dp))
-                        }
-                    }
-                }
+                Text(
+                    text = chat.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${chat.modelId?.take(20) ?: \"Chat\"} • ${formatTime(chat.updatedAt)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
             }
+            Text(
+                formatTime(chat.updatedAt),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Box {
-                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More", modifier = Modifier.size(18.dp))
+                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(16.dp))
                 }
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
-                ) {
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(
                         text = { Text(if (chat.isPinned) "Unpin" else "Pin") },
-                        onClick = {
-                            showMenu = false
-                            onPin()
-                        },
+                        onClick = { showMenu = false; onPin() },
                         leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) }
                     )
                     DropdownMenuItem(
                         text = { Text("Delete") },
-                        onClick = {
-                            showMenu = false
-                            onDelete()
-                        },
+                        onClick = { showMenu = false; onDelete() },
                         leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) }
                     )
                 }

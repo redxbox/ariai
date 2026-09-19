@@ -140,7 +140,7 @@ class AppViewModel(
                 val errorMessage = ChatMessage(
                     chatId = chatId,
                     role = MessageRole.ASSISTANT,
-                    content = "⚠️ No provider configured. Please add a provider in Settings > Providers. Free demo (Pollinations) should be auto-added. If not, add manually: https://text.pollinations.ai/openai",
+                    content = "⚠️ No provider configured. Please add a provider in Settings > AI Providers.\n\nTap Settings and add your API key for OpenAI, Gemini, Groq, Anthropic, etc.",
                     status = MessageStatus.ERROR
                 )
                 try {
@@ -226,10 +226,10 @@ class AppViewModel(
 
                 } catch (e: Exception) {
                     val errorMsg = when {
-                        e.message?.contains("API Error 401") == true -> "🔑 Invalid API key. Please check your provider settings.\n\nFor free demo, use Pollinations (no key) or get free Groq key at console.groq.com"
-                        e.message?.contains("API Error 429") == true -> "⏳ Rate limit exceeded. Please wait a moment or try another provider.\n\nFree providers have limits: Groq 14.4K/day, Gemini 1500/day"
+                        e.message?.contains("API Error 401") == true -> "🔑 Invalid API key. Please check your provider settings in AI Providers."
+                        e.message?.contains("API Error 429") == true -> "⏳ Rate limit exceeded. Please wait a moment or try another provider."
                         e.message?.contains("Unable to resolve host") == true -> "🌐 No internet connection. Please check your network."
-                        else -> "❌ Error: ${e.message?.take(300)}\n\nPlease check your API key and provider settings. Try free demo: Pollinations (no key needed)"
+                        else -> "❌ Error: ${e.message?.take(300)}\n\nPlease check your API key and provider settings."
                     }
                     
                     val errorMessage = ChatMessage(

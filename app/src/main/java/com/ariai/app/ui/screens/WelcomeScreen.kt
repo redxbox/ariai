@@ -100,10 +100,10 @@ fun WelcomeScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         FeatureRow(icon = Icons.Default.Cloud, title = "Multi-Provider", desc = "OpenAI, Gemini, Claude, Groq, Ollama, 200+ models")
                         FeatureRow(icon = Icons.Default.Search, title = "Real Web Search", desc = "Tavily, Brave, Exa, Serper - live internet")
-                        FeatureRow(icon = Icons.Default.Image, title = "Image Generation", desc = "DALL·E 3, Imagen 3, Flux, Pollinations free")
+                        FeatureRow(icon = Icons.Default.Image, title = "Image Generation", desc = "DALL·E 3, Imagen 3, Flux - premium")
                         FeatureRow(icon = Icons.Default.Face, title = "Custom Agents", desc = "Create personas with tools & memory")
                         FeatureRow(icon = Icons.Default.Language, title = "6 Languages", desc = "English, Persian, Arabic, Turkish, German, French")
-                        FeatureRow(icon = Icons.Default.Palette, title = "Material You", desc = "Dynamic colors, dark/light, smooth animations")
+                        FeatureRow(icon = Icons.Default.Palette, title = "Glass Design", desc = "Premium glassmorphism, dynamic colors")
                     }
                 }
             }
@@ -111,22 +111,22 @@ fun WelcomeScreen(
             item {
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF00C853).copy(alpha = 0.1f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(shape = CircleShape, color = Color(0xFF00C853).copy(alpha = 0.2f), modifier = Modifier.size(40.dp)) {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), modifier = Modifier.size(40.dp)) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Text("🎉", style = MaterialTheme.typography.titleLarge)
+                                Text("✨", style = MaterialTheme.typography.titleLarge)
                             }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Free Demo Available!", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color(0xFF00C853))
-                            Text("Pollinations & LLM7 work with no API key. Groq & Gemini have generous free tiers.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Premium BYO Experience", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text("Bring your own API keys. Glass design, smooth animations, professional.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

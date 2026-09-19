@@ -69,7 +69,7 @@ fun ImageGenScreen(
                         Text("🎨 AI Image Generation", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Generate images with DALL·E 3, Imagen 3, Flux, Pollinations free, etc.",
+                            "Generate images with DALL·E 3, Imagen 3, Flux - premium glass design",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
