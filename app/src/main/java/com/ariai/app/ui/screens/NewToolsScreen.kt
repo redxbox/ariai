@@ -22,19 +22,17 @@ fun NewToolsScreen(
     onToolClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.fillMaxSize().background(Color(0xFFF5F7FF))
-    ) {
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF5F7FF))) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.9f)),
                     title = {
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Ari", color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium)
-                                Text("AI", color = Color(0xFF6C4DFF), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium)
+                                Text("Ari", color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                                Text("AI", color = Color(0xFF6C4DFF), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                             }
                             Text("Smarter Tools. Real Results.", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
                         }
@@ -68,35 +66,34 @@ fun NewToolsScreen(
                         Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp) {
                             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("All Tools", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
-                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("All Tools", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, color = Color.Black)
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Black)
                             }
                         }
                     }
                 }
 
-                // Grid of tools
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                            ToolCardLight(title = "Summarize", desc = "Turn long content\ninto clear summaries.", icon = "📄", bg = Color(0xFFE8E0FF), modifier = Modifier.weight(1f), onClick = { onToolClick("Summarize") })
-                            ToolCardLight(title = "Write", desc = "Create articles, emails,\nideas and more.", icon = "✏️", bg = Color(0xFFD6E4FF), modifier = Modifier.weight(1f), onClick = { onToolClick("Write") })
+                            ToolCard(title = "Summarize", desc = "Turn long content\ninto clear summaries.", icon = "📄", bg = Color(0xFFE8E0FF), modifier = Modifier.weight(1f), onClick = { onToolClick("Summarize") })
+                            ToolCard(title = "Write", desc = "Create articles, emails,\nideas and more.", icon = "✏️", bg = Color(0xFFD6E4FF), modifier = Modifier.weight(1f), onClick = { onToolClick("Write") })
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                            ToolCardLight(title = "Code", desc = "Build, debug,\nexplain code.", icon = "</>", bg = Color(0xFFD1F5E0), modifier = Modifier.weight(1f), onClick = { onToolClick("Code") })
-                            ToolCardLight(title = "Generate Image", desc = "Create images from\ntext descriptions.", icon = "🖼️", bg = Color(0xFFFFD6E0), modifier = Modifier.weight(1f), onClick = { onToolClick("Generate Image") })
+                            ToolCard(title = "Code", desc = "Build, debug,\nexplain code.", icon = "💻", bg = Color(0xFFD1F5E0), modifier = Modifier.weight(1f), onClick = { onToolClick("Code") })
+                            ToolCard(title = "Generate Image", desc = "Create images from\ntext descriptions.", icon = "🎨", bg = Color(0xFFFFD6E0), modifier = Modifier.weight(1f), onClick = { onToolClick("Generate Image") })
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                            ToolCardLight(title = "Analyze File", desc = "Understand PDFs,\nDocs, spreadsheets.", icon = "📁", bg = Color(0xFFFFE8B5), modifier = Modifier.weight(1f), onClick = { onToolClick("Analyze File") })
-                            ToolCardLight(title = "Web Search", desc = "Get real-time\ninformation from the web.", icon = "🌐", bg = Color(0xFFD6D6FF), modifier = Modifier.weight(1f), onClick = { onToolClick("Web Search") })
+                            ToolCard(title = "Analyze File", desc = "Understand PDFs,\nDocs, spreadsheets.", icon = "📁", bg = Color(0xFFFFE8B5), modifier = Modifier.weight(1f), onClick = { onToolClick("Analyze File") })
+                            ToolCard(title = "Web Search", desc = "Get real-time\ninformation from the web.", icon = "🌐", bg = Color(0xFFD6D6FF), modifier = Modifier.weight(1f), onClick = { onToolClick("Web Search") })
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                            ToolCardLight(title = "Voice", desc = "Speak, transcribe,\nand get answers.", icon = "🎤", bg = Color(0xFFC5F0E0), modifier = Modifier.weight(1f), onClick = { onToolClick("Voice") })
-                            ToolCardLight(title = "Analyze Video", desc = "Understand and\nsummarize videos.", icon = "🎬", bg = Color(0xFFFFD6F0), modifier = Modifier.weight(1f), onClick = { onToolClick("Analyze Video") })
+                            ToolCard(title = "Voice", desc = "Speak, transcribe,\nand get answers.", icon = "🎤", bg = Color(0xFFC5F0E0), modifier = Modifier.weight(1f), onClick = { onToolClick("Voice") })
+                            ToolCard(title = "Analyze Video", desc = "Understand and\nsummarize videos.", icon = "🎬", bg = Color(0xFFFFD6F0), modifier = Modifier.weight(1f), onClick = { onToolClick("Analyze Video") })
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                            ToolCardLight(title = "Translate", desc = "Translate text\nbetween languages.", icon = "A文", bg = Color(0xFFD6E8FF), modifier = Modifier.weight(1f), onClick = { onToolClick("Translate") })
-                            ToolCardLight(title = "Analyze Data", desc = "Find insights in\nyour data.", icon = "📊", bg = Color(0xFFFFD6C0), modifier = Modifier.weight(1f), onClick = { onToolClick("Analyze Data") })
+                            ToolCard(title = "Translate", desc = "Translate text\nbetween languages.", icon = "🌐", bg = Color(0xFFD6E8FF), modifier = Modifier.weight(1f), onClick = { onToolClick("Translate") })
+                            ToolCard(title = "Analyze Data", desc = "Find insights in\nyour data.", icon = "📊", bg = Color(0xFFFFD6C0), modifier = Modifier.weight(1f), onClick = { onToolClick("Analyze Data") })
                         }
                     }
                 }
@@ -113,12 +110,7 @@ fun NewToolsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
-                                Box(
-                                    modifier = Modifier.size(48.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("✨", style = MaterialTheme.typography.titleLarge)
-                                }
+                                Text("✨", style = MaterialTheme.typography.titleLarge)
                                 Column {
                                     Text("More tools coming soon", fontWeight = FontWeight.Bold, color = Color.Black)
                                     Text("We're constantly adding new capabilities.", style = MaterialTheme.typography.labelSmall, color = Color.Black.copy(alpha = 0.6f))
@@ -135,14 +127,14 @@ fun NewToolsScreen(
                     }
                 }
 
-                item { Spacer(modifier = Modifier.height(80.dp)) }
+                item { Spacer(modifier = Modifier.height(20.dp)) }
             }
         }
     }
 }
 
 @Composable
-fun ToolCardLight(title: String, desc: String, icon: String, bg: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun ToolCard(title: String, desc: String, icon: String, bg: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -161,8 +153,8 @@ fun ToolCardLight(title: String, desc: String, icon: String, bg: Color, modifier
                     }
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(title, fontWeight = FontWeight.Bold, color = Color.Black, style = MaterialTheme.typography.titleSmall)
-                    Text(desc, style = MaterialTheme.typography.labelSmall, color = Color.Black.copy(alpha = 0.6f))
+                    Text(title, fontWeight = FontWeight.Bold, color = Color.Black, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    Text(desc, style = MaterialTheme.typography.labelSmall, color = Color.Black.copy(alpha = 0.6f), maxLines = 2)
                 }
             }
             Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFF0F0FF), modifier = Modifier.size(32.dp)) {

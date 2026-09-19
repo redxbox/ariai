@@ -28,311 +28,235 @@ fun HomeScreen(
     onNewChat: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Dark background like screenshot - deep navy with purple waves
+    // Light glass theme - consistent across all pages
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF0A0A1E),
-                        Color(0xFF121230),
-                        Color(0xFF0A0A1E)
+                        Color(0xFFF8F9FF),
+                        Color(0xFFEFF1FF),
+                        Color(0xFFF5F7FF)
                     )
                 )
             )
     ) {
-        // Purple wave decorations
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            Color(0xFF6C4DFF).copy(alpha = 0.15f),
-                            Color(0xFF00D4FF).copy(alpha = 0.1f),
-                            Color(0xFF6C4DFF).copy(alpha = 0.15f)
-                        )
-                    )
-                )
-        )
-
-        Row(modifier = Modifier.fillMaxSize()) {
-            // Left sidebar - dark glass
-            Card(
-                shape = RoundedCornerShape(0.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F2A).copy(alpha = 0.9f)),
-                modifier = Modifier.width(200.dp).fillMaxHeight()
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            item {
+                // Top bar - AriAI logo + search + more
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                        // Logo
-                        Column {
-                            Text(
-                                "AriAI",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                "Think freely.\nGo beyond.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.6f),
-                                lineHeight = 14.sp
-                            )
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Ari", color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium, fontSize = 28.sp)
+                            Text("AI", color = Color(0xFF6C4DFF), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium, fontSize = 28.sp)
                         }
-
-                        // Navigation
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SidebarItem(icon = Icons.Default.Home, label = "Home", selected = true, onClick = {})
-                            SidebarItem(icon = Icons.Default.Chat, label = "Chat", onClick = onNavigateToChat)
-                            SidebarItem(icon = Icons.Default.ViewInAr, label = "Providers", onClick = onNavigateToProviders)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            SidebarItem(icon = Icons.Default.Apps, label = "Tools", onClick = onNavigateToTools)
-                            SidebarItem(icon = Icons.Default.Folder, label = "Library", onClick = {})
-                            SidebarItem(icon = Icons.Default.Settings, label = "Settings", onClick = onNavigateToSettings)
-                        }
+                        Text("Think freely.\nGo beyond.", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall, lineHeight = 14.sp)
                     }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        // Crystal pyramid decoration
-                        Box(
-                            modifier = Modifier.size(80.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🔷", style = MaterialTheme.typography.displayMedium)
-                        }
-                        Text(
-                            "A Smarter\nYou\nEvery Day.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.5f),
-                            lineHeight = 16.sp
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { }.padding(vertical = 8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Surface(shape = CircleShape, color = Color.White, shadowElevation = 2.dp, modifier = Modifier.size(44.dp)) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(Icons.Default.Search, contentDescription = null, tint = Color.Black.copy(alpha = 0.7f))
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("My Account", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                        }
+                        Surface(shape = CircleShape, color = Color.White, shadowElevation = 2.dp, modifier = Modifier.size(44.dp)) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.Black.copy(alpha = 0.7f))
+                            }
                         }
                     }
                 }
             }
 
-            // Main content
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                contentPadding = PaddingValues(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                item {
-                    // Top bar with search and more
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(shape = RoundedCornerShape(12.dp), color = Color.White.copy(alpha = 0.1f), modifier = Modifier.size(40.dp)) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = Color.White)
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Surface(shape = RoundedCornerShape(12.dp), color = Color.White.copy(alpha = 0.1f), modifier = Modifier.size(40.dp)) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.White)
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    // Orb with A logo
+            item {
+                // Orb with A logo - centered
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Outer glow
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Glow effect
-                        Box(
-                            modifier = Modifier
-                                .size(160.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.radialGradient(
-                                        colors = listOf(
-                                            Color(0xFF6C4DFF).copy(alpha = 0.5f),
-                                            Color(0xFF00D4FF).copy(alpha = 0.3f),
-                                            Color.Transparent
-                                        )
+                        modifier = Modifier
+                            .size(140.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFF6C4DFF).copy(alpha = 0.2f),
+                                        Color(0xFF00D4FF).copy(alpha = 0.1f),
+                                        Color.Transparent
                                     )
                                 )
-                        )
-                        // Orb
-                        Box(
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0xFF1A1A4A),
-                                            Color(0xFF2A2A6A)
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "A",
-                                style = MaterialTheme.typography.displayLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier
                             )
-                        }
-                    }
-                }
-
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    )
+                    // Orb
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFF6C4DFF), Color(0xFF8B5CF6), Color(0xFF00D4FF))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                "Good morning",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text("☀️", style = MaterialTheme.typography.titleLarge)
-                        }
-                        Text(
-                            "What would you like to do today?",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White.copy(alpha = 0.6f)
+                        Text("A", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.displayMedium)
+                    }
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Good morning", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("☀️", style = MaterialTheme.typography.titleLarge)
+                    }
+                    Text("What would you like to do today?", style = MaterialTheme.typography.bodyMedium, color = Color.Black.copy(alpha = 0.6f))
+                }
+            }
+
+            item {
+                // Grid 3 columns - fixed height cards, no vertical text bug
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        HomeCard(
+                            title = "Explain",
+                            subtitle = "Make complex\nthings simple",
+                            icon = "💡",
+                            bg = Color(0xFFEDE7FF),
+                            iconColor = Color(0xFF6C4DFF),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNewChat
+                        )
+                        HomeCard(
+                            title = "Write",
+                            subtitle = "Turn ideas\ninto content",
+                            icon = "✏️",
+                            bg = Color(0xFFD6E4FF),
+                            iconColor = Color(0xFF4A90E2),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNewChat
+                        )
+                        HomeCard(
+                            title = "Code",
+                            subtitle = "Build, debug,\ncreate",
+                            icon = "💻",
+                            bg = Color(0xFFD1F5E0),
+                            iconColor = Color(0xFF00C853),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNewChat
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        HomeCard(
+                            title = "Create",
+                            subtitle = "Generate\nimages",
+                            icon = "🎨",
+                            bg = Color(0xFFFFD6E0),
+                            iconColor = Color(0xFFE91E63),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToTools
+                        )
+                        HomeCard(
+                            title = "Search",
+                            subtitle = "Get real-time\ninfo",
+                            icon = "🌐",
+                            bg = Color(0xFFFFE8B5),
+                            iconColor = Color(0xFFFF9800),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNewChat
+                        )
+                        HomeCard(
+                            title = "More",
+                            subtitle = "Discover\nall tools",
+                            icon = "⋯",
+                            bg = Color(0xFFE0E0E0),
+                            iconColor = Color(0xFF616161),
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToTools
                         )
                     }
                 }
+            }
 
-                item {
-                    // 3x2 grid of glass cards
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                // Quick actions - functional
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Quick Actions", fontWeight = FontWeight.Bold, color = Color.Black, style = MaterialTheme.typography.titleSmall)
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                            HomeGlassCard(
-                                title = "Explain",
-                                subtitle = "Make complex\nthings simple",
-                                icon = "💡",
-                                iconBg = Color(0xFF6C4DFF),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNewChat
-                            )
-                            HomeGlassCard(
-                                title = "Write",
-                                subtitle = "Turn ideas into\ncontent",
-                                icon = "✏️",
-                                iconBg = Color(0xFF4A90E2),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNewChat
-                            )
-                            HomeGlassCard(
-                                title = "Code",
-                                subtitle = "Build, debug,\ncreate",
-                                icon = "</>",
-                                iconBg = Color(0xFF00E676),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNewChat
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                            HomeGlassCard(
-                                title = "Create",
-                                subtitle = "Generate images\nand visuals",
-                                icon = "🖼️",
-                                iconBg = Color(0xFFE91E63),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNewChat
-                            )
-                            HomeGlassCard(
-                                title = "Search",
-                                subtitle = "Get real-time\ninformation",
-                                icon = "🌐",
-                                iconBg = Color(0xFFFF9800),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNewChat
-                            )
-                            HomeGlassCard(
-                                title = "More",
-                                subtitle = "Discover all tools",
-                                icon = "•••",
-                                iconBg = Color(0xFF9C27B0),
-                                modifier = Modifier.weight(1f),
-                                onClick = onNavigateToTools
-                            )
+                            QuickActionButton(text = "New Chat", icon = Icons.Default.Chat, modifier = Modifier.weight(1f), onClick = onNewChat)
+                            QuickActionButton(text = "Providers", icon = Icons.Default.Storage, modifier = Modifier.weight(1f), onClick = onNavigateToProviders)
+                            QuickActionButton(text = "Settings", icon = Icons.Default.Settings, modifier = Modifier.weight(1f), onClick = onNavigateToSettings)
                         }
                     }
                 }
             }
+
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
     }
 }
 
 @Composable
-fun SidebarItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, selected: Boolean = false, onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) Color(0xFF6C4DFF).copy(alpha = 0.3f) else Color.Transparent,
-        border = if (selected) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF6C4DFF).copy(alpha = 0.5f)) else null,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(icon, contentDescription = null, tint = if (selected) Color(0xFF9C7CFF) else Color.White.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) Color.White else Color.White.copy(alpha = 0.6f), fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
-        }
-    }
-}
-
-@Composable
-fun HomeGlassCard(title: String, subtitle: String, icon: String, iconBg: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun HomeCard(title: String, subtitle: String, icon: String, bg: Color, iconColor: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.08f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-        modifier = modifier.clickable(onClick = onClick)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier
+            .height(140.dp)
+            .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Surface(shape = RoundedCornerShape(12.dp), color = iconBg.copy(alpha = 0.2f), modifier = Modifier.size(48.dp)) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Text(icon, style = MaterialTheme.typography.titleMedium, color = iconBg)
-                    }
+        Column(
+            modifier = Modifier.fillMaxSize().padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Surface(shape = RoundedCornerShape(12.dp), color = bg, modifier = Modifier.size(44.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text(icon, style = MaterialTheme.typography.titleMedium)
                 }
             }
             Column {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), lineHeight = 14.sp)
+                Text(title, fontWeight = FontWeight.Bold, color = Color.Black, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color.Black.copy(alpha = 0.6f), lineHeight = 12.sp, maxLines = 2)
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
-            }
+        }
+    }
+}
+
+@Composable
+fun QuickActionButton(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFF0F0FF),
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = Color(0xFF6C4DFF), modifier = Modifier.size(20.dp))
+            Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = Color.Black)
         }
     }
 }

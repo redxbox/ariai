@@ -31,21 +31,21 @@ fun NewSettingsScreen(
     onDynamicColorChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFF0A0A1E))) {
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF5F7FF))) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.9f)),
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+                            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.Black)
                         }
                     },
                     title = {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                            Text("Settings", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                            Text("Customize your AriAI experience.", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+                            Text("Settings", color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                            Text("Customize your AriAI experience.", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
                         }
                     },
                     actions = { Spacer(modifier = Modifier.width(48.dp)) }
@@ -57,12 +57,11 @@ fun NewSettingsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // AriAI header
                 item {
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.08f)),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         modifier = Modifier.fillMaxWidth().clickable { }
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -74,98 +73,82 @@ fun NewSettingsScreen(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("AriAI", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                Text("A smarter you, every day.", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+                                Text("AriAI", color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("A smarter you, every day.", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
                             }
-                            Text("v1.0.0", color = Color.White.copy(alpha = 0.4f), style = MaterialTheme.typography.labelSmall)
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(start = 8.dp))
+                            Text("v1.0.0", color = Color.Black.copy(alpha = 0.4f), style = MaterialTheme.typography.labelSmall)
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Black.copy(alpha = 0.3f), modifier = Modifier.padding(start = 8.dp))
                         }
                     }
                 }
 
-                // Account
+                item { Text("Account", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp)) }
                 item {
-                    Text("Account", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 4.dp))
-                }
-                item {
-                    SettingsGroup {
-                        SettingsRow(icon = Icons.Default.Person, title = "Account", subtitle = "Manage your profile and subscription", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Default.Star, title = "Subscription", subtitle = "Free Plan", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRowWithSwitch(icon = Icons.Default.Sync, title = "Sync", subtitle = "Backup and sync your chats", checked = true, onCheckedChange = {}, onClick = {})
+                    SettingsGroupLight {
+                        SettingsRowLight(icon = Icons.Default.Person, title = "Account", subtitle = "Manage your profile and subscription", onClick = {})
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowLight(icon = Icons.Default.Star, title = "Subscription", subtitle = "Free Plan", onClick = {})
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowWithSwitchLight(icon = Icons.Default.Sync, title = "Sync", subtitle = "Backup and sync your chats", checked = true, onCheckedChange = {}, onClick = {})
                     }
                 }
 
-                // AI & Models
+                item { Text("AI & Models", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp)) }
                 item {
-                    Text("AI & Models", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 4.dp))
-                }
-                item {
-                    SettingsGroup {
-                        SettingsRow(icon = Icons.Default.ViewInAr, title = "Providers", subtitle = "Manage AI providers and API keys", onClick = onProvidersClick)
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Default.Tune, title = "Default Model", subtitle = "GPT-4o", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Default.Settings, title = "Model Parameters", subtitle = "Temperature, max tokens, etc.", onClick = {})
+                    SettingsGroupLight {
+                        SettingsRowLight(icon = Icons.Default.Storage, title = "Providers", subtitle = "Manage AI providers and API keys", onClick = onProvidersClick)
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowLight(icon = Icons.Default.Tune, title = "Default Model", subtitle = "GPT-4o", onClick = {})
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowLight(icon = Icons.Default.Settings, title = "Model Parameters", subtitle = "Temperature, max tokens, etc.", onClick = {})
                     }
                 }
 
-                // Chat
+                item { Text("Chat", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp)) }
                 item {
-                    Text("Chat", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 4.dp))
-                }
-                item {
-                    SettingsGroup {
-                        SettingsRow(icon = Icons.Default.Chat, title = "Chat Settings", subtitle = "Behavior, style, and response format", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Default.Description, title = "Data & Storage", subtitle = "Manage your chat history", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Default.Image, title = "Media Settings", subtitle = "Images, videos, and file handling", onClick = {})
+                    SettingsGroupLight {
+                        SettingsRowLight(icon = Icons.Default.Chat, title = "Chat Settings", subtitle = "Behavior, style, and response format", onClick = {})
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowLight(icon = Icons.Default.Description, title = "Data & Storage", subtitle = "Manage your chat history", onClick = {})
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowLight(icon = Icons.Default.Image, title = "Media Settings", subtitle = "Images, videos, and file handling", onClick = {})
                     }
                 }
 
-                // Appearance
+                item { Text("Appearance", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp)) }
                 item {
-                    Text("Appearance", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 4.dp))
-                }
-                item {
-                    SettingsGroup {
-                        SettingsRow(icon = Icons.Default.Palette, title = "Theme", subtitle = "System (Auto)", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Default.Language, title = "Language", subtitle = "English", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRowWithSwitch(icon = Icons.Default.ColorLens, title = "Use Dynamic Color", subtitle = "Match your device theme", checked = dynamicColor, onCheckedChange = onDynamicColorChange, onClick = {})
+                    SettingsGroupLight {
+                        SettingsRowLight(icon = Icons.Default.Palette, title = "Theme", subtitle = "System (Auto)", onClick = { onThemeChange(if (currentTheme == "light") "dark" else "light") })
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowLight(icon = Icons.Default.Language, title = "Language", subtitle = "English", onClick = {})
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowWithSwitchLight(icon = Icons.Default.ColorLens, title = "Use Dynamic Color", subtitle = "Match your device theme", checked = dynamicColor, onCheckedChange = onDynamicColorChange, onClick = {})
                     }
                 }
 
-                // Advanced
+                item { Text("Advanced", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp)) }
                 item {
-                    Text("Advanced", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 4.dp))
-                }
-                item {
-                    SettingsGroup {
-                        SettingsRow(icon = Icons.Default.Code, title = "Advanced Settings", subtitle = "Developer options", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Default.Security, title = "Privacy & Security", subtitle = "Your data, your control", onClick = {})
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsRow(icon = Icons.Default.Info, title = "About", subtitle = "Version, licenses, acknowledgments", onClick = {})
+                    SettingsGroupLight {
+                        SettingsRowLight(icon = Icons.Default.Code, title = "Advanced Settings", subtitle = "Developer options", onClick = {})
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowLight(icon = Icons.Default.Security, title = "Privacy & Security", subtitle = "Your data, your control", onClick = {})
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
+                        SettingsRowLight(icon = Icons.Default.Info, title = "About", subtitle = "Version, licenses, acknowledgments", onClick = {})
                     }
                 }
 
-                // Log Out
                 item {
-                    Surface(
+                    Button(
+                        onClick = {},
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        color = Color.White.copy(alpha = 0.05f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                        modifier = Modifier.fillMaxWidth().clickable { }
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                        contentPadding = PaddingValues(16.dp)
                     ) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Logout, contentDescription = null, tint = Color(0xFFFF6B6B))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Log Out", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
-                        }
+                        Icon(Icons.Default.Logout, contentDescription = null, tint = Color(0xFFFF6B6B))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Log Out", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -176,11 +159,11 @@ fun NewSettingsScreen(
 }
 
 @Composable
-fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun SettingsGroupLight(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.08f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(content = content)
@@ -188,41 +171,45 @@ fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnScop
 }
 
 @Composable
-fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SettingsRowLight(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF0F0FF)), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Color(0xFF6C4DFF), modifier = Modifier.size(20.dp))
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+            Text(title, color = Color.Black, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Black.copy(alpha = 0.2f), modifier = Modifier.size(20.dp))
     }
 }
 
 @Composable
-fun SettingsRowWithSwitch(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SettingsRowWithSwitchLight(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    var isChecked by remember { mutableStateOf(checked) }
     Row(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF0F0FF)), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Color(0xFF6C4DFF), modifier = Modifier.size(20.dp))
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+            Text(title, color = Color.Black, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
         }
         Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF6C4DFF), uncheckedThumbColor = Color.White, uncheckedTrackColor = Color.White.copy(alpha = 0.2f))
+            checked = isChecked,
+            onCheckedChange = {
+                isChecked = it
+                onCheckedChange(it)
+            },
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF6C4DFF), uncheckedThumbColor = Color.White, uncheckedTrackColor = Color.Black.copy(alpha = 0.1f))
         )
     }
 }
