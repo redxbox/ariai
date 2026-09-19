@@ -1,0 +1,77 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "main", "arena/*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+    
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.6
+    
+    - name: Clean
+      run: ./gradlew clean --stacktrace
+      continue-on-error: true
+    
+    - name: Build Debug APK
+      run: |
+        set -o pipefail
+        ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee build.log
+    
+    - name: Upload build log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
+        retention-days: 3
+    
+    - name: Upload build reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-reports
+        path: |
+          app/build/reports/
+          app/build/outputs/
+        retention-days: 3
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: AriAi-debug-APK
+        path: app/build/outputs/apk/debug/app-debug.apk
+        retention-days: 7
+
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v5
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    - name: Grant execute permission
+      run: chmod +x gradlew
+    - name: Run Lint
+      run: ./gradlew :app:lintDebug --stacktrace || true
