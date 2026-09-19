@@ -60,71 +60,48 @@ fun ProviderListScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(padding),
+            modifier = modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Glass filter chips - All / Cloud / Local / Custom
+            // Filter chips simple
             item {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     listOf("All", "Cloud", "Local", "Custom").forEachIndexed { index, label ->
-                        FilterChip(
-                            selected = index == 0,
-                            onClick = {},
-                            label = { Text(label) },
+                        Surface(
                             shape = RoundedCornerShape(12.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        )
+                            color = if (index == 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.clickable { }
+                        ) {
+                            Text(label, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
 
-            // Configured providers - glass premium cards with toggle
             if (providers.isEmpty()) {
                 item {
                     Card(
                         shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                        ),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Box(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            colors = listOf(
-                                                Color(0xFF6C4DFF).copy(alpha = 0.3f),
-                                                Color(0xFF00D4AA).copy(alpha = 0.3f)
-                                            )
-                                        )
-                                    ),
+                                modifier = Modifier.size(80.dp).clip(CircleShape).background(
+                                    Brush.linearGradient(colors = listOf(Color(0xFF6C4DFF).copy(alpha = 0.3f), Color(0xFF00D4AA).copy(alpha = 0.3f)))
+                                ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text("🔌", style = MaterialTheme.typography.displaySmall)
                             }
                             Text("No providers yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text("Add your first AI provider to start chatting", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Button(
-                                onClick = onAddProvider,
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
+                            Button(onClick = onAddProvider, shape = RoundedCornerShape(12.dp)) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Add Provider")
@@ -134,10 +111,7 @@ fun ProviderListScreen(
                 }
             }
 
-            items(
-                count = providers.size,
-                key = { index -> "${providers[index].id}_${providers[index].createdAt}_$index" }
-            ) { index ->
+            items(count = providers.size, key = { index -> "${providers[index].id}_${providers[index].createdAt}_$index" }) { index ->
                 val provider = providers[index]
                 GlassProviderCard(
                     provider = provider,
@@ -147,95 +121,36 @@ fun ProviderListScreen(
                 )
             }
 
-            // Premium providers suggestion - glass style like screenshot
             item {
-                Text(
-                    "Popular Providers",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                Text("Popular Providers", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
             }
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PremiumProviderSuggestion(
-                        name = "OpenAI",
-                        subtitle = "GPT-4o, 4o-mini, o3",
-                        iconText = "O",
-                        colors = listOf(Color(0xFF74AA9C), Color(0xFF10A37F)),
-                        onClick = onAddProvider
-                    )
-                    PremiumProviderSuggestion(
-                        name = "Anthropic",
-                        subtitle = "Claude 3.7, 3.5",
-                        iconText = "A",
-                        colors = listOf(Color(0xFFD4A574), Color(0xFFCC785C)),
-                        onClick = onAddProvider
-                    )
-                    PremiumProviderSuggestion(
-                        name = "Google",
-                        subtitle = "Gemini 2.0, 1.5",
-                        iconText = "G",
-                        colors = listOf(Color(0xFF4285F4), Color(0xFF34A853)),
-                        onClick = onAddProvider
-                    )
-                    PremiumProviderSuggestion(
-                        name = "Meta",
-                        subtitle = "Llama 3.3, 3.1",
-                        iconText = "∞",
-                        colors = listOf(Color(0xFF0668E1), Color(0xFF00C7FB)),
-                        onClick = onAddProvider
-                    )
-                    PremiumProviderSuggestion(
-                        name = "DeepSeek",
-                        subtitle = "R1, V3",
-                        iconText = "D",
-                        colors = listOf(Color(0xFF4D6BFE), Color(0xFF6C4DFF)),
-                        onClick = onAddProvider
-                    )
-                    PremiumProviderSuggestion(
-                        name = "Qwen",
-                        subtitle = "Qwen3, Qwen2.5",
-                        iconText = "Q",
-                        colors = listOf(Color(0xFF7C4DFF), Color(0xFF536DFE)),
-                        onClick = onAddProvider
-                    )
-                    PremiumProviderSuggestion(
-                        name = "Mistral",
-                        subtitle = "Large, Medium, Small",
-                        iconText = "M",
-                        colors = listOf(Color(0xFFFF6B35), Color(0xFFF7931E)),
-                        onClick = onAddProvider
-                    )
+                    PopularProviderRow(name = "OpenAI", subtitle = "GPT-4o, 4o-mini, o3", letter = "O", colors = listOf(Color(0xFF74AA9C), Color(0xFF10A37F)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Anthropic", subtitle = "Claude 3.7, 3.5", letter = "C", colors = listOf(Color(0xFFD4A574), Color(0xFFCC785C)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Google", subtitle = "Gemini 2.0, 1.5", letter = "G", colors = listOf(Color(0xFF4285F4), Color(0xFF34A853)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Meta", subtitle = "Llama 3.3, 3.1", letter = "M", colors = listOf(Color(0xFF0668E1), Color(0xFF00C7FB)), onClick = onAddProvider)
+                    PopularProviderRow(name = "DeepSeek", subtitle = "R1, V3", letter = "D", colors = listOf(Color(0xFF4D6BFE), Color(0xFF6C4DFF)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Qwen", subtitle = "Qwen3, Qwen2.5", letter = "Q", colors = listOf(Color(0xFF7C4DFF), Color(0xFF536DFE)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Mistral", subtitle = "Large, Medium, Small", letter = "Mi", colors = listOf(Color(0xFFFF6B35), Color(0xFFF7931E)), onClick = onAddProvider)
                 }
             }
 
             item {
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth().clickable { onAddProvider() }
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onAddProvider() }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text("Add Custom Provider", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
 
-            item {
-                Spacer(modifier = Modifier.height(80.dp))
-            }
+            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
 }
@@ -262,22 +177,12 @@ fun GlassProviderCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Brush.linearGradient(colors = providerColor)),
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(colors = providerColor)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -303,30 +208,15 @@ fun GlassProviderCard(
                     maxLines = 1
                 )
             }
-            Switch(
-                checked = enabled,
-                onCheckedChange = { enabled = it }
-            )
+            Switch(checked = enabled, onCheckedChange = { enabled = it })
             Box {
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Test") },
-                        onClick = { showMenu = false; onTest() },
-                        leadingIcon = { Icon(Icons.Default.Speed, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Edit") },
-                        onClick = { showMenu = false; onEdit() },
-                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        onClick = { showMenu = false; onDelete() },
-                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) }
-                    )
+                    DropdownMenuItem(text = { Text("Test") }, onClick = { showMenu = false; onTest() }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) })
+                    DropdownMenuItem(text = { Text("Edit") }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) })
+                    DropdownMenuItem(text = { Text("Delete") }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
                 }
             }
         }
@@ -334,44 +224,32 @@ fun GlassProviderCard(
 }
 
 @Composable
-fun PremiumProviderSuggestion(
+fun PopularProviderRow(
     name: String,
     subtitle: String,
-    iconText: String,
+    letter: String,
     colors: List<Color>,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Brush.linearGradient(colors = colors)),
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(colors = colors)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(iconText, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text(letter, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Switch(checked = false, onCheckedChange = { onClick() }, modifier = Modifier.size(32.dp))
+            Switch(checked = false, onCheckedChange = { onClick() })
         }
     }
 }
@@ -395,156 +273,75 @@ fun AddProviderScreen(
         topBar = {
             TopAppBar(
                 title = { Text(if (initialProvider == null) strings.addProvider else strings.edit, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = null)
-                    }
-                },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = null) } },
                 actions = {
                     Button(
                         onClick = {
                             if (name.isNotBlank() && baseUrl.isNotBlank()) {
-                                onSave(
-                                    Provider(
-                                        id = initialProvider?.id ?: java.util.UUID.randomUUID().toString(),
-                                        name = name,
-                                        type = selectedType,
-                                        baseUrl = baseUrl,
-                                        apiKey = apiKey,
-                                        models = initialProvider?.models ?: emptyList()
-                                    )
-                                )
+                                onSave(Provider(id = initialProvider?.id ?: java.util.UUID.randomUUID().toString(), name = name, type = selectedType, baseUrl = baseUrl, apiKey = apiKey, models = initialProvider?.models ?: emptyList()))
                             }
                         },
                         enabled = name.isNotBlank() && baseUrl.isNotBlank(),
                         shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(strings.save)
-                    }
+                    ) { Text(strings.save) }
                 }
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        LazyColumn(modifier = modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                ) {
+                Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Quick Setup", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(
-                                "OpenAI" to "https://api.openai.com/v1",
-                                "Gemini" to "https://generativelanguage.googleapis.com/v1beta",
-                                "Groq" to "https://api.groq.com/openai/v1"
-                            ).forEach { (label, url) ->
-                                FilterChip(
-                                    selected = baseUrl == url,
-                                    onClick = {
+                            listOf("OpenAI" to "https://api.openai.com/v1", "Gemini" to "https://generativelanguage.googleapis.com/v1beta", "Groq" to "https://api.groq.com/openai/v1").forEach { (label, url) ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (baseUrl == url) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier.clickable {
                                         baseUrl = url
                                         name = label
-                                        selectedType = when (label) {
-                                            "Gemini" -> ProviderType.GEMINI
-                                            else -> ProviderType.OPENAI_COMPATIBLE
-                                        }
-                                    },
-                                    label = { Text(label) },
-                                    shape = RoundedCornerShape(8.dp)
-                                )
+                                        selectedType = if (label == "Gemini") ProviderType.GEMINI else ProviderType.OPENAI_COMPATIBLE
+                                    }
+                                ) {
+                                    Text(label, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
+                                }
                             }
                         }
                     }
                 }
             }
-
             item {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(strings.providerName) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("OpenAI, Gemini, Groq...") },
-                    shape = RoundedCornerShape(12.dp)
-                )
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(strings.providerName) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("OpenAI, Gemini, Groq...") }, shape = RoundedCornerShape(12.dp))
             }
-
             item {
-                ExposedDropdownMenuBox(
-                    expanded = showTypeMenu,
-                    onExpandedChange = { showTypeMenu = !showTypeMenu }
-                ) {
-                    OutlinedTextField(
-                        value = selectedType.name,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(strings.providerType) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showTypeMenu) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    ExposedDropdownMenu(
-                        expanded = showTypeMenu,
-                        onDismissRequest = { showTypeMenu = false }
-                    ) {
+                ExposedDropdownMenuBox(expanded = showTypeMenu, onExpandedChange = { showTypeMenu = !showTypeMenu }) {
+                    OutlinedTextField(value = selectedType.name, onValueChange = {}, readOnly = true, label = { Text(strings.providerType) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showTypeMenu) }, modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp))
+                    ExposedDropdownMenu(expanded = showTypeMenu, onDismissRequest = { showTypeMenu = false }) {
                         ProviderType.values().forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type.name) },
-                                onClick = {
-                                    selectedType = type
-                                    showTypeMenu = false
-                                    baseUrl = when (type) {
-                                        ProviderType.OPENAI -> "https://api.openai.com/v1"
-                                        ProviderType.GEMINI -> "https://generativelanguage.googleapis.com/v1beta"
-                                        ProviderType.ANTHROPIC -> "https://api.anthropic.com"
-                                        ProviderType.OLLAMA -> "http://localhost:11434/v1"
-                                        else -> baseUrl
-                                    }
+                            DropdownMenuItem(text = { Text(type.name) }, onClick = {
+                                selectedType = type
+                                showTypeMenu = false
+                                baseUrl = when (type) {
+                                    ProviderType.OPENAI -> "https://api.openai.com/v1"
+                                    ProviderType.GEMINI -> "https://generativelanguage.googleapis.com/v1beta"
+                                    ProviderType.ANTHROPIC -> "https://api.anthropic.com"
+                                    ProviderType.OLLAMA -> "http://localhost:11434/v1"
+                                    else -> baseUrl
                                 }
-                            )
+                            })
                         }
                     }
                 }
             }
-
             item {
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = { baseUrl = it },
-                    label = { Text(strings.baseUrl) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("https://api.openai.com/v1") },
-                    shape = RoundedCornerShape(12.dp)
-                )
+                OutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, label = { Text(strings.baseUrl) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("https://api.openai.com/v1") }, shape = RoundedCornerShape(12.dp))
             }
-
             item {
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text(strings.apiKey) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("sk-...") },
-                    shape = RoundedCornerShape(12.dp)
-                )
+                OutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = { Text(strings.apiKey) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("sk-...") }, shape = RoundedCornerShape(12.dp))
             }
-
             item {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)

@@ -110,11 +110,11 @@ fun ChatScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceEvenly
                                 ) {
-                                    AttachmentOption(icon = Icons.Default.UploadFile, label = "Upload File", onClick = { showAttachments = false })
+                                    AttachmentOption(icon = Icons.Default.AttachFile, label = "Upload File", onClick = { showAttachments = false })
                                     AttachmentOption(icon = Icons.Default.Image, label = "Photo", onClick = { showAttachments = false })
-                                    AttachmentOption(icon = Icons.Default.PhotoCamera, label = "Take Picture", onClick = { showAttachments = false })
+                                    AttachmentOption(icon = Icons.Default.CameraAlt, label = "Take Picture", onClick = { showAttachments = false })
                                 }
-                                Divider()
+                                HorizontalDivider()
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -147,7 +147,7 @@ fun ChatScreen(
                                             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
-                                            Icon(Icons.Default.Compress, contentDescription = null)
+                                            Icon(Icons.Default.Archive, contentDescription = null)
                                             Text("Compress History", style = MaterialTheme.typography.titleSmall)
                                         }
                                     }
