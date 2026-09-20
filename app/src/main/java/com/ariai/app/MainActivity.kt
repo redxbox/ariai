@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,6 +68,7 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
     val scope = rememberCoroutineScope()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "home"
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val providers by viewModel.providers.collectAsState()
     val chats by viewModel.chats.collectAsState()
@@ -89,7 +89,6 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                 drawerContentColor = Color.Black,
                 modifier = Modifier.width(300.dp)
             ) {
-                // Drawer header - clean RikkaHub style
                 Column(modifier = Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFF6C4DFF)), contentAlignment = Alignment.Center) {
@@ -97,7 +96,7 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                         }
                         Column {
                             Text("AriAI", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
-                            Text("Personal AI", color = Color.Black.copy(alpha = 0.6f), fontSize = 12.sp)
+                            Text("Personal AI Assistant", color = Color.Black.copy(alpha = 0.6f), fontSize = 12.sp)
                         }
                     }
                     Button(
@@ -129,27 +128,42 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                     scope.launch { drawerState.close() }
                     navController.navigate("providers") { launchSingleTop = true }
                 })
+                DrawerItem(icon = Icons.Default.Image, label = "Image Gen", selected = currentRoute == "imagegen", onClick = {
+                    scope.launch { drawerState.close() }
+                    navController.navigate("imagegen") { launchSingleTop = true }
+                })
                 DrawerItem(icon = Icons.Default.Settings, label = "Settings", selected = currentRoute == "settings", onClick = {
                     scope.launch { drawerState.close() }
                     navController.navigate("settings") { launchSingleTop = true }
                 })
                 Spacer(Modifier.weight(1f))
                 HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
-                DrawerItem(icon = Icons.Default.Info, label = "About", selected = false, onClick = {})
+                DrawerItem(icon = Icons.Default.Info, label = "About AriAI v1.0", selected = false, onClick = {
+                    scope.launch {
+                        drawerState.close()
+                        snackbarHostState.showSnackbar("AriAI v1.0 - Personal AI Assistant")
+                    }
+                })
+                DrawerItem(icon = Icons.Default.Share, label = "Share App", selected = false, onClick = {
+                    scope.launch {
+                        drawerState.close()
+                        snackbarHostState.showSnackbar("Share AriAI with friends")
+                    }
+                })
                 Spacer(Modifier.height(16.dp))
             }
         }
     ) {
         Scaffold(
             containerColor = Color(0xFFFEFBFF),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                // RikkaHub style top bar - clean, edge-to-edge, no shadow
                 if (!currentRoute.startsWith("chat/")) {
                     TopAppBar(
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.95f)),
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.Black)
+                                Icon(Icons.Default.Menu, contentDescription = "Open menu", tint = Color.Black)
                             }
                         },
                         title = {
@@ -159,6 +173,7 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                                     currentRoute == "tools" -> "Tools"
                                     currentRoute == "providers" -> "Providers"
                                     currentRoute == "settings" -> "Settings"
+                                    currentRoute == "imagegen" -> "Image Generation"
                                     else -> "AriAI"
                                 },
                                 fontWeight = FontWeight.SemiBold,
@@ -171,7 +186,12 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                                     val newId = viewModel.createNewChat()
                                     navController.navigate("chat/$newId")
                                 }) {
-                                    Icon(Icons.Default.Edit, contentDescription = "New Chat", tint = Color.Black)
+                                    Icon(Icons.Default.Edit, contentDescription = "New chat", tint = Color.Black)
+                                }
+                            }
+                            if (currentRoute == "tools" || currentRoute == "providers") {
+                                IconButton(onClick = { scope.launch { snackbarHostState.showSnackbar("Search") } }) {
+                                    Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Black)
                                 }
                             }
                         }
@@ -185,7 +205,6 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                 modifier = Modifier.padding(padding)
             ) {
                 composable("home") {
-                    // RikkaHub style home = chat list with empty state, not crowded
                     if (chats.isEmpty()) {
                         HomeScreen(
                             onNavigateToChat = { navController.navigate("chats") },
@@ -259,13 +278,13 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
 
                 composable("tools") {
                     NewToolsScreen(
-                        onToolClick = { tool ->
-                            when (tool) {
-                                "Image Generation" -> navController.navigate("imagegen")
-                                else -> {
-                                    val newId = viewModel.createNewChat()
-                                    navController.navigate("chat/$newId")
-                                }
+                        onToolClick = { prompt ->
+                            if (prompt == "Image Generation") {
+                                navController.navigate("imagegen")
+                            } else {
+                                val newId = viewModel.createNewChat()
+                                navController.navigate("chat/$newId")
+                                viewModel.sendMessage(prompt)
                             }
                         }
                     )
@@ -343,7 +362,7 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
 @Composable
 fun DrawerItem(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
     NavigationDrawerItem(
-        icon = { Icon(icon, contentDescription = null, tint = if (selected) Color(0xFF6C4DFF) else Color.Black.copy(alpha = 0.6f)) },
+        icon = { Icon(icon, contentDescription = label, tint = if (selected) Color(0xFF6C4DFF) else Color.Black.copy(alpha = 0.6f)) },
         label = { Text(label, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) Color(0xFF6C4DFF) else Color.Black) },
         selected = selected,
         onClick = onClick,

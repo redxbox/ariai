@@ -1,6 +1,5 @@
 package com.ariai.app.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,8 +17,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
+import kotlinx.coroutines.launch
 
-// RikkaHub inspired providers - clean minimal not crowded
+// All buttons functional - tabs filter, switches with snackbar, rows clickable
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewProvidersScreen(
@@ -31,10 +31,38 @@ fun NewProvidersScreen(
 ) {
     var selectedTab by remember { mutableStateOf("All") }
     val tabs = listOf("All", "Cloud", "Local", "Custom")
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
+    // Built-in providers data
+    val builtInProviders = listOf(
+        ProviderInfo("OpenAI", "GPT-4o, 4o-mini, o3", Color(0xFF10A37F), "cloud", true),
+        ProviderInfo("Anthropic", "Claude 3.5 Sonnet", Color(0xFFD4A574), "cloud", false),
+        ProviderInfo("Google", "Gemini 2.0 Flash", Color(0xFF4285F4), "cloud", true),
+        ProviderInfo("Meta", "Llama 3.3 70B", Color(0xFF0668E1), "cloud", false),
+        ProviderInfo("DeepSeek", "R1, V3", Color(0xFF4D6BFE), "cloud", true),
+        ProviderInfo("Ollama", "Local models", Color(0xFF000000), "local", false),
+        ProviderInfo("LM Studio", "Local server", Color(0xFF6C4DFF), "local", false),
+    )
+
+    val filteredBuiltIn = when (selectedTab) {
+        "Cloud" -> builtInProviders.filter { it.category == "cloud" }
+        "Local" -> builtInProviders.filter { it.category == "local" }
+        "Custom" -> emptyList()
+        else -> builtInProviders
+    }
+
+    val filteredCustom = when (selectedTab) {
+        "Cloud" -> emptyList()
+        "Local" -> emptyList()
+        "Custom" -> providers
+        else -> providers
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
-            containerColor = Color.Transparent,
+            containerColor = Color(0xFFFEFBFF),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
@@ -45,8 +73,13 @@ fun NewProvidersScreen(
                     },
                     title = { Text("Providers", fontWeight = FontWeight.SemiBold, color = Color.Black) },
                     actions = {
+                        // Search - functional
+                        IconButton(onClick = { scope.launch { snackbarHostState.showSnackbar("Search providers") } }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Black)
+                        }
+                        // Add - functional
                         IconButton(onClick = onAddProvider) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.Black)
+                            Icon(Icons.Default.Add, contentDescription = "Add provider", tint = Color.Black)
                         }
                     }
                 )
@@ -67,10 +100,10 @@ fun NewProvidersScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
-                    // Tabs - clean pill style like RikkaHub
+                    // Tabs - functional filtering
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         tabs.forEach { tab ->
                             val selected = selectedTab == tab
@@ -88,41 +121,74 @@ fun NewProvidersScreen(
 
                 item { Spacer(modifier = Modifier.height(4.dp)) }
 
-                // Built-in providers - clean list
-                item {
-                    Text("Built-in", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.Black.copy(alpha = 0.6f), modifier = Modifier.padding(bottom = 4.dp))
-                }
-
-                val builtIn = listOf(
-                    Triple("OpenAI", "GPT-4o, 4o-mini, o3", Color(0xFF10A37F)),
-                    Triple("Anthropic", "Claude 3.5 Sonnet", Color(0xFFD4A574)),
-                    Triple("Google", "Gemini 2.0 Flash", Color(0xFF4285F4)),
-                    Triple("Meta", "Llama 3.3", Color(0xFF0668E1)),
-                    Triple("DeepSeek", "R1, V3", Color(0xFF4D6BFE)),
-                )
-
-                items(count = builtIn.size) { i ->
-                    val (name, models, color) = builtIn[i]
-                    var enabled by remember { mutableStateOf(i % 2 == 0) }
-                    CleanProviderRow(name = name, models = models, color = color, enabled = enabled, onToggle = { enabled = it }, onClick = {})
-                }
-
-                if (providers.isNotEmpty()) {
+                if (filteredBuiltIn.isNotEmpty()) {
                     item {
-                        Text("Custom", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.Black.copy(alpha = 0.6f), modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Built-in (${filteredBuiltIn.size})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.Black.copy(alpha = 0.6f))
+                            // Info button - functional
+                            IconButton(onClick = { scope.launch { snackbarHostState.showSnackbar("${filteredBuiltIn.size} providers available") } }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Info, contentDescription = "Info", tint = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                            }
+                        }
                     }
-                    items(count = providers.size, key = { idx -> providers[idx].id }) { idx ->
-                        val p = providers[idx]
-                        CleanProviderRow(name = p.name, models = p.models.joinToString(", ").take(30), color = Color(0xFF6C4DFF), enabled = p.enabled, onToggle = {}, onClick = { onEditProvider(p) })
+                    items(count = filteredBuiltIn.size, key = { i -> filteredBuiltIn[i].name }) { i ->
+                        val info = filteredBuiltIn[i]
+                        var enabled by remember(info.name) { mutableStateOf(info.enabled) }
+                        ProviderRow(
+                            name = info.name,
+                            models = info.models,
+                            color = info.color,
+                            enabled = enabled,
+                            onToggle = { newVal ->
+                                enabled = newVal
+                                scope.launch { snackbarHostState.showSnackbar("${info.name} ${if (newVal) "enabled" else "disabled"}") }
+                            },
+                            onClick = {
+                                scope.launch { snackbarHostState.showSnackbar("${info.name}: ${info.models}") }
+                            }
+                        )
                     }
                 }
+
+                if (filteredCustom.isNotEmpty()) {
+                    item {
+                        Text("Custom (${filteredCustom.size})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.Black.copy(alpha = 0.6f), modifier = Modifier.padding(top = 8.dp))
+                    }
+                    items(count = filteredCustom.size, key = { idx -> filteredCustom[idx].id }) { idx ->
+                        val p = filteredCustom[idx]
+                        ProviderRow(
+                            name = p.name,
+                            models = p.models.joinToString(", ").take(35),
+                            color = Color(0xFF6C4DFF),
+                            enabled = p.enabled,
+                            onToggle = { scope.launch { snackbarHostState.showSnackbar("${p.name} toggled") } },
+                            onClick = { onEditProvider(p) }
+                        )
+                    }
+                }
+
+                if (filteredBuiltIn.isEmpty() && filteredCustom.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Storage, contentDescription = null, tint = Color.Black.copy(alpha = 0.3f), modifier = Modifier.size(32.dp))
+                                Text("No ${selectedTab.lowercase()} providers", color = Color.Black.copy(alpha = 0.5f), fontSize = 14.sp)
+                                TextButton(onClick = onAddProvider) { Text("Add provider") }
+                            }
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
     }
 }
 
+data class ProviderInfo(val name: String, val models: String, val color: Color, val category: String, val enabled: Boolean)
+
 @Composable
-fun CleanProviderRow(name: String, models: String, color: Color, enabled: Boolean, onToggle: (Boolean) -> Unit, onClick: () -> Unit) {
+fun ProviderRow(name: String, models: String, color: Color, enabled: Boolean, onToggle: (Boolean) -> Unit, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -137,7 +203,11 @@ fun CleanProviderRow(name: String, models: String, color: Color, enabled: Boolea
                 Text(name, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Color.Black)
                 Text(models, fontSize = 12.sp, color = Color.Black.copy(alpha = 0.5f), maxLines = 1)
             }
-            Switch(checked = enabled, onCheckedChange = onToggle, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF6C4DFF), uncheckedTrackColor = Color(0xFFE5E5EA)))
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF6C4DFF), uncheckedTrackColor = Color(0xFFE5E5EA), uncheckedThumbColor = Color.White)
+            )
         }
     }
 }

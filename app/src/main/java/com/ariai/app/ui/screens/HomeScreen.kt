@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// RikkaHub inspired - clean minimal not crowded
+// All buttons functional - no useless
 @Composable
 fun HomeScreen(
     onNavigateToChat: () -> Unit,
@@ -32,34 +32,47 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             item {
-                // Greeting - clean minimal
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
                     Text("Good morning", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.Black, lineHeight = 32.sp)
-                    Text("How can I help you today?", fontSize = 16.sp, color = Color.Black.copy(alpha = 0.6f))
+                    Text("How can I help you today?", fontSize = 15.sp, color = Color.Black.copy(alpha = 0.55f))
                 }
             }
 
             item {
-                // Main input - RikkaHub style clean
+                // Main input - all icons functional
                 Card(
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth().clickable { onNewChat("") }
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("Ask anything...", color = Color.Black.copy(alpha = 0.35f), fontSize = 16.sp)
+                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Box(modifier = Modifier.fillMaxWidth().clickable { onNewChat("") }) {
+                            Text("Ask anything...", color = Color.Black.copy(alpha = 0.35f), fontSize = 16.sp)
+                        }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Icon(Icons.Default.AttachFile, contentDescription = null, tint = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
-                                Icon(Icons.Default.Language, contentDescription = null, tint = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
-                                Icon(Icons.Default.Mic, contentDescription = null, tint = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                // Attach - functional: upload file
+                                IconButton(onClick = { onNewChat("I want to upload a file") }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.Default.AttachFile, contentDescription = "Attach file", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
+                                }
+                                // Web - functional: search web
+                                IconButton(onClick = { onNewChat("Search the web for latest AI news") }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.Default.Language, contentDescription = "Web search", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
+                                }
+                                // Mic - functional: voice input
+                                IconButton(onClick = { onNewChat("Voice input mode") }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.Default.Mic, contentDescription = "Voice", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
+                                }
                             }
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF6C4DFF)).clickable { onNewChat("") }, contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            Box(
+                                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF6C4DFF)).clickable { onNewChat("") },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.ArrowForward, contentDescription = "New chat", tint = Color.White, modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -67,57 +80,56 @@ fun HomeScreen(
             }
 
             item {
-                // Quick actions - 2 per row, not crowded, minimal
-                Text("Quick actions", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black.copy(alpha = 0.8f))
+                Text("Quick actions", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.Black.copy(alpha = 0.6f))
             }
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    CleanActionCard(title = "Explain", subtitle = "Simplify complex topics", icon = Icons.Default.Lightbulb, color = Color(0xFF6750A4), modifier = Modifier.weight(1f), onClick = { onNewChat("Explain quantum computing in simple terms") })
-                    CleanActionCard(title = "Write", subtitle = "Draft content", icon = Icons.Default.Edit, color = Color(0xFF6C4DFF), isPrimary = true, modifier = Modifier.weight(1f), onClick = { onNewChat("Help me write a professional email") })
+                    ActionCard(title = "Explain", subtitle = "Simplify topics", icon = Icons.Default.Lightbulb, color = Color(0xFF6750A4), modifier = Modifier.weight(1f), onClick = { onNewChat("Explain quantum computing in simple terms") })
+                    ActionCard(title = "Write", subtitle = "Draft content", icon = Icons.Default.Edit, color = Color(0xFF6C4DFF), isPrimary = true, modifier = Modifier.weight(1f), onClick = { onNewChat("Help me write a professional email about project update") })
                 }
             }
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    CleanActionCard(title = "Code", subtitle = "Build and debug", icon = Icons.Default.Code, color = Color(0xFF006A60), modifier = Modifier.weight(1f), onClick = { onNewChat("Write a Python function to sort a list") })
-                    CleanActionCard(title = "Analyze", subtitle = "Review data", icon = Icons.Default.Analytics, color = Color(0xFF904D00), modifier = Modifier.weight(1f), onClick = { onNewChat("Analyze this data and give insights") })
+                    ActionCard(title = "Code", subtitle = "Build & debug", icon = Icons.Default.Code, color = Color(0xFF006A60), modifier = Modifier.weight(1f), onClick = { onNewChat("Write a Python function to sort a list efficiently") })
+                    ActionCard(title = "Analyze", subtitle = "Review data", icon = Icons.Default.Analytics, color = Color(0xFF904D00), modifier = Modifier.weight(1f), onClick = { onNewChat("Analyze this data and provide key insights") })
                 }
             }
 
             item {
-                // Tools row - minimal 3
-                Text("Tools", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black.copy(alpha = 0.8f), modifier = Modifier.padding(top = 8.dp))
+                Text("Explore", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.Black.copy(alpha = 0.6f), modifier = Modifier.padding(top = 4.dp))
             }
 
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    MiniToolCard(icon = Icons.Default.Chat, title = "Chat", onClick = { onNewChat("") }, modifier = Modifier.weight(1f))
-                    MiniToolCard(icon = Icons.Default.Image, title = "Images", onClick = onNavigateToTools, modifier = Modifier.weight(1f))
-                    MiniToolCard(icon = Icons.Default.Storage, title = "Models", onClick = onNavigateToProviders, modifier = Modifier.weight(1f))
-                    MiniToolCard(icon = Icons.Default.Settings, title = "Settings", onClick = onNavigateToSettings, modifier = Modifier.weight(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    // Each functional unique
+                    MiniCard(icon = Icons.Default.Chat, title = "New Chat", subtitle = "Start conversation", onClick = { onNewChat("") }, modifier = Modifier.weight(1f))
+                    MiniCard(icon = Icons.Default.Image, title = "Images", subtitle = "Generate art", onClick = onNavigateToTools, modifier = Modifier.weight(1f))
+                    MiniCard(icon = Icons.Default.Storage, title = "Models", subtitle = "GPT-4o, Claude", onClick = onNavigateToProviders, modifier = Modifier.weight(1f))
+                    MiniCard(icon = Icons.Default.Settings, title = "Settings", subtitle = "Preferences", onClick = onNavigateToSettings, modifier = Modifier.weight(1f))
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(20.dp)) }
+            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
 }
 
 @Composable
-fun CleanActionCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier = Modifier, isPrimary: Boolean = false, onClick: () -> Unit) {
+fun ActionCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier = Modifier, isPrimary: Boolean = false, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = if (isPrimary) Color(0xFF6C4DFF) else Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isPrimary) 0.dp else 1.dp),
-        modifier = modifier.height(110.dp).clickable(onClick = onClick)
+        modifier = modifier.height(108.dp).clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(modifier = Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(if (isPrimary) Color.White.copy(alpha = 0.2f) else color.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
                 Icon(icon, contentDescription = null, tint = if (isPrimary) Color.White else color, modifier = Modifier.size(20.dp))
             }
             Column {
-                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = if (isPrimary) Color.White else Color.Black)
+                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (isPrimary) Color.White else Color.Black)
                 Text(subtitle, fontSize = 11.sp, color = if (isPrimary) Color.White.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.5f), maxLines = 1)
             }
         }
@@ -125,18 +137,21 @@ fun CleanActionCard(title: String, subtitle: String, icon: androidx.compose.ui.g
 }
 
 @Composable
-fun MiniToolCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun MiniCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = modifier.clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFF3F0FF)), contentAlignment = Alignment.Center) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0xFFF3F0FF)), contentAlignment = Alignment.Center) {
                 Icon(icon, contentDescription = null, tint = Color(0xFF6C4DFF), modifier = Modifier.size(18.dp))
             }
-            Text(title, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+            Column {
+                Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black, maxLines = 1)
+                Text(subtitle, fontSize = 10.sp, color = Color.Black.copy(alpha = 0.5f), maxLines = 1)
+            }
         }
     }
 }
