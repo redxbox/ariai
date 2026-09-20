@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-// All tools functional with unique actions
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewToolsScreen(
@@ -36,9 +35,9 @@ fun NewToolsScreen(
         ToolData("Document Chat", "Chat with docs", Icons.Default.Description, Color(0xFF904D00), "Help me summarize this document"),
         ToolData("Web Search", "Search web", Icons.Default.Search, Color(0xFF00639B), "Search the web for latest AI developments"),
         ToolData("Code Assistant", "Write & debug", Icons.Default.Code, Color(0xFF6C4DFF), "Write a Python function to implement binary search"),
-        ToolData("Speech", "Voice chat", Icons.Default.RecordVoiceOver, Color(0xFFBA1A1A), "Start voice conversation"),
-        ToolData("Playground", "Test models", Icons.Default.Science, Color(0xFF4F6600), "Open model playground"),
-        ToolData("Templates", "Quick prompts", Icons.Default.Dashboard, Color(0xFF7D5260), "Show prompt templates"),
+        ToolData("Speech", "Voice chat", Icons.Default.Mic, Color(0xFFBA1A1A), "Start voice conversation"),
+        ToolData("Playground", "Test models", Icons.Default.Settings, Color(0xFF4F6600), "Open model playground"),
+        ToolData("Templates", "Quick prompts", Icons.Default.List, Color(0xFF7D5260), "Show prompt templates"),
     )
 
     Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
@@ -75,7 +74,6 @@ fun NewToolsScreen(
                     ToolCard(
                         tool = tool,
                         onClick = {
-                            // Each tool unique action
                             when (tool.name) {
                                 "Image Generation" -> onToolClick("Image Generation")
                                 "Vision" -> onToolClick(tool.prompt)
@@ -122,7 +120,7 @@ fun ToolCard(tool: ToolData, onClick: () -> Unit) {
                 Box(modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(tool.color.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
                     Icon(tool.icon, contentDescription = tool.name, tint = tool.color, modifier = Modifier.size(22.dp))
                 }
-                Icon(Icons.Default.ArrowOutward, contentDescription = null, tint = Color.Black.copy(alpha = 0.2f), modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.Black.copy(alpha = 0.2f), modifier = Modifier.size(16.dp))
             }
             Column {
                 Text(tool.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.Black, maxLines = 1)

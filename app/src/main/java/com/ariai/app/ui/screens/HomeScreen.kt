@@ -18,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// All buttons functional - no useless
 @Composable
 fun HomeScreen(
     onNavigateToChat: () -> Unit,
@@ -42,7 +41,6 @@ fun HomeScreen(
             }
 
             item {
-                // Main input - all icons functional
                 Card(
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -55,15 +53,12 @@ fun HomeScreen(
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                // Attach - functional: upload file
                                 IconButton(onClick = { onNewChat("I want to upload a file") }, modifier = Modifier.size(36.dp)) {
                                     Icon(Icons.Default.AttachFile, contentDescription = "Attach file", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
                                 }
-                                // Web - functional: search web
                                 IconButton(onClick = { onNewChat("Search the web for latest AI news") }, modifier = Modifier.size(36.dp)) {
                                     Icon(Icons.Default.Language, contentDescription = "Web search", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
                                 }
-                                // Mic - functional: voice input
                                 IconButton(onClick = { onNewChat("Voice input mode") }, modifier = Modifier.size(36.dp)) {
                                     Icon(Icons.Default.Mic, contentDescription = "Voice", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
                                 }
@@ -85,7 +80,7 @@ fun HomeScreen(
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    ActionCard(title = "Explain", subtitle = "Simplify topics", icon = Icons.Default.Lightbulb, color = Color(0xFF6750A4), modifier = Modifier.weight(1f), onClick = { onNewChat("Explain quantum computing in simple terms") })
+                    ActionCard(title = "Explain", subtitle = "Simplify topics", icon = Icons.Default.Info, color = Color(0xFF6750A4), modifier = Modifier.weight(1f), onClick = { onNewChat("Explain quantum computing in simple terms") })
                     ActionCard(title = "Write", subtitle = "Draft content", icon = Icons.Default.Edit, color = Color(0xFF6C4DFF), isPrimary = true, modifier = Modifier.weight(1f), onClick = { onNewChat("Help me write a professional email about project update") })
                 }
             }
@@ -93,7 +88,7 @@ fun HomeScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     ActionCard(title = "Code", subtitle = "Build & debug", icon = Icons.Default.Code, color = Color(0xFF006A60), modifier = Modifier.weight(1f), onClick = { onNewChat("Write a Python function to sort a list efficiently") })
-                    ActionCard(title = "Analyze", subtitle = "Review data", icon = Icons.Default.Analytics, color = Color(0xFF904D00), modifier = Modifier.weight(1f), onClick = { onNewChat("Analyze this data and provide key insights") })
+                    ActionCard(title = "Analyze", subtitle = "Review data", icon = Icons.Default.Search, color = Color(0xFF904D00), modifier = Modifier.weight(1f), onClick = { onNewChat("Analyze this data and provide key insights") })
                 }
             }
 
@@ -103,7 +98,6 @@ fun HomeScreen(
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    // Each functional unique
                     MiniCard(icon = Icons.Default.Chat, title = "New Chat", subtitle = "Start conversation", onClick = { onNewChat("") }, modifier = Modifier.weight(1f))
                     MiniCard(icon = Icons.Default.Image, title = "Images", subtitle = "Generate art", onClick = onNavigateToTools, modifier = Modifier.weight(1f))
                     MiniCard(icon = Icons.Default.Storage, title = "Models", subtitle = "GPT-4o, Claude", onClick = onNavigateToProviders, modifier = Modifier.weight(1f))

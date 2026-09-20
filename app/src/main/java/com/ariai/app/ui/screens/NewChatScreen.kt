@@ -79,7 +79,6 @@ fun NewChatScreen(
                             IconButton(onClick = onOpenDrawer) {
                                 Icon(Icons.Default.Menu, contentDescription = "Open menu", tint = Color.Black)
                             }
-                            // Add - functional: new chat
                             IconButton(onClick = {
                                 scope.launch { snackbarHostState.showSnackbar("Starting new chat") }
                                 onBack()
@@ -95,7 +94,6 @@ fun NewChatScreen(
                         }
                     },
                     actions = {
-                        // Top menu - functional
                         Box {
                             IconButton(onClick = { showTopMenu = true }) {
                                 Icon(Icons.Default.MoreHoriz, contentDescription = "More", tint = Color.Black)
@@ -104,7 +102,7 @@ fun NewChatScreen(
                                 DropdownMenuItem(text = { Text("Clear chat") }, onClick = {
                                     showTopMenu = false
                                     scope.launch { snackbarHostState.showSnackbar("Chat cleared") }
-                                }, leadingIcon = { Icon(Icons.Default.DeleteSweep, contentDescription = null) })
+                                }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
                                 DropdownMenuItem(text = { Text("Share chat") }, onClick = {
                                     showTopMenu = false
                                     scope.launch { snackbarHostState.showSnackbar("Share coming soon") }
@@ -121,14 +119,12 @@ fun NewChatScreen(
             bottomBar = {
                 Surface(color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        // Input card - functional
                         Surface(shape = RoundedCornerShape(24.dp), color = Color(0xFFF2F2F7), modifier = Modifier.fillMaxWidth()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                // Crop - functional: attach image
                                 Box(
                                     modifier = Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(Color.White).clickable {
                                         onSendMessage("I want to attach an image")
@@ -158,7 +154,6 @@ fun NewChatScreen(
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                // Send - functional
                                 Box(
                                     modifier = Modifier.size(38.dp).clip(CircleShape).background(if (inputText.isBlank()) Color(0xFFE5E5EA) else Color(0xFF6C4DFF)).clickable {
                                         if (inputText.isNotBlank()) {
@@ -173,7 +168,6 @@ fun NewChatScreen(
                                 ) {
                                     Icon(Icons.Default.ArrowUpward, contentDescription = "Send message", tint = if (inputText.isBlank()) Color.Black.copy(alpha = 0.3f) else Color.White, modifier = Modifier.size(20.dp))
                                 }
-                                // Attach - functional
                                 Box(
                                     modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFF2F2F7)).clickable {
                                         onSendMessage("I want to upload a file")
@@ -184,7 +178,6 @@ fun NewChatScreen(
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                // Search toggle - functional unique
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
                                     color = if (useSearch) Color(0xFF6C4DFF).copy(alpha = 0.12f) else Color(0xFFF2F2F7),
@@ -195,7 +188,6 @@ fun NewChatScreen(
                                         if (useSearch) Text("Search", color = Color(0xFF6C4DFF), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                                     }
                                 }
-                                // Reasoning toggle - functional unique
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
                                     color = if (useReasoning) Color(0xFF6C4DFF).copy(alpha = 0.12f) else Color(0xFFF2F2F7),
@@ -252,17 +244,14 @@ fun NewChatScreen(
                                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Text(m.content, color = Color.Black, style = MaterialTheme.typography.bodyMedium)
                                     Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                                        // Copy - functional with clipboard
                                         Row(modifier = Modifier.clickable { copyToClipboard(m.content) }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Icon(Icons.Default.ContentCopy, contentDescription = "Copy message", tint = Color.Black.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
                                             Text("Copy", fontSize = MaterialTheme.typography.labelSmall.fontSize, color = Color.Black.copy(alpha = 0.45f))
                                         }
-                                        // Branch - functional
                                         Row(modifier = Modifier.clickable { onBranchMessage(m) }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Icon(Icons.Default.Share, contentDescription = "Branch chat", tint = Color.Black.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
                                             Text("Branch", fontSize = MaterialTheme.typography.labelSmall.fontSize, color = Color.Black.copy(alpha = 0.45f))
                                         }
-                                        // Regenerate - functional
                                         Row(modifier = Modifier.clickable { onRegenerate(m) }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Icon(Icons.Default.Refresh, contentDescription = "Regenerate", tint = Color.Black.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
                                             Text("Retry", fontSize = MaterialTheme.typography.labelSmall.fontSize, color = Color.Black.copy(alpha = 0.45f))

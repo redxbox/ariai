@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-// All buttons functional - no useless
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewSettingsScreen(
@@ -51,7 +50,6 @@ fun NewSettingsScreen(
                     },
                     title = { Text("Settings", fontWeight = FontWeight.SemiBold, color = Color.Black) },
                     actions = {
-                        // Search settings - functional
                         IconButton(onClick = { scope.launch { snackbarHostState.showSnackbar("Search settings") } }) {
                             Icon(Icons.Default.Search, contentDescription = "Search settings", tint = Color.Black)
                         }
@@ -65,7 +63,6 @@ fun NewSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    // Profile card - functional: shows workspace info
                     Card(
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -89,20 +86,9 @@ fun NewSettingsScreen(
                     SettingsGroup(title = "Appearance") {
                         Text("Theme", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            listOf("light" to "Light" to Icons.Default.WbSunny, "dark" to "Dark" to Icons.Default.NightsStay, "system" to "System" to Icons.Default.SettingsBrightness).forEach { (pair, icon) ->
-                                val (value, label) = pair
-                                val selected = currentTheme == value
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (selected) Color(0xFF6C4DFF) else Color(0xFFF2F2F7),
-                                    modifier = Modifier.weight(1f).clickable { onThemeChange(value) }
-                                ) {
-                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Icon(icon, contentDescription = label, tint = if (selected) Color.White else Color.Black.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
-                                        Text(label, color = if (selected) Color.White else Color.Black, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-                                    }
-                                }
-                            }
+                            ThemeChip(value = "light", label = "Light", icon = Icons.Default.WbSunny, selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
+                            ThemeChip(value = "dark", label = "Dark", icon = Icons.Default.NightsStay, selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
+                            ThemeChip(value = "system", label = "System", icon = Icons.Default.Settings, selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
                         }
                         Spacer(Modifier.height(12.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -117,20 +103,16 @@ fun NewSettingsScreen(
 
                 item {
                     SettingsGroup(title = "General") {
-                        // Language - functional
                         SettingsItem(icon = Icons.Default.Language, title = "Language", value = if (currentLanguage == "en") "English" else currentLanguage, onClick = {
                             val newLang = if (currentLanguage == "en") "fa" else "en"
                             onLanguageChange(newLang)
                             scope.launch { snackbarHostState.showSnackbar("Language: $newLang") }
                         })
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        // Providers - functional
                         SettingsItem(icon = Icons.Default.Storage, title = "Providers", value = "Manage", onClick = onProvidersClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        // Chat settings - functional
                         SettingsItem(icon = Icons.Default.Chat, title = "Chat Settings", value = "", onClick = { scope.launch { snackbarHostState.showSnackbar("Chat: font size, bubbles") } })
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        // Notifications - functional
                         SettingsItem(icon = Icons.Default.Notifications, title = "Notifications", value = "", onClick = { scope.launch { snackbarHostState.showSnackbar("Notifications settings") } })
                     }
                 }
@@ -165,6 +147,20 @@ fun NewSettingsScreen(
 
                 item { Spacer(modifier = Modifier.height(20.dp)) }
             }
+        }
+    }
+}
+
+@Composable
+fun ThemeChip(value: String, label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) Color(0xFF6C4DFF) else Color(0xFFF2F2F7),
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(icon, contentDescription = label, tint = if (selected) Color.White else Color.Black.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+            Text(label, color = if (selected) Color.White else Color.Black, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
         }
     }
 }

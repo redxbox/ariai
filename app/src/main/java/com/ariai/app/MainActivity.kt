@@ -116,11 +116,11 @@ fun AriAiAppNavigation(viewModel: AppViewModel) {
                 }
                 HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(Modifier.height(8.dp))
-                DrawerItem(icon = Icons.Default.ChatBubbleOutline, label = "Chats", selected = currentRoute.startsWith("chat") || currentRoute == "chats" || currentRoute == "home", onClick = {
+                DrawerItem(icon = Icons.Default.Chat, label = "Chats", selected = currentRoute.startsWith("chat") || currentRoute == "chats" || currentRoute == "home", onClick = {
                     scope.launch { drawerState.close() }
                     navController.navigate("chats") { launchSingleTop = true }
                 })
-                DrawerItem(icon = Icons.Default.AutoAwesome, label = "Tools", selected = currentRoute == "tools", onClick = {
+                DrawerItem(icon = Icons.Default.Star, label = "Tools", selected = currentRoute == "tools", onClick = {
                     scope.launch { drawerState.close() }
                     navController.navigate("tools") { launchSingleTop = true }
                 })
