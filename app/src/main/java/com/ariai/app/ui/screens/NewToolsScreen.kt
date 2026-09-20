@@ -31,7 +31,7 @@ fun NewToolsScreen(
 
     val tools = listOf(
         ToolData("Image Generation", "Create with AI", Icons.Default.Image, Color(0xFF6750A4), "Generate an image of a futuristic city"),
-        ToolData("Vision", "Analyze images", Icons.Default.Visibility, Color(0xFF006A60), "Analyze this image and describe what you see"),
+        ToolData("Vision", "Analyze images", Icons.Default.Search, Color(0xFF006A60), "Analyze this image and describe what you see"),
         ToolData("Document Chat", "Chat with docs", Icons.Default.Description, Color(0xFF904D00), "Help me summarize this document"),
         ToolData("Web Search", "Search web", Icons.Default.Search, Color(0xFF00639B), "Search the web for latest AI developments"),
         ToolData("Code Assistant", "Write & debug", Icons.Default.Code, Color(0xFF6C4DFF), "Write a Python function to implement binary search"),

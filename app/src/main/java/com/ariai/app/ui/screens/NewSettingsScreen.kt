@@ -86,9 +86,9 @@ fun NewSettingsScreen(
                     SettingsGroup(title = "Appearance") {
                         Text("Theme", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            ThemeChip(value = "light", label = "Light", icon = Icons.Default.WbSunny, selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
-                            ThemeChip(value = "dark", label = "Dark", icon = Icons.Default.NightsStay, selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
-                            ThemeChip(value = "system", label = "System", icon = Icons.Default.Settings, selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
+                            ThemeChip(label = "Light", icon = Icons.Default.Star, selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
+                            ThemeChip(label = "Dark", icon = Icons.Default.Star, selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
+                            ThemeChip(label = "System", icon = Icons.Default.Settings, selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
                         }
                         Spacer(Modifier.height(12.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -131,7 +131,7 @@ fun NewSettingsScreen(
                     SettingsGroup(title = "Advanced") {
                         SettingsItem(icon = Icons.Default.Code, title = "Developer", value = "", onClick = { scope.launch { snackbarHostState.showSnackbar("Developer options") } })
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        SettingsItem(icon = Icons.Default.BugReport, title = "Debug Logs", value = "", onClick = { scope.launch { snackbarHostState.showSnackbar("Logs: export debug logs") } })
+                        SettingsItem(icon = Icons.Default.Info, title = "Debug Logs", value = "", onClick = { scope.launch { snackbarHostState.showSnackbar("Logs: export debug logs") } })
                     }
                 }
 
@@ -152,7 +152,7 @@ fun NewSettingsScreen(
 }
 
 @Composable
-fun ThemeChip(value: String, label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ThemeChip(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = if (selected) Color(0xFF6C4DFF) else Color(0xFFF2F2F7),

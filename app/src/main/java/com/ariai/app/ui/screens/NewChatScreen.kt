@@ -132,7 +132,7 @@ fun NewChatScreen(
                                     },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.CropFree, contentDescription = "Attach image", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.Image, contentDescription = "Attach image", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(18.dp))
                                 }
                                 OutlinedTextField(
                                     value = inputText,
@@ -194,7 +194,7 @@ fun NewChatScreen(
                                     modifier = Modifier.clickable { useReasoning = !useReasoning }
                                 ) {
                                     Box(modifier = Modifier.padding(10.dp), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.Psychology, contentDescription = "Toggle reasoning", tint = if (useReasoning) Color(0xFF6C4DFF) else Color.Black.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Star, contentDescription = "Toggle reasoning", tint = if (useReasoning) Color(0xFF6C4DFF) else Color.Black.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }

@@ -22,7 +22,6 @@ import com.ariai.app.data.models.Chat
 import java.text.SimpleDateFormat
 import java.util.*
 
-// RikkaHub inspired chat list - clean minimal not crowded
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
@@ -50,11 +49,10 @@ fun ChatListScreen(
             }
         ) { padding ->
             if (chats.isEmpty()) {
-                // Empty state - clean centered like RikkaHub
                 Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(32.dp)) {
                         Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFF6C4DFF).copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = Color(0xFF6C4DFF), modifier = Modifier.size(36.dp))
+                            Icon(Icons.Default.Chat, contentDescription = null, tint = Color(0xFF6C4DFF), modifier = Modifier.size(36.dp))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("No conversations yet", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = Color.Black)
@@ -115,7 +113,7 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 2.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -131,7 +129,7 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
                     Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.Black.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("Pin") }, onClick = { showMenu = false; onPin() }, leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) })
+                    DropdownMenuItem(text = { Text("Pin") }, onClick = { showMenu = false; onPin() }, leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) })
                     DropdownMenuItem(text = { Text("Delete") }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
                 }
             }
@@ -150,3 +148,5 @@ fun formatTimeClean(timestamp: Long): String {
         else -> SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(timestamp))
     }
 }
+
+fun formatTime(timestamp: Long): String = formatTimeClean(timestamp)
