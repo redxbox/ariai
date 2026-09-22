@@ -1,24 +1,83 @@
 name: Android CI
 on:
   push:
-    branches: [ "main" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: set up JDK 17
-      uses: actions/setup-java@v3
+    - uses: actions/checkout@v6
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
       with:
         java-version: '17'
         distribution: 'temurin'
         cache: gradle
+
+    - name: Install Android SDK
+      run: |
+        set -euo pipefail
+        SDK="$HOME/android-sdk"
+        mkdir -p "$SDK/cmdline-tools"
+        curl -fsSL -o /tmp/cmd.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+        unzip -q /tmp/cmd.zip -d /tmp/cmd
+        mv /tmp/cmd/cmdline-tools "$SDK/cmdline-tools/latest"
+        yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses >/dev/null || true
+        "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK"           "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+        echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+        echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+        echo "$SDK/platform-tools" >> "$GITHUB_PATH"
+        echo "sdk.dir=$SDK" > local.properties
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew assembleDebug --no-daemon
-    - name: Upload APK
-      uses: actions/upload-artifact@v3
+
+    - name: Build and test
+      run: |
+        set -o pipefail
+        ./gradlew lintDebug testDebugUnitTest assembleDebug assembleRelease bundleRelease --stacktrace --no-daemon 2>&1 | tee gradle-out.txt
+
+    - name: Annotate errors
+      if: failure()
+      run: |
+        python3 - <<'PY'
+        from pathlib import Path
+        p = Path("gradle-out.txt")
+        if not p.exists():
+            print("::error::gradle-out.txt missing")
+            raise SystemExit
+        n = 0
+        for line in p.read_text(errors="replace").splitlines():
+            if line.startswith("e:") or "Unresolved" in line or "FAILED" in line:
+                print(f"::error::{line[:300]}")
+                n += 1
+                if n >= 40:
+                    break
+        if n == 0:
+            for line in p.read_text(errors="replace").splitlines()[-30:]:
+                print(f"::error::{line[:300]}")
+        PY
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v6
       with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+        name: gradle-log
+        path: gradle-out.txt
+        if-no-files-found: ignore
+
+    - name: Upload Android artifacts
+      if: success()
+      uses: actions/upload-artifact@v6
+      with:
+        name: AriAi-build
+        path: |
+          app/build/outputs/apk/debug/app-debug.apk
+          app/build/outputs/apk/release/app-release.apk
+          app/build/outputs/bundle/release/app-release.aab
