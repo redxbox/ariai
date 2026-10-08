@@ -150,8 +150,10 @@ class ChatRepository(
         modelId: String,
         systemPrompt: String?,
         temperature: Float = 0.7f,
-        searchContext: String? = null
-    ) = aiClient.chatCompletionStream(provider, messages, modelId, systemPrompt, temperature, searchContext != null, searchContext)
+        searchContext: String? = null,
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        nativeSearch: Boolean = false
+    ) = aiClient.chatCompletionStream(provider, messages, modelId, systemPrompt, temperature, searchContext != null, searchContext, reasoning, nativeSearch)
 
     suspend fun generateImage(provider: Provider, request: ImageGenRequest) = 
         aiClient.generateImage(provider, request)

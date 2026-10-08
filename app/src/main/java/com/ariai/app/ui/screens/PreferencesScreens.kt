@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import com.ariai.app.data.models.ReasoningLevel
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,8 +52,8 @@ fun PreferencesScreen(
     onThemeChange: (String) -> Unit,
     dynamicColor: Boolean,
     onDynamicColorChange: (Boolean) -> Unit,
-    showReasoning: Boolean,
-    onReasoningChange: (Boolean) -> Unit,
+    reasoning: ReasoningLevel,
+    onReasoningChange: (ReasoningLevel) -> Unit,
     fontSize: Int,
     onFontSizeChange: (Int) -> Unit,
     onBack: () -> Unit
@@ -88,7 +89,18 @@ fun PreferencesScreen(
             item { SectionTitle("Chat") }
             item {
                 SettingCard {
-                    SwitchRow("Show reasoning", "Display the model's reasoning steps", showReasoning, onReasoningChange)
+                    Text("Default thinking depth", fontWeight = FontWeight.Medium, color = Ink)
+                    Text("Used for new messages. You can change it per message in the chat.", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        ReasoningLevel.values().forEach { level ->
+                            FilterChip(
+                                selected = reasoning == level,
+                                onClick = { onReasoningChange(level) },
+                                label = { Text(level.label, fontSize = 12.sp, maxLines = 1) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                     HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                     Text("Message text size", fontWeight = FontWeight.Medium, color = Ink)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

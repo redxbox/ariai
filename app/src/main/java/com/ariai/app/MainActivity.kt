@@ -29,6 +29,7 @@ import com.ariai.app.ui.drawer.AppDrawerContent
 import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
 import com.ariai.app.util.LocalStrings
+import com.ariai.app.data.models.SearchMode
 import com.ariai.app.util.getStringsForLanguage
 import kotlinx.coroutines.launch
 
@@ -86,7 +87,9 @@ fun AppRoot(viewModel: AppViewModel) {
     val mcpServers = remember { mutableStateListOf<McpServerItem>() }
     val defaultProviderId by viewModel.defaultProviderId.collectAsState()
     val defaultModelId by viewModel.defaultModelId.collectAsState()
-    val showReasoning by viewModel.showReasoning.collectAsState()
+    val reasoningLevel by viewModel.reasoningLevel.collectAsState()
+    val searchModeState by viewModel.searchMode.collectAsState()
+    val favoriteModels by viewModel.favoriteModels.collectAsState()
     val fontSize by viewModel.fontSize.collectAsState()
     val defaultModelName = providers.firstOrNull { it.id == defaultProviderId }?.let { p ->
         p.models.firstOrNull { it.id == defaultModelId }?.let { "${it.displayName} · ${p.name}" }
@@ -178,15 +181,24 @@ fun AppRoot(viewModel: AppViewModel) {
                         currentStreamingContent = streamingContent,
                         selectedModel = currentChat?.modelId,
                         providers = providers,
-                        onSendMessage = { viewModel.sendMessage(it) },
+                        reasoning = reasoningLevel,
+                        searchMode = searchModeState,
+                        favorites = favoriteModels,
+                        localSearchConfigured = searchKeys.values.any { it.isNotBlank() },
+                        onSendMessage = { text, files, level, mode -> viewModel.sendMessage(text, files, level, mode) },
                         onBack = { newChat() },
                         onBranchMessage = { viewModel.branchMessage(it) },
                         onRegenerate = { viewModel.regenerateMessage(it) },
                         onCopyMessage = { },
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },
+                        onToggleFavorite = { pid, mid -> viewModel.toggleFavoriteModel(pid, mid) },
+                        onReasoningChange = { viewModel.setReasoningLevel(it) },
+                        onSearchModeChange = { viewModel.setSearchMode(it) },
+                        onCompressHistory = { done -> viewModel.compressHistory(done) },
+                        onOpenExtensions = { navController.navigate("mcp") },
+                        onOpenSearchSettings = { navController.navigate("search_service") },
                         fontSize = fontSize,
-                        showReasoning = showReasoning,
                         onAddProvider = { navController.navigate("add_provider") }
                     )
                 }
@@ -247,8 +259,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         onThemeChange = { viewModel.setTheme(it) },
                         dynamicColor = dynamicColor,
                         onDynamicColorChange = { viewModel.setDynamicColor(it) },
-                        showReasoning = showReasoning,
-                        onReasoningChange = { viewModel.setShowReasoning(it) },
+                        reasoning = reasoningLevel,
+                        onReasoningChange = { viewModel.setReasoningLevel(it) },
                         fontSize = fontSize,
                         onFontSizeChange = { viewModel.setFontSize(it) },
                         onBack = { navController.popBackStack() }
@@ -303,7 +315,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         onSearch = { query ->
                             val id = viewModel.createNewChat()
                             navController.navigate("chat/$id")
-                            viewModel.sendMessage(query, useWebSearch = true)
+                            viewModel.sendMessage(query, searchMode = SearchMode.LOCAL)
                         }
                     )
                 }

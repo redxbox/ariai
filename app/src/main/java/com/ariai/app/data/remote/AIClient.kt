@@ -25,12 +25,14 @@ class AIClient {
         systemPrompt: String? = null,
         temperature: Float = 0.7f,
         useSearch: Boolean = false,
-        searchContext: String? = null
+        searchContext: String? = null,
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        nativeSearch: Boolean = false
     ): Flow<String> = flow {
         try {
             val url = buildChatUrl(provider, modelId)
             val isStream = true
-            val body = buildRequestBody(provider, messages, modelId, systemPrompt, temperature, searchContext, isStream)
+            val body = buildRequestBody(provider, messages, modelId, systemPrompt, temperature, searchContext, isStream, reasoning, nativeSearch)
 
             val requestBuilder = Request.Builder()
                 .url(url)
@@ -273,6 +275,16 @@ class AIClient {
         }
     }
 
+    /** Message text with extracted text-file contents appended. */
+    private fun ChatMessage.promptText(): String {
+        val files = attachments.mapNotNull { a -> a.textContent?.let { "\n\n[File: ${a.name}]\n$it" } }
+        return content + files.joinToString("")
+    }
+
+    /** Images that carry base64 data and can be sent to vision models. */
+    private fun ChatMessage.imageParts(): List<Attachment> =
+        attachments.filter { it.type == AttachmentType.IMAGE && !it.base64Data.isNullOrBlank() }
+
     private fun buildRequestBody(
         provider: Provider,
         messages: List<ChatMessage>,
@@ -280,26 +292,32 @@ class AIClient {
         systemPrompt: String?,
         temperature: Float,
         searchContext: String?,
-        isStream: Boolean = true
+        isStream: Boolean = true,
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        nativeSearch: Boolean = false
     ): RequestBody {
         val json = JSONObject()
+        val lastMessage = messages.lastOrNull()
 
         when (provider.type) {
             ProviderType.GEMINI -> {
                 val contents = JSONArray()
                 messages.forEach { msg ->
                     if (msg.role == MessageRole.SYSTEM) return@forEach
-                    val contentObj = JSONObject().apply {
-                        put("role", if (msg.role == MessageRole.USER) "user" else "model")
-                        val parts = JSONArray()
-                        var text = msg.content
-                        if (searchContext != null && msg == messages.lastOrNull()) {
-                            text = "Web search results:\n$searchContext\n\nUser question: $text\n\nAnswer using the search results when relevant."
-                        }
-                        parts.put(JSONObject().put("text", text))
-                        put("parts", parts)
+                    val parts = JSONArray()
+                    var text = msg.promptText()
+                    if (searchContext != null && msg == lastMessage) {
+                        text = "Web search results:\n$searchContext\n\nUser question: $text\n\nAnswer using the search results when relevant."
                     }
-                    contents.put(contentObj)
+                    if (text.isNotBlank()) parts.put(JSONObject().put("text", text))
+                    msg.imageParts().forEach { img ->
+                        parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", img.mimeType).put("data", img.base64Data)))
+                    }
+                    if (parts.length() == 0) return@forEach
+                    contents.put(JSONObject().apply {
+                        put("role", if (msg.role == MessageRole.USER) "user" else "model")
+                        put("parts", parts)
+                    })
                 }
                 json.put("contents", contents)
                 if (systemPrompt != null) {
@@ -308,31 +326,54 @@ class AIClient {
                 json.put("generationConfig", JSONObject().apply {
                     put("temperature", temperature.toDouble())
                     put("maxOutputTokens", 8192)
+                    reasoning.geminiBudget?.let { put("thinkingConfig", JSONObject().put("thinkingBudget", it)) }
                 })
+                if (nativeSearch) {
+                    json.put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
+                }
             }
             ProviderType.ANTHROPIC -> {
+                val budget = reasoning.budgetTokens
                 json.put("model", if (modelId.isNotBlank()) modelId else "claude-3-5-sonnet-20241022")
-                json.put("max_tokens", 4096)
-                json.put("temperature", temperature.toDouble())
+                json.put("max_tokens", if (budget != null) budget + 4096 else 4096)
                 json.put("stream", isStream)
-                if (systemPrompt != null) json.put("system", systemPrompt)
+                if (budget != null) {
+                    // Extended thinking requires temperature 1 (the API default), so it is omitted here.
+                    json.put("thinking", JSONObject().put("type", "enabled").put("budget_tokens", budget))
+                } else {
+                    json.put("temperature", temperature.toDouble())
+                }
+                val systemText = listOfNotNull(
+                    systemPrompt,
+                    searchContext?.let { "You have access to web search results:\n$it\nUse them to answer accurately with citations." }
+                ).joinToString("\n\n")
+                if (systemText.isNotBlank()) json.put("system", systemText)
                 val msgs = JSONArray()
                 messages.filter { it.role != MessageRole.SYSTEM }.forEach { m ->
+                    val content = JSONArray()
+                    m.imageParts().forEach { img ->
+                        content.put(JSONObject().put("type", "image").put("source", JSONObject()
+                            .put("type", "base64").put("media_type", img.mimeType).put("data", img.base64Data)))
+                    }
+                    val text = m.promptText()
+                    if (text.isNotBlank()) content.put(JSONObject().put("type", "text").put("text", text))
+                    if (content.length() == 0) return@forEach
                     msgs.put(JSONObject().apply {
                         put("role", if (m.role == MessageRole.USER) "user" else "assistant")
-                        put("content", m.content)
+                        put("content", content)
                     })
                 }
                 json.put("messages", msgs)
             }
             else -> {
                 val actualModel = if (modelId.isBlank()) "gpt-4o-mini" else modelId
-                
+
                 json.put("model", actualModel)
                 json.put("temperature", temperature.toDouble().coerceIn(0.0, 2.0))
                 json.put("stream", isStream)
                 json.put("max_tokens", 2048)
-                
+                reasoning.effort?.let { json.put("reasoning_effort", it) }
+
                 val msgs = JSONArray()
                 if (systemPrompt != null && systemPrompt.isNotBlank()) {
                     msgs.put(JSONObject().apply {
@@ -348,7 +389,20 @@ class AIClient {
                 }
                 messages.forEach { m ->
                     if (m.role == MessageRole.SYSTEM && systemPrompt != null) return@forEach
-                    if (m.content.isBlank()) return@forEach
+                    val text = m.promptText()
+                    val images = m.imageParts()
+                    if (text.isBlank() && images.isEmpty()) return@forEach
+                    val content: Any = if (m.role == MessageRole.USER && images.isNotEmpty()) {
+                        JSONArray().apply {
+                            put(JSONObject().put("type", "text").put("text", text))
+                            images.forEach { img ->
+                                put(JSONObject().put("type", "image_url").put("image_url",
+                                    JSONObject().put("url", "data:${img.mimeType};base64,${img.base64Data}")))
+                            }
+                        }
+                    } else {
+                        text
+                    }
                     msgs.put(JSONObject().apply {
                         put("role", when (m.role) {
                             MessageRole.USER -> "user"
@@ -356,7 +410,7 @@ class AIClient {
                             MessageRole.SYSTEM -> "system"
                             MessageRole.TOOL -> "tool"
                         })
-                        put("content", m.content)
+                        put("content", content)
                     })
                 }
                 json.put("messages", msgs)
@@ -379,6 +433,10 @@ class AIClient {
 
     private fun parseOpenAIStreamChunk(json: JSONObject): String {
         return try {
+            // Anthropic streams text as content_block_delta events.
+            if (json.optString("type") == "content_block_delta") {
+                return json.optJSONObject("delta")?.optString("text", "") ?: ""
+            }
             val choices = json.optJSONArray("choices") ?: return ""
             if (choices.length() == 0) return ""
             val first = choices.getJSONObject(0)

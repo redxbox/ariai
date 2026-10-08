@@ -23,6 +23,11 @@ class AppViewModel(
     val streamResponse = prefs.streamResponseFlow.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val showReasoning = prefs.showReasoningFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val fontSize = prefs.fontSizeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 15)
+    val reasoningLevel = prefs.reasoningLevelFlow.map { ReasoningLevel.fromName(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ReasoningLevel.AUTO)
+    val searchMode = prefs.searchModeFlow.map { SearchMode.fromName(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SearchMode.OFF)
+    val favoriteModels = prefs.favoriteModelsFlow.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     fun setDefaultSelection(providerId: String, modelId: String) {
         viewModelScope.launch { prefs.setDefaultSelection(providerId, modelId) }
@@ -146,29 +151,55 @@ class AppViewModel(
         }
     }
 
-    fun sendMessage(content: String, useWebSearch: Boolean = false) {
+    /** Summary of older turns (if any) and the messages that still go to the model. */
+    private fun activeContext(all: List<ChatMessage>): Pair<String?, List<ChatMessage>> {
+        val idx = all.indexOfLast { it.role == MessageRole.SYSTEM }
+        val summary = if (idx >= 0) all[idx].content else null
+        val after = all.drop(idx + 1).filter {
+            it.status != MessageStatus.ERROR && (it.content.isNotBlank() || it.attachments.isNotEmpty())
+        }
+        return summary to after
+    }
+
+    private fun resolveProvider(): Provider? = try {
+        providers.value.find { it.id == getCurrentChat()?.providerId } ?: providers.value.firstOrNull()
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun postAssistantError(chatId: String, text: String) {
+        viewModelScope.launch {
+            val message = ChatMessage(chatId = chatId, role = MessageRole.ASSISTANT, content = text, status = MessageStatus.ERROR)
+            try {
+                repository.saveMessage(message)
+                _messages.value = _messages.value + message
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun sendMessage(
+        content: String,
+        attachments: List<Attachment> = emptyList(),
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        searchMode: SearchMode = SearchMode.OFF
+    ) {
         val chatId = _currentChatId.value ?: return
-        if (content.isBlank()) return
-        
-        val provider = try {
-            providers.value.find { it.id == getCurrentChat()?.providerId } ?: providers.value.firstOrNull()
-        } catch (e: Exception) {
+        if (content.isBlank() && attachments.isEmpty()) return
+        if (_isStreaming.value) return
+
+        val provider = resolveProvider()
+        if (provider == null) {
+            postAssistantError(chatId, "⚠️ No provider configured. Add a provider in Settings > AI Providers.")
+            return
+        }
+
+        val localSearchKey = if (searchMode == SearchMode.LOCAL) {
+            searchKeys.value.entries.firstOrNull { it.value.isNotBlank() }
+        } else {
             null
         }
-        
-        if (provider == null) {
-            viewModelScope.launch {
-                val errorMessage = ChatMessage(
-                    chatId = chatId,
-                    role = MessageRole.ASSISTANT,
-                    content = "⚠️ No provider configured. Please add a provider in Settings > AI Providers.\n\nTap Settings and add your API key for OpenAI, Gemini, Groq, Anthropic, etc.",
-                    status = MessageStatus.ERROR
-                )
-                try {
-                    repository.saveMessage(errorMessage)
-                    _messages.value = _messages.value + errorMessage
-                } catch (e: Exception) {}
-            }
+        if (searchMode == SearchMode.LOCAL && localSearchKey == null) {
+            postAssistantError(chatId, "🔎 Local search needs an API key. Add one in Settings > Search service.")
             return
         }
 
@@ -177,33 +208,30 @@ class AppViewModel(
                 val userMessage = ChatMessage(
                     chatId = chatId,
                     role = MessageRole.USER,
-                    content = content
+                    content = content,
+                    attachments = attachments
                 )
                 repository.saveMessage(userMessage)
                 _messages.value = _messages.value + userMessage
 
-                // Check if web search needed
                 var searchContext: String? = null
-                if (useWebSearch || content.contains(Regex("search|اخبار|جستجو|what's latest|current", RegexOption.IGNORE_CASE))) {
-                    val searchProviderKey = searchKeys.value.entries.firstOrNull { it.value.isNotBlank() }
-                    if (searchProviderKey != null) {
-                        try {
-                            val sp = SearchProvider(
-                                name = searchProviderKey.key,
-                                type = when (searchProviderKey.key) {
-                                    "tavily" -> SearchProviderType.TAVILY
-                                    "brave" -> SearchProviderType.BRAVE
-                                    "exa" -> SearchProviderType.EXA
-                                    "serper" -> SearchProviderType.SERPER
-                                    else -> SearchProviderType.CUSTOM
-                                },
-                                apiKey = searchProviderKey.value
-                            )
-                            val result = repository.searchWeb(content, sp)
-                            searchContext = repository.formatSearchForLLM(result)
-                        } catch (e: Exception) {
-                            // Search failed, continue without
-                        }
+                if (localSearchKey != null) {
+                    try {
+                        val sp = SearchProvider(
+                            name = localSearchKey.key,
+                            type = when (localSearchKey.key) {
+                                "tavily" -> SearchProviderType.TAVILY
+                                "brave" -> SearchProviderType.BRAVE
+                                "exa" -> SearchProviderType.EXA
+                                "serper" -> SearchProviderType.SERPER
+                                else -> SearchProviderType.CUSTOM
+                            },
+                            apiKey = localSearchKey.value
+                        )
+                        val result = repository.searchWeb(content, sp)
+                        searchContext = repository.formatSearchForLLM(result)
+                    } catch (e: Exception) {
+                        // Search failed: answer without results instead of blocking the message.
                     }
                 }
 
@@ -211,16 +239,21 @@ class AppViewModel(
                 _streamingContent.value = ""
 
                 try {
-                    val allMessages = _messages.value.toList()
-                    val systemPrompt = getCurrentChat()?.systemPrompt ?: getAgentSystemPrompt()
+                    val (summary, history) = activeContext(_messages.value)
+                    val systemPrompt = listOfNotNull(
+                        getCurrentChat()?.systemPrompt ?: getAgentSystemPrompt(),
+                        summary?.let { "Summary of the earlier conversation:\n$it" }
+                    ).joinToString("\n\n").ifBlank { null }
 
                     var fullResponse = ""
                     repository.streamChat(
                         provider = provider,
-                        messages = allMessages,
+                        messages = history,
                         modelId = getCurrentChat()?.modelId ?: provider.models.firstOrNull()?.id ?: "openai",
                         systemPrompt = systemPrompt,
-                        searchContext = searchContext
+                        searchContext = searchContext,
+                        reasoning = reasoning,
+                        nativeSearch = searchMode == SearchMode.MODEL
                     ).collect { chunk ->
                         fullResponse += chunk
                         _streamingContent.value = fullResponse
@@ -240,9 +273,8 @@ class AppViewModel(
                     repository.saveMessage(assistantMessage)
                     _messages.value = _messages.value + assistantMessage
 
-                    // Auto title generation for first message
                     if (_messages.value.size <= 3) {
-                        updateChatTitle(chatId, content.take(30))
+                        updateChatTitle(chatId, content.ifBlank { attachments.first().name }.take(30))
                     }
 
                 } catch (e: Exception) {
@@ -252,7 +284,7 @@ class AppViewModel(
                         e.message?.contains("Unable to resolve host") == true -> "🌐 No internet connection. Please check your network."
                         else -> "❌ Error: ${e.message?.take(300)}\n\nPlease check your API key and provider settings."
                     }
-                    
+
                     val errorMessage = ChatMessage(
                         chatId = chatId,
                         role = MessageRole.ASSISTANT,
@@ -268,11 +300,74 @@ class AppViewModel(
                     _streamingContent.value = ""
                 }
             } catch (e: Exception) {
-                // Ultimate crash prevention
                 _isStreaming.value = false
                 _streamingContent.value = ""
             }
         }
+    }
+
+    /**
+     * Replaces the older part of the conversation with a model-written summary, so long
+     * chats stay within context. [onDone] receives a short message for the user.
+     */
+    fun compressHistory(onDone: (String) -> Unit) {
+        val chatId = _currentChatId.value ?: return
+        if (_isStreaming.value) {
+            onDone("Wait for the reply to finish first")
+            return
+        }
+        val provider = resolveProvider()
+        if (provider == null) {
+            onDone("Add a provider first")
+            return
+        }
+        val (previousSummary, history) = activeContext(_messages.value)
+        if (history.size < 2) {
+            onDone("Not enough messages to compress yet")
+            return
+        }
+        viewModelScope.launch {
+            _isStreaming.value = true
+            try {
+                val instruction = ChatMessage(
+                    chatId = chatId,
+                    role = MessageRole.USER,
+                    content = "Summarize the conversation so far for your own later reference. Keep facts about the user, decisions, preferences and open tasks. Reply in the language the user used. Be concise."
+                )
+                val modelId = getCurrentChat()?.modelId ?: provider.models.firstOrNull()?.id ?: "openai"
+                val systemPrompt = previousSummary?.let { "Summary of the earlier conversation:\n$it" }
+                val summary = StringBuilder()
+                repository.streamChat(
+                    provider = provider,
+                    messages = history + instruction,
+                    modelId = modelId,
+                    systemPrompt = systemPrompt
+                ).collect { summary.append(it) }
+
+                val text = summary.toString().trim()
+                if (text.isBlank()) throw Exception("empty summary")
+                val marker = ChatMessage(chatId = chatId, role = MessageRole.SYSTEM, content = text)
+                repository.saveMessage(marker)
+                _messages.value = _messages.value + marker
+                onDone("Older messages compressed")
+            } catch (e: Exception) {
+                onDone("Compression failed: ${e.message?.take(120)}")
+            } finally {
+                _isStreaming.value = false
+            }
+        }
+    }
+
+    fun setReasoningLevel(level: ReasoningLevel) {
+        viewModelScope.launch { prefs.setReasoningLevel(level.name) }
+    }
+
+    fun setSearchMode(mode: SearchMode) {
+        viewModelScope.launch { prefs.setSearchMode(mode.name) }
+    }
+
+    fun toggleFavoriteModel(providerId: String, modelId: String) {
+        viewModelScope.launch { prefs.toggleFavoriteModel(favoriteKey(providerId, modelId)) }
     }
 
     fun updateChatProvider(chatId: String, providerId: String, modelId: String) {

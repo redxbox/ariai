@@ -172,14 +172,18 @@ fun ColumnScope.AppDrawerContent(
 
     HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
 
-    // Footer navigation
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-        FooterItem(Icons.Default.Storage, "Providers", currentRoute == "providers") { onNavigate("providers") }
-        FooterItem(Icons.Default.Settings, "MCP servers", currentRoute == "mcp") { onNavigate("mcp") }
-        FooterItem(Icons.Default.Settings, "Settings", currentRoute == "settings") { onNavigate("settings") }
-        FooterItem(Icons.Default.Info, "About", false, onAbout)
-        Spacer(Modifier.height(12.dp))
+    // Footer: quick access to the main areas. Each button opens a real screen.
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        FooterAction(Icons.Default.Storage, "Providers", currentRoute == "providers") { onNavigate("providers") }
+        FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }
+        FooterAction(Icons.Default.Public, "Search", currentRoute == "search_service") { onNavigate("search_service") }
+        FooterAction(Icons.Default.Settings, "Settings", currentRoute == "settings") { onNavigate("settings") }
+        FooterAction(Icons.Default.Info, "About", false, onAbout)
     }
+    Spacer(Modifier.height(8.dp))
 }
 
 @Composable
@@ -228,16 +232,19 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
 }
 
 @Composable
-private fun FooterItem(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
-    NavigationDrawerItem(
-        icon = { Icon(icon, contentDescription = null, tint = if (selected) Accent else Ink.copy(alpha = 0.6f), modifier = Modifier.size(20.dp)) },
-        label = { Text(label, fontSize = 14.sp, color = if (selected) Accent else Ink, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal) },
-        selected = selected,
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        colors = NavigationDrawerItemDefaults.colors(
-            selectedContainerColor = Accent.copy(alpha = 0.12f),
-            unselectedContainerColor = Color.Transparent
-        )
-    )
+private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp))
+                .background(if (selected) Accent.copy(alpha = 0.14f) else Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = label, tint = if (selected) Accent else Ink.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        }
+        Text(label, fontSize = 11.sp, color = if (selected) Accent else Ink.copy(alpha = 0.6f))
+    }
 }

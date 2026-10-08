@@ -18,7 +18,9 @@ data class Attachment(
     val name: String,
     val uri: String? = null,
     val base64Data: String? = null,
-    val mimeType: String
+    val mimeType: String,
+    /** Extracted text for text-like files; inlined into the prompt. */
+    val textContent: String? = null
 ) : Parcelable
 
 enum class AttachmentType {

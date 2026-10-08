@@ -28,6 +28,9 @@ class PreferencesManager(private val context: Context) {
         val AUTO_TITLE = booleanPreferencesKey("auto_title")
         val FONT_SIZE = intPreferencesKey("font_size")
         val FIRST_LAUNCH = booleanPreferencesKey("first_launch")
+        val REASONING_LEVEL = stringPreferencesKey("reasoning_level")
+        val SEARCH_MODE = stringPreferencesKey("search_mode")
+        val FAVORITE_MODELS = stringSetPreferencesKey("favorite_models")
     }
 
     val languageFlow: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "en" }
@@ -40,6 +43,9 @@ class PreferencesManager(private val context: Context) {
     val showReasoningFlow: Flow<Boolean> = context.dataStore.data.map { it[SHOW_REASONING] ?: false }
     val fontSizeFlow: Flow<Int> = context.dataStore.data.map { it[FONT_SIZE] ?: 15 }
     val firstLaunchFlow: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH] ?: true }
+    val reasoningLevelFlow: Flow<String?> = context.dataStore.data.map { it[REASONING_LEVEL] }
+    val searchModeFlow: Flow<String?> = context.dataStore.data.map { it[SEARCH_MODE] }
+    val favoriteModelsFlow: Flow<Set<String>> = context.dataStore.data.map { it[FAVORITE_MODELS] ?: emptySet() }
 
     val searchKeysFlow: Flow<Map<String, String>> = context.dataStore.data.map { prefs ->
         mapOf(
@@ -102,5 +108,20 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setFontSize(size: Int) {
         context.dataStore.edit { it[FONT_SIZE] = size }
+    }
+
+    suspend fun setReasoningLevel(name: String) {
+        context.dataStore.edit { it[REASONING_LEVEL] = name }
+    }
+
+    suspend fun setSearchMode(name: String) {
+        context.dataStore.edit { it[SEARCH_MODE] = name }
+    }
+
+    suspend fun toggleFavoriteModel(key: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[FAVORITE_MODELS] ?: emptySet()
+            prefs[FAVORITE_MODELS] = if (key in current) current - key else current + key
+        }
     }
 }
