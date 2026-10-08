@@ -292,6 +292,7 @@ fun AddProviderScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     val accent = providerPresets.firstOrNull { it.type == selectedType }?.color ?: initialPreset.color
     val canSave = name.isNotBlank() && baseUrl.isNotBlank()
+    val existingModels: List<AIModel> = initialProvider?.models.orEmpty()
 
     if (confirmDelete && initialProvider != null) {
         AlertDialog(
@@ -414,7 +415,7 @@ fun AddProviderScreen(
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                if (initialProvider?.models?.isNotEmpty() == true) "${initialProvider.models.size} models" else "Default models for this provider",
+                                if (existingModels.isNotEmpty()) "${existingModels.size} models" else "Default models for this provider",
                                 fontWeight = FontWeight.Medium,
                                 color = Color(0xFF1C1B1F)
                             )
@@ -432,7 +433,7 @@ fun AddProviderScreen(
                 Button(
                     onClick = {
                         val id = initialProvider?.id ?: java.util.UUID.randomUUID().toString()
-                        val models = if (initialProvider?.models?.isNotEmpty() == true) initialProvider.models
+                        val models = if (existingModels.isNotEmpty()) existingModels
                         else getDefaultModelsForType(selectedType, id)
                         onSave(
                             Provider(
