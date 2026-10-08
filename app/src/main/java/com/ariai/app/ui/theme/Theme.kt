@@ -12,15 +12,28 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
+    primary = androidx.compose.ui.graphics.Color(0xFFB7A6FF),
+    onPrimary = androidx.compose.ui.graphics.Color(0xFF2A1B7A),
     secondary = PurpleGrey80,
-    tertiary = Pink80
+    tertiary = Pink80,
+    background = androidx.compose.ui.graphics.Color(0xFF121216),
+    surface = androidx.compose.ui.graphics.Color(0xFF1C1B22),
+    onBackground = androidx.compose.ui.graphics.Color(0xFFE6E1E9),
+    onSurface = androidx.compose.ui.graphics.Color(0xFFE6E1E9)
 )
 
+// Light palette: soft lavender-gray canvas, white raised surfaces, violet accent.
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
+    primary = androidx.compose.ui.graphics.Color(0xFF6C4DFF),
+    onPrimary = androidx.compose.ui.graphics.Color.White,
     secondary = PurpleGrey40,
-    tertiary = Pink40
+    tertiary = Pink40,
+    background = androidx.compose.ui.graphics.Color(0xFFF7F6FB),
+    surface = androidx.compose.ui.graphics.Color.White,
+    surfaceVariant = androidx.compose.ui.graphics.Color(0xFFEFEDF6),
+    onBackground = androidx.compose.ui.graphics.Color(0xFF1C1B1F),
+    onSurface = androidx.compose.ui.graphics.Color(0xFF1C1B1F),
+    outline = androidx.compose.ui.graphics.Color(0x1F000000)
 )
 
 @Composable

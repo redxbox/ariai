@@ -29,6 +29,9 @@ fun SimpleSettingsScreen(
     onSearchClick: () -> Unit = {},
     onSearchServiceClick: () -> Unit = {},
     onStorageClick: () -> Unit = {},
+    onDefaultModelClick: () -> Unit = {},
+    onPreferencesClick: () -> Unit = {},
+    defaultModelName: String = "Not chosen",
     onClearAll: () -> Unit = {},
     onMcpClick: () -> Unit = {},
     currentTheme: String,
@@ -43,7 +46,7 @@ fun SimpleSettingsScreen(
     val scope = rememberCoroutineScope()
     var speechEnabled by remember { mutableStateOf(true) }
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -73,6 +76,8 @@ fun SimpleSettingsScreen(
                             SimpleChip(label = "System", selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
                         }
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        SimpleRow(icon = Icons.Default.Settings, title = "Preferences", subtitle = "Chat options, text size, theme", onClick = onPreferencesClick)
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column {
                                 Text("Dynamic colors", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
@@ -90,10 +95,7 @@ fun SimpleSettingsScreen(
 
                 item {
                     SimpleGroup(title = "Models & services") {
-                        SimpleRow(icon = Icons.Default.Star, title = "Default model", subtitle = "Choose the model for new chats", onClick = {
-                            scope.launch { snackbarHostState.showSnackbar("Pick a model inside Providers") }
-                            onProvidersClick()
-                        })
+                        SimpleRow(icon = Icons.Default.Star, title = "Default model", subtitle = defaultModelName, onClick = onDefaultModelClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Storage, title = "Providers", subtitle = "OpenAI, Gemini, Claude and more", onClick = onProvidersClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))

@@ -32,11 +32,13 @@ class PreferencesManager(private val context: Context) {
 
     val languageFlow: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "en" }
     val themeFlow: Flow<String> = context.dataStore.data.map { it[THEME] ?: "system" }
-    val dynamicColorFlow: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLOR] ?: true }
+    val dynamicColorFlow: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLOR] ?: false }
     val defaultProviderFlow: Flow<String?> = context.dataStore.data.map { it[DEFAULT_PROVIDER_ID] }
     val defaultModelFlow: Flow<String?> = context.dataStore.data.map { it[DEFAULT_MODEL_ID] }
     val streamResponseFlow: Flow<Boolean> = context.dataStore.data.map { it[STREAM_RESPONSE] ?: true }
     val memoryEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[MEMORY_ENABLED] ?: true }
+    val showReasoningFlow: Flow<Boolean> = context.dataStore.data.map { it[SHOW_REASONING] ?: false }
+    val fontSizeFlow: Flow<Int> = context.dataStore.data.map { it[FONT_SIZE] ?: 15 }
     val firstLaunchFlow: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH] ?: true }
 
     val searchKeysFlow: Flow<Map<String, String>> = context.dataStore.data.map { prefs ->
@@ -81,5 +83,24 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setFirstLaunchDone() {
         context.dataStore.edit { it[FIRST_LAUNCH] = false }
+    }
+
+    suspend fun setDefaultSelection(providerId: String, modelId: String) {
+        context.dataStore.edit {
+            it[DEFAULT_PROVIDER_ID] = providerId
+            it[DEFAULT_MODEL_ID] = modelId
+        }
+    }
+
+    suspend fun setStreamResponse(enabled: Boolean) {
+        context.dataStore.edit { it[STREAM_RESPONSE] = enabled }
+    }
+
+    suspend fun setShowReasoning(enabled: Boolean) {
+        context.dataStore.edit { it[SHOW_REASONING] = enabled }
+    }
+
+    suspend fun setFontSize(size: Int) {
+        context.dataStore.edit { it[FONT_SIZE] = size }
     }
 }

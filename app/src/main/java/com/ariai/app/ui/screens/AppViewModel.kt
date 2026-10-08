@@ -16,8 +16,29 @@ class AppViewModel(
     // Preferences
     val language = prefs.languageFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "en")
     val theme = prefs.themeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
-    val dynamicColor = prefs.dynamicColorFlow.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val dynamicColor = prefs.dynamicColorFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val searchKeys = prefs.searchKeysFlow.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val defaultProviderId = prefs.defaultProviderFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val defaultModelId = prefs.defaultModelFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val streamResponse = prefs.streamResponseFlow.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val showReasoning = prefs.showReasoningFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val fontSize = prefs.fontSizeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 15)
+
+    fun setDefaultSelection(providerId: String, modelId: String) {
+        viewModelScope.launch { prefs.setDefaultSelection(providerId, modelId) }
+    }
+
+    fun setStreamResponse(enabled: Boolean) {
+        viewModelScope.launch { prefs.setStreamResponse(enabled) }
+    }
+
+    fun setShowReasoning(enabled: Boolean) {
+        viewModelScope.launch { prefs.setShowReasoning(enabled) }
+    }
+
+    fun setFontSize(size: Int) {
+        viewModelScope.launch { prefs.setFontSize(size) }
+    }
 
     // Data
     val providers = repository.getProviders().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -90,8 +111,8 @@ class AppViewModel(
         val chat = Chat(
             id = id,
             title = "New Chat",
-            providerId = providerId ?: providers.value.firstOrNull()?.id,
-            modelId = modelId ?: providers.value.firstOrNull()?.models?.firstOrNull()?.id,
+            providerId = providerId ?: defaultProviderId.value ?: providers.value.firstOrNull()?.id,
+            modelId = modelId ?: defaultModelId.value ?: providers.value.firstOrNull()?.models?.firstOrNull()?.id,
             agentId = agentId
         )
         viewModelScope.launch {

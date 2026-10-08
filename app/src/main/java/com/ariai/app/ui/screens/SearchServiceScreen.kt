@@ -48,10 +48,10 @@ fun SearchServiceScreen(
     val activeKey = searchServices.firstOrNull { !searchKeys[it.key].isNullOrBlank() }?.key
 
     Scaffold(
-        containerColor = Color(0xFFFEFBFF),
+        containerColor = Color(0xFFF7F6FB),
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFEFBFF)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
                 title = { Text("Search service", fontWeight = FontWeight.SemiBold, color = Ink) }
             )

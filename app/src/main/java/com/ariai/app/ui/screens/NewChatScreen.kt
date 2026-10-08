@@ -4,6 +4,17 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -51,12 +62,14 @@ fun NewChatScreen(
     onOpenDrawer: () -> Unit = {},
     onSelectModel: (String, String) -> Unit = { _, _ -> },
     onAddProvider: () -> Unit = {},
+    fontSize: Int = 15,
+    showReasoning: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showModelSheet by remember { mutableStateOf(false) }
     var inputText by remember { mutableStateOf("") }
     var useSearch by remember { mutableStateOf(false) }
-    var useReasoning by remember { mutableStateOf(false) }
+    var useReasoning by remember(showReasoning) { mutableStateOf(showReasoning) }
     var showAttachments by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -99,12 +112,12 @@ fun NewChatScreen(
     }
 
     Scaffold(
-        containerColor = Color(0xFFFEFBFF),
+        containerColor = Color(0xFFF7F6FB),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFEFBFF)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
                         Icon(Icons.Default.Menu, contentDescription = "Open menu", tint = Ink)
@@ -148,7 +161,7 @@ fun NewChatScreen(
         },
         bottomBar = {
             Column(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFFFEFBFF)).navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().background(Color(0xFFF7F6FB)).navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 AnimatedVisibility(visible = showAttachments) {
@@ -199,7 +212,7 @@ fun NewChatScreen(
                             val canSend = inputText.isNotBlank() && !isStreaming
                             Box(
                                 modifier = Modifier.size(40.dp).clip(CircleShape)
-                                    .background(if (canSend) Accent else Color(0xFFE6E0F5))
+                                    .background(animateColorAsState(if (canSend) Accent else Color(0xFFE6E0F5), tween(200), label = "send").value)
                                     .clickable(enabled = canSend) { send() },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -231,19 +244,20 @@ fun NewChatScreen(
                 items(count = messages.size, key = { i -> "${messages[i].id}_$i" }) { i ->
                     val m = messages[i]
                     if (m.role == MessageRole.USER) {
-                        UserBubble(m.content)
+                        AppearIn { UserBubble(m.content, fontSize) }
                     } else {
-                        AssistantBlock(
+                        AppearIn { AssistantBlock(
                             text = m.content,
+                            fontSize = fontSize,
                             onCopy = { copyToClipboard(m.content) },
                             onBranch = { onBranchMessage(m) },
                             onRetry = { onRegenerate(m) }
-                        )
+                        ) }
                     }
                 }
                 if (currentStreamingContent.isNotEmpty()) {
                     item(key = "streaming") {
-                        AssistantBlock(text = currentStreamingContent, streaming = isStreaming)
+                        AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
                     }
                 }
             }
@@ -252,14 +266,14 @@ fun NewChatScreen(
 }
 
 @Composable
-private fun UserBubble(text: String) {
+private fun UserBubble(text: String, fontSize: Int) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Surface(
             shape = RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp),
             color = Accent.copy(alpha = 0.11f),
             modifier = Modifier.widthIn(max = 300.dp)
         ) {
-            Text(text, color = Ink, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+            Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 7).sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
         }
     }
 }
@@ -267,15 +281,16 @@ private fun UserBubble(text: String) {
 @Composable
 private fun AssistantBlock(
     text: String,
+    fontSize: Int,
     streaming: Boolean = false,
     onCopy: (() -> Unit)? = null,
     onBranch: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text, color = Ink, fontSize = 15.sp, lineHeight = 23.sp)
+    Column(modifier = Modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
         if (streaming) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), color = Accent, trackColor = Accent.copy(alpha = 0.12f))
+            TypingDots()
         } else if (onCopy != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ActionIcon(Icons.Default.ContentCopy, "Copy", onCopy)
@@ -323,6 +338,36 @@ private fun AttachChip(icon: androidx.compose.ui.graphics.vector.ImageVector, la
         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Icon(icon, contentDescription = label, tint = Accent, modifier = Modifier.size(18.dp))
             Text(label, color = Ink, fontSize = 13.sp)
+        }
+    }
+}
+
+/** Fades and slides each message in once when it first appears. */
+@Composable
+private fun AppearIn(content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(220)) + slideInVertically(tween(260, easing = FastOutSlowInEasing)) { it / 6 }
+    ) {
+        content()
+    }
+}
+
+/** Three pulsing dots shown while the model is generating. */
+@Composable
+private fun TypingDots() {
+    val transition = rememberInfiniteTransition(label = "typing")
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(top = 4.dp)) {
+        repeat(3) { i ->
+            val alpha by transition.animateFloat(
+                initialValue = 0.2f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(600, delayMillis = i * 150), RepeatMode.Reverse),
+                label = "dot$i"
+            )
+            Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Accent.copy(alpha = alpha)))
         }
     }
 }

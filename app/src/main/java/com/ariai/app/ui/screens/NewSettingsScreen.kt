@@ -36,7 +36,7 @@ fun NewSettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },

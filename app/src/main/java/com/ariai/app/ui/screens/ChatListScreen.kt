@@ -34,7 +34,7 @@ fun ChatListScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
         Scaffold(
             containerColor = Color.Transparent,
             floatingActionButton = {

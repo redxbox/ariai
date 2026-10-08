@@ -40,7 +40,7 @@ fun NewToolsScreen(
         ToolData("Templates", "Quick prompts", Icons.Default.List, Color(0xFF7D5260), "Show prompt templates"),
     )
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },

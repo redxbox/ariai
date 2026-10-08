@@ -3,6 +3,13 @@ package com.ariai.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideIntoContainer
+import androidx.compose.animation.slideOutOfContainer
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -78,6 +85,13 @@ fun AppRoot(viewModel: AppViewModel) {
     val searchKeys by viewModel.searchKeys.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
     val mcpServers = remember { mutableStateListOf<McpServerItem>() }
+    val defaultProviderId by viewModel.defaultProviderId.collectAsState()
+    val defaultModelId by viewModel.defaultModelId.collectAsState()
+    val showReasoning by viewModel.showReasoning.collectAsState()
+    val fontSize by viewModel.fontSize.collectAsState()
+    val defaultModelName = providers.firstOrNull { it.id == defaultProviderId }?.let { p ->
+        p.models.firstOrNull { it.id == defaultModelId }?.let { "${it.displayName} · ${p.name}" }
+    } ?: "Not chosen"
 
     fun go(route: String) {
         scope.launch { drawerState.close() }
@@ -125,13 +139,21 @@ fun AppRoot(viewModel: AppViewModel) {
         }
     ) {
         Scaffold(
-            containerColor = Color(0xFFFEFBFF),
+            containerColor = Color(0xFFF7F6FB),
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
             NavHost(
                 navController = navController,
                 startDestination = "chats",
-                modifier = Modifier.padding(padding)
+                modifier = Modifier.padding(padding),
+                enterTransition = {
+                    fadeIn(tween(220)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(280, easing = FastOutSlowInEasing))
+                },
+                exitTransition = { fadeOut(tween(160)) },
+                popEnterTransition = { fadeIn(tween(220)) },
+                popExitTransition = {
+                    fadeOut(tween(160)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(280, easing = FastOutSlowInEasing))
+                }
             ) {
                 composable("chats") {
                     ChatListScreen(
@@ -164,6 +186,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         onCopyMessage = { },
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },
+                        fontSize = fontSize,
+                        showReasoning = showReasoning,
                         onAddProvider = { navController.navigate("add_provider") }
                     )
                 }
@@ -193,7 +217,8 @@ fun AppRoot(viewModel: AppViewModel) {
                     AddProviderScreen(
                         initialProvider = providers.find { it.id == providerId },
                         onSave = { viewModel.saveProvider(it); navController.popBackStack() },
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onDelete = { id -> viewModel.deleteProvider(id); navController.popBackStack() }
                     )
                 }
 
@@ -210,7 +235,34 @@ fun AppRoot(viewModel: AppViewModel) {
                         dynamicColor = dynamicColor,
                         onThemeChange = { viewModel.setTheme(it) },
                         onLanguageChange = { viewModel.setLanguage(it) },
-                        onDynamicColorChange = { viewModel.setDynamicColor(it) }
+                        onDynamicColorChange = { viewModel.setDynamicColor(it) },
+                        onDefaultModelClick = { navController.navigate("default_model") },
+                        onPreferencesClick = { navController.navigate("preferences") },
+                        defaultModelName = defaultModelName
+                    )
+                }
+
+                composable("preferences") {
+                    PreferencesScreen(
+                        theme = theme,
+                        onThemeChange = { viewModel.setTheme(it) },
+                        dynamicColor = dynamicColor,
+                        onDynamicColorChange = { viewModel.setDynamicColor(it) },
+                        showReasoning = showReasoning,
+                        onReasoningChange = { viewModel.setShowReasoning(it) },
+                        fontSize = fontSize,
+                        onFontSizeChange = { viewModel.setFontSize(it) },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable("default_model") {
+                    DefaultModelScreen(
+                        providers = providers,
+                        defaultModelId = defaultModelId,
+                        onSelect = { pid, mid -> viewModel.setDefaultSelection(pid, mid) },
+                        onAddProvider = { navController.navigate("add_provider") },
+                        onBack = { navController.popBackStack() }
                     )
                 }
 

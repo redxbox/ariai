@@ -19,6 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.*
 import com.ariai.app.util.LocalStrings
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -255,113 +259,218 @@ fun PopularProviderRow(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+private data class ProviderPreset(val label: String, val type: ProviderType, val baseUrl: String, val color: Color)
+
+private val providerPresets = listOf(
+    ProviderPreset("OpenAI", ProviderType.OPENAI, "https://api.openai.com/v1", Color(0xFF10A37F)),
+    ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", Color(0xFF4285F4)),
+    ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", Color(0xFFC96442)),
+    ProviderPreset("Ollama", ProviderType.OLLAMA, "http://localhost:11434/v1", Color(0xFF3A3A3C)),
+    ProviderPreset("Custom", ProviderType.OPENAI_COMPATIBLE, "", Color(0xFF6C4DFF))
+)
+
+/**
+ * Add or edit an AI provider. Brand presets fill in the endpoint and type,
+ * models are created from the provider defaults when the provider is first saved.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddProviderScreen(
     initialProvider: Provider? = null,
     onSave: (Provider) -> Unit,
     onBack: () -> Unit,
+    onDelete: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val strings = LocalStrings.current
+    val isEdit = initialProvider != null
+    val initialPreset = providerPresets.firstOrNull { it.type == initialProvider?.type } ?: providerPresets.last()
     var name by remember { mutableStateOf(initialProvider?.name ?: "") }
     var baseUrl by remember { mutableStateOf(initialProvider?.baseUrl ?: "https://api.openai.com/v1") }
     var apiKey by remember { mutableStateOf(initialProvider?.apiKey ?: "") }
-    var selectedType by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI_COMPATIBLE) }
-    var showTypeMenu by remember { mutableStateOf(false) }
+    var selectedType by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI) }
+    var reveal by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val accent = providerPresets.firstOrNull { it.type == selectedType }?.color ?: initialPreset.color
+    val canSave = name.isNotBlank() && baseUrl.isNotBlank()
+
+    if (confirmDelete && initialProvider != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete provider?") },
+            text = { Text("${initialProvider.name} and its models will be removed.") },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete(initialProvider.id) }) { Text("Delete", color = Color(0xFFBA1A1A)) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
+    }
 
     Scaffold(
+        containerColor = Color(0xFFF7F6FB),
         topBar = {
             TopAppBar(
-                title = { Text(if (initialProvider == null) strings.addProvider else strings.edit, fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = null) } },
-                actions = {
-                    Button(
-                        onClick = {
-                            if (name.isNotBlank() && baseUrl.isNotBlank()) {
-                                onSave(Provider(id = initialProvider?.id ?: java.util.UUID.randomUUID().toString(), name = name, type = selectedType, baseUrl = baseUrl, apiKey = apiKey, models = initialProvider?.models ?: emptyList()))
-                            }
-                        },
-                        enabled = name.isNotBlank() && baseUrl.isNotBlank(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) { Text(strings.save) }
-                }
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFF1C1B1F)) } },
+                title = { Text(if (isEdit) "Edit provider" else "Add provider", fontWeight = FontWeight.SemiBold, color = Color(0xFF1C1B1F)) }
             )
         }
     ) { padding ->
-        LazyColumn(modifier = modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(
+            modifier = modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Hero preview
             item {
-                Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Quick Setup", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("OpenAI" to "https://api.openai.com/v1", "Gemini" to "https://generativelanguage.googleapis.com/v1beta", "Groq" to "https://api.groq.com/openai/v1").forEach { (label, url) ->
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (baseUrl == url) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                                    modifier = Modifier.clickable {
-                                        baseUrl = url
-                                        name = label
-                                        selectedType = if (label == "Gemini") ProviderType.GEMINI else ProviderType.OPENAI_COMPATIBLE
-                                    }
-                                ) {
-                                    Text(label, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
+                Box(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                        .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.55f))))
+                        .padding(20.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Box(
+                            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.22f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(name.firstOrNull()?.uppercase() ?: "?", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                        }
+                        Column {
+                            Text(name.ifBlank { "Provider name" }, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(providerTypeLabel(selectedType), color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // Brand presets
+            item { SectionLabel("Provider") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    providerPresets.forEach { preset ->
+                        val selected = selectedType == preset.type
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
+                                .background(if (selected) preset.color.copy(alpha = 0.12f) else Color.White)
+                                .clickable {
+                                    selectedType = preset.type
+                                    baseUrl = preset.baseUrl
+                                    if (name.isBlank() && preset.type != ProviderType.OPENAI_COMPATIBLE) name = preset.label
                                 }
+                                .padding(vertical = 12.dp, horizontal = 4.dp)
+                        ) {
+                            Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(preset.color), contentAlignment = Alignment.Center) {
+                                Text(preset.label.first().toString(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
+                            Text(preset.label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) preset.color else Color(0xFF1C1B1F).copy(alpha = 0.7f), maxLines = 1)
                         }
                     }
                 }
             }
+
+            // Connection
+            item { SectionLabel("Connection") }
             item {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(strings.providerName) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("OpenAI, Gemini, Groq...") }, shape = RoundedCornerShape(12.dp))
-            }
-            item {
-                ExposedDropdownMenuBox(expanded = showTypeMenu, onExpandedChange = { showTypeMenu = !showTypeMenu }) {
-                    OutlinedTextField(value = selectedType.name, onValueChange = {}, readOnly = true, label = { Text(strings.providerType) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showTypeMenu) }, modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp))
-                    ExposedDropdownMenu(expanded = showTypeMenu, onDismissRequest = { showTypeMenu = false }) {
-                        ProviderType.values().forEach { type ->
-                            DropdownMenuItem(text = { Text(type.name) }, onClick = {
-                                selectedType = type
-                                showTypeMenu = false
-                                baseUrl = when (type) {
-                                    ProviderType.OPENAI -> "https://api.openai.com/v1"
-                                    ProviderType.GEMINI -> "https://generativelanguage.googleapis.com/v1beta"
-                                    ProviderType.ANTHROPIC -> "https://api.anthropic.com"
-                                    ProviderType.OLLAMA -> "http://localhost:11434/v1"
-                                    else -> baseUrl
-                                }
-                            })
-                        }
-                    }
-                }
-            }
-            item {
-                OutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, label = { Text(strings.baseUrl) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("https://api.openai.com/v1") }, shape = RoundedCornerShape(12.dp))
-            }
-            item {
-                OutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = { Text(strings.apiKey) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("sk-...") }, shape = RoundedCornerShape(12.dp))
-            }
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("How to get API key?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = when (selectedType) {
-                                ProviderType.OPENAI -> "OpenAI: platform.openai.com > API keys"
-                                ProviderType.GEMINI -> "Gemini: aistudio.google.com > Get API key"
-                                ProviderType.ANTHROPIC -> "Claude: console.anthropic.com > API keys"
-                                ProviderType.OLLAMA -> "Ollama: No API key needed for local"
-                                else -> "Check provider docs for API key"
-                            },
-                            style = MaterialTheme.typography.bodySmall
+                Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Name") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
                         )
+                        OutlinedTextField(
+                            value = baseUrl,
+                            onValueChange = { baseUrl = it },
+                            label = { Text("Base URL") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = apiKey,
+                            onValueChange = { apiKey = it },
+                            label = { Text("API key") },
+                            singleLine = true,
+                            visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { reveal = !reveal }) {
+                                    Icon(Icons.Default.Visibility, contentDescription = if (reveal) "Hide key" else "Show key", tint = Color(0xFF1C1B1F).copy(alpha = 0.5f))
+                                }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("Stored only on this device.", fontSize = 12.sp, color = Color(0xFF1C1B1F).copy(alpha = 0.5f))
                     }
                 }
             }
+
+            // Models
+            item { SectionLabel("Models") }
+            item {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                if (initialProvider?.models?.isNotEmpty() == true) "${initialProvider.models.size} models" else "Default models for this provider",
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF1C1B1F)
+                            )
+                            Text("Added automatically when you save.", fontSize = 12.sp, color = Color(0xFF1C1B1F).copy(alpha = 0.5f))
+                        }
+                        Icon(Icons.Default.Star, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+
+            item { Spacer(Modifier.height(4.dp)) }
+
+            // Actions
+            item {
+                Button(
+                    onClick = {
+                        val id = initialProvider?.id ?: java.util.UUID.randomUUID().toString()
+                        val models = if (initialProvider?.models?.isNotEmpty() == true) initialProvider.models
+                        else getDefaultModelsForType(selectedType, id)
+                        onSave(
+                            Provider(
+                                id = id,
+                                name = name.trim(),
+                                type = selectedType,
+                                baseUrl = baseUrl.trim(),
+                                apiKey = apiKey.trim(),
+                                models = models,
+                                enabled = initialProvider?.enabled ?: true,
+                                customHeaders = initialProvider?.customHeaders ?: emptyMap(),
+                                customBody = initialProvider?.customBody,
+                                createdAt = initialProvider?.createdAt ?: System.currentTimeMillis()
+                            )
+                        )
+                    },
+                    enabled = canSave,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C4DFF)),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) { Text("Save", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+            }
+
+            if (isEdit) {
+                item {
+                    OutlinedButton(
+                        onClick = { confirmDelete = true },
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) { Text("Delete provider", color = Color(0xFFBA1A1A), fontWeight = FontWeight.SemiBold) }
+                }
+            }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1C1B1F).copy(alpha = 0.5f), modifier = Modifier.padding(start = 6.dp))
 }

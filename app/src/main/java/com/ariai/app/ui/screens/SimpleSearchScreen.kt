@@ -28,7 +28,7 @@ fun SimpleSearchScreen(
     val scope = rememberCoroutineScope()
     val recentSearches = remember { mutableStateListOf("AI news today", "Python best practices", "Quantum computing") }
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },

@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -160,6 +161,7 @@ fun ColumnScope.AppDrawerContent(
                     modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp)
                 )
                 is DrawerRow.ChatRow -> ChatRowItem(
+                    modifier = Modifier.animateItemPlacement(),
                     chat = row.chat,
                     selected = row.chat.id == currentChatId,
                     onClick = { onChatClick(row.chat) },
@@ -183,10 +185,10 @@ fun ColumnScope.AppDrawerContent(
 }
 
 @Composable
-private fun ChatRowItem(chat: Chat, selected: Boolean, onClick: () -> Unit, onPin: () -> Unit, onDelete: () -> Unit) {
+private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boolean, onClick: () -> Unit, onPin: () -> Unit, onDelete: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) Accent.copy(alpha = 0.12f) else Color.Transparent)

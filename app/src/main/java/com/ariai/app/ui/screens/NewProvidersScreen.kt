@@ -67,10 +67,10 @@ fun NewProvidersScreen(
     val modelCount = providers.sumOf { it.models.size }
 
     Scaffold(
-        containerColor = Color(0xFFFEFBFF),
+        containerColor = Color(0xFFF7F6FB),
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFEFBFF)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
                 title = { Text("Providers", fontWeight = FontWeight.SemiBold, color = Ink) }
             )
