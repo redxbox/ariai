@@ -49,8 +49,11 @@ fun NewChatScreen(
     onCopyMessage: (String) -> Unit,
     onProviderChange: (String, String) -> Unit = { _, _ -> },
     onOpenDrawer: () -> Unit = {},
+    onSelectModel: (String, String) -> Unit = { _, _ -> },
+    onAddProvider: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var showModelSheet by remember { mutableStateOf(false) }
     var inputText by remember { mutableStateOf("") }
     var useSearch by remember { mutableStateOf(false) }
     var useReasoning by remember { mutableStateOf(false) }
@@ -85,6 +88,16 @@ fun NewChatScreen(
         showAttachments = false
     }
 
+    if (showModelSheet) {
+        ModelPickerSheet(
+            providers = providers,
+            selectedModelId = selectedModel,
+            onSelect = { pid, mid -> onSelectModel(pid, mid) },
+            onAddProvider = { showModelSheet = false; onAddProvider() },
+            onDismiss = { showModelSheet = false }
+        )
+    }
+
     Scaffold(
         containerColor = Color(0xFFFEFBFF),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -98,9 +111,9 @@ fun NewChatScreen(
                     }
                 },
                 title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().clickable { showModelSheet = true }) {
                         Text(chat?.title?.takeIf { it.isNotBlank() } ?: "New chat", color = Ink, fontWeight = FontWeight.SemiBold, maxLines = 1, fontSize = 16.sp)
-                        Text(selectedModel ?: "No model selected", color = Muted, fontSize = 11.sp, maxLines = 1)
+                        Text(selectedModel ?: "Tap to choose a model", color = Muted, fontSize = 11.sp, maxLines = 1)
                     }
                 },
                 actions = {

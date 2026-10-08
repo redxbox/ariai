@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -43,9 +45,12 @@ class MainActivity : ComponentActivity() {
                 else -> isSystemInDarkTheme()
             }
 
-            CompositionLocalProvider(LocalStrings provides strings) {
-                AriAiTheme(darkTheme = isDarkTheme, dynamicColor = dynamicColor) {
-                    AppRoot(viewModel = viewModel)
+            // The app is English-only: force LTR so menus and text never mirror on RTL devices.
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                CompositionLocalProvider(LocalStrings provides strings) {
+                    AriAiTheme(darkTheme = isDarkTheme, dynamicColor = dynamicColor) {
+                        AppRoot(viewModel = viewModel)
+                    }
                 }
             }
         }
@@ -72,6 +77,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val dynamicColor by viewModel.dynamicColor.collectAsState()
     val searchKeys by viewModel.searchKeys.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
+    val mcpServers = remember { mutableStateListOf<McpServerItem>() }
 
     fun go(route: String) {
         scope.launch { drawerState.close() }
@@ -156,7 +162,9 @@ fun AppRoot(viewModel: AppViewModel) {
                         onBranchMessage = { viewModel.branchMessage(it) },
                         onRegenerate = { viewModel.regenerateMessage(it) },
                         onCopyMessage = { },
-                        onOpenDrawer = { scope.launch { drawerState.open() } }
+                        onOpenDrawer = { scope.launch { drawerState.open() } },
+                        onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },
+                        onAddProvider = { navController.navigate("add_provider") }
                     )
                 }
 
@@ -226,7 +234,16 @@ fun AppRoot(viewModel: AppViewModel) {
                 }
 
                 composable("mcp") {
-                    SimpleMcpScreen(onBack = { navController.popBackStack() })
+                    SimpleMcpScreen(
+                        servers = mcpServers,
+                        onToggle = { id ->
+                            val i = mcpServers.indexOfFirst { it.id == id }
+                            if (i >= 0) mcpServers[i] = mcpServers[i].copy(enabled = !mcpServers[i].enabled)
+                        },
+                        onAdd = { mcpServers.add(it) },
+                        onRemove = { id -> mcpServers.removeAll { it.id == id } },
+                        onBack = { navController.popBackStack() }
+                    )
                 }
 
                 composable("search") {
