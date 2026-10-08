@@ -293,11 +293,13 @@ fun AddProviderScreen(
     var reveal by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val accent = providerPresets.firstOrNull { it.type == selectedType }?.color ?: initialPreset.color
-    val canSave = name.isNotBlank() && baseUrl.isNotBlank()
     val providerId = remember { initialProvider?.id ?: java.util.UUID.randomUUID().toString() }
     var models by remember { mutableStateOf(initialProvider?.models ?: getDefaultModelsForType(selectedType, providerId)) }
     var modelsEdited by remember { mutableStateOf(initialProvider != null) }
     var showAddModel by remember { mutableStateOf(false) }
+    var headers by remember { mutableStateOf(initialProvider?.customHeaders?.map { it.key to it.value }.orEmpty()) }
+    var customBody by remember { mutableStateOf(initialProvider?.customBody.orEmpty()) }
+    val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody)
     // Brand presets fill in the default models, until the user edits the list.
     LaunchedEffect(selectedType) {
         if (!modelsEdited) models = getDefaultModelsForType(selectedType, providerId)
@@ -305,6 +307,7 @@ fun AddProviderScreen(
     if (showAddModel) {
         AddModelSheet(
             providerId = providerId,
+            providerType = selectedType,
             onAdd = { model ->
                 models = models + model
                 modelsEdited = true
@@ -456,6 +459,28 @@ fun AddProviderScreen(
                 }
             }
 
+            // Advanced: headers and body sent to every model of this provider.
+            item { SectionLabel("Advanced") }
+            item {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Custom headers", fontWeight = FontWeight.Medium, color = AriInk)
+                        KeyValueEditor(items = headers, onChange = { headers = it })
+                        OutlinedTextField(
+                            value = customBody,
+                            onValueChange = { customBody = it },
+                            label = { Text("Custom body (JSON)") },
+                            minLines = 2,
+                            maxLines = 6,
+                            isError = !isValidJsonObject(customBody),
+                            supportingText = { if (!isValidJsonObject(customBody)) Text("Must be a JSON object") },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
             item { Spacer(Modifier.height(4.dp)) }
 
             // Actions
@@ -471,8 +496,8 @@ fun AddProviderScreen(
                                 apiKey = apiKey.trim(),
                                 models = models.map { it.copy(providerId = providerId) },
                                 enabled = initialProvider?.enabled ?: true,
-                                customHeaders = initialProvider?.customHeaders ?: emptyMap(),
-                                customBody = initialProvider?.customBody,
+                                customHeaders = headers.filter { it.first.isNotBlank() }.toMap(),
+                                customBody = customBody.trim().ifBlank { null },
                                 createdAt = initialProvider?.createdAt ?: System.currentTimeMillis()
                             )
                         )
@@ -516,6 +541,8 @@ private fun ModelRow(model: AIModel, color: Color, onRemove: () -> Unit) {
                     if (model.supportsVision) ModelTag("Vision", AriTagBlueBg, AriTagBlueFg)
                     if (model.supportsFunctionCalling) ModelTag("Tools", AriTagGreenBg, AriTagGreenFg)
                     if (model.supportsImageGen) ModelTag("Image", AriTagAmberBg, AriTagAmberFg)
+                    if ("google_search" in model.builtInTools) ModelTag("Search", AriTagAmberBg, AriTagAmberFg)
+                    if ("url_context" in model.builtInTools) ModelTag("URL", AriTagAmberBg, AriTagAmberFg)
                 }
             }
             IconButton(onClick = onRemove) {
@@ -532,39 +559,140 @@ private fun ModelTag(label: String, bg: Color, fg: Color) {
     }
 }
 
-/** Basic model form: id, name, type and capabilities. Mirrors the reference's Basic Settings. */
+/** Key/value rows for custom headers. */
+@Composable
+private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pair<String, String>>) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.forEachIndexed { index, pair ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = pair.first,
+                    onValueChange = { key -> onChange(items.toMutableList().also { it[index] = key to pair.second }) },
+                    label = { Text("Header") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = pair.second,
+                    onValueChange = { value -> onChange(items.toMutableList().also { it[index] = pair.first to value }) },
+                    label = { Text("Value") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { onChange(items.toMutableList().also { it.removeAt(index) }) }) {
+                    Icon(Icons.Default.Close, contentDescription = "Remove header", tint = AriMuted)
+                }
+            }
+        }
+        OutlinedButton(
+            onClick = { onChange(items + ("" to "")) },
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Add header")
+        }
+    }
+}
+
+/** True when the text is empty or a JSON object. */
+private fun isValidJsonObject(text: String): Boolean =
+    text.isBlank() || runCatching { org.json.JSONObject(text) }.isSuccess
+
+@Composable
+private fun ToolToggleRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = AriTint, modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Medium, color = if (enabled) AriInk else AriMuted)
+                Text(subtitle, fontSize = 12.sp, color = AriMuted)
+            }
+            Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        }
+    }
+}
+
+/** Model form with the reference's three tabs: Built-in Tools, Advanced, Basic. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddModelSheet(providerId: String, onAdd: (AIModel) -> Unit, onDismiss: () -> Unit) {
+private fun AddModelSheet(
+    providerId: String,
+    providerType: ProviderType,
+    onAdd: (AIModel) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var tab by remember { mutableStateOf(2) }
     var modelId by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var isImage by remember { mutableStateOf(false) }
     var vision by remember { mutableStateOf(false) }
     var tools by remember { mutableStateOf(true) }
+    var search by remember { mutableStateOf(false) }
+    var urlContext by remember { mutableStateOf(false) }
+    var headers by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+    var customBody by remember { mutableStateOf("") }
+    val bodyValid = isValidJsonObject(customBody)
+    val isGemini = providerType == ProviderType.GEMINI
+
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             Text("Add model", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
-            OutlinedTextField(
-                value = modelId, onValueChange = { modelId = it }, label = { Text("Model ID") },
-                singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = displayName, onValueChange = { displayName = it }, label = { Text("Display name (optional)") },
-                singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
-            )
-            Text("Type", fontSize = 12.sp, color = AriMuted)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !isImage, onClick = { isImage = false }, label = { Text("Chat") })
-                FilterChip(selected = isImage, onClick = { isImage = true }, label = { Text("Image") })
+            TabRow(selectedTabIndex = tab, containerColor = AriPaper) {
+                listOf("Built-in Tools", "Advanced", "Basic").forEachIndexed { index, label ->
+                    Tab(selected = tab == index, onClick = { tab = index }, text = { Text(label, fontSize = 12.sp) })
+                }
             }
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Accepts images", modifier = Modifier.weight(1f), color = AriInk)
-                Switch(checked = vision, onCheckedChange = { vision = it })
+
+            when (tab) {
+                0 -> {
+                    Text(
+                        if (isGemini) "Tools the API runs for this model." else "Built-in tools need the official Gemini API. Turn on a Gemini provider to use them.",
+                        fontSize = 12.sp, color = AriMuted
+                    )
+                    ToolToggleRow("Search", "Google Search grounding", search, enabled = isGemini) { search = it }
+                    ToolToggleRow("URL context", "Read the links in the message", urlContext, enabled = isGemini) { urlContext = it }
+                }
+                1 -> {
+                    Text("Extra headers for this model only.", fontSize = 12.sp, color = AriMuted)
+                    KeyValueEditor(items = headers, onChange = { headers = it })
+                    OutlinedTextField(
+                        value = customBody,
+                        onValueChange = { customBody = it },
+                        label = { Text("Custom body (JSON)") },
+                        placeholder = { Text("{\"temperature\": 0.2}") },
+                        minLines = 3,
+                        maxLines = 6,
+                        isError = !bodyValid,
+                        supportingText = { if (!bodyValid) Text("Must be a JSON object") },
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                else -> {
+                    OutlinedTextField(
+                        value = modelId, onValueChange = { modelId = it }, label = { Text("Model ID") },
+                        singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = displayName, onValueChange = { displayName = it }, label = { Text("Display name (optional)") },
+                        singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Type", fontSize = 12.sp, color = AriMuted)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !isImage, onClick = { isImage = false }, label = { Text("Chat") })
+                        FilterChip(selected = isImage, onClick = { isImage = true }, label = { Text("Image") })
+                    }
+                    ToolToggleRow("Accepts images", "Vision input", vision, enabled = true) { vision = it }
+                    ToolToggleRow("Tool calling", "Function calling", tools, enabled = true) { tools = it }
+                }
             }
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Tool calling", modifier = Modifier.weight(1f), color = AriInk)
-                Switch(checked = tools, onCheckedChange = { tools = it })
-            }
+
             Button(
                 onClick = {
                     val id = modelId.trim()
@@ -577,11 +705,17 @@ private fun AddModelSheet(providerId: String, onAdd: (AIModel) -> Unit, onDismis
                             supportsFunctionCalling = tools,
                             supportsImageGen = isImage,
                             contextWindow = 8192,
-                            isCustom = true
+                            isCustom = true,
+                            builtInTools = listOfNotNull(
+                                "google_search".takeIf { search && isGemini },
+                                "url_context".takeIf { urlContext && isGemini }
+                            ),
+                            headers = headers.filter { it.first.isNotBlank() }.toMap(),
+                            customBody = customBody.trim().ifBlank { null }
                         )
                     )
                 },
-                enabled = modelId.isNotBlank(),
+                enabled = modelId.isNotBlank() && bodyValid,
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AriInk),
                 modifier = Modifier.fillMaxWidth().height(50.dp)

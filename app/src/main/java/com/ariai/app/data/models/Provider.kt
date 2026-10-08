@@ -35,7 +35,13 @@ data class AIModel(
     val supportsFunctionCalling: Boolean = true,
     val supportsImageGen: Boolean = false,
     val contextWindow: Int = 8192,
-    val isCustom: Boolean = false
+    val isCustom: Boolean = false,
+    /** Gemini built-in tools: "google_search", "url_context". */
+    val builtInTools: List<String> = emptyList(),
+    /** Extra HTTP headers sent only for this model. */
+    val headers: Map<String, String> = emptyMap(),
+    /** Extra JSON merged into the request body for this model. */
+    val customBody: String? = null
 ) : Parcelable
 
 fun getDefaultModelsForType(type: ProviderType, providerId: String): List<AIModel> {

@@ -181,7 +181,11 @@ class ChatRepository(
             enabled = enabled,
             customHeaders = try { Converters().toStringMap(customHeaders) } catch (e: Exception) { emptyMap() },
             customBody = customBody,
-            createdAt = createdAt
+            createdAt = createdAt,
+            models = com.ariai.app.data.models.modelsFromJson(modelsJson).ifEmpty {
+                // Providers saved before model storage existed start with the defaults.
+                if (modelsJson == "[]") com.ariai.app.data.models.getDefaultModelsForType(runCatching { ProviderType.valueOf(type) }.getOrDefault(ProviderType.OPENAI_COMPATIBLE), id) else emptyList()
+            }
         )
     } catch (e: Exception) {
         Provider(id = id, name = name.ifBlank { "Unknown" }, type = ProviderType.OPENAI_COMPATIBLE, baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" }, apiKey = apiKey)
@@ -196,7 +200,8 @@ class ChatRepository(
         enabled = enabled,
         customHeaders = try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { "" },
         customBody = customBody,
-        createdAt = createdAt
+        createdAt = createdAt,
+        modelsJson = com.ariai.app.data.models.modelsToJson(models)
     )
 
     private fun ChatEntity.toModel() = Chat(

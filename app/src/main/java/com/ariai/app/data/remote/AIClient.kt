@@ -55,7 +55,8 @@ class AIClient {
                 ProviderType.GEMINI -> {}
             }
 
-            provider.customHeaders.forEach { (k, v) ->
+            val modelHeaders = provider.models.find { it.id == modelId }?.headers.orEmpty()
+            (provider.customHeaders + modelHeaders).forEach { (k, v) ->
                 if (k.isNotBlank() && v.isNotBlank()) {
                     requestBuilder.addHeader(k, v)
                 }
@@ -256,6 +257,13 @@ class AIClient {
         }
     }
 
+    /** Built-in tool names enabled for this model. Only Gemini supports them. */
+    private fun modelTools(provider: Provider, modelId: String): MutableList<String> {
+        if (provider.type != ProviderType.GEMINI) return mutableListOf()
+        val enabled = provider.models.find { it.id == modelId }?.builtInTools.orEmpty()
+        return enabled.filter { it == "google_search" || it == "url_context" }.toMutableList()
+    }
+
     private fun buildChatUrl(provider: Provider, modelId: String = "", forceNonStream: Boolean = false): String {
         val base = provider.baseUrl.trimEnd('/')
 
@@ -328,8 +336,10 @@ class AIClient {
                     put("maxOutputTokens", 8192)
                     reasoning.geminiBudget?.let { put("thinkingConfig", JSONObject().put("thinkingBudget", it)) }
                 })
-                if (nativeSearch) {
-                    json.put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
+                val tools = modelTools(provider, modelId)
+                if (nativeSearch && !tools.contains("google_search")) tools.add("google_search")
+                if (tools.isNotEmpty()) {
+                    json.put("tools", JSONArray().apply { tools.forEach { put(JSONObject().put(it, JSONObject())) } })
                 }
             }
             ProviderType.ANTHROPIC -> {
@@ -417,7 +427,8 @@ class AIClient {
             }
         }
 
-        provider.customBody?.let { custom ->
+        val modelBody = provider.models.find { it.id == modelId }?.customBody
+        listOfNotNull(provider.customBody, modelBody).forEach { custom ->
             try {
                 val customJson = JSONObject(custom)
                 customJson.keys().forEach { key ->

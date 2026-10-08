@@ -14,7 +14,10 @@ class AriAiApp : Application() {
             this,
             AppDatabase::class.java,
             "ariai_db"
-        ).fallbackToDestructiveMigration().build()
+        )
+            .addMigrations(com.ariai.app.data.local.MIGRATION_1_2)
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     val preferencesManager by lazy {

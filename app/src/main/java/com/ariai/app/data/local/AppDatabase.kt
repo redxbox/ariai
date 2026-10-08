@@ -52,7 +52,8 @@ data class ProviderEntity(
     val enabled: Boolean,
     val customHeaders: String,
     val customBody: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    @ColumnInfo(defaultValue = "[]") val modelsJson: String = "[]"
 )
 
 @Entity(tableName = "chats")
@@ -168,7 +169,7 @@ interface AgentDao {
 
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
