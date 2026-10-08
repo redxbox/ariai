@@ -49,3 +49,20 @@ fun modelsFromJson(raw: String): List<AIModel> = try {
 } catch (e: Exception) {
     emptyList()
 }
+
+/** Reads a provider pasted as JSON: name, type, baseUrl, apiKey, optional customHeaders and customBody. */
+fun providerFromJson(text: String): Provider? = try {
+    val o = JSONObject(text.trim())
+    val name = o.optString("name").trim()
+    val baseUrl = o.optString("baseUrl").trim()
+    if (name.isBlank() || baseUrl.isBlank()) null else Provider(
+        name = name,
+        type = runCatching { ProviderType.valueOf(o.optString("type")) }.getOrDefault(ProviderType.OPENAI_COMPATIBLE),
+        baseUrl = baseUrl,
+        apiKey = o.optString("apiKey").trim(),
+        customHeaders = o.optJSONObject("customHeaders")?.let { h -> h.keys().asSequence().associateWith { h.getString(it) } } ?: emptyMap(),
+        customBody = o.optString("customBody").ifBlank { null }
+    )
+} catch (e: Exception) {
+    null
+}

@@ -262,9 +262,9 @@ fun PopularProviderRow(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-private data class ProviderPreset(val label: String, val type: ProviderType, val baseUrl: String, val color: Color)
+internal data class ProviderPreset(val label: String, val type: ProviderType, val baseUrl: String, val color: Color)
 
-private val providerPresets = listOf(
+internal val providerPresets = listOf(
     ProviderPreset("OpenAI", ProviderType.OPENAI, "https://api.openai.com/v1", AriOpenAI),
     ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", AriGemini),
     ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", AriAnthropic),
@@ -280,6 +280,7 @@ private val providerPresets = listOf(
 @Composable
 fun AddProviderScreen(
     initialProvider: Provider? = null,
+    presetType: ProviderType? = null,
     fetchModels: suspend (Provider) -> List<AIModel>,
     onSave: (Provider) -> Unit,
     onBack: () -> Unit,
@@ -288,15 +289,15 @@ fun AddProviderScreen(
 ) {
     val isEdit = initialProvider != null
     val initialPreset = providerPresets.firstOrNull { it.type == initialProvider?.type } ?: providerPresets.last()
-    var name by remember { mutableStateOf(initialProvider?.name ?: "") }
-    var baseUrl by remember { mutableStateOf(initialProvider?.baseUrl ?: "https://api.openai.com/v1") }
+    var name by remember { mutableStateOf(initialProvider?.name ?: providerPresets.firstOrNull { it.type == presetType }?.label.orEmpty()) }
+    var baseUrl by remember { mutableStateOf(initialProvider?.baseUrl ?: providerPresets.firstOrNull { it.type == presetType }?.baseUrl ?: "https://api.openai.com/v1") }
     var apiKey by remember { mutableStateOf(initialProvider?.apiKey ?: "") }
-    var selectedType by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI) }
+    var selectedType by remember { mutableStateOf(initialProvider?.type ?: presetType ?: ProviderType.OPENAI) }
     var reveal by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val accent = providerPresets.firstOrNull { it.type == selectedType }?.color ?: initialPreset.color
     val providerId = remember { initialProvider?.id ?: java.util.UUID.randomUUID().toString() }
-    var models by remember { mutableStateOf(initialProvider?.models ?: getDefaultModelsForType(selectedType, providerId)) }
+    var models by remember { mutableStateOf(initialProvider?.models ?: emptyList()) }
     var modelsEdited by remember { mutableStateOf(initialProvider != null) }
     var showAddModel by remember { mutableStateOf(false) }
     var modelFilter by remember { mutableStateOf("") }
@@ -340,10 +341,6 @@ fun AddProviderScreen(
         }
     }
     val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody)
-    // Brand presets fill in the default models, until the user edits the list.
-    LaunchedEffect(selectedType) {
-        if (!modelsEdited) models = getDefaultModelsForType(selectedType, providerId)
-    }
     if (showAddModel) {
         AddModelSheet(
             providerId = providerId,
@@ -382,28 +379,6 @@ fun AddProviderScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Hero preview
-            item {
-                Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                        .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.55f))))
-                        .padding(20.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Box(
-                            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.22f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(name.firstOrNull()?.uppercase() ?: "?", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                        }
-                        Column {
-                            Text(name.ifBlank { "Provider name" }, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(providerTypeLabel(selectedType), color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-
             // Brand presets
             item { SectionLabel("Provider") }
             item {

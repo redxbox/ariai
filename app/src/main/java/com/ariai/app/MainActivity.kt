@@ -212,14 +212,21 @@ fun AppRoot(viewModel: AppViewModel) {
                     NewProvidersScreen(
                         providers = providers,
                         onAddProvider = { navController.navigate("add_provider") },
+                        onAddPreset = { navController.navigate("add_provider?preset=${it.name}") },
+                        onImportProvider = { viewModel.saveProvider(it) },
                         onEditProvider = { navController.navigate("edit_provider/${it.id}") },
                         onBack = { navController.popBackStack() },
                         onToggleProvider = { viewModel.saveProvider(it.copy(enabled = !it.enabled)) }
                     )
                 }
 
-                composable("add_provider") {
+                composable(
+                    "add_provider?preset={preset}",
+                    arguments = listOf(navArgument("preset") { type = NavType.StringType; defaultValue = "" })
+                ) { entry ->
                     AddProviderScreen(
+                        presetType = entry.arguments?.getString("preset")
+                            ?.let { runCatching { com.ariai.app.data.models.ProviderType.valueOf(it) }.getOrNull() },
                         fetchModels = { viewModel.fetchModels(it) },
                         onSave = { viewModel.saveProvider(it); navController.popBackStack() },
                         onBack = { navController.popBackStack() }
