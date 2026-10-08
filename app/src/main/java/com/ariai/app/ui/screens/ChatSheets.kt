@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,10 +24,10 @@ import com.ariai.app.data.models.ReasoningLevel
 import com.ariai.app.data.models.SearchMode
 import kotlin.math.roundToInt
 
-private val Accent = Color(0xFF6C4DFF)
+private val Accent = AriInk
 private val Ink = Color(0xFF1C1B1F)
-private val SheetBg = Color(0xFFF7F6FB)
-private val Tile = Color(0xFFEFEDF6)
+private val SheetBg = AriPaper
+private val Tile = AriTint
 
 /** Actions offered by the "+" button above the chat input. */
 @OptIn(ExperimentalMaterial3Api::class)

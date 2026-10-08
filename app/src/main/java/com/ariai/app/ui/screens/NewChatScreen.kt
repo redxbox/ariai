@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -57,10 +59,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Accent = Color(0xFF6C4DFF)
+private val Accent = AriInk
 private val Ink = Color(0xFF1C1B1F)
 private val Muted = Color(0xFF1C1B1F).copy(alpha = 0.55f)
-private val PageBg = Color(0xFFF7F6FB)
+private val PageBg = AriPaper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -261,7 +263,7 @@ fun NewChatScreen(
         bottomBar = {
             Column(
                 modifier = Modifier.fillMaxWidth().background(PageBg).navigationBarsPadding().imePadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (pending.isNotEmpty()) {
@@ -320,7 +322,7 @@ fun NewChatScreen(
                             val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && !isStreaming
                             Box(
                                 modifier = Modifier.size(40.dp).clip(CircleShape)
-                                    .background(animateColorAsState(if (canSend) Accent else Color(0xFFE6E0F5), tween(200), label = "send").value)
+                                    .background(animateColorAsState(if (canSend) AriAccent else AriTint, tween(200), label = "send").value)
                                     .clickable(enabled = canSend) { send() },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -385,7 +387,7 @@ private fun ModelChip(text: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
-        color = Color(0xFFF2F2F7)
+        color = AriTint
     ) {
         Text(
             text,
@@ -496,7 +498,7 @@ private fun ActionIcon(icon: ImageVector, description: String, onClick: () -> Un
 private fun IconCircle(icon: ImageVector, description: String, active: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier.size(36.dp).clip(CircleShape)
-            .background(if (active) Accent.copy(alpha = 0.14f) else Color(0xFFF2F2F7))
+            .background(if (active) Accent.copy(alpha = 0.14f) else AriTint)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

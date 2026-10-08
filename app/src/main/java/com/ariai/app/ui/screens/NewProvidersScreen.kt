@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 
-private val Accent = Color(0xFF6C4DFF)
+private val Accent = AriInk
 private val Ink = Color(0xFF1C1B1F)
 
 fun providerTypeLabel(type: ProviderType): String = when (type) {
@@ -36,12 +38,12 @@ fun providerTypeLabel(type: ProviderType): String = when (type) {
 }
 
 private fun providerColors(type: ProviderType): Pair<Color, Color> = when (type) {
-    ProviderType.OPENAI -> Color(0xFF10A37F) to Color(0xFF6BD7B5)
-    ProviderType.GEMINI -> Color(0xFF4285F4) to Color(0xFF8AB4F8)
-    ProviderType.ANTHROPIC -> Color(0xFFC96442) to Color(0xFFE8A07F)
-    ProviderType.OLLAMA -> Color(0xFF3A3A3C) to Color(0xFF8E8E93)
-    ProviderType.OPENAI_COMPATIBLE -> Color(0xFF6C4DFF) to Color(0xFFB7A6FF)
-    ProviderType.CUSTOM -> Color(0xFF7D5260) to Color(0xFFD7A9BD)
+    ProviderType.OPENAI -> AriMuted to AriMuted
+    ProviderType.GEMINI -> AriMuted to AriMuted
+    ProviderType.ANTHROPIC -> AriMuted to AriMuted
+    ProviderType.OLLAMA -> AriMuted to AriMuted
+    ProviderType.OPENAI_COMPATIBLE -> AriInk to AriMuted
+    ProviderType.CUSTOM -> AriMuted to AriMuted
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,10 +69,10 @@ fun NewProvidersScreen(
     val modelCount = providers.sumOf { it.models.size }
 
     Scaffold(
-        containerColor = Color(0xFFF7F6FB),
+        containerColor = AriPaper,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
                 title = { Text("Providers", fontWeight = FontWeight.SemiBold, color = Ink) }
             )
@@ -95,7 +97,7 @@ fun NewProvidersScreen(
                 // Hero summary
                 Box(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                        .background(Brush.linearGradient(listOf(Accent, Color(0xFF9C7CFF), Color(0xFF4FC3F7))))
+                        .background(Brush.linearGradient(listOf(Accent, AriMuted, AriMuted)))
                         .padding(20.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -203,7 +205,7 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
                 }
                 val extra = provider.models.size - shown.size
                 if (extra > 0) {
-                    Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFFF2F2F7)) {
+                    Surface(shape = RoundedCornerShape(10.dp), color = AriTint) {
                         Text("+$extra", color = Ink.copy(alpha = 0.6f), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                     }
                 }
@@ -213,7 +215,7 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (provider.enabled) Color(0xFF34C759) else Color(0xFFAEAEB2)))
+                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (provider.enabled) AriInk else AriMuted))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     if (provider.enabled) "Active" else "Disabled",

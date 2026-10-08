@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -97,7 +99,7 @@ fun ProviderListScreen(
                         ) {
                             Box(
                                 modifier = Modifier.size(80.dp).clip(CircleShape).background(
-                                    Brush.linearGradient(colors = listOf(Color(0xFF6C4DFF).copy(alpha = 0.3f), Color(0xFF00D4AA).copy(alpha = 0.3f)))
+                                    Brush.linearGradient(colors = listOf(AriInk.copy(alpha = 0.3f), AriInk.copy(alpha = 0.3f)))
                                 ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -131,13 +133,13 @@ fun ProviderListScreen(
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PopularProviderRow(name = "OpenAI", subtitle = "GPT-4o, 4o-mini, o3", letter = "O", colors = listOf(Color(0xFF74AA9C), Color(0xFF10A37F)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Anthropic", subtitle = "Claude 3.7, 3.5", letter = "C", colors = listOf(Color(0xFFD4A574), Color(0xFFCC785C)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Google", subtitle = "Gemini 2.0, 1.5", letter = "G", colors = listOf(Color(0xFF4285F4), Color(0xFF34A853)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Meta", subtitle = "Llama 3.3, 3.1", letter = "M", colors = listOf(Color(0xFF0668E1), Color(0xFF00C7FB)), onClick = onAddProvider)
-                    PopularProviderRow(name = "DeepSeek", subtitle = "R1, V3", letter = "D", colors = listOf(Color(0xFF4D6BFE), Color(0xFF6C4DFF)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Qwen", subtitle = "Qwen3, Qwen2.5", letter = "Q", colors = listOf(Color(0xFF7C4DFF), Color(0xFF536DFE)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Mistral", subtitle = "Large, Medium, Small", letter = "Mi", colors = listOf(Color(0xFFFF6B35), Color(0xFFF7931E)), onClick = onAddProvider)
+                    PopularProviderRow(name = "OpenAI", subtitle = "GPT-4o, 4o-mini, o3", letter = "O", colors = listOf(AriInk, AriMuted), onClick = onAddProvider)
+                    PopularProviderRow(name = "Anthropic", subtitle = "Claude 3.7, 3.5", letter = "C", colors = listOf(AriAccent, AriAccent), onClick = onAddProvider)
+                    PopularProviderRow(name = "Google", subtitle = "Gemini 2.0, 1.5", letter = "G", colors = listOf(AriMuted, AriInk), onClick = onAddProvider)
+                    PopularProviderRow(name = "Meta", subtitle = "Llama 3.3, 3.1", letter = "M", colors = listOf(AriInk, AriInk), onClick = onAddProvider)
+                    PopularProviderRow(name = "DeepSeek", subtitle = "R1, V3", letter = "D", colors = listOf(AriInk, AriInk), onClick = onAddProvider)
+                    PopularProviderRow(name = "Qwen", subtitle = "Qwen3, Qwen2.5", letter = "Q", colors = listOf(AriInk, AriInk), onClick = onAddProvider)
+                    PopularProviderRow(name = "Mistral", subtitle = "Large, Medium, Small", letter = "Mi", colors = listOf(AriAccent, AriAccent), onClick = onAddProvider)
                 }
             }
 
@@ -171,11 +173,11 @@ fun GlassProviderCard(
     var enabled by remember { mutableStateOf(provider.enabled) }
 
     val providerColor = when (provider.type) {
-        ProviderType.OPENAI -> listOf(Color(0xFF74AA9C), Color(0xFF10A37F))
-        ProviderType.GEMINI -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
-        ProviderType.ANTHROPIC -> listOf(Color(0xFFD4A574), Color(0xFFCC785C))
+        ProviderType.OPENAI -> listOf(AriInk, AriMuted)
+        ProviderType.GEMINI -> listOf(AriMuted, AriInk)
+        ProviderType.ANTHROPIC -> listOf(AriAccent, AriAccent)
         ProviderType.OLLAMA -> listOf(Color(0xFF000000), Color(0xFF434343))
-        else -> listOf(Color(0xFF6C4DFF), Color(0xFF00D4AA))
+        else -> listOf(AriInk, AriInk)
     }
 
     Card(
@@ -262,11 +264,11 @@ fun PopularProviderRow(
 private data class ProviderPreset(val label: String, val type: ProviderType, val baseUrl: String, val color: Color)
 
 private val providerPresets = listOf(
-    ProviderPreset("OpenAI", ProviderType.OPENAI, "https://api.openai.com/v1", Color(0xFF10A37F)),
-    ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", Color(0xFF4285F4)),
-    ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", Color(0xFFC96442)),
-    ProviderPreset("Ollama", ProviderType.OLLAMA, "http://localhost:11434/v1", Color(0xFF3A3A3C)),
-    ProviderPreset("Custom", ProviderType.OPENAI_COMPATIBLE, "", Color(0xFF6C4DFF))
+    ProviderPreset("OpenAI", ProviderType.OPENAI, "https://api.openai.com/v1", AriMuted),
+    ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", AriMuted),
+    ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", AriMuted),
+    ProviderPreset("Ollama", ProviderType.OLLAMA, "http://localhost:11434/v1", AriMuted),
+    ProviderPreset("Custom", ProviderType.OPENAI_COMPATIBLE, "", AriInk)
 )
 
 /**
@@ -299,16 +301,16 @@ fun AddProviderScreen(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete provider?") },
             text = { Text("${initialProvider.name} and its models will be removed.") },
-            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete(initialProvider.id) }) { Text("Delete", color = Color(0xFFBA1A1A)) } },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete(initialProvider.id) }) { Text("Delete", color = AriAccent) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
         )
     }
 
     Scaffold(
-        containerColor = Color(0xFFF7F6FB),
+        containerColor = AriPaper,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFF1C1B1F)) } },
                 title = { Text(if (isEdit) "Edit provider" else "Add provider", fontWeight = FontWeight.SemiBold, color = Color(0xFF1C1B1F)) }
             )
@@ -452,7 +454,7 @@ fun AddProviderScreen(
                     },
                     enabled = canSave,
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C4DFF)),
+                    colors = ButtonDefaults.buttonColors(containerColor = AriInk),
                     modifier = Modifier.fillMaxWidth().height(52.dp)
                 ) { Text("Save", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
             }
@@ -463,7 +465,7 @@ fun AddProviderScreen(
                         onClick = { confirmDelete = true },
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) { Text("Delete provider", color = Color(0xFFBA1A1A), fontWeight = FontWeight.SemiBold) }
+                    ) { Text("Delete provider", color = AriAccent, fontWeight = FontWeight.SemiBold) }
                 }
             }
             item { Spacer(Modifier.height(24.dp)) }

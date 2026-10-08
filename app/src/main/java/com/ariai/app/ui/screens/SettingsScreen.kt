@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -55,7 +57,7 @@ fun SettingsScreen(
                 ) {
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            modifier = Modifier.size(48.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF6C4DFF), Color(0xFF00D4AA)))),
+                            modifier = Modifier.size(48.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AriInk, AriInk))),
                             contentAlignment = Alignment.Center
                         ) {
                             Text("A", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
@@ -87,12 +89,12 @@ fun SettingsScreen(
                         HorizontalDivider()
                         Text("Accent Color", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                            listOf(Color(0xFF6C4DFF), Color(0xFF2196F3), Color(0xFFE91E63), Color(0xFFFF9800), Color(0xFF4CAF50)).forEach { color ->
+                            listOf(AriInk, AriInk, AriAccent, AriAccent, AriInk).forEach { color ->
                                 Box(
                                     modifier = Modifier.size(40.dp).clip(CircleShape).background(color).clickable { },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (color == Color(0xFF6C4DFF)) {
+                                    if (color == AriInk) {
                                         Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                                     }
                                 }

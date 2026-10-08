@@ -1,61 +1,58 @@
 package com.ariai.app.ui.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+// Monochrome: white and black, with one small accent used per screen.
 private val DarkColorScheme = darkColorScheme(
-    primary = androidx.compose.ui.graphics.Color(0xFFB7A6FF),
-    onPrimary = androidx.compose.ui.graphics.Color(0xFF2A1B7A),
-    secondary = PurpleGrey80,
-    tertiary = Pink80,
-    background = androidx.compose.ui.graphics.Color(0xFF121216),
-    surface = androidx.compose.ui.graphics.Color(0xFF1C1B22),
-    onBackground = androidx.compose.ui.graphics.Color(0xFFE6E1E9),
-    onSurface = androidx.compose.ui.graphics.Color(0xFFE6E1E9)
+    primary = Color.White,
+    onPrimary = Color(0xFF111111),
+    secondary = Color(0xFFBDBDBD),
+    tertiary = AriAccent,
+    background = Color(0xFF000000),
+    surface = Color(0xFF000000),
+    surfaceVariant = Color(0xFF1C1C1C),
+    onBackground = Color(0xFFF2F2F2),
+    onSurface = Color(0xFFF2F2F2),
+    outline = Color(0x33FFFFFF)
 )
 
-// Light palette: soft lavender-gray canvas, white raised surfaces, violet accent.
 private val LightColorScheme = lightColorScheme(
-    primary = androidx.compose.ui.graphics.Color(0xFF6C4DFF),
-    onPrimary = androidx.compose.ui.graphics.Color.White,
-    secondary = PurpleGrey40,
-    tertiary = Pink40,
-    background = androidx.compose.ui.graphics.Color(0xFFF7F6FB),
-    surface = androidx.compose.ui.graphics.Color.White,
-    surfaceVariant = androidx.compose.ui.graphics.Color(0xFFEFEDF6),
-    onBackground = androidx.compose.ui.graphics.Color(0xFF1C1B1F),
-    onSurface = androidx.compose.ui.graphics.Color(0xFF1C1B1F),
-    outline = androidx.compose.ui.graphics.Color(0x1F000000)
+    primary = AriInk,
+    onPrimary = Color.White,
+    secondary = Color(0xFF555555),
+    tertiary = AriAccent,
+    background = AriPaper,
+    surface = AriPaper,
+    surfaceVariant = AriTint,
+    onBackground = AriInk,
+    onSurface = AriInk,
+    outline = AriLine
 )
 
 @Composable
 fun AriAiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    // Dynamic colour is off: the palette must stay black and white.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = colorScheme.background.toArgb()
+            window.navigationBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
         }
     }
 

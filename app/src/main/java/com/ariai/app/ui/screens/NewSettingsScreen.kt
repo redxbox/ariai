@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -36,7 +38,7 @@ fun NewSettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
+    Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -70,7 +72,7 @@ fun NewSettingsScreen(
                         modifier = Modifier.fillMaxWidth().clickable { scope.launch { snackbarHostState.showSnackbar("Personal Workspace: AriAI") } }
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFF6C4DFF)), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(AriInk), contentAlignment = Alignment.Center) {
                                 Text("A", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             }
                             Column(modifier = Modifier.weight(1f)) {
@@ -89,14 +91,6 @@ fun NewSettingsScreen(
                             ThemeChip(label = "Light", icon = Icons.Default.Star, selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
                             ThemeChip(label = "Dark", icon = Icons.Default.Star, selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
                             ThemeChip(label = "System", icon = Icons.Default.Settings, selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column {
-                                Text("Dynamic colors", fontSize = 13.sp, color = Color.Black, fontWeight = FontWeight.Medium)
-                                Text("Use system colors", fontSize = 11.sp, color = Color.Black.copy(alpha = 0.5f))
-                            }
-                            Switch(checked = dynamicColor, onCheckedChange = onDynamicColorChange, colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF6C4DFF)))
                         }
                     }
                 }
@@ -155,7 +149,7 @@ fun NewSettingsScreen(
 fun ThemeChip(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) Color(0xFF6C4DFF) else Color(0xFFF2F2F7),
+        color = if (selected) AriInk else AriTint,
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -180,7 +174,7 @@ fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 @Composable
 fun SettingsItem(icon: ImageVector, title: String, value: String, onClick: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF2F2F7)), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(AriTint), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = Color.Black.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
         }
         Text(title, modifier = Modifier.weight(1f), fontSize = 14.sp, color = Color.Black, fontWeight = FontWeight.Medium)

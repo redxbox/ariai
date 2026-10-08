@@ -1,5 +1,7 @@
 package com.ariai.app
 
+import com.ariai.app.ui.theme.*
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,7 +45,6 @@ class MainActivity : ComponentActivity() {
 
             val language by viewModel.language.collectAsState()
             val theme by viewModel.theme.collectAsState()
-            val dynamicColor by viewModel.dynamicColor.collectAsState()
             val strings = getStringsForLanguage(language)
 
             val isDarkTheme = when (theme) {
@@ -55,7 +56,7 @@ class MainActivity : ComponentActivity() {
             // The app is English-only: force LTR so menus and text never mirror on RTL devices.
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 CompositionLocalProvider(LocalStrings provides strings) {
-                    AriAiTheme(darkTheme = isDarkTheme, dynamicColor = dynamicColor) {
+                    AriAiTheme(darkTheme = isDarkTheme) {
                         AppRoot(viewModel = viewModel)
                     }
                 }
@@ -68,10 +69,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppRoot(viewModel: AppViewModel) {
     val navController = rememberNavController()
+    // Opening the app lands directly on a chat, not on a list.
+    val startRoute = remember { "chat/${viewModel.createNewChat()}" }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val backStack by navController.currentBackStackEntryAsState()
-    val currentRoute = backStack?.destination?.route ?: "chats"
+    val currentRoute = backStack?.destination?.route ?: startRoute
     val snackbarHostState = remember { SnackbarHostState() }
 
     val providers by viewModel.providers.collectAsState()
@@ -81,7 +84,6 @@ fun AppRoot(viewModel: AppViewModel) {
     val streamingContent by viewModel.streamingContent.collectAsState()
     val language by viewModel.language.collectAsState()
     val theme by viewModel.theme.collectAsState()
-    val dynamicColor by viewModel.dynamicColor.collectAsState()
     val searchKeys by viewModel.searchKeys.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
     val mcpServers = remember { mutableStateListOf<McpServerItem>() }
@@ -117,8 +119,8 @@ fun AppRoot(viewModel: AppViewModel) {
         gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = Color.White,
-                drawerContentColor = Color(0xFF1C1B1F),
+                drawerContainerColor = AriPaper,
+                drawerContentColor = AriInk,
                 modifier = Modifier.width(312.dp)
             ) {
                 AppDrawerContent(
@@ -140,13 +142,16 @@ fun AppRoot(viewModel: AppViewModel) {
             }
         }
     ) {
+        // Screens handle their own status/navigation-bar insets, so the outer
+        // Scaffold adds none. This removes the double top and bottom margin.
         Scaffold(
-            containerColor = Color(0xFFF7F6FB),
+            containerColor = AriPaper,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
             NavHost(
                 navController = navController,
-                startDestination = "chats",
+                startDestination = startRoute,
                 modifier = Modifier.padding(padding),
                 enterTransition = {
                     fadeIn(tween(220)) + slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { it / 6 }
@@ -257,8 +262,6 @@ fun AppRoot(viewModel: AppViewModel) {
                     PreferencesScreen(
                         theme = theme,
                         onThemeChange = { viewModel.setTheme(it) },
-                        dynamicColor = dynamicColor,
-                        onDynamicColorChange = { viewModel.setDynamicColor(it) },
                         reasoning = reasoningLevel,
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         fontSize = fontSize,

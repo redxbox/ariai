@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -136,9 +138,9 @@ fun VoiceChatScreen(
                         .background(
                             Brush.linearGradient(
                                 colors = when {
-                                    isListening -> listOf(Color(0xFFFF3D57), Color(0xFFFF8A65))
-                                    isSpeaking -> listOf(Color(0xFF00C853), Color(0xFF69F0AE))
-                                    isProcessing -> listOf(Color(0xFFFFD600), Color(0xFFFFAB00))
+                                    isListening -> listOf(AriAccent, AriAccent)
+                                    isSpeaking -> listOf(AriInk, AriInk)
+                                    isProcessing -> listOf(AriAccent, AriAccent)
                                     else -> listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
                                 }
                             )
@@ -173,7 +175,7 @@ fun VoiceChatScreen(
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
-                    color = if (isListening) Color(0xFFFF3D57) else MaterialTheme.colorScheme.onSurface
+                    color = if (isListening) AriAccent else MaterialTheme.colorScheme.onSurface
                 )
 
                 if (recognizedText.isNotEmpty()) {
@@ -189,7 +191,7 @@ fun VoiceChatScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFFFF3D57))
+                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp), tint = AriAccent)
                             Text(recognizedText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                         }
                     }
@@ -219,7 +221,7 @@ fun VoiceChatScreen(
                     },
                     modifier = Modifier.size(80.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = if (isListening) Color(0xFFFF3D57) else MaterialTheme.colorScheme.primary
+                        containerColor = if (isListening) AriAccent else MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Icon(

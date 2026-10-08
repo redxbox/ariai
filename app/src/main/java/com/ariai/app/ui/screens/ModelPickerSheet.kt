@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,7 +25,7 @@ import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.favoriteKey
 
-private val Accent = Color(0xFF6C4DFF)
+private val Accent = AriInk
 private val Ink = Color(0xFF1C1B1F)
 
 /**
@@ -60,7 +62,7 @@ fun ModelPickerSheet(
         .map { p -> p to p.models.filter { matches(p, it) } }
         .filter { it.second.isNotEmpty() }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFFF7F6FB)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -196,7 +198,7 @@ private fun ModelRow(
                 Icon(
                     if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (favorite) "Remove from favorites" else "Add to favorites",
-                    tint = if (favorite) Accent else Ink.copy(alpha = 0.4f),
+                    tint = if (favorite) AriAccent else Ink.copy(alpha = 0.4f),
                     modifier = Modifier.size(20.dp)
                 )
             }

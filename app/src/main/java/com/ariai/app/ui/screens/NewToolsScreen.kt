@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,17 +32,17 @@ fun NewToolsScreen(
     val scope = rememberCoroutineScope()
 
     val tools = listOf(
-        ToolData("Image Generation", "Create with AI", Icons.Default.Image, Color(0xFF6750A4), "Generate an image of a futuristic city"),
-        ToolData("Vision", "Analyze images", Icons.Default.Search, Color(0xFF006A60), "Analyze this image and describe what you see"),
-        ToolData("Document Chat", "Chat with docs", Icons.Default.Description, Color(0xFF904D00), "Help me summarize this document"),
-        ToolData("Web Search", "Search web", Icons.Default.Search, Color(0xFF00639B), "Search the web for latest AI developments"),
-        ToolData("Code Assistant", "Write & debug", Icons.Default.Code, Color(0xFF6C4DFF), "Write a Python function to implement binary search"),
-        ToolData("Speech", "Voice chat", Icons.Default.Mic, Color(0xFFBA1A1A), "Start voice conversation"),
-        ToolData("Playground", "Test models", Icons.Default.Settings, Color(0xFF4F6600), "Open model playground"),
-        ToolData("Templates", "Quick prompts", Icons.Default.List, Color(0xFF7D5260), "Show prompt templates"),
+        ToolData("Image Generation", "Create with AI", Icons.Default.Image, AriInk, "Generate an image of a futuristic city"),
+        ToolData("Vision", "Analyze images", Icons.Default.Search, AriInk, "Analyze this image and describe what you see"),
+        ToolData("Document Chat", "Chat with docs", Icons.Default.Description, AriInk, "Help me summarize this document"),
+        ToolData("Web Search", "Search web", Icons.Default.Search, AriInk, "Search the web for latest AI developments"),
+        ToolData("Code Assistant", "Write & debug", Icons.Default.Code, AriInk, "Write a Python function to implement binary search"),
+        ToolData("Speech", "Voice chat", Icons.Default.Mic, AriAccent, "Start voice conversation"),
+        ToolData("Playground", "Test models", Icons.Default.Settings, AriInk, "Open model playground"),
+        ToolData("Templates", "Quick prompts", Icons.Default.List, AriMuted, "Show prompt templates"),
     )
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
+    Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },

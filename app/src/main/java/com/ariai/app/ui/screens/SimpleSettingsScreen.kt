@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -44,9 +46,8 @@ fun SimpleSettingsScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var speechEnabled by remember { mutableStateOf(true) }
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
+    Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -78,14 +79,6 @@ fun SimpleSettingsScreen(
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Settings, title = "Preferences", subtitle = "Chat options, text size, theme", onClick = onPreferencesClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column {
-                                Text("Dynamic colors", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
-                                Text("Use wallpaper-based palette", fontSize = 11.sp, color = Color.Black.copy(alpha = 0.5f))
-                            }
-                            Switch(checked = dynamicColor, onCheckedChange = onDynamicColorChange, colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF6C4DFF)))
-                        }
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Language, title = "Language", subtitle = if (currentLanguage == "en") "English" else currentLanguage, onClick = {
                             val newLang = if (currentLanguage == "en") "fa" else "en"
                             onLanguageChange(newLang)
@@ -101,13 +94,6 @@ fun SimpleSettingsScreen(
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Search, title = "Search service", subtitle = "Web search for answers", onClick = onSearchServiceClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column {
-                                Text("Speech service", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
-                                Text(if (speechEnabled) "Voice input and speech on" else "Off", fontSize = 11.sp, color = Color.Black.copy(alpha = 0.5f))
-                            }
-                            Switch(checked = speechEnabled, onCheckedChange = { speechEnabled = it }, colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF6C4DFF)))
-                        }
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Settings, title = "MCP servers", subtitle = "Connect local tools", onClick = onMcpClick)
                     }
@@ -151,7 +137,7 @@ fun SimpleGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 fun SimpleChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) Color(0xFF6C4DFF) else Color(0xFFF2F2F7),
+        color = if (selected) AriInk else AriTint,
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
@@ -163,7 +149,7 @@ fun SimpleChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: 
 @Composable
 fun SimpleRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF2F2F7)), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(AriTint), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = Color.Black.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
         }
         Column(modifier = Modifier.weight(1f)) {

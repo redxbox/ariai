@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,7 +33,7 @@ fun HomeScreen(
 ) {
     Box(
         modifier = modifier.fillMaxSize().background(
-            Brush.verticalGradient(listOf(Color(0xFFF0F4FF), Color(0xFFF8FAFF), Color.White))
+            Brush.verticalGradient(listOf(AriTint, AriPaper, Color.White))
         )
     ) {
         LazyColumn(
@@ -47,14 +49,14 @@ fun HomeScreen(
                 ) {
                     Column {
                         Row {
-                            Text("Ari", color = Color(0xFF1A1A2E), fontWeight = FontWeight.Bold, fontSize = 28.sp)
-                            Text("AI", color = Color(0xFF6C4DFF), fontWeight = FontWeight.Bold, fontSize = 28.sp)
+                            Text("Ari", color = AriInk, fontWeight = FontWeight.Bold, fontSize = 28.sp)
+                            Text("AI", color = AriInk, fontWeight = FontWeight.Bold, fontSize = 28.sp)
                         }
-                        Text("Ideas flow differently here.", color = Color(0xFF1A1A2E).copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall, fontSize = 12.sp)
+                        Text("Ideas flow differently here.", color = AriInk.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall, fontSize = 12.sp)
                     }
                     Surface(shape = CircleShape, color = Color.White, shadowElevation = 3.dp, modifier = Modifier.size(44.dp)) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text("A", color = Color(0xFF6C4DFF), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("A", color = AriInk, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
                     }
                 }
@@ -62,8 +64,8 @@ fun HomeScreen(
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Good morning", fontWeight = FontWeight.Bold, fontSize = 28.sp, color = Color(0xFF1A1A2E))
-                    Text("What shall we explore today?", color = Color(0xFF1A1A2E).copy(alpha = 0.6f), style = MaterialTheme.typography.bodyMedium)
+                    Text("Good morning", fontWeight = FontWeight.Bold, fontSize = 28.sp, color = AriInk)
+                    Text("What shall we explore today?", color = AriInk.copy(alpha = 0.6f), style = MaterialTheme.typography.bodyMedium)
                 }
             }
 
@@ -83,7 +85,7 @@ fun HomeScreen(
                                 Icon(Icons.Default.Language, contentDescription = "Web", tint = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(20.dp).clickable { onNewChat("Search web") })
                                 Icon(Icons.Default.Mic, contentDescription = "Voice", tint = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(20.dp).clickable { onNewChat("Voice input") })
                             }
-                            Surface(shape = CircleShape, color = Color(0xFF6C4DFF), modifier = Modifier.size(40.dp).clickable { onNewChat("") }) {
+                            Surface(shape = CircleShape, color = AriInk, modifier = Modifier.size(40.dp).clickable { onNewChat("") }) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     Icon(Icons.Default.ArrowForward, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(20.dp))
                                 }
@@ -96,9 +98,9 @@ fun HomeScreen(
             item {
                 // 3 cards with UNIQUE actions - not same
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    HomeActionCard(title = "Explain", desc = "Make complex\nthings simple", icon = "💡", bg = Color(0xFFF3F0FF), modifier = Modifier.weight(1f), onClick = { onNewChat("Explain quantum computing simply") })
+                    HomeActionCard(title = "Explain", desc = "Make complex\nthings simple", icon = "💡", bg = AriTint, modifier = Modifier.weight(1f), onClick = { onNewChat("Explain quantum computing simply") })
                     HomeActionCardPrimary(modifier = Modifier.weight(1f), onClick = { onNewChat("Write a blog post about AI") })
-                    HomeActionCard(title = "Code", desc = "Build, debug,\ncreate", icon = "💻", bg = Color(0xFFE8F5E9), modifier = Modifier.weight(1f), onClick = { onNewChat("Write a Python function to sort list") })
+                    HomeActionCard(title = "Code", desc = "Build, debug,\ncreate", icon = "💻", bg = AriTint, modifier = Modifier.weight(1f), onClick = { onNewChat("Write a Python function to sort list") })
                 }
             }
 
@@ -155,7 +157,7 @@ fun HomeActionCard(title: String, desc: String, icon: String, bg: Color, modifie
 fun HomeActionCardPrimary(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF6C4DFF)),
+        colors = CardDefaults.cardColors(containerColor = AriInk),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = modifier.height(120.dp).clickable(onClick = onClick)
     ) {
@@ -196,9 +198,9 @@ fun ShortcutRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: St
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFFF0F0FF), modifier = Modifier.size(36.dp)) {
+        Surface(shape = RoundedCornerShape(10.dp), color = AriTint, modifier = Modifier.size(36.dp)) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(icon, contentDescription = null, tint = Color(0xFF6C4DFF), modifier = Modifier.size(18.dp))
+                Icon(icon, contentDescription = null, tint = AriInk, modifier = Modifier.size(18.dp))
             }
         }
         Column(modifier = Modifier.weight(1f)) {

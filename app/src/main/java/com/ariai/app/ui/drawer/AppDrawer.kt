@@ -1,5 +1,7 @@
 package com.ariai.app.ui.drawer
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,8 +26,8 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Chat
 import java.util.Calendar
 
-private val Accent = Color(0xFF6C4DFF)
-private val Ink = Color(0xFF1C1B1F)
+
+private val Ink = AriInk
 
 private enum class DayBucket(val label: String) { PINNED("Pinned"), TODAY("Today"), YESTERDAY("Yesterday"), EARLIER("Earlier") }
 
@@ -84,29 +86,15 @@ fun ColumnScope.AppDrawerContent(
         out
     }
 
-    // Header
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(listOf(Accent, Color(0xFF9C7CFF)))),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("A", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        }
-        Column {
-            Text("AriAI", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Ink)
-            Text("Your AI workspace", fontSize = 11.sp, color = Ink.copy(alpha = 0.5f))
-        }
-    }
+    // Status-bar inset only: no decorative header or extra top margin.
+    Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+    Spacer(Modifier.height(12.dp))
 
     Button(
         onClick = onNewChat,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Accent)
+        colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
     ) {
         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
@@ -123,7 +111,7 @@ fun ColumnScope.AppDrawerContent(
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Color.White,
             unfocusedContainerColor = Color.White,
-            focusedBorderColor = Accent.copy(alpha = 0.35f),
+            focusedBorderColor = AriInk.copy(alpha = 0.35f),
             unfocusedBorderColor = Color.Black.copy(alpha = 0.06f)
         ),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
@@ -183,7 +171,7 @@ fun ColumnScope.AppDrawerContent(
         FooterAction(Icons.Default.Settings, "Settings", currentRoute == "settings") { onNavigate("settings") }
         FooterAction(Icons.Default.Info, "About", false, onAbout)
     }
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
 }
 
 @Composable
@@ -193,18 +181,23 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) Accent.copy(alpha = 0.12f) else Color.Transparent)
+            .background(if (selected) AriTint else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selected) {
+            // The one coloured element in the drawer: marks the open chat.
+            Box(Modifier.size(6.dp).clip(CircleShape).background(AriAccent))
+            Spacer(Modifier.width(8.dp))
+        }
         if (chat.isPinned) {
-            Icon(Icons.Default.Star, contentDescription = null, tint = Accent, modifier = Modifier.size(14.dp))
+            Icon(Icons.Default.Star, contentDescription = null, tint = Ink, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
         }
         Text(
             chat.title.ifBlank { "New chat" },
-            color = if (selected) Accent else Ink,
+            color = Ink,
             fontSize = 14.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
@@ -240,11 +233,11 @@ private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, on
     ) {
         Box(
             modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp))
-                .background(if (selected) Accent.copy(alpha = 0.14f) else Color.White),
+                .background(if (selected) AriTint else AriPaper),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = label, tint = if (selected) Accent else Ink.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = label, tint = Ink, modifier = Modifier.size(20.dp))
         }
-        Text(label, fontSize = 11.sp, color = if (selected) Accent else Ink.copy(alpha = 0.6f))
+        Text(label, fontSize = 11.sp, color = Ink, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }

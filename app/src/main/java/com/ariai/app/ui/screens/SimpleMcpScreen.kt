@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Accent = Color(0xFF6C4DFF)
+private val Accent = AriInk
 private val Ink = Color(0xFF1C1B1F)
 
 enum class McpTransport(val label: String) { SSE("SSE"), STREAMABLE_HTTP("Streamable HTTP") }
@@ -43,10 +45,10 @@ fun SimpleMcpScreen(
     var showAdd by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = Color(0xFFF7F6FB),
+        containerColor = AriPaper,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
                 title = { Text("MCP servers", fontWeight = FontWeight.SemiBold, color = Ink) }
             )
@@ -98,7 +100,7 @@ fun SimpleMcpScreen(
                             Text(server.name, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = Ink)
                             Text(server.transport.label, fontSize = 11.sp, color = Ink.copy(alpha = 0.5f))
                             Text(server.url, fontSize = 11.sp, color = Ink.copy(alpha = 0.4f), maxLines = 1)
-                            Text(if (server.enabled) "Connected" else "Disabled", fontSize = 11.sp, color = if (server.enabled) Color(0xFF248A3D) else Ink.copy(alpha = 0.45f))
+                            Text(if (server.enabled) "Connected" else "Disabled", fontSize = 11.sp, color = if (server.enabled) AriInk else Ink.copy(alpha = 0.45f))
                         }
                         IconButton(onClick = { onRemove(server.id) }) { Icon(Icons.Default.Delete, contentDescription = "Remove server", tint = Ink.copy(alpha = 0.45f)) }
                         Switch(checked = server.enabled, onCheckedChange = { onToggle(server.id) }, colors = SwitchDefaults.colors(checkedTrackColor = Accent))
@@ -128,7 +130,7 @@ private fun AddMcpServerSheet(onSave: (McpServerItem) -> Unit, onDismiss: () -> 
     val urlValid = url.startsWith("http://") || url.startsWith("https://")
     val valid = name.isNotBlank() && urlValid
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFFF7F6FB)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Add MCP server", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = Ink)
 

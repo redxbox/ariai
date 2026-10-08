@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,9 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
 
-private val Accent = Color(0xFF6C4DFF)
+private val Accent = AriInk
 private val Ink = Color(0xFF1C1B1F)
-private val Surface0 = Color(0xFFF7F6FB)
+private val Surface0 = AriPaper
 
 @Composable
 private fun SectionTitle(text: String) {
@@ -82,7 +84,6 @@ fun PreferencesScreen(
                             FilterChip(selected = theme == key, onClick = { onThemeChange(key) }, label = { Text(label) }, modifier = Modifier.weight(1f))
                         }
                     }
-                    SwitchRow("Dynamic colors", "Use wallpaper-based palette", dynamicColor, onDynamicColorChange)
                 }
             }
 

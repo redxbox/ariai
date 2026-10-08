@@ -36,3 +36,12 @@ val GradientGreen = listOf(Color(0xFF00D4AA), Color(0xFF00A381))
 val GradientOrange = listOf(Color(0xFFFF8E53), Color(0xFFFE6B8B))
 val GradientBlue = listOf(Color(0xFF4285F4), Color(0xFF34A853))
 val GradientSunset = listOf(Color(0xFF6C4DFF), Color(0xFF00D4AA), Color(0xFFFF6B6B))
+
+// Monochrome base: white paper, near-black ink, neutral greys.
+val AriInk = Color(0xFF111111)
+val AriPaper = Color(0xFFFFFFFF)
+val AriMuted = Color(0x8A111111)
+val AriLine = Color(0x14000000)
+val AriTint = Color(0xFFF3F3F3)
+// The single colour accent. Used only for one small element per screen.
+val AriAccent = Color(0xFFD9704A)

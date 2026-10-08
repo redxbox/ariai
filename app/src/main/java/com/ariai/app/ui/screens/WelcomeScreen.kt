@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -57,9 +59,9 @@ fun WelcomeScreen(
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    Color(0xFF6C4DFF),
-                                    Color(0xFF00D4AA),
-                                    Color(0xFFFF6B6B)
+                                    AriInk,
+                                    AriInk,
+                                    AriAccent
                                 )
                             )
                         ),

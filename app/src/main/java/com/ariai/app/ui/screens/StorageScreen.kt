@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,7 +26,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Accent = Color(0xFF6C4DFF)
+private val Accent = AriInk
 private val Ink = Color(0xFF1C1B1F)
 
 /** Local data overview with a chat list export and a guarded "clear all". */
@@ -44,17 +46,17 @@ fun StorageScreen(
             title = { Text("Delete all chats?") },
             text = { Text("This removes every conversation on this device. It cannot be undone.") },
             confirmButton = {
-                TextButton(onClick = { confirmClear = false; onClearAll() }) { Text("Delete all", color = Color(0xFFBA1A1A)) }
+                TextButton(onClick = { confirmClear = false; onClearAll() }) { Text("Delete all", color = AriAccent) }
             },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } }
         )
     }
 
     Scaffold(
-        containerColor = Color(0xFFF7F6FB),
+        containerColor = AriPaper,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
                 title = { Text("Data & storage", fontWeight = FontWeight.SemiBold, color = Ink) }
             )
@@ -116,9 +118,9 @@ fun StorageScreen(
                     modifier = Modifier.fillMaxWidth().clickable(enabled = chats.isNotEmpty()) { confirmClear = true }
                 ) {
                     Row(modifier = Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFBA1A1A))
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = AriAccent)
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Delete all chats", fontWeight = FontWeight.Medium, color = Color(0xFFBA1A1A))
+                            Text("Delete all chats", fontWeight = FontWeight.Medium, color = AriAccent)
                             Text("Removes every conversation on this device", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                         }
                     }

@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,7 +30,7 @@ fun SimpleSearchScreen(
     val scope = rememberCoroutineScope()
     val recentSearches = remember { mutableStateListOf("AI news today", "Python best practices", "Quantum computing") }
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
+    Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -61,7 +63,7 @@ fun SimpleSearchScreen(
                                     recentSearches.add(0, query)
                                     onSearch(query)
                                 }) {
-                                    Icon(Icons.Default.ArrowForward, contentDescription = "Search", tint = Color(0xFF6C4DFF))
+                                    Icon(Icons.Default.ArrowForward, contentDescription = "Search", tint = AriInk)
                                 }
                             }
                         },
@@ -70,7 +72,7 @@ fun SimpleSearchScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = Color.White,
-                            focusedBorderColor = Color(0xFF6C4DFF).copy(alpha = 0.3f),
+                            focusedBorderColor = AriInk.copy(alpha = 0.3f),
                             unfocusedBorderColor = Color.Black.copy(alpha = 0.08f)
                         ),
                         singleLine = true
@@ -105,7 +107,7 @@ fun SimpleSearchScreen(
                                 Text("Search providers", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Color.Black)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     listOf("Web", "Chats", "Docs").forEach { type ->
-                                        Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFF2F2F7), modifier = Modifier.clickable { scope.launch { snackbarHostState.showSnackbar("$type search") } }) {
+                                        Surface(shape = RoundedCornerShape(20.dp), color = AriTint, modifier = Modifier.clickable { scope.launch { snackbarHostState.showSnackbar("$type search") } }) {
                                             Text(type, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontSize = 12.sp, color = Color.Black.copy(alpha = 0.7f))
                                         }
                                     }
@@ -115,11 +117,11 @@ fun SimpleSearchScreen(
                     }
                 } else {
                     item {
-                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF6C4DFF).copy(alpha = 0.1f)), modifier = Modifier.fillMaxWidth().clickable { onSearch(query) }) {
+                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = AriInk.copy(alpha = 0.1f)), modifier = Modifier.fillMaxWidth().clickable { onSearch(query) }) {
                             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF6C4DFF))
+                                Icon(Icons.Default.Search, contentDescription = null, tint = AriInk)
                                 Column {
-                                    Text("Search for \"$query\"", fontWeight = FontWeight.Medium, color = Color(0xFF6C4DFF), fontSize = 14.sp)
+                                    Text("Search for \"$query\"", fontWeight = FontWeight.Medium, color = AriInk, fontSize = 14.sp)
                                     Text("Press to search with AI", color = Color.Black.copy(alpha = 0.6f), fontSize = 12.sp)
                                 }
                             }

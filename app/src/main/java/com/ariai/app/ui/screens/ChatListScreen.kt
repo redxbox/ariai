@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -34,13 +36,13 @@ fun ChatListScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFF7F6FB))) {
+    Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
         Scaffold(
             containerColor = Color.Transparent,
             floatingActionButton = {
                 FloatingActionButton(
                     onClick = onNewChat,
-                    containerColor = Color(0xFF6C4DFF),
+                    containerColor = AriInk,
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.size(56.dp)
                 ) {
@@ -51,14 +53,14 @@ fun ChatListScreen(
             if (chats.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(32.dp)) {
-                        Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFF6C4DFF).copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Chat, contentDescription = null, tint = Color(0xFF6C4DFF), modifier = Modifier.size(36.dp))
+                        Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(AriInk.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Chat, contentDescription = null, tint = AriInk, modifier = Modifier.size(36.dp))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("No conversations yet", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = Color.Black)
                             Text("Start a new chat to begin", color = Color.Black.copy(alpha = 0.5f), fontSize = 14.sp)
                         }
-                        Button(onClick = onNewChat, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C4DFF)), modifier = Modifier.padding(top = 8.dp)) {
+                        Button(onClick = onNewChat, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = AriInk), modifier = Modifier.padding(top = 8.dp)) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("New Chat")
@@ -82,7 +84,7 @@ fun ChatListScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = Color.White,
                                 unfocusedContainerColor = Color.White,
-                                focusedBorderColor = Color(0xFF6C4DFF).copy(alpha = 0.3f),
+                                focusedBorderColor = AriInk.copy(alpha = 0.3f),
                                 unfocusedBorderColor = Color.Black.copy(alpha = 0.08f)
                             ),
                             singleLine = true
@@ -117,8 +119,8 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 2.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFF3F0FF)), contentAlignment = Alignment.Center) {
-                Text(chat.title.firstOrNull()?.uppercase() ?: "C", color = Color(0xFF6C4DFF), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(AriTint), contentAlignment = Alignment.Center) {
+                Text(chat.title.firstOrNull()?.uppercase() ?: "C", color = AriInk, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(chat.title, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)

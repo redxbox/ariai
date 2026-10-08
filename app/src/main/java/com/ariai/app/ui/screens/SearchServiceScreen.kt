@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.ui.theme.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,7 +23,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Accent = Color(0xFF6C4DFF)
+private val Accent = AriInk
 private val Ink = Color(0xFF1C1B1F)
 
 private data class SearchService(val key: String, val name: String, val description: String)
@@ -48,10 +50,10 @@ fun SearchServiceScreen(
     val activeKey = searchServices.firstOrNull { !searchKeys[it.key].isNullOrBlank() }?.key
 
     Scaffold(
-        containerColor = Color(0xFFF7F6FB),
+        containerColor = AriPaper,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF7F6FB)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
                 title = { Text("Search service", fontWeight = FontWeight.SemiBold, color = Ink) }
             )
@@ -97,7 +99,7 @@ fun SearchServiceScreen(
                                 },
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (isActive) Color(0xFF248A3D) else Ink.copy(alpha = 0.45f)
+                                color = if (isActive) AriInk else Ink.copy(alpha = 0.45f)
                             )
                         }
                         if (isOpen) {
