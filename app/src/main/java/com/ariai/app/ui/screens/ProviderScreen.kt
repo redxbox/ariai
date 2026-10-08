@@ -133,13 +133,13 @@ fun ProviderListScreen(
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PopularProviderRow(name = "OpenAI", subtitle = "GPT-4o, 4o-mini, o3", letter = "O", colors = listOf(AriInk, AriMuted), onClick = onAddProvider)
-                    PopularProviderRow(name = "Anthropic", subtitle = "Claude 3.7, 3.5", letter = "C", colors = listOf(AriAccent, AriAccent), onClick = onAddProvider)
-                    PopularProviderRow(name = "Google", subtitle = "Gemini 2.0, 1.5", letter = "G", colors = listOf(AriMuted, AriInk), onClick = onAddProvider)
-                    PopularProviderRow(name = "Meta", subtitle = "Llama 3.3, 3.1", letter = "M", colors = listOf(AriInk, AriInk), onClick = onAddProvider)
-                    PopularProviderRow(name = "DeepSeek", subtitle = "R1, V3", letter = "D", colors = listOf(AriInk, AriInk), onClick = onAddProvider)
-                    PopularProviderRow(name = "Qwen", subtitle = "Qwen3, Qwen2.5", letter = "Q", colors = listOf(AriInk, AriInk), onClick = onAddProvider)
-                    PopularProviderRow(name = "Mistral", subtitle = "Large, Medium, Small", letter = "Mi", colors = listOf(AriAccent, AriAccent), onClick = onAddProvider)
+                    PopularProviderRow(name = "OpenAI", subtitle = "GPT-4o, 4o-mini, o3", letter = "O", colors = listOf(AriOpenAI, AriOpenAI.copy(alpha = 0.55f)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Anthropic", subtitle = "Claude 3.7, 3.5", letter = "C", colors = listOf(AriAnthropic, AriAnthropic.copy(alpha = 0.55f)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Google", subtitle = "Gemini 2.0, 1.5", letter = "G", colors = listOf(AriGemini, AriGemini.copy(alpha = 0.55f)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Meta", subtitle = "Llama 3.3, 3.1", letter = "M", colors = listOf(AriMuted, AriMuted), onClick = onAddProvider)
+                    PopularProviderRow(name = "DeepSeek", subtitle = "R1, V3", letter = "D", colors = listOf(AriMuted, AriMuted), onClick = onAddProvider)
+                    PopularProviderRow(name = "Qwen", subtitle = "Qwen3, Qwen2.5", letter = "Q", colors = listOf(AriCustom, AriCustom.copy(alpha = 0.55f)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Mistral", subtitle = "Large, Medium, Small", letter = "Mi", colors = listOf(AriAccent, AriAccent.copy(alpha = 0.55f)), onClick = onAddProvider)
                 }
             }
 
@@ -173,9 +173,9 @@ fun GlassProviderCard(
     var enabled by remember { mutableStateOf(provider.enabled) }
 
     val providerColor = when (provider.type) {
-        ProviderType.OPENAI -> listOf(AriInk, AriMuted)
-        ProviderType.GEMINI -> listOf(AriMuted, AriInk)
-        ProviderType.ANTHROPIC -> listOf(AriAccent, AriAccent)
+        ProviderType.OPENAI -> listOf(AriOpenAI, AriOpenAI.copy(alpha = 0.55f))
+        ProviderType.GEMINI -> listOf(AriGemini, AriGemini.copy(alpha = 0.55f))
+        ProviderType.ANTHROPIC -> listOf(AriAnthropic, AriAnthropic.copy(alpha = 0.55f))
         ProviderType.OLLAMA -> listOf(Color(0xFF000000), Color(0xFF434343))
         else -> listOf(AriInk, AriInk)
     }
@@ -264,11 +264,11 @@ fun PopularProviderRow(
 private data class ProviderPreset(val label: String, val type: ProviderType, val baseUrl: String, val color: Color)
 
 private val providerPresets = listOf(
-    ProviderPreset("OpenAI", ProviderType.OPENAI, "https://api.openai.com/v1", AriMuted),
-    ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", AriMuted),
-    ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", AriMuted),
-    ProviderPreset("Ollama", ProviderType.OLLAMA, "http://localhost:11434/v1", AriMuted),
-    ProviderPreset("Custom", ProviderType.OPENAI_COMPATIBLE, "", AriInk)
+    ProviderPreset("OpenAI", ProviderType.OPENAI, "https://api.openai.com/v1", AriOpenAI),
+    ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", AriGemini),
+    ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", AriAnthropic),
+    ProviderPreset("Ollama", ProviderType.OLLAMA, "http://localhost:11434/v1", AriOllama),
+    ProviderPreset("Custom", ProviderType.OPENAI_COMPATIBLE, "", AriCustom)
 )
 
 /**
@@ -294,7 +294,25 @@ fun AddProviderScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     val accent = providerPresets.firstOrNull { it.type == selectedType }?.color ?: initialPreset.color
     val canSave = name.isNotBlank() && baseUrl.isNotBlank()
-    val existingModels: List<AIModel> = initialProvider?.models.orEmpty()
+    val providerId = remember { initialProvider?.id ?: java.util.UUID.randomUUID().toString() }
+    var models by remember { mutableStateOf(initialProvider?.models ?: getDefaultModelsForType(selectedType, providerId)) }
+    var modelsEdited by remember { mutableStateOf(initialProvider != null) }
+    var showAddModel by remember { mutableStateOf(false) }
+    // Brand presets fill in the default models, until the user edits the list.
+    LaunchedEffect(selectedType) {
+        if (!modelsEdited) models = getDefaultModelsForType(selectedType, providerId)
+    }
+    if (showAddModel) {
+        AddModelSheet(
+            providerId = providerId,
+            onAdd = { model ->
+                models = models + model
+                modelsEdited = true
+                showAddModel = false
+            },
+            onDismiss = { showAddModel = false }
+        )
+    }
 
     if (confirmDelete && initialProvider != null) {
         AlertDialog(
@@ -410,21 +428,31 @@ fun AddProviderScreen(
                 }
             }
 
-            // Models
+            // Models: the list the app sends to the API. Add or remove here.
             item { SectionLabel("Models") }
+            if (models.isEmpty()) {
+                item {
+                    Text("No models yet. Add one below.", fontSize = 13.sp, color = AriMuted, modifier = Modifier.padding(start = 6.dp))
+                }
+            }
+            models.forEach { model ->
+                item(key = model.id) {
+                    ModelRow(
+                        model = model,
+                        color = accent,
+                        onRemove = { models = models.filterNot { it.id == model.id } }
+                    )
+                }
+            }
             item {
-                Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                if (existingModels.isNotEmpty()) "${existingModels.size} models" else "Default models for this provider",
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF1C1B1F)
-                            )
-                            Text("Added automatically when you save.", fontSize = 12.sp, color = Color(0xFF1C1B1F).copy(alpha = 0.5f))
-                        }
-                        Icon(Icons.Default.Star, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
-                    }
+                OutlinedButton(
+                    onClick = { showAddModel = true },
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add model", fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -434,17 +462,14 @@ fun AddProviderScreen(
             item {
                 Button(
                     onClick = {
-                        val id = initialProvider?.id ?: java.util.UUID.randomUUID().toString()
-                        val models = if (existingModels.isNotEmpty()) existingModels
-                        else getDefaultModelsForType(selectedType, id)
                         onSave(
                             Provider(
-                                id = id,
+                                id = providerId,
                                 name = name.trim(),
                                 type = selectedType,
                                 baseUrl = baseUrl.trim(),
                                 apiKey = apiKey.trim(),
-                                models = models,
+                                models = models.map { it.copy(providerId = providerId) },
                                 enabled = initialProvider?.enabled ?: true,
                                 customHeaders = initialProvider?.customHeaders ?: emptyMap(),
                                 customBody = initialProvider?.customBody,
@@ -469,6 +494,99 @@ fun AddProviderScreen(
                 }
             }
             item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun ModelRow(model: AIModel, color: Color, onRemove: () -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(model.displayName.firstOrNull()?.uppercase() ?: "M", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(model.displayName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(model.id, fontSize = 11.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    if (model.supportsVision) ModelTag("Vision", AriTagBlueBg, AriTagBlueFg)
+                    if (model.supportsFunctionCalling) ModelTag("Tools", AriTagGreenBg, AriTagGreenFg)
+                    if (model.supportsImageGen) ModelTag("Image", AriTagAmberBg, AriTagAmberFg)
+                }
+            }
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Default.Close, contentDescription = "Remove model", tint = AriMuted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelTag(label: String, bg: Color, fg: Color) {
+    Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(bg).padding(horizontal = 8.dp, vertical = 2.dp)) {
+        Text(label, fontSize = 10.sp, color = fg, fontWeight = FontWeight.Medium)
+    }
+}
+
+/** Basic model form: id, name, type and capabilities. Mirrors the reference's Basic Settings. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddModelSheet(providerId: String, onAdd: (AIModel) -> Unit, onDismiss: () -> Unit) {
+    var modelId by remember { mutableStateOf("") }
+    var displayName by remember { mutableStateOf("") }
+    var isImage by remember { mutableStateOf(false) }
+    var vision by remember { mutableStateOf(false) }
+    var tools by remember { mutableStateOf(true) }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("Add model", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
+            OutlinedTextField(
+                value = modelId, onValueChange = { modelId = it }, label = { Text("Model ID") },
+                singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = displayName, onValueChange = { displayName = it }, label = { Text("Display name (optional)") },
+                singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
+            )
+            Text("Type", fontSize = 12.sp, color = AriMuted)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !isImage, onClick = { isImage = false }, label = { Text("Chat") })
+                FilterChip(selected = isImage, onClick = { isImage = true }, label = { Text("Image") })
+            }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Accepts images", modifier = Modifier.weight(1f), color = AriInk)
+                Switch(checked = vision, onCheckedChange = { vision = it })
+            }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Tool calling", modifier = Modifier.weight(1f), color = AriInk)
+                Switch(checked = tools, onCheckedChange = { tools = it })
+            }
+            Button(
+                onClick = {
+                    val id = modelId.trim()
+                    onAdd(
+                        AIModel(
+                            id = id,
+                            displayName = displayName.trim().ifBlank { id },
+                            providerId = providerId,
+                            supportsVision = vision,
+                            supportsFunctionCalling = tools,
+                            supportsImageGen = isImage,
+                            contextWindow = 8192,
+                            isCustom = true
+                        )
+                    )
+                },
+                enabled = modelId.isNotBlank(),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AriInk),
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            ) { Text("Add", fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(16.dp))
         }
     }
 }

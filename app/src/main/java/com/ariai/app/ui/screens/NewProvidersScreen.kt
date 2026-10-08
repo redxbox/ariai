@@ -38,12 +38,11 @@ fun providerTypeLabel(type: ProviderType): String = when (type) {
 }
 
 private fun providerColors(type: ProviderType): Pair<Color, Color> = when (type) {
-    ProviderType.OPENAI -> AriMuted to AriMuted
-    ProviderType.GEMINI -> AriMuted to AriMuted
-    ProviderType.ANTHROPIC -> AriMuted to AriMuted
-    ProviderType.OLLAMA -> AriMuted to AriMuted
-    ProviderType.OPENAI_COMPATIBLE -> AriInk to AriMuted
-    ProviderType.CUSTOM -> AriMuted to AriMuted
+    ProviderType.OPENAI -> AriOpenAI to AriOpenAI.copy(alpha = 0.55f)
+    ProviderType.GEMINI -> AriGemini to AriGemini.copy(alpha = 0.55f)
+    ProviderType.ANTHROPIC -> AriAnthropic to AriAnthropic.copy(alpha = 0.55f)
+    ProviderType.OLLAMA -> AriOllama to AriMuted
+    ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> AriCustom to AriCustom.copy(alpha = 0.55f)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
