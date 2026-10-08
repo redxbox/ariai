@@ -15,6 +15,9 @@ class ChatRepository(
 ) {
     // Providers - crash-proof
     fun getProviders(): Flow<List<Provider>> = db.providerDao().getAllProviders()
+
+    /** Asks the provider's API which models it supports. Throws on failure. */
+    suspend fun fetchModels(provider: Provider): List<AIModel> = aiClient.listModels(provider)
         .map { list ->
             try {
                 list.map { it.toModel() }

@@ -220,6 +220,7 @@ fun AppRoot(viewModel: AppViewModel) {
 
                 composable("add_provider") {
                     AddProviderScreen(
+                        fetchModels = { viewModel.fetchModels(it) },
                         onSave = { viewModel.saveProvider(it); navController.popBackStack() },
                         onBack = { navController.popBackStack() }
                     )
@@ -232,6 +233,7 @@ fun AppRoot(viewModel: AppViewModel) {
                     val providerId = entry.arguments?.getString("providerId") ?: ""
                     AddProviderScreen(
                         initialProvider = providers.find { it.id == providerId },
+                        fetchModels = { viewModel.fetchModels(it) },
                         onSave = { viewModel.saveProvider(it); navController.popBackStack() },
                         onBack = { navController.popBackStack() },
                         onDelete = { id -> viewModel.deleteProvider(id); navController.popBackStack() }

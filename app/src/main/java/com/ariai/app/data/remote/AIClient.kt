@@ -229,7 +229,7 @@ class AIClient {
             }
 
             val response = client.newCall(builder.build()).execute()
-            if (!response.isSuccessful) return getDefaultModelsForType(provider.type, provider.id)
+            if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}")
 
             val json = JSONObject(response.body!!.string())
             val models = mutableListOf<AIModel>()
@@ -251,9 +251,10 @@ class AIClient {
                     models.add(AIModel(id, id, provider.id, id.contains("vision") || id.contains("4o"), true, id.contains("dall-e") || id.contains("image"), 128000))
                 }
             }
-            if (models.isEmpty()) getDefaultModelsForType(provider.type, provider.id) else models
+            if (models.isEmpty()) throw IllegalStateException("No models returned")
+            models
         } catch (e: Exception) {
-            getDefaultModelsForType(provider.type, provider.id)
+            throw e
         }
     }
 

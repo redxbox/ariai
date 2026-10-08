@@ -90,10 +90,13 @@ class AppViewModel(
         viewModelScope.launch { prefs.setSearchApiKey(provider, key) }
     }
 
+    suspend fun fetchModels(provider: Provider): List<AIModel> = repository.fetchModels(provider)
+
     fun saveProvider(provider: Provider) {
         viewModelScope.launch {
             val models = if (provider.models.isEmpty()) {
-                getDefaultModelsForType(provider.type, provider.id)
+                runCatching { repository.fetchModels(provider) }.getOrNull()?.takeIf { it.isNotEmpty() }
+                    ?: getDefaultModelsForType(provider.type, provider.id)
             } else provider.models
             repository.saveProvider(provider.copy(models = models))
         }

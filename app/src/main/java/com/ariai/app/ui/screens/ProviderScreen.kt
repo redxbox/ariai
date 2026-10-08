@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.*
 import com.ariai.app.util.LocalStrings
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -279,6 +280,7 @@ private val providerPresets = listOf(
 @Composable
 fun AddProviderScreen(
     initialProvider: Provider? = null,
+    fetchModels: suspend (Provider) -> List<AIModel>,
     onSave: (Provider) -> Unit,
     onBack: () -> Unit,
     onDelete: (String) -> Unit = {},
@@ -297,6 +299,43 @@ fun AddProviderScreen(
     var models by remember { mutableStateOf(initialProvider?.models ?: getDefaultModelsForType(selectedType, providerId)) }
     var modelsEdited by remember { mutableStateOf(initialProvider != null) }
     var showAddModel by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var fetching by remember { mutableStateOf(false) }
+    var fetchError by remember { mutableStateOf<String?>(null) }
+    // Key of the URL/key/type the models were last fetched for. Save fetches again when it changes.
+    fun sourceKey() = "${baseUrl.trim()}|${apiKey.trim()}|$selectedType"
+    var fetchedKey by remember {
+        mutableStateOf(initialProvider?.let { "${it.baseUrl.trim()}|${it.apiKey.trim()}|${it.type}" })
+    }
+    fun draftProvider(list: List<AIModel>) = Provider(
+        id = providerId,
+        name = name.trim(),
+        type = selectedType,
+        baseUrl = baseUrl.trim(),
+        apiKey = apiKey.trim(),
+        models = list.map { it.copy(providerId = providerId) },
+        enabled = initialProvider?.enabled ?: true,
+        customHeaders = headers.filter { it.first.isNotBlank() }.toMap(),
+        customBody = customBody.trim().ifBlank { null },
+        createdAt = initialProvider?.createdAt ?: System.currentTimeMillis()
+    )
+    fun fetchAndMerge(onDone: (List<AIModel>?) -> Unit) {
+        fetching = true
+        fetchError = null
+        scope.launch {
+            val result = runCatching { fetchModels(draftProvider(models)) }
+            fetching = false
+            result.onSuccess { fetched ->
+                val merged = mergeFetched(models, fetched)
+                models = merged
+                fetchedKey = sourceKey()
+                onDone(merged)
+            }.onFailure {
+                fetchError = "Could not load models: ${it.message ?: "network error"}"
+                onDone(null)
+            }
+        }
+    }
     var headers by remember { mutableStateOf(initialProvider?.customHeaders?.map { it.key to it.value }.orEmpty()) }
     var customBody by remember { mutableStateOf(initialProvider?.customBody.orEmpty()) }
     val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody)
@@ -433,6 +472,19 @@ fun AddProviderScreen(
 
             // Models: the list the app sends to the API. Add or remove here.
             item { SectionLabel("Models") }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        fetchError ?: "Models the API supports are loaded on save.",
+                        fontSize = 12.sp,
+                        color = if (fetchError != null) AriAccent else AriMuted,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { fetchAndMerge {} }, enabled = !fetching && baseUrl.isNotBlank()) {
+                        Text(if (fetching) "Loading…" else "Fetch", color = AriInk, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
             if (models.isEmpty()) {
                 item {
                     Text("No models yet. Add one below.", fontSize = 13.sp, color = AriMuted, modifier = Modifier.padding(start = 6.dp))
@@ -487,26 +539,18 @@ fun AddProviderScreen(
             item {
                 Button(
                     onClick = {
-                        onSave(
-                            Provider(
-                                id = providerId,
-                                name = name.trim(),
-                                type = selectedType,
-                                baseUrl = baseUrl.trim(),
-                                apiKey = apiKey.trim(),
-                                models = models.map { it.copy(providerId = providerId) },
-                                enabled = initialProvider?.enabled ?: true,
-                                customHeaders = headers.filter { it.first.isNotBlank() }.toMap(),
-                                customBody = customBody.trim().ifBlank { null },
-                                createdAt = initialProvider?.createdAt ?: System.currentTimeMillis()
-                            )
-                        )
+                        if (sourceKey() != fetchedKey) {
+                            // URL, key or type changed: load the models from the API first.
+                            fetchAndMerge { list -> if (list != null) onSave(draftProvider(list)) }
+                        } else {
+                            onSave(draftProvider(models))
+                        }
                     },
-                    enabled = canSave,
+                    enabled = canSave && !fetching,
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AriInk),
                     modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) { Text("Save", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+                ) { Text(if (fetching) "Loading models…" else "Save", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
             }
 
             if (isEdit) {
@@ -599,6 +643,14 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
 }
 
 /** True when the text is empty or a JSON object. */
+/** Replaces the list with the API's models, keeping settings already set for the same IDs and custom models. */
+private fun mergeFetched(current: List<AIModel>, fetched: List<AIModel>): List<AIModel> {
+    val byId = current.associateBy { it.id }
+    val fromApi = fetched.map { byId[it.id] ?: it }
+    val customOnly = current.filter { it.isCustom && fetched.none { f -> f.id == it.id } }
+    return fromApi + customOnly
+}
+
 private fun isValidJsonObject(text: String): Boolean =
     text.isBlank() || runCatching { org.json.JSONObject(text) }.isSuccess
 
