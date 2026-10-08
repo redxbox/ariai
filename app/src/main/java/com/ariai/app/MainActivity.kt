@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -117,6 +119,41 @@ fun SimpleNavigation(viewModel: AppViewModel) {
                 HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(Modifier.height(8.dp))
 
+                // Recent conversations (drawer list, like the reference app)
+                Text(
+                    "Recent",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.Black.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 4.dp)
+                )
+                Column(
+                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    if (chats.isEmpty()) {
+                        Text("No conversations yet", fontSize = 13.sp, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.padding(16.dp))
+                    }
+                    chats.take(12).forEach { chat ->
+                        NavigationDrawerItem(
+                            label = { Text(chat.title, maxLines = 1, fontSize = 14.sp, color = Color.Black) },
+                            selected = currentRoute == "chat/${chat.id}",
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                viewModel.loadChat(chat.id)
+                                navController.navigate("chat/${chat.id}") { launchSingleTop = true }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = NavigationDrawerItemDefaults.colors(
+                                selectedContainerColor = Color(0xFF6C4DFF).copy(alpha = 0.12f),
+                                unselectedContainerColor = Color.Transparent
+                            ),
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+
                 // Essential menu only - not crowded
                 SimpleDrawerItem(icon = Icons.Default.Chat, label = "Chat History", selected = currentRoute == "chats" || currentRoute.startsWith("chat/"), onClick = {
                     scope.launch { drawerState.close() }
@@ -139,7 +176,7 @@ fun SimpleNavigation(viewModel: AppViewModel) {
                     navController.navigate("settings") { launchSingleTop = true }
                 })
 
-                Spacer(Modifier.weight(1f))
+
                 HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
                 SimpleDrawerItem(icon = Icons.Default.Info, label = "About", selected = false, onClick = {
                     scope.launch {
@@ -212,6 +249,8 @@ fun SimpleNavigation(viewModel: AppViewModel) {
                     SimpleSettingsScreen(
                         onBack = { navController.popBackStack() },
                         onProvidersClick = { navController.navigate("providers") },
+                        onSearchClick = { navController.navigate("search") },
+                        onMcpClick = { navController.navigate("mcp") },
                         currentTheme = theme,
                         currentLanguage = language,
                         dynamicColor = dynamicColor,

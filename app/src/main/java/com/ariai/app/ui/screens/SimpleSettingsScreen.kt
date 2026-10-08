@@ -26,6 +26,8 @@ import kotlinx.coroutines.launch
 fun SimpleSettingsScreen(
     onBack: () -> Unit,
     onProvidersClick: () -> Unit,
+    onSearchClick: () -> Unit = {},
+    onMcpClick: () -> Unit = {},
     currentTheme: String,
     currentLanguage: String,
     dynamicColor: Boolean,
@@ -37,7 +39,6 @@ fun SimpleSettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var speechEnabled by remember { mutableStateOf(true) }
-    var selectedSpeechVoice by remember { mutableStateOf("Default") }
 
     Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
         Scaffold(
@@ -61,63 +62,67 @@ fun SimpleSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item {
-                    // Theme selection - essential
-                    SimpleGroup(title = "Appearance") {
+                    SimpleGroup(title = "General") {
                         Text("Theme", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             SimpleChip(label = "Light", selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
                             SimpleChip(label = "Dark", selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
                             SimpleChip(label = "System", selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
                         }
-                    }
-                }
-
-                item {
-                    SimpleGroup(title = "Providers") {
-                        SimpleRow(icon = Icons.Default.Add, title = "Add Providers", subtitle = "OpenAI, Gemini, Claude", onClick = onProvidersClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Storage, title = "Manage Providers", subtitle = "${0} configured", onClick = onProvidersClick)
-                    }
-                }
-
-                item {
-                    SimpleGroup(title = "Speech Service") {
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column {
-                                Text("Voice Input", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
-                                Text("Enable microphone", fontSize = 11.sp, color = Color.Black.copy(alpha = 0.5f))
+                                Text("Dynamic colors", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+                                Text("Use wallpaper-based palette", fontSize = 11.sp, color = Color.Black.copy(alpha = 0.5f))
+                            }
+                            Switch(checked = dynamicColor, onCheckedChange = onDynamicColorChange, colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF6C4DFF)))
+                        }
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        SimpleRow(icon = Icons.Default.Language, title = "Language", subtitle = if (currentLanguage == "en") "English" else currentLanguage, onClick = {
+                            val newLang = if (currentLanguage == "en") "fa" else "en"
+                            onLanguageChange(newLang)
+                        })
+                    }
+                }
+
+                item {
+                    SimpleGroup(title = "Models & services") {
+                        SimpleRow(icon = Icons.Default.Star, title = "Default model", subtitle = "Choose the model for new chats", onClick = {
+                            scope.launch { snackbarHostState.showSnackbar("Pick a model inside Providers") }
+                            onProvidersClick()
+                        })
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        SimpleRow(icon = Icons.Default.Storage, title = "Providers", subtitle = "OpenAI, Gemini, Claude and more", onClick = onProvidersClick)
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        SimpleRow(icon = Icons.Default.Search, title = "Search service", subtitle = "Web search for answers", onClick = onSearchClick)
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                                Text("Speech service", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+                                Text(if (speechEnabled) "Voice input and speech on" else "Off", fontSize = 11.sp, color = Color.Black.copy(alpha = 0.5f))
                             }
                             Switch(checked = speechEnabled, onCheckedChange = { speechEnabled = it }, colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF6C4DFF)))
                         }
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Mic, title = "Voice", subtitle = selectedSpeechVoice, onClick = {
-                            selectedSpeechVoice = if (selectedSpeechVoice == "Default") "Natural" else "Default"
-                            scope.launch { snackbarHostState.showSnackbar("Voice: $selectedSpeechVoice") }
-                        })
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.VolumeUp, title = "Text to Speech", subtitle = if (speechEnabled) "Enabled" else "Disabled", onClick = {
-                            speechEnabled = !speechEnabled
-                        })
+                        SimpleRow(icon = Icons.Default.Settings, title = "MCP servers", subtitle = "Connect local tools", onClick = onMcpClick)
                     }
                 }
 
                 item {
-                    SimpleGroup(title = "General") {
-                        SimpleRow(icon = Icons.Default.Language, title = "Language", subtitle = if (currentLanguage == "en") "English" else currentLanguage, onClick = {
-                            val newLang = if (currentLanguage == "en") "fa" else "en"
-                            onLanguageChange(newLang)
-                            scope.launch { snackbarHostState.showSnackbar("Language: $newLang") }
+                    SimpleGroup(title = "Data") {
+                        SimpleRow(icon = Icons.Default.Share, title = "Backup & export", subtitle = "Export chats as file", onClick = {
+                            scope.launch { snackbarHostState.showSnackbar("Export is available in the next update") }
                         })
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Delete, title = "Clear Chat History", subtitle = "Delete all conversations", onClick = {
-                            scope.launch { snackbarHostState.showSnackbar("Clear history - confirm in chat list") }
+                        SimpleRow(icon = Icons.Default.Delete, title = "Clear chat history", subtitle = "Delete all conversations", onClick = {
+                            scope.launch { snackbarHostState.showSnackbar("Use the chat list to delete single chats") }
                         })
                     }
                 }
 
                 item {
                     SimpleGroup(title = "About") {
-                        SimpleRow(icon = Icons.Default.Info, title = "About AriAI", subtitle = "v1.0", onClick = {
+                        SimpleRow(icon = Icons.Default.Info, title = "About AriAI", subtitle = "Version 1.0", onClick = {
                             scope.launch { snackbarHostState.showSnackbar("AriAI v1.0 - Personal AI") }
                         })
                     }
