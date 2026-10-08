@@ -3,6 +3,7 @@ package com.ariai.app.ui.screens
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,11 +22,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
 import com.ariai.app.data.models.Provider
 import kotlinx.coroutines.launch
+
+private val Accent = Color(0xFF6C4DFF)
+private val Ink = Color(0xFF1C1B1F)
+private val Muted = Color(0xFF1C1B1F).copy(alpha = 0.55f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,237 +54,262 @@ fun NewChatScreen(
     var inputText by remember { mutableStateOf("") }
     var useSearch by remember { mutableStateOf(false) }
     var useReasoning by remember { mutableStateOf(false) }
+    var showAttachments by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(messages.size, currentStreamingContent) {
-        if (messages.isNotEmpty() || currentStreamingContent.isNotEmpty()) {
-            scope.launch { listState.animateScrollToItem(maxOf(0, messages.size - 1)) }
-        }
+    LaunchedEffect(messages.size, currentStreamingContent.length) {
+        val last = messages.size + if (currentStreamingContent.isNotEmpty()) 1 else 0
+        if (last > 0) listState.animateScrollToItem(last - 1)
     }
 
     fun copyToClipboard(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Copied", text))
-        scope.launch { snackbarHostState.showSnackbar("Copied to clipboard") }
+        clipboard.setPrimaryClip(ClipData.newPlainText("Message", text))
+        scope.launch { snackbarHostState.showSnackbar("Copied") }
         onCopyMessage(text)
     }
 
-    Box(modifier = modifier.fillMaxSize().background(Color(0xFFFEFBFF))) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.95f)),
-                    navigationIcon = {
-                        Row {
-                            IconButton(onClick = onOpenDrawer) {
-                                Icon(Icons.Default.Menu, contentDescription = "Open menu", tint = Color.Black)
-                            }
-                            IconButton(onClick = {
-                                scope.launch { snackbarHostState.showSnackbar("Starting new chat") }
-                                onBack()
-                            }) {
-                                Icon(Icons.Default.Add, contentDescription = "New chat", tint = Color.Black)
-                            }
+    fun send() {
+        val text = inputText.trim()
+        if (text.isBlank() || isStreaming) return
+        val prefix = buildString {
+            if (useSearch) append("[WebSearch] ")
+            if (useReasoning) append("[Reasoning] ")
+        }
+        onSendMessage(prefix + text)
+        inputText = ""
+        showAttachments = false
+    }
+
+    Scaffold(
+        containerColor = Color(0xFFFEFBFF),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFEFBFF)),
+                navigationIcon = {
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(Icons.Default.Menu, contentDescription = "Open menu", tint = Ink)
+                    }
+                },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text(chat?.title?.takeIf { it.isNotBlank() } ?: "New chat", color = Ink, fontWeight = FontWeight.SemiBold, maxLines = 1, fontSize = 16.sp)
+                        Text(selectedModel ?: "No model selected", color = Muted, fontSize = 11.sp, maxLines = 1)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.Edit, contentDescription = "New chat", tint = Ink)
+                    }
+                    Box {
+                        IconButton(onClick = { showTopMenu = true }) {
+                            Icon(Icons.Default.MoreHoriz, contentDescription = "More", tint = Ink)
                         }
-                    },
-                    title = {
-                        Column {
-                            Text(chat?.title ?: "New Chat", color = Color.Black, fontWeight = FontWeight.SemiBold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
-                            Text(selectedModel ?: "GPT-4o", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
-                        }
-                    },
-                    actions = {
-                        Box {
-                            IconButton(onClick = { showTopMenu = true }) {
-                                Icon(Icons.Default.MoreHoriz, contentDescription = "More", tint = Color.Black)
-                            }
-                            DropdownMenu(expanded = showTopMenu, onDismissRequest = { showTopMenu = false }) {
-                                DropdownMenuItem(text = { Text("Clear chat") }, onClick = {
+                        DropdownMenu(expanded = showTopMenu, onDismissRequest = { showTopMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Copy conversation") },
+                                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                                onClick = {
                                     showTopMenu = false
-                                    scope.launch { snackbarHostState.showSnackbar("Chat cleared") }
-                                }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
-                                DropdownMenuItem(text = { Text("Share chat") }, onClick = {
+                                    copyToClipboard(messages.joinToString("\n\n") { it.content })
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Model") },
+                                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                onClick = {
                                     showTopMenu = false
-                                    scope.launch { snackbarHostState.showSnackbar("Share coming soon") }
-                                }, leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) })
-                                DropdownMenuItem(text = { Text("Model settings") }, onClick = {
-                                    showTopMenu = false
-                                    scope.launch { snackbarHostState.showSnackbar("Model: $selectedModel") }
-                                }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) })
-                            }
+                                    scope.launch { snackbarHostState.showSnackbar("Model: ${selectedModel ?: "none"}") }
+                                }
+                            )
                         }
                     }
-                )
-            },
-            bottomBar = {
-                Surface(color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(shape = RoundedCornerShape(24.dp), color = Color(0xFFF2F2F7), modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(Color.White).clickable {
-                                        onSendMessage("I want to attach an image")
-                                        scope.launch { snackbarHostState.showSnackbar("Image attachment") }
-                                    },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Image, contentDescription = "Attach image", tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(18.dp))
-                                }
-                                OutlinedTextField(
-                                    value = inputText,
-                                    onValueChange = { inputText = it },
-                                    placeholder = { Text("Chat with AI", color = Color.Black.copy(alpha = 0.35f)) },
-                                    modifier = Modifier.weight(1f),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        focusedTextColor = Color.Black,
-                                        unfocusedTextColor = Color.Black,
-                                        focusedBorderColor = Color.Transparent,
-                                        unfocusedBorderColor = Color.Transparent,
-                                        cursorColor = Color(0xFF6C4DFF)
-                                    ),
-                                    maxLines = 4
-                                )
-                            }
+                }
+            )
+        },
+        bottomBar = {
+            Column(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFFFEFBFF)).navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AnimatedVisibility(visible = showAttachments) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AttachChip(icon = Icons.Default.Image, label = "Image") {
+                            scope.launch { snackbarHostState.showSnackbar("Image attachments are coming soon") }
                         }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(
-                                    modifier = Modifier.size(38.dp).clip(CircleShape).background(if (inputText.isBlank()) Color(0xFFE5E5EA) else Color(0xFF6C4DFF)).clickable {
-                                        if (inputText.isNotBlank()) {
-                                            var final = inputText
-                                            if (useSearch) final = "[WebSearch] $final"
-                                            if (useReasoning) final = "[Reasoning] $final"
-                                            onSendMessage(final)
-                                            inputText = ""
-                                        }
-                                    },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.ArrowUpward, contentDescription = "Send message", tint = if (inputText.isBlank()) Color.Black.copy(alpha = 0.3f) else Color.White, modifier = Modifier.size(20.dp))
-                                }
-                                Box(
-                                    modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFF2F2F7)).clickable {
-                                        onSendMessage("I want to upload a file")
-                                    },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Add, contentDescription = "Attach file", tint = Color.Black.copy(alpha = 0.65f), modifier = Modifier.size(20.dp))
-                                }
+                        AttachChip(icon = Icons.Default.AttachFile, label = "File") {
+                            scope.launch { snackbarHostState.showSnackbar("File attachments are coming soon") }
+                        }
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = Color.White,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 3.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)) {
+                        TextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            placeholder = { Text("Message AriAI", color = Muted) },
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 5,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = Accent,
+                                focusedTextColor = Ink,
+                                unfocusedTextColor = Ink
+                            )
+                        )
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconCircle(icon = Icons.Default.Add, description = "Attachments", active = showAttachments) {
+                                showAttachments = !showAttachments
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(20.dp),
-                                    color = if (useSearch) Color(0xFF6C4DFF).copy(alpha = 0.12f) else Color(0xFFF2F2F7),
-                                    modifier = Modifier.clickable { useSearch = !useSearch }
-                                ) {
-                                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Icon(Icons.Default.Search, contentDescription = "Toggle web search", tint = if (useSearch) Color(0xFF6C4DFF) else Color.Black.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                                        if (useSearch) Text("Search", color = Color(0xFF6C4DFF), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(20.dp),
-                                    color = if (useReasoning) Color(0xFF6C4DFF).copy(alpha = 0.12f) else Color(0xFFF2F2F7),
-                                    modifier = Modifier.clickable { useReasoning = !useReasoning }
-                                ) {
-                                    Box(modifier = Modifier.padding(10.dp), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.Star, contentDescription = "Toggle reasoning", tint = if (useReasoning) Color(0xFF6C4DFF) else Color.Black.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                                    }
-                                }
+                            Spacer(Modifier.width(6.dp))
+                            ToggleChip(icon = Icons.Default.Search, label = "Search", active = useSearch) { useSearch = !useSearch }
+                            Spacer(Modifier.width(6.dp))
+                            ToggleChip(icon = Icons.Default.Star, label = "Reasoning", active = useReasoning) { useReasoning = !useReasoning }
+                            Spacer(Modifier.weight(1f))
+                            val canSend = inputText.isNotBlank() && !isStreaming
+                            Box(
+                                modifier = Modifier.size(40.dp).clip(CircleShape)
+                                    .background(if (canSend) Accent else Color(0xFFE6E0F5))
+                                    .clickable(enabled = canSend) { send() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.ArrowUpward, contentDescription = "Send", tint = if (canSend) Color.White else Ink.copy(alpha = 0.35f), modifier = Modifier.size(20.dp))
                             }
                         }
                     }
                 }
             }
-        ) { padding ->
+        }
+    ) { padding ->
+        if (messages.isEmpty() && currentStreamingContent.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(Accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Chat, contentDescription = null, tint = Accent, modifier = Modifier.size(30.dp))
+                    }
+                    Text("How can I help you?", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+                    Text("Type a message below to start.", color = Muted, fontSize = 13.sp)
+                }
+            }
+        } else {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                if (messages.isEmpty() && currentStreamingContent.isEmpty()) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().height(400.dp), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(Color(0xFF6C4DFF)), contentAlignment = Alignment.Center) {
-                                    Text("A", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
-                                }
-                                Text("How can I help you today?", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    SuggestionChip(onClick = { onSendMessage("Explain quantum computing") }, label = { Text("Explain") })
-                                    SuggestionChip(onClick = { onSendMessage("Write a blog post") }, label = { Text("Write") })
-                                    SuggestionChip(onClick = { onSendMessage("Write code for sorting") }, label = { Text("Code") })
-                                }
-                            }
-                        }
-                    }
-                }
-
-                items(count = messages.size, key = { i -> "${messages[i].id}_${messages[i].timestamp}_$i" }) { i ->
+                items(count = messages.size, key = { i -> "${messages[i].id}_$i" }) { i ->
                     val m = messages[i]
                     if (m.role == MessageRole.USER) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF6C4DFF)), modifier = Modifier.widthIn(max = 320.dp)) {
-                                Text(m.content, color = Color.White, modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
+                        UserBubble(m.content)
                     } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                            Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFF6C4DFF)), contentAlignment = Alignment.Center) {
-                                Text("A", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                            }
-                            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.weight(1f)) {
-                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(m.content, color = Color.Black, style = MaterialTheme.typography.bodyMedium)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                                        Row(modifier = Modifier.clickable { copyToClipboard(m.content) }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy message", tint = Color.Black.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
-                                            Text("Copy", fontSize = MaterialTheme.typography.labelSmall.fontSize, color = Color.Black.copy(alpha = 0.45f))
-                                        }
-                                        Row(modifier = Modifier.clickable { onBranchMessage(m) }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Icon(Icons.Default.Share, contentDescription = "Branch chat", tint = Color.Black.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
-                                            Text("Branch", fontSize = MaterialTheme.typography.labelSmall.fontSize, color = Color.Black.copy(alpha = 0.45f))
-                                        }
-                                        Row(modifier = Modifier.clickable { onRegenerate(m) }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Icon(Icons.Default.Refresh, contentDescription = "Regenerate", tint = Color.Black.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
-                                            Text("Retry", fontSize = MaterialTheme.typography.labelSmall.fontSize, color = Color.Black.copy(alpha = 0.45f))
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        AssistantBlock(
+                            text = m.content,
+                            onCopy = { copyToClipboard(m.content) },
+                            onBranch = { onBranchMessage(m) },
+                            onRetry = { onRegenerate(m) }
+                        )
                     }
                 }
-
                 if (currentStreamingContent.isNotEmpty()) {
-                    item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFF6C4DFF)), contentAlignment = Alignment.Center) {
-                                Text("A", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                            }
-                            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.weight(1f)) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Text(currentStreamingContent, color = Color.Black, style = MaterialTheme.typography.bodyMedium)
-                                    if (isStreaming) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), color = Color(0xFF6C4DFF))
-                                }
-                            }
-                        }
+                    item(key = "streaming") {
+                        AssistantBlock(text = currentStreamingContent, streaming = isStreaming)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun UserBubble(text: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Surface(
+            shape = RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp),
+            color = Accent.copy(alpha = 0.11f),
+            modifier = Modifier.widthIn(max = 300.dp)
+        ) {
+            Text(text, color = Ink, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        }
+    }
+}
+
+@Composable
+private fun AssistantBlock(
+    text: String,
+    streaming: Boolean = false,
+    onCopy: (() -> Unit)? = null,
+    onBranch: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null
+) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text, color = Ink, fontSize = 15.sp, lineHeight = 23.sp)
+        if (streaming) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), color = Accent, trackColor = Accent.copy(alpha = 0.12f))
+        } else if (onCopy != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                ActionIcon(Icons.Default.ContentCopy, "Copy", onCopy)
+                ActionIcon(Icons.Default.Share, "Branch", onBranch ?: {})
+                ActionIcon(Icons.Default.Refresh, "Retry", onRetry ?: {})
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(32.dp)) {
+        Icon(icon, contentDescription = description, tint = Muted, modifier = Modifier.size(16.dp))
+    }
+}
+
+@Composable
+private fun IconCircle(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(36.dp).clip(CircleShape).background(if (active) Accent.copy(alpha = 0.14f) else Color(0xFFF2F2F7)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = description, tint = if (active) Accent else Ink.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun ToggleChip(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = if (active) Accent.copy(alpha = 0.14f) else Color(0xFFF2F2F7),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(icon, contentDescription = label, tint = if (active) Accent else Ink.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+            Text(label, color = if (active) Accent else Ink.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+        }
+    }
+}
+
+@Composable
+private fun AttachChip(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.clickable(onClick = onClick)) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(icon, contentDescription = label, tint = Accent, modifier = Modifier.size(18.dp))
+            Text(label, color = Ink, fontSize = 13.sp)
         }
     }
 }
