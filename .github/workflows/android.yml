@@ -36,6 +36,16 @@ jobs:
         set -o pipefail
         ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee build.log
     
+    - name: Report build errors as annotations
+      if: failure()
+      run: |
+        # Surface Kotlin/aapt errors as GitHub annotations so they can be read without raw log access.
+        grep -E "^e: |error:|What went wrong|Execution failed" build.log | head -40 | while IFS= read -r line; do
+          safe=$(echo "$line" | tr -d '\r' | cut -c1-900)
+          echo "::error title=Build error::$safe"
+        done
+        echo "::notice title=Build tail::$(tail -n 30 build.log | tr '\n' ' ' | cut -c1-3000)"
+    
     - name: Upload build log
       if: always()
       uses: actions/upload-artifact@v4
