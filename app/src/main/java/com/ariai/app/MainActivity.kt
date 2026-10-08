@@ -248,10 +248,10 @@ fun AppRoot(viewModel: AppViewModel) {
                         onClearAll = { navController.navigate("storage") },
                         currentTheme = theme,
                         currentLanguage = language,
-                        dynamicColor = dynamicColor,
+                        dynamicColor = false,
+                        onDynamicColorChange = {},
                         onThemeChange = { viewModel.setTheme(it) },
                         onLanguageChange = { viewModel.setLanguage(it) },
-                        onDynamicColorChange = { viewModel.setDynamicColor(it) },
                         onDefaultModelClick = { navController.navigate("default_model") },
                         onPreferencesClick = { navController.navigate("preferences") },
                         defaultModelName = defaultModelName
@@ -262,6 +262,8 @@ fun AppRoot(viewModel: AppViewModel) {
                     PreferencesScreen(
                         theme = theme,
                         onThemeChange = { viewModel.setTheme(it) },
+                        dynamicColor = false,
+                        onDynamicColorChange = {},
                         reasoning = reasoningLevel,
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         fontSize = fontSize,

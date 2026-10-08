@@ -19,7 +19,8 @@ val AriSecondary = Color(0xFF00D4AA)
 val AriSecondaryLight = Color(0xFF5CFFD6)
 val AriSecondaryDark = Color(0xFF00A381)
 
-val AriAccent = Color(0xFFFF6B6B)
+// The single colour accent. Used only for one small element per screen.
+val AriAccent = Color(0xFFD9704A)
 val AriAccentLight = Color(0xFFFF9E9E)
 
 val AriBackground = Color(0xFF0F0F13)
@@ -43,5 +44,3 @@ val AriPaper = Color(0xFFFFFFFF)
 val AriMuted = Color(0x8A111111)
 val AriLine = Color(0x14000000)
 val AriTint = Color(0xFFF3F3F3)
-// The single colour accent. Used only for one small element per screen.
-val AriAccent = Color(0xFFD9704A)
