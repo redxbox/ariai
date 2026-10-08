@@ -3,24 +3,13 @@ package com.ariai.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -28,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.ariai.app.ui.drawer.AppDrawerContent
 import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
 import com.ariai.app.util.LocalStrings
@@ -50,12 +40,12 @@ class MainActivity : ComponentActivity() {
             val isDarkTheme = when (theme) {
                 "light" -> false
                 "dark" -> true
-                else -> androidx.compose.foundation.isSystemInDarkTheme()
+                else -> isSystemInDarkTheme()
             }
 
             CompositionLocalProvider(LocalStrings provides strings) {
                 AriAiTheme(darkTheme = isDarkTheme, dynamicColor = dynamicColor) {
-                    SimpleNavigation(viewModel = viewModel)
+                    AppRoot(viewModel = viewModel)
                 }
             }
         }
@@ -64,12 +54,12 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SimpleNavigation(viewModel: AppViewModel) {
+fun AppRoot(viewModel: AppViewModel) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route ?: "chats"
+    val backStack by navController.currentBackStackEntryAsState()
+    val currentRoute = backStack?.destination?.route ?: "chats"
     val snackbarHostState = remember { SnackbarHostState() }
 
     val providers by viewModel.providers.collectAsState()
@@ -80,111 +70,51 @@ fun SimpleNavigation(viewModel: AppViewModel) {
     val language by viewModel.language.collectAsState()
     val theme by viewModel.theme.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
+    val searchKeys by viewModel.searchKeys.collectAsState()
+    val currentChatId by viewModel.currentChatId.collectAsState()
+
+    fun go(route: String) {
+        scope.launch { drawerState.close() }
+        navController.navigate(route) { launchSingleTop = true }
+    }
+
+    fun openChat(chatId: String) {
+        scope.launch { drawerState.close() }
+        viewModel.loadChat(chatId)
+        navController.navigate("chat/$chatId") { launchSingleTop = true }
+    }
+
+    fun newChat() {
+        scope.launch { drawerState.close() }
+        val id = viewModel.createNewChat()
+        navController.navigate("chat/$id") { launchSingleTop = true }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = true, // Swipe to open
+        gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = Color.White,
-                drawerContentColor = Color.Black,
-                modifier = Modifier.width(300.dp)
+                drawerContentColor = Color(0xFF1C1B1F),
+                modifier = Modifier.width(312.dp)
             ) {
-                // Header
-                Column(modifier = Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFF6C4DFF)), contentAlignment = Alignment.Center) {
-                            Text("A", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        }
-                        Column {
-                            Text("AriAI", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                            Text("Personal AI", color = Color.Black.copy(alpha = 0.55f), fontSize = 11.sp)
+                AppDrawerContent(
+                    chats = chats,
+                    currentChatId = currentChatId,
+                    currentRoute = currentRoute,
+                    onNewChat = { newChat() },
+                    onChatClick = { openChat(it.id) },
+                    onPinChat = { viewModel.pinChat(it) },
+                    onDeleteChat = { viewModel.deleteChat(it.id) },
+                    onNavigate = { go(it) },
+                    onAbout = {
+                        scope.launch {
+                            drawerState.close()
+                            snackbarHostState.showSnackbar("AriAI v1.0 - Personal AI")
                         }
                     }
-                    Button(
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            val newId = viewModel.createNewChat()
-                            navController.navigate("chat/$newId")
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C4DFF))
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("New Chat")
-                    }
-                }
-                HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
-                Spacer(Modifier.height(8.dp))
-
-                // Recent conversations (drawer list, like the reference app)
-                Text(
-                    "Recent",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Black.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 4.dp)
                 )
-                Column(
-                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    if (chats.isEmpty()) {
-                        Text("No conversations yet", fontSize = 13.sp, color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.padding(16.dp))
-                    }
-                    chats.take(12).forEach { chat ->
-                        NavigationDrawerItem(
-                            label = { Text(chat.title, maxLines = 1, fontSize = 14.sp, color = Color.Black) },
-                            selected = currentRoute == "chat/${chat.id}",
-                            onClick = {
-                                scope.launch { drawerState.close() }
-                                viewModel.loadChat(chat.id)
-                                navController.navigate("chat/${chat.id}") { launchSingleTop = true }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = Color(0xFF6C4DFF).copy(alpha = 0.12f),
-                                unselectedContainerColor = Color.Transparent
-                            ),
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-
-                // Essential menu only - not crowded
-                SimpleDrawerItem(icon = Icons.Default.Chat, label = "Chat History", selected = currentRoute == "chats" || currentRoute.startsWith("chat/"), onClick = {
-                    scope.launch { drawerState.close() }
-                    navController.navigate("chats") { launchSingleTop = true }
-                })
-                SimpleDrawerItem(icon = Icons.Default.Search, label = "Search", selected = currentRoute == "search", onClick = {
-                    scope.launch { drawerState.close() }
-                    navController.navigate("search") { launchSingleTop = true }
-                })
-                SimpleDrawerItem(icon = Icons.Default.Storage, label = "Providers", selected = currentRoute == "providers", onClick = {
-                    scope.launch { drawerState.close() }
-                    navController.navigate("providers") { launchSingleTop = true }
-                })
-                SimpleDrawerItem(icon = Icons.Default.Settings, label = "MCP Servers", selected = currentRoute == "mcp", onClick = {
-                    scope.launch { drawerState.close() }
-                    navController.navigate("mcp") { launchSingleTop = true }
-                })
-                SimpleDrawerItem(icon = Icons.Default.Settings, label = "Settings", selected = currentRoute == "settings", onClick = {
-                    scope.launch { drawerState.close() }
-                    navController.navigate("settings") { launchSingleTop = true }
-                })
-
-
-                HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp))
-                SimpleDrawerItem(icon = Icons.Default.Info, label = "About", selected = false, onClick = {
-                    scope.launch {
-                        drawerState.close()
-                        snackbarHostState.showSnackbar("AriAI v1.0")
-                    }
-                })
-                Spacer(Modifier.height(16.dp))
             }
         }
     ) {
@@ -194,20 +124,14 @@ fun SimpleNavigation(viewModel: AppViewModel) {
         ) { padding ->
             NavHost(
                 navController = navController,
-                startDestination = "chats", // Direct to chat history - no home page
+                startDestination = "chats",
                 modifier = Modifier.padding(padding)
             ) {
                 composable("chats") {
                     ChatListScreen(
                         chats = chats,
-                        onChatClick = { chat ->
-                            viewModel.loadChat(chat.id)
-                            navController.navigate("chat/${chat.id}")
-                        },
-                        onNewChat = {
-                            val newId = viewModel.createNewChat()
-                            navController.navigate("chat/$newId")
-                        },
+                        onChatClick = { openChat(it.id) },
+                        onNewChat = { newChat() },
                         onDeleteChat = { viewModel.deleteChat(it.id) },
                         onPinChat = { viewModel.pinChat(it) }
                     )
@@ -216,8 +140,8 @@ fun SimpleNavigation(viewModel: AppViewModel) {
                 composable(
                     "chat/{chatId}",
                     arguments = listOf(navArgument("chatId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
+                ) { entry ->
+                    val chatId = entry.arguments?.getString("chatId") ?: ""
                     val currentChat = chats.find { it.id == chatId }
                     LaunchedEffect(chatId) { viewModel.loadChat(chatId) }
                     NewChatScreen(
@@ -225,10 +149,10 @@ fun SimpleNavigation(viewModel: AppViewModel) {
                         messages = messages,
                         isStreaming = isStreaming,
                         currentStreamingContent = streamingContent,
-                        selectedModel = currentChat?.modelId ?: "GPT-4o",
+                        selectedModel = currentChat?.modelId,
                         providers = providers,
-                        onSendMessage = { content -> viewModel.sendMessage(content) },
-                        onBack = { navController.popBackStack() },
+                        onSendMessage = { viewModel.sendMessage(it) },
+                        onBack = { newChat() },
                         onBranchMessage = { viewModel.branchMessage(it) },
                         onRegenerate = { viewModel.regenerateMessage(it) },
                         onCopyMessage = { },
@@ -240,7 +164,27 @@ fun SimpleNavigation(viewModel: AppViewModel) {
                     NewProvidersScreen(
                         providers = providers,
                         onAddProvider = { navController.navigate("add_provider") },
-                        onEditProvider = { provider -> navController.navigate("edit_provider/${provider.id}") },
+                        onEditProvider = { navController.navigate("edit_provider/${it.id}") },
+                        onBack = { navController.popBackStack() },
+                        onToggleProvider = { viewModel.saveProvider(it.copy(enabled = !it.enabled)) }
+                    )
+                }
+
+                composable("add_provider") {
+                    AddProviderScreen(
+                        onSave = { viewModel.saveProvider(it); navController.popBackStack() },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(
+                    "edit_provider/{providerId}",
+                    arguments = listOf(navArgument("providerId") { type = NavType.StringType })
+                ) { entry ->
+                    val providerId = entry.arguments?.getString("providerId") ?: ""
+                    AddProviderScreen(
+                        initialProvider = providers.find { it.id == providerId },
+                        onSave = { viewModel.saveProvider(it); navController.popBackStack() },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -249,14 +193,35 @@ fun SimpleNavigation(viewModel: AppViewModel) {
                     SimpleSettingsScreen(
                         onBack = { navController.popBackStack() },
                         onProvidersClick = { navController.navigate("providers") },
-                        onSearchClick = { navController.navigate("search") },
+                        onSearchServiceClick = { navController.navigate("search_service") },
+                        onStorageClick = { navController.navigate("storage") },
                         onMcpClick = { navController.navigate("mcp") },
+                        onClearAll = { navController.navigate("storage") },
                         currentTheme = theme,
                         currentLanguage = language,
                         dynamicColor = dynamicColor,
                         onThemeChange = { viewModel.setTheme(it) },
                         onLanguageChange = { viewModel.setLanguage(it) },
                         onDynamicColorChange = { viewModel.setDynamicColor(it) }
+                    )
+                }
+
+                composable("search_service") {
+                    SearchServiceScreen(
+                        searchKeys = searchKeys,
+                        onSaveKey = { name, key -> viewModel.setSearchKey(name, key) },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable("storage") {
+                    StorageScreen(
+                        chats = chats,
+                        onClearAll = {
+                            chats.forEach { viewModel.deleteChat(it.id) }
+                            scope.launch { snackbarHostState.showSnackbar("All chats deleted") }
+                        },
+                        onBack = { navController.popBackStack() }
                     )
                 }
 
@@ -268,57 +233,15 @@ fun SimpleNavigation(viewModel: AppViewModel) {
                     SimpleSearchScreen(
                         onBack = { navController.popBackStack() },
                         onSearch = { query ->
-                            val newId = viewModel.createNewChat()
-                            navController.navigate("chat/$newId")
-                            viewModel.sendMessage("Search: $query")
+                            val id = viewModel.createNewChat()
+                            navController.navigate("chat/$id")
+                            viewModel.sendMessage(query, useWebSearch = true)
                         }
-                    )
-                }
-
-                composable("add_provider") {
-                    AddProviderScreen(
-                        onSave = { provider ->
-                            viewModel.saveProvider(provider)
-                            navController.popBackStack()
-                        },
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-
-                composable(
-                    "edit_provider/{providerId}",
-                    arguments = listOf(navArgument("providerId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val providerId = backStackEntry.arguments?.getString("providerId") ?: ""
-                    val provider = providers.find { it.id == providerId }
-                    AddProviderScreen(
-                        initialProvider = provider,
-                        onSave = { updated ->
-                            viewModel.saveProvider(updated)
-                            navController.popBackStack()
-                        },
-                        onBack = { navController.popBackStack() }
                     )
                 }
             }
         }
     }
-}
-
-@Composable
-fun SimpleDrawerItem(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
-    NavigationDrawerItem(
-        icon = { Icon(icon, contentDescription = label, tint = if (selected) Color(0xFF6C4DFF) else Color.Black.copy(alpha = 0.6f)) },
-        label = { Text(label, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) Color(0xFF6C4DFF) else Color.Black, fontSize = 14.sp) },
-        selected = selected,
-        onClick = onClick,
-        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-        shape = RoundedCornerShape(14.dp),
-        colors = NavigationDrawerItemDefaults.colors(
-            selectedContainerColor = Color(0xFF6C4DFF).copy(alpha = 0.12f),
-            unselectedContainerColor = Color.Transparent
-        )
-    )
 }
 
 class AppViewModelFactory(

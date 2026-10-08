@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,8 +17,32 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
+import com.ariai.app.data.models.ProviderType
+
+private val Accent = Color(0xFF6C4DFF)
+private val Ink = Color(0xFF1C1B1F)
+
+fun providerTypeLabel(type: ProviderType): String = when (type) {
+    ProviderType.OPENAI -> "OpenAI"
+    ProviderType.GEMINI -> "Google Gemini"
+    ProviderType.ANTHROPIC -> "Anthropic"
+    ProviderType.OPENAI_COMPATIBLE -> "OpenAI compatible"
+    ProviderType.OLLAMA -> "Ollama (local)"
+    ProviderType.CUSTOM -> "Custom"
+}
+
+private fun providerColors(type: ProviderType): Pair<Color, Color> = when (type) {
+    ProviderType.OPENAI -> Color(0xFF10A37F) to Color(0xFF6BD7B5)
+    ProviderType.GEMINI -> Color(0xFF4285F4) to Color(0xFF8AB4F8)
+    ProviderType.ANTHROPIC -> Color(0xFFC96442) to Color(0xFFE8A07F)
+    ProviderType.OLLAMA -> Color(0xFF3A3A3C) to Color(0xFF8E8E93)
+    ProviderType.OPENAI_COMPATIBLE -> Color(0xFF6C4DFF) to Color(0xFFB7A6FF)
+    ProviderType.CUSTOM -> Color(0xFF7D5260) to Color(0xFFD7A9BD)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,128 +51,178 @@ fun NewProvidersScreen(
     onAddProvider: () -> Unit,
     onEditProvider: (Provider) -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    onToggleProvider: (Provider) -> Unit = {}
 ) {
-    var selectedTab by remember { mutableStateOf("All") }
+    var filter by remember { mutableStateOf("All") }
+    val filters = listOf("All", "Cloud", "Local", "Custom")
+    val visible = providers.filter {
+        when (filter) {
+            "Cloud" -> it.type != ProviderType.OLLAMA && it.type != ProviderType.CUSTOM
+            "Local" -> it.type == ProviderType.OLLAMA
+            "Custom" -> it.type == ProviderType.CUSTOM || it.type == ProviderType.OPENAI_COMPATIBLE
+            else -> true
+        }
+    }
+    val enabledCount = providers.count { it.enabled }
+    val modelCount = providers.sumOf { it.models.size }
 
-    Box(modifier = modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFE8F0FF), Color(0xFFF0F4FF), Color(0xFFF8FAFF))))) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                Column {
-                    TopAppBar(
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.7f)),
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.Black)
-                            }
-                        },
-                        title = {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                                Text("AI Providers", color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                                Text("Connect. Mix. Create.", color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
-                            }
-                        },
-                        actions = {
-                            IconButton(onClick = onAddProvider) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black)
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                    )
-                    // Tabs like screenshot - All Cloud Local Custom
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("All", "Cloud", "Local", "Custom").forEach { tab ->
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = if (selectedTab == tab) Color(0xFFE8E0FF) else Color.White.copy(alpha = 0.6f),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedTab == tab) Color(0xFF6C4DFF).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f)),
-                                modifier = Modifier.weight(1f).clickable { selectedTab = tab }
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {
-                                    Text(tab, color = if (selectedTab == tab) Color(0xFF6C4DFF) else Color.Black.copy(alpha = 0.6f), fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal, style = MaterialTheme.typography.labelMedium)
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            bottomBar = {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.7f)),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        modifier = Modifier.fillMaxWidth().clickable { onAddProvider() }
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF6C4DFF))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Add Custom Provider", color = Color(0xFF6C4DFF), fontWeight = FontWeight.Bold)
+    Scaffold(
+        containerColor = Color(0xFFFEFBFF),
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFEFBFF)),
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
+                title = { Text("Providers", fontWeight = FontWeight.SemiBold, color = Ink) }
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onAddProvider,
+                containerColor = Accent,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(18.dp),
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Add provider", fontWeight = FontWeight.SemiBold) }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                // Hero summary
+                Box(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                        .background(Brush.linearGradient(listOf(Accent, Color(0xFF9C7CFF), Color(0xFF4FC3F7))))
+                        .padding(20.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text("Connected providers", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            HeroStat(providers.size.toString(), "Total")
+                            HeroStat(enabledCount.toString(), "Active")
+                            HeroStat(modelCount.toString(), "Models")
                         }
                     }
                 }
             }
-        ) { padding ->
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Providers like screenshot - with icons and toggles
-                item { ProviderGlassRow(name = "OpenAI", models = "GPT-4o, 4o-mini, o3", iconBg = Color(0xFF10A37F), letter = "O", enabled = true) }
-                item { ProviderGlassRow(name = "Anthropic", models = "Claude 3.7, 3.5", iconBg = Color(0xFFD4A574), letter = "A", enabled = false) }
-                item { ProviderGlassRow(name = "Google", models = "Gemini 2.0, 1.5", iconBg = Color(0xFF4285F4), letter = "G", enabled = true) }
-                item { ProviderGlassRow(name = "Meta", models = "Llama 3.3, 3.1", iconBg = Color(0xFF0668E1), letter = "∞", enabled = false) }
-                item { ProviderGlassRow(name = "DeepSeek", models = "R1, V3", iconBg = Color(0xFF4D6BFE), letter = "D", enabled = true) }
-                item { ProviderGlassRow(name = "Qwen", models = "Qwen3, Qwen2.5", iconBg = Color(0xFF7C4DFF), letter = "Q", enabled = false) }
-                item { ProviderGlassRow(name = "Mistral", models = "Large, Medium, Small", iconBg = Color(0xFFFF6B35), letter = "M", enabled = false) }
 
-                // User providers
-                items(providers.size) { index ->
-                    val p = providers[index]
-                    ProviderGlassRow(
-                        name = p.name,
-                        models = p.models.take(2).joinToString(", ") { it.displayName }.ifEmpty { p.baseUrl.take(20) },
-                        iconBg = Color(0xFF6C4DFF),
-                        letter = p.name.firstOrNull()?.toString() ?: "A",
-                        enabled = p.enabled,
-                        onClick = { onEditProvider(p) }
-                    )
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    filters.forEach { f ->
+                        val selected = filter == f
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (selected) Accent else Color.White,
+                            shadowElevation = if (selected) 0.dp else 1.dp,
+                            modifier = Modifier.clickable { filter = f }
+                        ) {
+                            Text(
+                                f,
+                                color = if (selected) Color.White else Ink.copy(alpha = 0.7f),
+                                fontSize = 13.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
                 }
+            }
+
+            if (visible.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(Accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Storage, contentDescription = null, tint = Accent, modifier = Modifier.size(28.dp))
+                        }
+                        Text(if (providers.isEmpty()) "No providers yet" else "Nothing in this filter", fontWeight = FontWeight.SemiBold, color = Ink)
+                        Text("Add an API endpoint to start chatting.", color = Ink.copy(alpha = 0.5f), fontSize = 13.sp)
+                    }
+                }
+            }
+
+            itemsIndexed(visible, key = { index, p -> "${p.id}_$index" }) { _, provider ->
+                ProviderCard(
+                    provider = provider,
+                    onClick = { onEditProvider(provider) },
+                    onToggle = { onToggleProvider(provider) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun ProviderGlassRow(name: String, models: String, iconBg: Color, letter: String, enabled: Boolean, onClick: () -> Unit = {}) {
-    var isEnabled by remember { mutableStateOf(enabled) }
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.7f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+private fun HeroStat(value: String, label: String) {
+    Column {
+        Text(value, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -> Unit) {
+    val (c1, c2) = providerColors(provider.type)
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        shadowElevation = 2.dp,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(iconBg), contentAlignment = Alignment.Center) {
-                Text(letter.take(2), color = Color.White, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    modifier = Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(Brush.linearGradient(listOf(c1, c2))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(provider.name.firstOrNull()?.uppercase() ?: "P", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(provider.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(providerTypeLabel(provider.type), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f), maxLines = 1)
+                }
+                Switch(
+                    checked = provider.enabled,
+                    onCheckedChange = { onToggle() },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Accent)
+                )
             }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(name, color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                Text(models, color = Color.Black.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                val shown = provider.models.take(3)
+                shown.forEach { m ->
+                    Surface(shape = RoundedCornerShape(10.dp), color = c1.copy(alpha = 0.10f)) {
+                        Text(m.displayName, color = c1, fontSize = 11.sp, maxLines = 1, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    }
+                }
+                val extra = provider.models.size - shown.size
+                if (extra > 0) {
+                    Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFFF2F2F7)) {
+                        Text("+$extra", color = Ink.copy(alpha = 0.6f), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    }
+                }
+                if (provider.models.isEmpty()) {
+                    Text("No models added", color = Ink.copy(alpha = 0.4f), fontSize = 12.sp)
+                }
             }
-            Switch(
-                checked = isEnabled,
-                onCheckedChange = { isEnabled = it },
-                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF6C4DFF), uncheckedThumbColor = Color.White, uncheckedTrackColor = Color.Black.copy(alpha = 0.1f))
-            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (provider.enabled) Color(0xFF34C759) else Color(0xFFAEAEB2)))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    if (provider.enabled) "Active" else "Disabled",
+                    fontSize = 11.sp,
+                    color = Ink.copy(alpha = 0.55f)
+                )
+                Spacer(Modifier.weight(1f))
+                Text(provider.baseUrl.removePrefix("https://").removePrefix("http://").take(28), fontSize = 11.sp, color = Ink.copy(alpha = 0.4f), maxLines = 1)
+            }
         }
     }
 }

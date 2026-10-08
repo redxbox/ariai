@@ -27,6 +27,9 @@ fun SimpleSettingsScreen(
     onBack: () -> Unit,
     onProvidersClick: () -> Unit,
     onSearchClick: () -> Unit = {},
+    onSearchServiceClick: () -> Unit = {},
+    onStorageClick: () -> Unit = {},
+    onClearAll: () -> Unit = {},
     onMcpClick: () -> Unit = {},
     currentTheme: String,
     currentLanguage: String,
@@ -94,7 +97,7 @@ fun SimpleSettingsScreen(
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Storage, title = "Providers", subtitle = "OpenAI, Gemini, Claude and more", onClick = onProvidersClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Search, title = "Search service", subtitle = "Web search for answers", onClick = onSearchClick)
+                        SimpleRow(icon = Icons.Default.Search, title = "Search service", subtitle = "Web search for answers", onClick = onSearchServiceClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column {
@@ -110,13 +113,9 @@ fun SimpleSettingsScreen(
 
                 item {
                     SimpleGroup(title = "Data") {
-                        SimpleRow(icon = Icons.Default.Share, title = "Backup & export", subtitle = "Export chats as file", onClick = {
-                            scope.launch { snackbarHostState.showSnackbar("Export is available in the next update") }
-                        })
+                        SimpleRow(icon = Icons.Default.Storage, title = "Data & storage", subtitle = "Export list, storage overview", onClick = onStorageClick)
                         HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Delete, title = "Clear chat history", subtitle = "Delete all conversations", onClick = {
-                            scope.launch { snackbarHostState.showSnackbar("Use the chat list to delete single chats") }
-                        })
+                        SimpleRow(icon = Icons.Default.Delete, title = "Delete all chats", subtitle = "Remove every conversation", onClick = onClearAll)
                     }
                 }
 
