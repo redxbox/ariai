@@ -299,6 +299,8 @@ fun AddProviderScreen(
     var models by remember { mutableStateOf(initialProvider?.models ?: getDefaultModelsForType(selectedType, providerId)) }
     var modelsEdited by remember { mutableStateOf(initialProvider != null) }
     var showAddModel by remember { mutableStateOf(false) }
+    var headers by remember { mutableStateOf(initialProvider?.customHeaders?.map { it.key to it.value }.orEmpty()) }
+    var customBody by remember { mutableStateOf(initialProvider?.customBody.orEmpty()) }
     val scope = rememberCoroutineScope()
     var fetching by remember { mutableStateOf(false) }
     var fetchError by remember { mutableStateOf<String?>(null) }
@@ -336,8 +338,6 @@ fun AddProviderScreen(
             }
         }
     }
-    var headers by remember { mutableStateOf(initialProvider?.customHeaders?.map { it.key to it.value }.orEmpty()) }
-    var customBody by remember { mutableStateOf(initialProvider?.customBody.orEmpty()) }
     val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody)
     // Brand presets fill in the default models, until the user edits the list.
     LaunchedEffect(selectedType) {
