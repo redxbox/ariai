@@ -160,7 +160,6 @@ fun ColumnScope.AppDrawerContent(
                     modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp)
                 )
                 is DrawerRow.ChatRow -> ChatRowItem(
-                    modifier = Modifier.animateItemPlacement(),
                     chat = row.chat,
                     selected = row.chat.id == currentChatId,
                     onClick = { onChatClick(row.chat) },

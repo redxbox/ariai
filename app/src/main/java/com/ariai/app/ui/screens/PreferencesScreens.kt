@@ -1,5 +1,6 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -170,7 +171,7 @@ fun DefaultModelScreen(
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = if (selected) Accent.copy(alpha = 0.10f) else Color.White,
-                        modifier = Modifier.fillMaxWidth().clickableRow { onSelect(provider.id, model.id) }
+                        modifier = Modifier.fillMaxWidth().clickable { onSelect(provider.id, model.id) }
                     ) {
                         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -185,7 +186,3 @@ fun DefaultModelScreen(
         }
     }
 }
-
-private fun Modifier.clickableRow(onClick: () -> Unit): Modifier = this.then(
-    androidx.compose.foundation.clickable(onClick = onClick)
-)

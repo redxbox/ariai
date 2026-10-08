@@ -3,11 +3,10 @@ package com.ariai.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideIntoContainer
-import androidx.compose.animation.slideOutOfContainer
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -147,12 +146,12 @@ fun AppRoot(viewModel: AppViewModel) {
                 startDestination = "chats",
                 modifier = Modifier.padding(padding),
                 enterTransition = {
-                    fadeIn(tween(220)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(280, easing = FastOutSlowInEasing))
+                    fadeIn(tween(220)) + slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { it / 6 }
                 },
                 exitTransition = { fadeOut(tween(160)) },
                 popEnterTransition = { fadeIn(tween(220)) },
                 popExitTransition = {
-                    fadeOut(tween(160)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(280, easing = FastOutSlowInEasing))
+                    fadeOut(tween(160)) + slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it / 6 }
                 }
             ) {
                 composable("chats") {
