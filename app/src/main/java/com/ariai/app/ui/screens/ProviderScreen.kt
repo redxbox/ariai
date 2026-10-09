@@ -301,6 +301,7 @@ fun AddProviderScreen(
     var modelsEdited by remember { mutableStateOf(initialProvider != null) }
     var showAddModel by remember { mutableStateOf(false) }
     var modelFilter by remember { mutableStateOf("") }
+    var modelsExpanded by remember { mutableStateOf(false) }
     var headers by remember { mutableStateOf(initialProvider?.customHeaders?.map { it.key to it.value }.orEmpty()) }
     var customBody by remember { mutableStateOf(initialProvider?.customBody.orEmpty()) }
     val scope = rememberCoroutineScope()
@@ -481,13 +482,33 @@ fun AddProviderScreen(
                         if (models.isEmpty()) {
                             Text("No models yet", fontSize = 13.sp, color = AriMuted, modifier = Modifier.padding(16.dp))
                         }
-                        visibleModels.forEachIndexed { index, model ->
+                        // Only a few rows are composed by default; the rest load on expand.
+                        val collapsible = visibleModels.size > 5 && modelFilter.isBlank()
+                        val shownModels = if (collapsible && !modelsExpanded) visibleModels.take(5) else visibleModels
+                        shownModels.forEachIndexed { index, model ->
                             if (index > 0) HorizontalDivider(color = AriTint, modifier = Modifier.padding(horizontal = 16.dp))
                             ModelRow(
                                 model = model,
                                 color = accent,
                                 onRemove = { models = models.filterNot { it.id == model.id } }
                             )
+                        }
+                        if (collapsible) {
+                            HorizontalDivider(color = AriTint)
+                            TextButton(onClick = { modelsExpanded = !modelsExpanded }, modifier = Modifier.fillMaxWidth()) {
+                                Icon(
+                                    if (modelsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (modelsExpanded) "Collapse" else "Expand",
+                                    tint = AriInk,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (modelsExpanded) "Show less" else "Show all ${visibleModels.size}",
+                                    color = AriInk,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                         HorizontalDivider(color = AriTint)
                         TextButton(onClick = { showAddModel = true }, modifier = Modifier.fillMaxWidth()) {

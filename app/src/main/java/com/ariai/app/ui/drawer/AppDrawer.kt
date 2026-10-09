@@ -65,7 +65,6 @@ fun ColumnScope.AppDrawerContent(
     currentChatId: String?,
     currentRoute: String,
     onNewChat: () -> Unit,
-    onNewImageChat: () -> Unit = onNewChat,
     onChatClick: (Chat) -> Unit,
     onPinChat: (Chat) -> Unit,
     onDeleteChat: (Chat) -> Unit,
@@ -97,31 +96,15 @@ fun ColumnScope.AppDrawerContent(
     Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
     Spacer(Modifier.height(12.dp))
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    Button(
+        onClick = onNewChat,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
     ) {
-        Button(
-            onClick = onNewChat,
-            modifier = Modifier.weight(1f).height(48.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("New chat", fontWeight = FontWeight.SemiBold)
-        }
-        OutlinedButton(
-            onClick = onNewImageChat,
-            modifier = Modifier.weight(1f).height(48.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = AriInk),
-            border = BorderStroke(1.dp, AriLine)
-        ) {
-            Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("عکس", fontWeight = FontWeight.SemiBold)
-        }
+        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("New chat", fontWeight = FontWeight.SemiBold)
     }
 
     OutlinedTextField(

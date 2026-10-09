@@ -211,6 +211,10 @@ fun AppRoot(viewModel: AppViewModel) {
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         onSearchModeChange = { viewModel.setSearchMode(it) },
                         onCompressHistory = { done -> viewModel.compressHistory(done) },
+                        onNewImageChat = { newImageChat() },
+                        onUseImageModel = {
+                            viewModel.firstImageModel()?.let { (pid, mid) -> viewModel.updateChatProvider(chatId, pid, mid) }
+                        },
                         onOpenExtensions = { navController.navigate("mcp") },
                         onOpenSearchSettings = { navController.navigate("search_service") },
                         fontSize = fontSize,

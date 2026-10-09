@@ -104,6 +104,8 @@ fun NewChatScreen(
     onReasoningChange: (ReasoningLevel) -> Unit = {},
     onSearchModeChange: (SearchMode) -> Unit = {},
     onCompressHistory: ((String) -> Unit) -> Unit = {},
+    onNewImageChat: () -> Unit = {},
+    onUseImageModel: () -> Unit = {},
     onOpenExtensions: () -> Unit = {},
     onOpenSearchSettings: () -> Unit = {},
     onAddProvider: () -> Unit = {},
@@ -239,6 +241,10 @@ fun NewChatScreen(
             onFile = { filePicker.launch(arrayOf("text/*", "application/json", "image/*")) },
             onCompress = { onCompressHistory { showNote(it) } },
             onExtensions = onOpenExtensions,
+            onImage = {
+                if (providers.any { p -> p.enabled && p.models.any { isImageModel(it) } }) onUseImageModel()
+                else showNote("No image model. Add one in provider settings.")
+            },
             onDismiss = { showAttachments = false }
         )
     }
@@ -306,6 +312,11 @@ fun NewChatScreen(
                                     showTopMenu = false
                                     copyToClipboard(messages.filter { it.role != MessageRole.SYSTEM }.joinToString("\n\n") { it.content })
                                 }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("عکس") },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                onClick = { showTopMenu = false; onNewImageChat() }
                             )
                             DropdownMenuItem(
                                 text = { Text("Choose model") },
