@@ -1,0 +1,127 @@
+package com.ariai.app.data.local
+
+import android.content.Context
+import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+val Context.dataStore by preferencesDataStore(name = "ariai_prefs")
+
+class PreferencesManager(private val context: Context) {
+    
+    companion object {
+        val LANGUAGE = stringPreferencesKey("language")
+        val THEME = stringPreferencesKey("theme") // light, dark, system
+        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val DEFAULT_PROVIDER_ID = stringPreferencesKey("default_provider_id")
+        val DEFAULT_MODEL_ID = stringPreferencesKey("default_model_id")
+        val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
+        val SEARCH_API_KEY = stringPreferencesKey("search_api_key")
+        val TAVILY_API_KEY = stringPreferencesKey("tavily_api_key")
+        val BRAVE_API_KEY = stringPreferencesKey("brave_api_key")
+        val EXA_API_KEY = stringPreferencesKey("exa_api_key")
+        val SERPER_API_KEY = stringPreferencesKey("serper_api_key")
+        val STREAM_RESPONSE = booleanPreferencesKey("stream_response")
+        val SHOW_REASONING = booleanPreferencesKey("show_reasoning")
+        val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
+        val AUTO_TITLE = booleanPreferencesKey("auto_title")
+        val FONT_SIZE = intPreferencesKey("font_size")
+        val FIRST_LAUNCH = booleanPreferencesKey("first_launch")
+        val REASONING_LEVEL = stringPreferencesKey("reasoning_level")
+        val SEARCH_MODE = stringPreferencesKey("search_mode")
+        val FAVORITE_MODELS = stringSetPreferencesKey("favorite_models")
+    }
+
+    val languageFlow: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "en" }
+    val themeFlow: Flow<String> = context.dataStore.data.map { it[THEME] ?: "system" }
+    val dynamicColorFlow: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLOR] ?: false }
+    val defaultProviderFlow: Flow<String?> = context.dataStore.data.map { it[DEFAULT_PROVIDER_ID] }
+    val defaultModelFlow: Flow<String?> = context.dataStore.data.map { it[DEFAULT_MODEL_ID] }
+    val streamResponseFlow: Flow<Boolean> = context.dataStore.data.map { it[STREAM_RESPONSE] ?: true }
+    val memoryEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[MEMORY_ENABLED] ?: true }
+    val showReasoningFlow: Flow<Boolean> = context.dataStore.data.map { it[SHOW_REASONING] ?: false }
+    val fontSizeFlow: Flow<Int> = context.dataStore.data.map { it[FONT_SIZE] ?: 15 }
+    val firstLaunchFlow: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH] ?: true }
+    val reasoningLevelFlow: Flow<String?> = context.dataStore.data.map { it[REASONING_LEVEL] }
+    val searchModeFlow: Flow<String?> = context.dataStore.data.map { it[SEARCH_MODE] }
+    val favoriteModelsFlow: Flow<Set<String>> = context.dataStore.data.map { it[FAVORITE_MODELS] ?: emptySet() }
+
+    val searchKeysFlow: Flow<Map<String, String>> = context.dataStore.data.map { prefs ->
+        mapOf(
+            "tavily" to (prefs[TAVILY_API_KEY] ?: ""),
+            "brave" to (prefs[BRAVE_API_KEY] ?: ""),
+            "exa" to (prefs[EXA_API_KEY] ?: ""),
+            "serper" to (prefs[SERPER_API_KEY] ?: "")
+        )
+    }
+
+    suspend fun setLanguage(lang: String) {
+        context.dataStore.edit { it[LANGUAGE] = lang }
+    }
+
+    suspend fun setTheme(theme: String) {
+        context.dataStore.edit { it[THEME] = theme }
+    }
+
+    suspend fun setDynamicColor(enabled: Boolean) {
+        context.dataStore.edit { it[DYNAMIC_COLOR] = enabled }
+    }
+
+    suspend fun setDefaultProvider(id: String) {
+        context.dataStore.edit { it[DEFAULT_PROVIDER_ID] = id }
+    }
+
+    suspend fun setDefaultModel(id: String) {
+        context.dataStore.edit { it[DEFAULT_MODEL_ID] = id }
+    }
+
+    suspend fun setSearchApiKey(provider: String, key: String) {
+        val prefKey = when (provider.lowercase()) {
+            "tavily" -> TAVILY_API_KEY
+            "brave" -> BRAVE_API_KEY
+            "exa" -> EXA_API_KEY
+            "serper" -> SERPER_API_KEY
+            else -> SEARCH_API_KEY
+        }
+        context.dataStore.edit { it[prefKey] = key }
+    }
+
+    suspend fun setFirstLaunchDone() {
+        context.dataStore.edit { it[FIRST_LAUNCH] = false }
+    }
+
+    suspend fun setDefaultSelection(providerId: String, modelId: String) {
+        context.dataStore.edit {
+            it[DEFAULT_PROVIDER_ID] = providerId
+            it[DEFAULT_MODEL_ID] = modelId
+        }
+    }
+
+    suspend fun setStreamResponse(enabled: Boolean) {
+        context.dataStore.edit { it[STREAM_RESPONSE] = enabled }
+    }
+
+    suspend fun setShowReasoning(enabled: Boolean) {
+        context.dataStore.edit { it[SHOW_REASONING] = enabled }
+    }
+
+    suspend fun setFontSize(size: Int) {
+        context.dataStore.edit { it[FONT_SIZE] = size }
+    }
+
+    suspend fun setReasoningLevel(name: String) {
+        context.dataStore.edit { it[REASONING_LEVEL] = name }
+    }
+
+    suspend fun setSearchMode(name: String) {
+        context.dataStore.edit { it[SEARCH_MODE] = name }
+    }
+
+    suspend fun toggleFavoriteModel(key: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[FAVORITE_MODELS] ?: emptySet()
+            prefs[FAVORITE_MODELS] = if (key in current) current - key else current + key
+        }
+    }
+}
