@@ -5,6 +5,7 @@ import com.ariai.app.ui.theme.*
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -29,6 +30,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.Icons
@@ -133,6 +135,14 @@ fun NewChatScreen(
         clipboard.setPrimaryClip(ClipData.newPlainText("Message", text))
         showNote("Copied")
         onCopyMessage(text)
+    }
+
+    fun shareText(text: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(Intent.createChooser(intent, null))
     }
 
     fun addFile(uri: Uri) {
@@ -387,6 +397,7 @@ fun NewChatScreen(
                                 text = m.content,
                                 fontSize = fontSize,
                                 onCopy = { copyToClipboard(m.content) },
+                                onShare = { shareText(m.content) },
                                 onBranch = { onBranchMessage(m) },
                                 onRetry = { onRegenerate(m) }
                             )
@@ -482,7 +493,9 @@ private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: In
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (text.isNotBlank()) {
-                    Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 7).sp)
+                    SelectionContainer {
+                        Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 7).sp)
+                    }
                 }
                 if (attachments.isNotEmpty()) {
                     Text(
@@ -504,17 +517,22 @@ private fun AssistantBlock(
     fontSize: Int,
     streaming: Boolean = false,
     onCopy: (() -> Unit)? = null,
+    onShare: (() -> Unit)? = null,
     onBranch: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
+        // SelectionContainer lets the user select and copy part of the reply.
+        SelectionContainer {
+            Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
+        }
         if (streaming) {
             TypingDots()
         } else if (onCopy != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ActionIcon(Icons.Default.ContentCopy, "Copy", onCopy)
-                ActionIcon(Icons.Default.Share, "Branch", onBranch ?: {})
+                ActionIcon(Icons.Default.Share, "Share", onShare ?: {})
+                ActionIcon(Icons.Default.CallSplit, "Branch", onBranch ?: {})
                 ActionIcon(Icons.Default.Refresh, "Retry", onRetry ?: {})
             }
         }
