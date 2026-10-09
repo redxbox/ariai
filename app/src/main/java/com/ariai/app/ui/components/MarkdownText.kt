@@ -1,5 +1,6 @@
 package com.ariai.app.ui.components
 
+import com.ariai.app.ui.theme.AriCard
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
