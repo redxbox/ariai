@@ -41,6 +41,8 @@ data class ChatMessage(
     val parentId: String? = null, // For branching
     val branchChildren: List<String> = emptyList(),
     val toolCalls: List<ToolCall> = emptyList(),
+    /** Absolute path of a generated image stored on this device. */
+    val imagePath: String? = null,
     val reasoning: String? = null, // For o1/thinking models
     val usage: TokenUsage? = null
 ) : Parcelable

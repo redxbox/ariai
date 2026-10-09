@@ -3,6 +3,17 @@ package com.ariai.app.ui.screens
 import com.ariai.app.ui.theme.*
 
 import android.content.ClipData
+import android.content.ContentValues
+import android.graphics.BitmapFactory
+import android.os.Build
+import android.provider.MediaStore
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -88,6 +99,7 @@ fun NewChatScreen(
     onCopyMessage: (String) -> Unit,
     onOpenDrawer: () -> Unit = {},
     onSelectModel: (String, String) -> Unit = { _, _ -> },
+    onEditImage: (ChatMessage, String) -> Unit = { _, _ -> },
     onToggleFavorite: (String, String) -> Unit = { _, _ -> },
     onReasoningChange: (ReasoningLevel) -> Unit = {},
     onSearchModeChange: (SearchMode) -> Unit = {},
@@ -102,6 +114,16 @@ fun NewChatScreen(
     var pending by remember { mutableStateOf<List<Attachment>>(emptyList()) }
     var showModelSheet by remember { mutableStateOf(false) }
     var showFullEditor by remember { mutableStateOf(false) }
+    var editingImage by remember { mutableStateOf<ChatMessage?>(null) }
+    editingImage?.let { source ->
+        EditImageDialog(
+            onDismiss = { editingImage = null },
+            onConfirm = { instruction ->
+                onEditImage(source, instruction)
+                editingImage = null
+            }
+        )
+    }
     if (showFullEditor) {
         FullScreenMessageEditor(
             text = inputText,
@@ -143,6 +165,29 @@ fun NewChatScreen(
             putExtra(Intent.EXTRA_TEXT, text)
         }
         context.startActivity(Intent.createChooser(intent, null))
+    }
+
+    fun saveImage(path: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            showNote("Saving needs Android 10 or newer")
+            return
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "ariai_${System.currentTimeMillis()}.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AriAI")
+        }
+        val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        if (uri == null) {
+            showNote("Save failed")
+            return
+        }
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                File(path).inputStream().use { it.copyTo(out) }
+            }
+        }.onSuccess { showNote("Saved to Pictures/AriAI") }
+            .onFailure { showNote("Save failed") }
     }
 
     fun addFile(uri: Uri) {
@@ -396,8 +441,11 @@ fun NewChatScreen(
                             AssistantBlock(
                                 text = m.content,
                                 fontSize = fontSize,
+                                imagePath = m.imagePath,
                                 onCopy = { copyToClipboard(m.content) },
                                 onShare = { shareText(m.content) },
+                                onEdit = { editingImage = m },
+                                onSave = { m.imagePath?.let { saveImage(it) } },
                                 onBranch = { onBranchMessage(m) },
                                 onRetry = { onRegenerate(m) }
                             )
@@ -516,18 +564,35 @@ private fun AssistantBlock(
     text: String,
     fontSize: Int,
     streaming: Boolean = false,
+    imagePath: String? = null,
     onCopy: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null,
     onBranch: (() -> Unit)? = null,
-    onRetry: (() -> Unit)? = null
+    onRetry: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
+    onSave: (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // SelectionContainer lets the user select and copy part of the reply.
-        SelectionContainer {
-            Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
+        if (imagePath != null) {
+            GeneratedImageView(imagePath)
+        }
+        if (text.isNotBlank()) {
+            // SelectionContainer lets the user select and copy part of the reply.
+            SelectionContainer {
+                Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
+            }
         }
         if (streaming) {
             TypingDots()
+        } else if (imagePath != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { onEdit?.invoke() }) {
+                    Text("Edit", color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
+                }
+                TextButton(onClick = { onSave?.invoke() }) {
+                    Text("Save", color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
+                }
+            }
         } else if (onCopy != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ActionIcon(Icons.Default.ContentCopy, "Copy", onCopy)
@@ -537,6 +602,49 @@ private fun AssistantBlock(
             }
         }
     }
+}
+
+/** Shows a generated image. Decoding runs off the main thread and is downsampled to save memory. */
+@Composable
+private fun GeneratedImageView(path: String) {
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = path) {
+        value = withContext(Dispatchers.IO) {
+            val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+            BitmapFactory.decodeFile(path, options)?.asImageBitmap()
+        }
+    }
+    bitmap?.let { bmp ->
+        Image(
+            bitmap = bmp,
+            contentDescription = "Generated image",
+            contentScale = ContentScale.FillWidth,
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+        )
+    }
+}
+
+@Composable
+private fun EditImageDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit image") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("What should change?") },
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { if (text.isNotBlank()) onConfirm(text.trim()) }) { Text("Send") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable

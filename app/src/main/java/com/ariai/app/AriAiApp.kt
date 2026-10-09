@@ -9,13 +9,18 @@ import com.ariai.app.data.remote.SearchClient
 import com.ariai.app.data.repository.ChatRepository
 
 class AriAiApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        com.ariai.app.data.local.ImageStore.init(filesDir)
+    }
+
     val database by lazy {
         Room.databaseBuilder(
             this,
             AppDatabase::class.java,
             "ariai_db"
         )
-            .addMigrations(com.ariai.app.data.local.MIGRATION_1_2)
+            .addMigrations(com.ariai.app.data.local.MIGRATION_1_2, com.ariai.app.data.local.MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
     }

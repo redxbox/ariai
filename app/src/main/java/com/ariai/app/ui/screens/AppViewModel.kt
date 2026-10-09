@@ -174,6 +174,55 @@ class AppViewModel(
         null
     }
 
+    /** Creates an image (or edits [source]) and stores it as its own assistant message. */
+    private suspend fun generateImageReply(
+        chatId: String,
+        provider: Provider,
+        modelId: String,
+        prompt: String,
+        source: java.io.File?
+    ) {
+        _isStreaming.value = true
+        try {
+            val response = if (source == null) {
+                repository.generateImage(provider, ImageGenRequest(prompt = prompt, model = modelId))
+            } else {
+                repository.editImage(provider, modelId, source, prompt)
+            }
+            val first = response.images.firstOrNull() ?: throw Exception("No image returned")
+            val file = com.ariai.app.data.local.ImageStore.save(repository.imageBytes(first))
+            val reply = ChatMessage(
+                chatId = chatId,
+                role = MessageRole.ASSISTANT,
+                content = first.revisedPrompt.orEmpty(),
+                modelId = modelId,
+                providerId = provider.id,
+                imagePath = file.absolutePath
+            )
+            repository.saveMessage(reply)
+            _messages.value = _messages.value + reply
+        } catch (e: Exception) {
+            postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}")
+        } finally {
+            _isStreaming.value = false
+        }
+    }
+
+    /** Sends an edit request for a generated image; the result is a separate image message. */
+    fun editGeneratedImage(source: ChatMessage, instruction: String) {
+        val path = source.imagePath ?: return
+        val modelId = source.modelId ?: return
+        val chatId = source.chatId
+        if (instruction.isBlank() || _isStreaming.value) return
+        val provider = providers.value.firstOrNull { it.id == source.providerId } ?: resolveProvider(chatId) ?: return
+        viewModelScope.launch {
+            val userMessage = ChatMessage(chatId = chatId, role = MessageRole.USER, content = "✏️ $instruction")
+            repository.saveMessage(userMessage)
+            _messages.value = _messages.value + userMessage
+            generateImageReply(chatId, provider, modelId, instruction, java.io.File(path))
+        }
+    }
+
     private fun postAssistantError(chatId: String, text: String) {
         viewModelScope.launch {
             val message = ChatMessage(chatId = chatId, role = MessageRole.ASSISTANT, content = text, status = MessageStatus.ERROR)
@@ -220,6 +269,15 @@ class AppViewModel(
                 )
                 repository.saveMessage(userMessage)
                 _messages.value = _messages.value + userMessage
+
+                // Image models answer with an image instead of text.
+                val targetModelId = _modelOverrides.value[chatId]?.second
+                    ?: getCurrentChat()?.modelId
+                    ?: provider.models.firstOrNull()?.id
+                if (targetModelId != null && provider.models.any { it.id == targetModelId && it.supportsImageGen }) {
+                    generateImageReply(chatId, provider, targetModelId, content, null)
+                    return@launch
+                }
 
                 var searchContext: String? = null
                 if (localSearchKey != null) {

@@ -163,6 +163,12 @@ class ChatRepository(
         // Network work must not run on the main thread.
         .flowOn(Dispatchers.IO)
 
+    suspend fun editImage(provider: Provider, model: String, image: java.io.File, prompt: String) =
+        withContext(Dispatchers.IO) { aiClient.editImage(provider, model, image, prompt) }
+
+    suspend fun imageBytes(image: com.ariai.app.data.models.GeneratedImage): ByteArray =
+        aiClient.imageBytes(image)
+
     suspend fun generateImage(provider: Provider, request: ImageGenRequest) = 
         withContext(Dispatchers.IO) { aiClient.generateImage(provider, request) }
 
@@ -252,7 +258,8 @@ class ChatRepository(
             providerId = providerId,
             parentId = parentId,
             branchChildren = if (branchChildren.isEmpty()) emptyList() else branchChildren.split("|||"),
-            reasoning = reasoning
+            reasoning = reasoning,
+            imagePath = imagePath
         )
     } catch (e: Exception) {
         ChatMessage(id = id, chatId = chatId, role = MessageRole.USER, content = content, timestamp = timestamp)
@@ -269,7 +276,8 @@ class ChatRepository(
         providerId = providerId,
         parentId = parentId,
         branchChildren = branchChildren.joinToString("|||"),
-        reasoning = reasoning
+        reasoning = reasoning,
+        imagePath = imagePath
     )
 
     private fun AgentEntity.toModel() = Agent(

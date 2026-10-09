@@ -83,7 +83,8 @@ data class MessageEntity(
     val providerId: String?,
     val parentId: String?,
     val branchChildren: String,
-    val reasoning: String?
+    val reasoning: String?,
+    val imagePath: String? = null
 )
 
 @Entity(tableName = "agents")
@@ -169,7 +170,7 @@ interface AgentDao {
 
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

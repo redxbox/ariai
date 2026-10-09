@@ -198,6 +198,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         onCopyMessage = { },
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },
+                        onEditImage = { message, instruction -> viewModel.editGeneratedImage(message, instruction) },
                         onToggleFavorite = { pid, mid -> viewModel.toggleFavoriteModel(pid, mid) },
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         onSearchModeChange = { viewModel.setSearchMode(it) },

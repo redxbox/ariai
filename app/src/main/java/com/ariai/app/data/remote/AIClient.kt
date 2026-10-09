@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.flow
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -215,6 +216,57 @@ class AIClient {
             ImageGenResponse(images, request.model)
         } catch (e: Exception) {
             throw e
+        }
+    }
+
+    /** Edits an image with an instruction (OpenAI-compatible /images/edits). */
+    suspend fun editImage(
+        provider: Provider,
+        model: String,
+        image: java.io.File,
+        prompt: String
+    ): ImageGenResponse = withContext(Dispatchers.IO) {
+        val url = "${provider.baseUrl.trimEnd('/')}/images/edits"
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("model", model)
+            .addFormDataPart("prompt", prompt)
+            .addFormDataPart("n", "1")
+            .addFormDataPart("image", image.name, image.asRequestBody("image/png".toMediaType()))
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .post(body)
+            .apply {
+                if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey}")
+            }
+            .build()
+        client.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw Exception("Image edit failed: HTTP ${response.code}")
+            val data = JSONObject(text).optJSONArray("data") ?: JSONArray()
+            val images = (0 until data.length()).map { i ->
+                val obj = data.getJSONObject(i)
+                GeneratedImage(
+                    url = obj.optString("url", null),
+                    base64 = obj.optString("b64_json", null),
+                    revisedPrompt = obj.optString("revised_prompt", null)
+                )
+            }
+            ImageGenResponse(images, model)
+        }
+    }
+
+    /** Returns the bytes of a generated image, from its base64 payload or its URL. */
+    suspend fun imageBytes(image: GeneratedImage): ByteArray = withContext(Dispatchers.IO) {
+        val b64 = image.base64
+        if (!b64.isNullOrBlank()) {
+            return@withContext android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+        }
+        val url = image.url ?: throw Exception("No image data returned")
+        client.newCall(Request.Builder().url(url).build()).execute().use { r ->
+            if (!r.isSuccessful) throw Exception("Image download failed: HTTP ${r.code}")
+            r.body?.bytes() ?: throw Exception("Empty image response")
         }
     }
 
