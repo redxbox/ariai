@@ -380,9 +380,9 @@ fun NewChatScreen(
                 items(count = messages.size, key = { i -> "${messages[i].id}_$i" }) { i ->
                     val m = messages[i]
                     when (m.role) {
-                        MessageRole.SYSTEM -> AppearIn { CompressedNotice() }
-                        MessageRole.USER -> AppearIn { UserBubble(m.content, m.attachments, fontSize) }
-                        else -> AppearIn {
+                        MessageRole.SYSTEM -> AppearIn(m.id) { CompressedNotice() }
+                        MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }
+                        else -> AppearIn(m.id) {
                             AssistantBlock(
                                 text = m.content,
                                 fontSize = fontSize,
@@ -527,11 +527,17 @@ private fun IconCircle(icon: ImageVector, description: String, active: Boolean, 
     }
 }
 
+private val appearedKeys = HashSet<String>()
+
 /** Fades and slides each message in once when it first appears. */
 @Composable
-private fun AppearIn(content: @Composable () -> Unit) {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { visible = true }
+private fun AppearIn(key: String, content: @Composable () -> Unit) {
+    // Items already shown once skip the entrance animation (LazyColumn recreates items on scroll).
+    var visible by remember(key) { mutableStateOf(appearedKeys.contains(key)) }
+    LaunchedEffect(key) {
+        appearedKeys.add(key)
+        visible = true
+    }
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(220)) + slideInVertically(tween(260, easing = FastOutSlowInEasing)) { it / 6 }
