@@ -476,6 +476,14 @@ fun NewChatScreen(
                     }
                 }
             }
+            if (chatMode != ChatMode.TEXT) {
+                ModeChip(
+                    mode = chatMode,
+                    onClose = { onChatModeChange(ChatMode.TEXT) },
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 6.dp)
+                )
+            }
+            }
         }
     }
 }
