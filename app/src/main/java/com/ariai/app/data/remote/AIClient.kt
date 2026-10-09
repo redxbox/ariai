@@ -197,7 +197,11 @@ class AIClient {
 
             val response = client.newCall(httpRequest).execute()
             if (!response.isSuccessful) {
-                throw Exception("Image gen failed: ${response.code}")
+                val code = response.code
+                response.close()
+                // Some gateways (e.g. OpenRouter) make images through chat completions instead.
+                if (code in listOf(400, 404, 405, 422)) return generateImageViaChat(provider, request)
+                throw Exception("Image gen failed: $code")
             }
 
             val json = JSONObject(response.body!!.string())
@@ -254,6 +258,36 @@ class AIClient {
                 )
             }
             ImageGenResponse(images, model)
+        }
+    }
+
+    private fun generateImageViaChat(provider: Provider, request: ImageGenRequest): ImageGenResponse {
+        val url = "${provider.baseUrl.trimEnd('/')}/chat/completions"
+        val body = JSONObject().apply {
+            put("model", request.model)
+            put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", request.prompt)))
+            put("modalities", JSONArray().put("image").put("text"))
+        }
+        val httpRequest = Request.Builder()
+            .url(url)
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .apply { if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey}") }
+            .build()
+        client.newCall(httpRequest).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw Exception("Image gen failed: ${response.code}")
+            val message = JSONObject(text).optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
+            val images = message?.optJSONArray("images") ?: JSONArray()
+            val out = (0 until images.length()).mapNotNull { i ->
+                val u = images.optJSONObject(i)?.optJSONObject("image_url")?.optString("url", "").orEmpty()
+                when {
+                    u.isBlank() -> null
+                    u.startsWith("data:") -> GeneratedImage(base64 = u.substringAfter("base64,"))
+                    else -> GeneratedImage(url = u)
+                }
+            }
+            if (out.isEmpty()) throw Exception("The model returned no image")
+            ImageGenResponse(out, request.model)
         }
     }
 

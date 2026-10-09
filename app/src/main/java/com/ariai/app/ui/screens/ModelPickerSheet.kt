@@ -119,21 +119,33 @@ fun ModelPickerSheet(
                     sections.forEach { (provider, allModels) ->
                         // While searching, show every match so nothing is hidden.
                         val isOpen = query.isNotBlank() || expandedProviders.contains(provider.id)
-                        val models = if (isOpen) allModels else allModels.take(1)
-                        val hiddenCount = allModels.size - models.size
+                        val shown = if (isOpen) allModels else allModels.take(1)
+                        val canToggle = query.isBlank() && allModels.size > 1
+                        val onToggle: () -> Unit = {
+                            expandedProviders = if (isOpen) expandedProviders - provider.id else expandedProviders + provider.id
+                        }
+                        val first = shown.firstOrNull()
+                        // The provider name, count and arrow sit inside the card of the first model.
                         item(key = "h_${provider.id}") {
-                            ProviderHeader(
+                            ProviderCard(
                                 name = provider.name,
                                 count = allModels.size,
                                 open = isOpen,
-                                canToggle = query.isBlank() && allModels.size > 1,
-                                onToggle = {
-                                    expandedProviders = if (isOpen) expandedProviders - provider.id
-                                    else expandedProviders + provider.id
+                                canToggle = canToggle,
+                                onToggle = onToggle
+                            ) {
+                                if (first != null) {
+                                    ModelRow(
+                                        model = first,
+                                        selected = first.id == selectedModelId,
+                                        favorite = favorites.contains(favoriteKey(provider.id, first.id)),
+                                        onSelect = { onSelect(provider.id, first.id); onDismiss() },
+                                        onToggleFavorite = { onToggleFavorite(provider.id, first.id) }
+                                    )
                                 }
-                            )
+                            }
                         }
-                        items(models, key = { m -> "${provider.id}_${m.id}" }) { model ->
+                        items(shown.drop(1), key = { m -> "${provider.id}_${m.id}" }) { model ->
                             ModelRow(
                                 model = model,
                                 selected = model.id == selectedModelId,
@@ -156,6 +168,46 @@ fun ModelPickerSheet(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ProviderCard(
+    name: String,
+    count: Int,
+    open: Boolean,
+    canToggle: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Surface(shape = RoundedCornerShape(16.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (canToggle) Modifier.clickable(onClick = onToggle) else Modifier)
+                    .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    name,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Ink.copy(alpha = 0.5f),
+                    modifier = Modifier.weight(1f)
+                )
+                if (canToggle) {
+                    Text("$count", fontSize = 12.sp, color = Ink.copy(alpha = 0.4f))
+                    Icon(
+                        if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (open) "Collapse" else "Expand",
+                        tint = Ink.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            content()
         }
     }
 }

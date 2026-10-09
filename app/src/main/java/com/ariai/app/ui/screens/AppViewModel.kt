@@ -274,7 +274,7 @@ class AppViewModel(
                 val targetModelId = _modelOverrides.value[chatId]?.second
                     ?: getCurrentChat()?.modelId
                     ?: provider.models.firstOrNull()?.id
-                if (targetModelId != null && provider.models.any { it.id == targetModelId && it.supportsImageGen }) {
+                if (targetModelId != null && provider.models.any { it.id == targetModelId && isImageModel(it) }) {
                     generateImageReply(chatId, provider, targetModelId, content, null)
                     return@launch
                 }
@@ -540,3 +540,8 @@ class AppViewModel(
         }
     }
 }
+
+/** A model makes images if the provider flagged it or its name says so. */
+fun isImageModel(model: com.ariai.app.data.models.AIModel): Boolean =
+    model.supportsImageGen ||
+        Regex("image|dall-e|imagen|flux|stable-diffusion|sdxl", RegexOption.IGNORE_CASE).containsMatchIn(model.id)
