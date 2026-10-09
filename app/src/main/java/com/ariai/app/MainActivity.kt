@@ -136,7 +136,6 @@ fun AppRoot(viewModel: AppViewModel) {
                     currentChatId = currentChatId,
                     currentRoute = currentRoute,
                     onNewChat = { newChat() },
-                    onNewImageChat = { newImageChat() },
                     onChatClick = { openChat(it.id) },
                     onPinChat = { viewModel.pinChat(it) },
                     onDeleteChat = { viewModel.deleteChat(it.id) },
