@@ -84,6 +84,7 @@ class AppViewModel(
     val messages = _messages.asStateFlow()
 
     private val _isStreaming = MutableStateFlow(false)
+    private var sendPending = false
     val isStreaming = _isStreaming.asStateFlow()
 
     private val _streamingContent = MutableStateFlow("")
@@ -288,7 +289,7 @@ class AppViewModel(
     ) {
         val chatId = _currentChatId.value ?: return
         if (content.isBlank() && attachments.isEmpty()) return
-        if (_isStreaming.value) return
+        if (_isStreaming.value || sendPending) return
 
         val provider = resolveProvider(chatId)
         if (provider == null) {
@@ -306,6 +307,8 @@ class AppViewModel(
             return
         }
 
+        // Set before launching so a fast second tap cannot start a second send.
+        sendPending = true
         viewModelScope.launch {
             try {
                 val userMessage = ChatMessage(
@@ -443,7 +446,7 @@ class AppViewModel(
                 _isStreaming.value = false
                 _streamingContent.value = ""
             }
-        }
+        }.invokeOnCompletion { sendPending = false }
     }
 
     /**
