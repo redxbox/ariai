@@ -643,13 +643,28 @@ private fun GeneratedImageView(path: String) {
             BitmapFactory.decodeFile(path, options)?.asImageBitmap()
         }
     }
+    var full by remember { mutableStateOf(false) }
     bitmap?.let { bmp ->
         Image(
             bitmap = bmp,
             contentDescription = "Generated image",
             contentScale = ContentScale.FillWidth,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { full = true }
         )
+    }
+    if (full) bitmap?.let { FullImageDialog(it) { full = false } }
+}
+
+/** Full-screen view of an image; tap anywhere to close. */
+@Composable
+private fun FullImageDialog(bitmap: ImageBitmap, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black).clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(bitmap = bitmap, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+        }
     }
 }
 
@@ -849,12 +864,13 @@ private fun RemoteImage(url: String) {
         }
     }
     val shape = RoundedCornerShape(16.dp)
+    var full by remember { mutableStateOf(false) }
     bitmap?.let {
         Image(
             bitmap = it,
             contentDescription = null,
             contentScale = ContentScale.FillWidth,
-            modifier = Modifier.fillMaxWidth().clip(shape)
+            modifier = Modifier.fillMaxWidth().clip(shape).clickable { full = true }
         )
     } ?: Box(
         modifier = Modifier.fillMaxWidth().height(180.dp).clip(shape).background(AriTint),
@@ -862,6 +878,7 @@ private fun RemoteImage(url: String) {
     ) {
         Text("Loading image…", fontSize = 12.sp, color = AriMuted)
     }
+    if (full) bitmap?.let { FullImageDialog(it) { full = false } }
 }
 
 /** Thin label in the chat's top-left corner: current thinking depth, opens the depth sheet. */

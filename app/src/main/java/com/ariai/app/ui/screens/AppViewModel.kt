@@ -68,6 +68,21 @@ class AppViewModel(
 
     fun setChatMode(chatId: String, mode: ChatMode) {
         _chatModes.value = _chatModes.value + (chatId to mode)
+        // Picking Image or Video switches the chat to a matching model automatically.
+        val pred: ((com.ariai.app.data.models.AIModel) -> Boolean)? = when (mode) {
+            ChatMode.IMAGE -> com.ariai.app.data.models.AIModel::supportsImageGen
+            ChatMode.VIDEO -> com.ariai.app.data.models.AIModel::supportsVideoGen
+            ChatMode.TEXT -> null
+        }
+        if (pred != null) {
+            val preferred = resolveProvider(chatId) ?: return
+            findModel(preferred, pred)?.let { (p, m) -> updateChatProvider(chatId, p.id, m.id) }
+        }
+    }
+
+    /** Adds a message unless it is already in the list (the DB flow can deliver it first). */
+    private fun appendMessage(message: ChatMessage) {
+        if (_messages.value.none { it.id == message.id }) _messages.value = _messages.value + message
     }
 
     /** Finds a model matching [pred]; the chat's own provider is preferred. */
@@ -226,7 +241,7 @@ class AppViewModel(
                 imagePath = file.absolutePath
             )
             repository.saveMessage(reply)
-            _messages.value = _messages.value + reply
+            appendMessage(reply)
         } catch (e: Exception) {
             postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}")
         } finally {
@@ -248,7 +263,7 @@ class AppViewModel(
                 imagePath = file.absolutePath
             )
             repository.saveMessage(reply)
-            _messages.value = _messages.value + reply
+            appendMessage(reply)
         } catch (e: Exception) {
             postAssistantError(chatId, "❌ Video error: ${e.message ?: e::class.java.simpleName}")
         } finally {
@@ -266,7 +281,7 @@ class AppViewModel(
         viewModelScope.launch {
             val userMessage = ChatMessage(chatId = chatId, role = MessageRole.USER, content = "✏️ $instruction")
             repository.saveMessage(userMessage)
-            _messages.value = _messages.value + userMessage
+            appendMessage(userMessage)
             generateImageReply(chatId, provider, modelId, instruction, java.io.File(path))
         }
     }
@@ -276,7 +291,7 @@ class AppViewModel(
             val message = ChatMessage(chatId = chatId, role = MessageRole.ASSISTANT, content = text, status = MessageStatus.ERROR)
             try {
                 repository.saveMessage(message)
-                _messages.value = _messages.value + message
+                appendMessage(message)
             } catch (_: Exception) {}
         }
     }
@@ -318,7 +333,7 @@ class AppViewModel(
                     attachments = attachments
                 )
                 repository.saveMessage(userMessage)
-                _messages.value = _messages.value + userMessage
+                appendMessage(userMessage)
 
                 val targetModelId = _modelOverrides.value[chatId]?.second
                     ?: getCurrentChat()?.modelId
@@ -414,7 +429,7 @@ class AppViewModel(
                         providerId = provider.id
                     )
                     repository.saveMessage(assistantMessage)
-                    _messages.value = _messages.value + assistantMessage
+                    appendMessage(assistantMessage)
 
                     if (_messages.value.size <= 3) {
                         updateChatTitle(chatId, content.ifBlank { attachments.first().name }.take(30))
@@ -436,7 +451,7 @@ class AppViewModel(
                     )
                     try {
                         repository.saveMessage(errorMessage)
-                        _messages.value = _messages.value + errorMessage
+                        appendMessage(errorMessage)
                     } catch (e2: Exception) {}
                 } finally {
                     _isStreaming.value = false
@@ -491,7 +506,7 @@ class AppViewModel(
                 if (text.isBlank()) throw Exception("empty summary")
                 val marker = ChatMessage(chatId = chatId, role = MessageRole.SYSTEM, content = text)
                 repository.saveMessage(marker)
-                _messages.value = _messages.value + marker
+                appendMessage(marker)
                 onDone("Older messages compressed")
             } catch (e: Exception) {
                 onDone("Compression failed: ${e.message?.take(120)}")
