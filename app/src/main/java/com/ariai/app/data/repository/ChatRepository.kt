@@ -169,8 +169,12 @@ class ChatRepository(
     suspend fun imageBytes(image: com.ariai.app.data.models.GeneratedImage): ByteArray =
         aiClient.imageBytes(image)
 
-    suspend fun generateVideo(provider: Provider, modelId: String, prompt: String): ByteArray =
-        withContext(Dispatchers.IO) { aiClient.generateVideo(provider, modelId, prompt) }
+    suspend fun generateVideo(
+        provider: Provider,
+        modelId: String,
+        prompt: String,
+        onProgress: (String) -> Unit = {}
+    ): ByteArray = withContext(Dispatchers.IO) { aiClient.generateVideo(provider, modelId, prompt, onProgress) }
 
     suspend fun generateImage(provider: Provider, request: ImageGenRequest) = 
         withContext(Dispatchers.IO) { aiClient.generateImage(provider, request) }

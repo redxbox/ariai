@@ -612,12 +612,21 @@ class AIClient {
     private fun modalityList(arr: JSONArray?): List<String> =
         arr?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
 
-    /** Starts an async video job, polls until it finishes and returns the MP4 bytes. */
-    suspend fun generateVideo(provider: Provider, modelId: String, prompt: String): ByteArray = withContext(Dispatchers.IO) {
+    /**
+     * Starts an async video job, then waits until it finishes and returns the MP4 bytes.
+     * [onProgress] gets a short status line with the elapsed time, updated every second.
+     */
+    suspend fun generateVideo(
+        provider: Provider,
+        modelId: String,
+        prompt: String,
+        onProgress: (String) -> Unit = {}
+    ): ByteArray = withContext(Dispatchers.IO) {
         val base = provider.baseUrl.trim().trimEnd('/')
         fun auth(b: Request.Builder): Request.Builder = b.apply {
             if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey.trim()}")
         }
+        onProgress("Sending request")
         val submitBody = JSONObject().put("model", modelId).put("prompt", prompt)
             .toString().toRequestBody("application/json".toMediaType())
         val jobId = client.newCall(auth(Request.Builder().url("$base/videos").post(submitBody)).build()).execute().use { r ->
@@ -625,19 +634,35 @@ class AIClient {
             if (!r.isSuccessful) throw IllegalStateException("Video submit failed: ${r.code} ${text.take(160)}")
             JSONObject(text).optString("id").ifBlank { throw IllegalStateException("No job id returned") }
         }
-        val deadline = System.currentTimeMillis() + 15 * 60_000L
+
+        val started = System.currentTimeMillis()
+        val timeoutMs = 15 * 60_000L
+        var state = "queued"
+        var lastPoll = 0L
         while (true) {
-            Thread.sleep(5_000)
-            if (System.currentTimeMillis() > deadline) throw IllegalStateException("Video timed out")
-            val status = client.newCall(auth(Request.Builder().url("$base/videos/$jobId").get()).build()).execute().use { r ->
-                if (!r.isSuccessful) throw IllegalStateException("Video status failed: ${r.code}")
-                JSONObject(r.body?.string().orEmpty())
-            }
-            when (val state = status.optString("status")) {
-                "completed" -> break
-                "failed", "cancelled", "expired" ->
+            Thread.sleep(1_000)
+            val now = System.currentTimeMillis()
+            if (now - started > timeoutMs) throw IllegalStateException("Video timed out")
+            // Poll the job every 5 seconds; the elapsed timer still ticks every second.
+            if (now - lastPoll >= 5_000) {
+                lastPoll = now
+                val status = client.newCall(auth(Request.Builder().url("$base/videos/$jobId").get()).build()).execute().use { r ->
+                    if (!r.isSuccessful) throw IllegalStateException("Video status failed: ${r.code}")
+                    JSONObject(r.body?.string().orEmpty())
+                }
+                state = status.optString("status", state)
+                if (state == "completed") break
+                if (state == "failed" || state == "cancelled" || state == "expired") {
                     throw IllegalStateException(status.optString("error").ifBlank { "Video generation $state" })
+                }
             }
+            val label = when (state) {
+                "queued", "pending" -> "In queue"
+                "in_progress", "running", "processing" -> "Rendering"
+                else -> state.replaceFirstChar { it.uppercaseChar() }
+            }
+            val secs = ((now - started) / 1000).toInt()
+            onProgress("Generating video · $label · %02d:%02d".format(secs / 60, secs % 60))
         }
         client.newCall(auth(Request.Builder().url("$base/videos/$jobId/content?index=0").get()).build()).execute().use { r ->
             if (!r.isSuccessful) throw IllegalStateException("Video download failed: ${r.code}")

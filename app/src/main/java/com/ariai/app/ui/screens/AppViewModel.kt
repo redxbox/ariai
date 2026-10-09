@@ -251,8 +251,10 @@ class AppViewModel(
 
     private suspend fun generateVideoReply(chatId: String, provider: Provider, modelId: String, prompt: String) {
         _isStreaming.value = true
+        _streamingContent.value = "Generating video…"
         try {
-            val bytes = repository.generateVideo(provider, modelId, prompt)
+            // The progress line shows in the reply bubble until the video is ready.
+            val bytes = repository.generateVideo(provider, modelId, prompt) { _streamingContent.value = it }
             val file = com.ariai.app.data.local.ImageStore.saveVideo(bytes)
             val reply = ChatMessage(
                 chatId = chatId,
@@ -267,6 +269,7 @@ class AppViewModel(
         } catch (e: Exception) {
             postAssistantError(chatId, "❌ Video error: ${e.message ?: e::class.java.simpleName}")
         } finally {
+            _streamingContent.value = ""
             _isStreaming.value = false
         }
     }
