@@ -70,7 +70,6 @@ import com.ariai.app.data.models.SearchMode
 import com.ariai.app.util.ReadResult
 import com.ariai.app.util.bitmapAttachment
 import com.ariai.app.util.readAttachment
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
