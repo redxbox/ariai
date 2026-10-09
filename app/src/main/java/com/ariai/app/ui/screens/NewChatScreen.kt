@@ -243,10 +243,7 @@ fun NewChatScreen(
             onFile = { filePicker.launch(arrayOf("text/*", "application/json", "image/*")) },
             onCompress = { onCompressHistory { showNote(it) } },
             onExtensions = onOpenExtensions,
-            onImage = {
-                if (providers.any { p -> p.enabled && p.models.any { it.supportsImageGen } }) onChatModeChange(ChatMode.IMAGE)
-                else showNote("No image model. Fetch models in provider settings.")
-            },
+            onImage = { onChatModeChange(ChatMode.IMAGE) },
             onVideo = {
                 if (providers.any { p -> p.enabled && p.models.any { it.supportsVideoGen } }) onChatModeChange(ChatMode.VIDEO)
                 else showNote("No video model. Fetch models in provider settings.")
@@ -602,12 +599,16 @@ private fun AssistantBlock(
         if (imagePath != null) {
             if (isVideoPath(imagePath)) VideoCard(imagePath) else GeneratedImageView(imagePath)
         }
-        if (text.isNotBlank()) {
+        // Models often answer with image links; show those as pictures instead of raw URLs.
+        val imageUrls = remember(text) { extractImageUrls(text) }
+        val visibleText = remember(text) { if (imageUrls.isEmpty()) text else stripImageUrls(text) }
+        if (visibleText.isNotBlank()) {
             // SelectionContainer lets the user select and copy part of the reply.
             SelectionContainer {
-                Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
+                Text(visibleText, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
             }
         }
+        imageUrls.forEach { RemoteImage(it) }
         if (streaming) {
             TypingDots()
         } else if (imagePath != null && !isVideoPath(imagePath)) {
@@ -821,5 +822,41 @@ private fun VideoCard(path: String) {
                 )
             }) { Text("Open", color = AriInk, fontWeight = FontWeight.SemiBold) }
         }
+    }
+}
+
+private val ImageLinkRegex = Regex(
+    """!\[[^\]]*\]\((https?://[^\s)]+)\)|(https?://media\.pollinations\.ai/[^\s)]+|https?://[^\s)]+\.(?:png|jpe?g|webp|gif)(?:\?[^\s)]*)?)""",
+    RegexOption.IGNORE_CASE
+)
+
+private fun extractImageUrls(text: String): List<String> =
+    ImageLinkRegex.findAll(text).map { m -> m.groupValues[1].ifEmpty { m.groupValues[2] } }.distinct().toList()
+
+private fun stripImageUrls(text: String): String = ImageLinkRegex.replace(text, "").trim()
+
+/** Downloads an image link off the main thread and shows it at full width. */
+@Composable
+private fun RemoteImage(url: String) {
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = url) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                java.net.URL(url).openStream().use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+            }.getOrNull()
+        }
+    }
+    val shape = RoundedCornerShape(16.dp)
+    bitmap?.let {
+        Image(
+            bitmap = it,
+            contentDescription = null,
+            contentScale = ContentScale.FillWidth,
+            modifier = Modifier.fillMaxWidth().clip(shape)
+        )
+    } ?: Box(
+        modifier = Modifier.fillMaxWidth().height(180.dp).clip(shape).background(AriTint),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Loading image…", fontSize = 12.sp, color = AriMuted)
     }
 }
