@@ -56,10 +56,10 @@ fun SimpleSettingsScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = AriCard),
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AriInk)
                         }
                     },
-                    title = { Text("Settings", fontWeight = FontWeight.SemiBold, color = Color.Black) }
+                    title = { Text("Settings", fontWeight = FontWeight.SemiBold, color = AriInk) }
                 )
             }
         ) { padding ->
@@ -70,15 +70,15 @@ fun SimpleSettingsScreen(
             ) {
                 item {
                     SimpleGroup(title = "General") {
-                        Text("Theme", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
+                        Text("Theme", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AriInk, modifier = Modifier.padding(bottom = 8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             SimpleChip(label = "Light", selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
                             SimpleChip(label = "Dark", selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
                             SimpleChip(label = "System", selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
                         }
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Settings, title = "Preferences", subtitle = "Chat options, text size, theme", onClick = onPreferencesClick)
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Language, title = "Language", subtitle = if (currentLanguage == "en") "English" else currentLanguage, onClick = {
                             val newLang = if (currentLanguage == "en") "fa" else "en"
                             onLanguageChange(newLang)
@@ -89,12 +89,12 @@ fun SimpleSettingsScreen(
                 item {
                     SimpleGroup(title = "Models & services") {
                         SimpleRow(icon = Icons.Default.Star, title = "Default model", subtitle = defaultModelName, onClick = onDefaultModelClick)
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Storage, title = "Providers", subtitle = "OpenAI, Gemini, Claude and more", onClick = onProvidersClick)
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Search, title = "Search service", subtitle = "Web search for answers", onClick = onSearchServiceClick)
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Settings, title = "MCP servers", subtitle = "Connect local tools", onClick = onMcpClick)
                     }
                 }
@@ -102,7 +102,7 @@ fun SimpleSettingsScreen(
                 item {
                     SimpleGroup(title = "Data") {
                         SimpleRow(icon = Icons.Default.Storage, title = "Data & storage", subtitle = "Export list, storage overview", onClick = onStorageClick)
-                        HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Delete, title = "Delete all chats", subtitle = "Remove every conversation", onClick = onClearAll)
                     }
                 }
@@ -124,7 +124,7 @@ fun SimpleSettingsScreen(
 @Composable
 fun SimpleGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.Black.copy(alpha = 0.5f), modifier = Modifier.padding(start = 4.dp))
+        Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(start = 4.dp))
         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = AriCard), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 content()
@@ -141,7 +141,7 @@ fun SimpleChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: 
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-            Text(label, color = if (selected) AriCard else Color.Black, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(label, color = if (selected) AriCard else AriInk, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }
@@ -150,12 +150,12 @@ fun SimpleChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: 
 fun SimpleRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(AriTint), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = Color.Black.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
+            Icon(icon, contentDescription = null, tint = AriInk.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp, color = Color.Black, fontWeight = FontWeight.Medium)
-            Text(subtitle, fontSize = 11.sp, color = Color.Black.copy(alpha = 0.5f))
+            Text(title, fontSize = 14.sp, color = AriInk, fontWeight = FontWeight.Medium)
+            Text(subtitle, fontSize = 11.sp, color = AriInk.copy(alpha = 0.5f))
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Black.copy(alpha = 0.2f), modifier = Modifier.size(18.dp))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AriInk.copy(alpha = 0.2f), modifier = Modifier.size(18.dp))
     }
 }

@@ -30,7 +30,7 @@ import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.providerFromJson
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private val DisabledTint = Color(0xFFE9EAF0)
+private val DisabledTint: Color @Composable @ReadOnlyComposable get() = AriTint
 
 fun providerTypeLabel(type: ProviderType): String = when (type) {
     ProviderType.OPENAI -> "OpenAI"

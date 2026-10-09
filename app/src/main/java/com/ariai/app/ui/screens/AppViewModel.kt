@@ -11,6 +11,9 @@ import kotlinx.coroutines.launch
 /** What the next message in a chat produces. */
 enum class ChatMode { TEXT, IMAGE, VIDEO }
 
+/** Used only when a provider did not flag image models: matches names like "...-image-...". */
+private val imageNameHint = Regex("image|dall-e|imagen|flux|stable-diffusion|sdxl", RegexOption.IGNORE_CASE)
+
 class AppViewModel(
     private val repository: ChatRepository,
     private val prefs: PreferencesManager
@@ -69,16 +72,17 @@ class AppViewModel(
     fun setChatMode(chatId: String, mode: ChatMode) {
         _chatModes.value = _chatModes.value + (chatId to mode)
         // Picking Image or Video switches the chat to a matching model automatically.
-        val pred: ((com.ariai.app.data.models.AIModel) -> Boolean)? = when (mode) {
-            ChatMode.IMAGE -> com.ariai.app.data.models.AIModel::supportsImageGen
-            ChatMode.VIDEO -> com.ariai.app.data.models.AIModel::supportsVideoGen
-            ChatMode.TEXT -> null
-        }
-        if (pred != null) {
-            val preferred = resolveProvider(chatId) ?: return
-            findModel(preferred, pred)?.let { (p, m) -> updateChatProvider(chatId, p.id, m.id) }
+        if (mode != ChatMode.TEXT) {
+            val preferred = resolveProvider(chatId)
+            val found = if (mode == ChatMode.IMAGE) findImageModel(preferred) else findModel(preferred) { it.supportsVideoGen }
+            found?.let { (p, m) -> updateChatProvider(chatId, p.id, m.id) }
         }
     }
+
+    /** Flagged image models first; otherwise a model whose name says image. */
+    private fun findImageModel(preferred: Provider?): Pair<Provider, com.ariai.app.data.models.AIModel>? =
+        findModel(preferred) { it.supportsImageGen }
+            ?: findModel(preferred) { imageNameHint.containsMatchIn(it.id) }
 
     /** Adds a message unless it is already in the list (the DB flow can deliver it first). */
     private fun appendMessage(message: ChatMessage) {
@@ -86,8 +90,8 @@ class AppViewModel(
     }
 
     /** Finds a model matching [pred]; the chat's own provider is preferred. */
-    private fun findModel(preferred: Provider, pred: (com.ariai.app.data.models.AIModel) -> Boolean): Pair<Provider, com.ariai.app.data.models.AIModel>? {
-        preferred.models.firstOrNull(pred)?.let { return preferred to it }
+    private fun findModel(preferred: Provider?, pred: (com.ariai.app.data.models.AIModel) -> Boolean): Pair<Provider, com.ariai.app.data.models.AIModel>? {
+        preferred?.models?.firstOrNull(pred)?.let { return preferred to it }
         return providers.value.asSequence()
             .filter { it.enabled }
             .mapNotNull { p -> p.models.firstOrNull(pred)?.let { p to it } }
@@ -346,7 +350,7 @@ class AppViewModel(
                     ChatMode.IMAGE -> {
                         // A model flagged for images generates directly. Otherwise the chat's
                         // model answers normally, and image links in its reply are shown as pictures.
-                        val found = findModel(provider) { it.supportsImageGen }
+                        val found = findImageModel(provider)
                         if (found != null) {
                             generateImageReply(chatId, found.first, found.second.id, content, null)
                             return@launch

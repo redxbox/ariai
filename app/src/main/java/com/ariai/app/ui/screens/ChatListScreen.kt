@@ -57,8 +57,8 @@ fun ChatListScreen(
                             Icon(Icons.Default.Chat, contentDescription = null, tint = AriInk, modifier = Modifier.size(36.dp))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("No conversations yet", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = Color.Black)
-                            Text("Start a new chat to begin", color = Color.Black.copy(alpha = 0.5f), fontSize = 14.sp)
+                            Text("No conversations yet", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
+                            Text("Start a new chat to begin", color = AriInk.copy(alpha = 0.5f), fontSize = 14.sp)
                         }
                         Button(onClick = onNewChat, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = AriInk), modifier = Modifier.padding(top = 8.dp)) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -77,15 +77,15 @@ fun ChatListScreen(
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Search chats", color = Color.Black.copy(alpha = 0.4f)) },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(20.dp)) },
+                            placeholder = { Text("Search chats", color = AriInk.copy(alpha = 0.4f)) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriInk.copy(alpha = 0.4f), modifier = Modifier.size(20.dp)) },
                             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = AriCard,
                                 unfocusedContainerColor = AriCard,
                                 focusedBorderColor = AriInk.copy(alpha = 0.3f),
-                                unfocusedBorderColor = Color.Black.copy(alpha = 0.08f)
+                                unfocusedBorderColor = AriInk.copy(alpha = 0.08f)
                             ),
                             singleLine = true
                         )
@@ -95,7 +95,7 @@ fun ChatListScreen(
 
                     if (filtered.isNotEmpty()) {
                         item {
-                            Text("Today", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color.Black.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
+                            Text("Today", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(count = filtered.size, key = { i -> filtered[i].id }) { i ->
                             val chat = filtered[i]
@@ -123,12 +123,12 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
                 Text(chat.title.firstOrNull()?.uppercase() ?: "C", color = AriInk, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(chat.title, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${chat.modelId} • ${formatTimeClean(chat.updatedAt)}", fontSize = 12.sp, color = Color.Black.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(chat.title, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${chat.modelId} • ${formatTimeClean(chat.updatedAt)}", fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Box {
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.Black.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.MoreVert, contentDescription = null, tint = AriInk.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(text = { Text("Pin") }, onClick = { showMenu = false; onPin() }, leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) })

@@ -103,7 +103,7 @@ fun PreferencesScreen(
                             )
                         }
                     }
-                    HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+                    HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                     Text("Message text size", fontWeight = FontWeight.Medium, color = Ink)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         listOf(13 to "Small", 15 to "Medium", 17 to "Large").forEach { (size, label) ->

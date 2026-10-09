@@ -39,10 +39,10 @@ fun SimpleSearchScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = AriCard),
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AriInk)
                         }
                     },
-                    title = { Text("Search", fontWeight = FontWeight.SemiBold, color = Color.Black) }
+                    title = { Text("Search", fontWeight = FontWeight.SemiBold, color = AriInk) }
                 )
             }
         ) { padding ->
@@ -55,8 +55,8 @@ fun SimpleSearchScreen(
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("Search web or chat history", color = Color.Black.copy(alpha = 0.4f)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Black.copy(alpha = 0.4f)) },
+                        placeholder = { Text("Search web or chat history", color = AriInk.copy(alpha = 0.4f)) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriInk.copy(alpha = 0.4f)) },
                         trailingIcon = {
                             if (query.isNotBlank()) {
                                 IconButton(onClick = {
@@ -73,7 +73,7 @@ fun SimpleSearchScreen(
                             focusedContainerColor = AriCard,
                             unfocusedContainerColor = AriCard,
                             focusedBorderColor = AriInk.copy(alpha = 0.3f),
-                            unfocusedBorderColor = Color.Black.copy(alpha = 0.08f)
+                            unfocusedBorderColor = AriInk.copy(alpha = 0.08f)
                         ),
                         singleLine = true
                     )
@@ -81,7 +81,7 @@ fun SimpleSearchScreen(
 
                 if (query.isBlank()) {
                     item {
-                        Text("Recent searches", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black.copy(alpha = 0.5f), modifier = Modifier.padding(top = 8.dp))
+                        Text("Recent searches", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(top = 8.dp))
                     }
                     items(count = recentSearches.size, key = { i -> recentSearches[i] }) { i ->
                         val item = recentSearches[i]
@@ -93,10 +93,10 @@ fun SimpleSearchScreen(
                         ) {
                             Row(modifier = Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Icon(Icons.Default.Search, contentDescription = null, tint = Color.Black.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
-                                    Text(item, fontSize = 14.sp, color = Color.Black)
+                                    Icon(Icons.Default.Search, contentDescription = null, tint = AriInk.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
+                                    Text(item, fontSize = 14.sp, color = AriInk)
                                 }
-                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.Black.copy(alpha = 0.2f), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = AriInk.copy(alpha = 0.2f), modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -104,11 +104,11 @@ fun SimpleSearchScreen(
                     item {
                         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = AriCard), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Search providers", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Color.Black)
+                                Text("Search providers", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = AriInk)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     listOf("Web", "Chats", "Docs").forEach { type ->
                                         Surface(shape = RoundedCornerShape(20.dp), color = AriTint, modifier = Modifier.clickable { scope.launch { snackbarHostState.showSnackbar("$type search") } }) {
-                                            Text(type, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontSize = 12.sp, color = Color.Black.copy(alpha = 0.7f))
+                                            Text(type, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontSize = 12.sp, color = AriInk.copy(alpha = 0.7f))
                                         }
                                     }
                                 }
@@ -122,7 +122,7 @@ fun SimpleSearchScreen(
                                 Icon(Icons.Default.Search, contentDescription = null, tint = AriInk)
                                 Column {
                                     Text("Search for \"$query\"", fontWeight = FontWeight.Medium, color = AriInk, fontSize = 14.sp)
-                                    Text("Press to search with AI", color = Color.Black.copy(alpha = 0.6f), fontSize = 12.sp)
+                                    Text("Press to search with AI", color = AriInk.copy(alpha = 0.6f), fontSize = 12.sp)
                                 }
                             }
                         }

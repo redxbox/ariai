@@ -54,11 +54,11 @@ fun AttachmentSheet(
                 SheetTile(Icons.Default.CameraAlt, "Camera", Modifier.weight(1f)) { onDismiss(); onCamera() }
                 SheetTile(Icons.Default.Description, "Text file", Modifier.weight(1f)) { onDismiss(); onFile() }
             }
-            HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+            HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
             Text("Generate", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
             SheetRow(Icons.Default.Image, "Image", "Next message makes an image") { onDismiss(); onImage() }
             SheetRow(Icons.Default.Movie, "Video", "Next message makes a video") { onDismiss(); onVideo() }
-            HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
+            HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
             Text("Conversation", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
             SheetRow(Icons.Default.Archive, "Compress history", "Summarize older messages to save context") { onDismiss(); onCompress() }
             SheetRow(Icons.Default.Extension, "Extensions", "Manage MCP tool servers") { onDismiss(); onExtensions() }

@@ -83,7 +83,7 @@ fun ModelPickerSheet(
                     focusedContainerColor = AriCard,
                     unfocusedContainerColor = AriCard,
                     focusedBorderColor = Accent.copy(alpha = 0.35f),
-                    unfocusedBorderColor = Color.Black.copy(alpha = 0.06f)
+                    unfocusedBorderColor = AriInk.copy(alpha = 0.06f)
                 ),
                 modifier = Modifier.fillMaxWidth()
             )

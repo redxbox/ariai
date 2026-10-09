@@ -118,7 +118,7 @@ fun ColumnScope.AppDrawerContent(
             focusedContainerColor = AriCard,
             unfocusedContainerColor = AriCard,
             focusedBorderColor = AriInk.copy(alpha = 0.35f),
-            unfocusedBorderColor = Color.Black.copy(alpha = 0.06f)
+            unfocusedBorderColor = AriInk.copy(alpha = 0.06f)
         ),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
     )
@@ -164,7 +164,7 @@ fun ColumnScope.AppDrawerContent(
         }
     }
 
-    HorizontalDivider(color = Color.Black.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+    HorizontalDivider(color = AriInk.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
 
     // Footer: quick access to the main areas. Each button opens a real screen.
     Row(
