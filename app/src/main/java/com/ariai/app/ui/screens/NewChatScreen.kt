@@ -410,14 +410,27 @@ private fun ModelChip(text: String, onClick: () -> Unit) {
         shape = RoundedCornerShape(18.dp),
         color = AriTint
     ) {
-        Text(
-            text,
-            color = Ink.copy(alpha = 0.75f),
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 120.dp).padding(horizontal = 12.dp, vertical = 9.dp)
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text,
+                color = Ink.copy(alpha = 0.75f),
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 120.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            // Small arrow: opens the list with all models of the provider.
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = "Open models",
+                tint = Ink.copy(alpha = 0.5f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
     }
 }
 

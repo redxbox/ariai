@@ -57,6 +57,9 @@ class AppViewModel(
 
     // Chat state
     private val _currentChatId = MutableStateFlow<String?>(null)
+    // chatId -> (providerId, modelId) chosen in the chat screen this session.
+    private val _modelOverrides = MutableStateFlow<Map<String, Pair<String, String>>>(emptyMap())
+    val modelOverrides = _modelOverrides.asStateFlow()
     val currentChatId = _currentChatId.asStateFlow()
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -164,8 +167,9 @@ class AppViewModel(
         return summary to after
     }
 
-    private fun resolveProvider(): Provider? = try {
-        providers.value.find { it.id == getCurrentChat()?.providerId } ?: providers.value.firstOrNull()
+    private fun resolveProvider(chatId: String? = null): Provider? = try {
+        val providerId = (chatId?.let { _modelOverrides.value[it]?.first }) ?: getCurrentChat()?.providerId
+        providers.value.find { it.id == providerId } ?: providers.value.firstOrNull()
     } catch (e: Exception) {
         null
     }
@@ -190,7 +194,7 @@ class AppViewModel(
         if (content.isBlank() && attachments.isEmpty()) return
         if (_isStreaming.value) return
 
-        val provider = resolveProvider()
+        val provider = resolveProvider(chatId)
         if (provider == null) {
             postAssistantError(chatId, "⚠️ No provider configured. Add a provider in Settings > AI Providers.")
             return
@@ -253,7 +257,7 @@ class AppViewModel(
                     repository.streamChat(
                         provider = provider,
                         messages = history,
-                        modelId = getCurrentChat()?.modelId ?: provider.models.firstOrNull()?.id ?: "openai",
+                        modelId = _modelOverrides.value[chatId]?.second ?: getCurrentChat()?.modelId ?: provider.models.firstOrNull()?.id ?: "openai",
                         systemPrompt = systemPrompt,
                         searchContext = searchContext,
                         reasoning = reasoning,
@@ -381,10 +385,13 @@ class AppViewModel(
     }
 
     fun updateChatProvider(chatId: String, providerId: String, modelId: String) {
+        // Keep the choice in memory first so the chip and sending use it immediately,
+        // then persist it to the chat row.
+        _modelOverrides.value = _modelOverrides.value + (chatId to (providerId to modelId))
         viewModelScope.launch {
             try {
-                val chat = chats.value.find { it.id == chatId } ?: repository.getChatById(chatId) ?: return@launch
-                repository.saveChat(chat.copy(providerId = providerId, modelId = modelId))
+                val chat = chats.value.find { it.id == chatId } ?: repository.getChatById(chatId)
+                if (chat != null) repository.saveChat(chat.copy(providerId = providerId, modelId = modelId))
             } catch (e: Exception) {}
         }
     }

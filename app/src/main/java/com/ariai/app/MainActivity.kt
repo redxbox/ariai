@@ -79,6 +79,7 @@ fun AppRoot(viewModel: AppViewModel) {
 
     val providers by viewModel.providers.collectAsState()
     val chats by viewModel.chats.collectAsState()
+    val modelOverrides by viewModel.modelOverrides.collectAsState()
     val messages by viewModel.messages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
     val streamingContent by viewModel.streamingContent.collectAsState()
@@ -184,7 +185,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         messages = messages,
                         isStreaming = isStreaming,
                         currentStreamingContent = streamingContent,
-                        selectedModel = currentChat?.modelId,
+                        selectedModel = modelOverrides[chatId]?.second ?: currentChat?.modelId,
                         providers = providers,
                         reasoning = reasoningLevel,
                         searchMode = searchModeState,
