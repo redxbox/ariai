@@ -1,5 +1,8 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import com.ariai.app.ui.components.GlassCard
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.clickable
@@ -26,7 +29,7 @@ import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.providerFromJson
 
-private val Ink = Color(0xFF1C1B1F)
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val DisabledTint = Color(0xFFE9EAF0)
 
 fun providerTypeLabel(type: ProviderType): String = when (type) {
@@ -167,39 +170,52 @@ fun NewProvidersScreen(
 
 @Composable
 private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -> Unit) {
-    val brand = if (provider.enabled) providerBrandColor(provider.type) else Ink.copy(alpha = 0.4f)
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = if (provider.enabled) Color.White else DisabledTint,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    val brand = if (provider.enabled) providerBrandColor(provider.type) else AriMuted
+    val host = remember(provider.baseUrl) {
+        provider.baseUrl.trim().removePrefix("https://").removePrefix("http://").substringBefore('/')
+    }
+    GlassCard(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Box(
-                modifier = Modifier.size(46.dp).clip(providerShape(provider.type)).background(brand.copy(alpha = 0.16f)),
+                modifier = Modifier.size(44.dp).clip(providerShape(provider.type)).background(brand.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(provider.name.firstOrNull()?.uppercase() ?: "P", color = brand, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(provider.name.firstOrNull()?.uppercase() ?: "P", color = brand, fontWeight = FontWeight.Bold, fontSize = 17.sp)
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(provider.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    MiniChip(
-                        text = if (provider.models.isEmpty()) "No models" else "${provider.models.size} models",
-                        bg = AriTint,
-                        fg = Ink.copy(alpha = 0.6f)
-                    )
-                    MiniChip(
-                        text = if (provider.enabled) "Enabled" else "Disabled",
-                        bg = if (provider.enabled) AriTagGreenBg else Color.White,
-                        fg = if (provider.enabled) AriTagGreenFg else Ink.copy(alpha = 0.55f),
-                        onClick = onToggle
-                    )
-                }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(provider.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (host.isBlank()) providerTypeLabel(provider.type) else host,
+                    fontSize = 12.sp,
+                    color = AriMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    if (provider.models.isEmpty()) "No models" else "${provider.models.size} models",
+                    fontSize = 12.sp,
+                    color = AriMuted
+                )
             }
+            Switch(
+                checked = provider.enabled,
+                onCheckedChange = { onToggle() },
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = AriInk,
+                    checkedThumbColor = AriPaper,
+                    checkedBorderColor = AriInk,
+                    uncheckedTrackColor = AriTint,
+                    uncheckedThumbColor = AriMuted,
+                    uncheckedBorderColor = AriLine
+                )
+            )
         }
     }
 }
@@ -222,7 +238,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
-        containerColor = Color.White,
+        containerColor = AriCard,
         title = { Text("Import provider", fontWeight = FontWeight.SemiBold, color = Ink) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -271,7 +287,7 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
             providerPresets.forEach { preset ->
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
+                    color = AriCard,
                     modifier = Modifier.fillMaxWidth().clickable { onPick(preset.type) }
                 ) {
                     Row(

@@ -60,7 +60,7 @@ fun SettingsScreen(
                             modifier = Modifier.size(48.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AriInk, AriInk))),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("A", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                            Text("A", color = AriCard, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -95,7 +95,7 @@ fun SettingsScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (color == AriInk) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = AriCard, modifier = Modifier.size(20.dp))
                                     }
                                 }
                             }

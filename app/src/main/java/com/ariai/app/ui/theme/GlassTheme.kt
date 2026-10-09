@@ -29,7 +29,7 @@ fun GlassSurface(
         shape = shape,
         color = MaterialTheme.colorScheme.surface.copy(alpha = alpha),
         tonalElevation = 0.dp,
-        shadowElevation = 12.dp
+        shadowElevation = 0.dp
     ) {
         Box(
             modifier = Modifier

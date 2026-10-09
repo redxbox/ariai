@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import android.content.ClipData
@@ -73,9 +75,9 @@ import com.ariai.app.util.readAttachment
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Accent = AriInk
-private val Ink = Color(0xFF1C1B1F)
-private val Muted = Color(0xFF1C1B1F).copy(alpha = 0.55f)
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Muted: Color @Composable @ReadOnlyComposable get() = AriMuted
 private val PageBg = AriPaper
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -343,8 +345,8 @@ fun NewChatScreen(
 
                 Surface(
                     shape = RoundedCornerShape(26.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp,
+                    color = AriCard,
+                    shadowElevation = 0.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
@@ -404,7 +406,7 @@ fun NewChatScreen(
                                 Icon(
                                     Icons.Default.ArrowUpward,
                                     contentDescription = "Send",
-                                    tint = if (canSend) Color.White else Ink.copy(alpha = 0.35f),
+                                    tint = if (canSend) AriCard else Ink.copy(alpha = 0.35f),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -494,7 +496,7 @@ private fun ModelChip(text: String, onClick: () -> Unit) {
 
 @Composable
 private fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
-    Surface(shape = RoundedCornerShape(14.dp), color = Color.White, shadowElevation = 1.dp) {
+    Surface(shape = RoundedCornerShape(14.dp), color = AriCard, shadowElevation = 0.dp) {
         Row(
             modifier = Modifier.padding(start = 10.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -711,7 +713,7 @@ private fun FullScreenMessageEditor(
         onDismissRequest = onCollapse,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Surface(modifier = Modifier.fillMaxSize(), color = AriCard) {
             Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Icon(
                     Icons.Default.CloseFullscreen,

@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -23,9 +25,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Accent = AriInk
-private val Ink = Color(0xFF1C1B1F)
-
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private data class SearchService(val key: String, val name: String, val description: String)
 
 private val searchServices = listOf(
@@ -78,8 +79,8 @@ fun SearchServiceScreen(
                 val isActive = activeKey == service.key
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp,
+                    color = AriCard,
+                    shadowElevation = 0.dp,
                     modifier = Modifier.fillMaxWidth().clickable { expanded = if (isOpen) null else service.key }
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

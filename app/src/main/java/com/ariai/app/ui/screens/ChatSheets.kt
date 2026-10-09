@@ -24,8 +24,8 @@ import com.ariai.app.data.models.ReasoningLevel
 import com.ariai.app.data.models.SearchMode
 import kotlin.math.roundToInt
 
-private val Accent = AriInk
-private val Ink = Color(0xFF1C1B1F)
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val SheetBg = AriPaper
 private val Tile = AriTint
 
@@ -207,7 +207,7 @@ private fun SearchCard(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(if (selected) Accent.copy(alpha = 0.10f) else Color.White)
+            .background(if (selected) Accent.copy(alpha = 0.10f) else AriCard)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(16.dp)
             .alpha(if (enabled) 1f else 0.5f),

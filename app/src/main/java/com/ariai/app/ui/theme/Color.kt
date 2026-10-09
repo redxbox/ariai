@@ -38,12 +38,6 @@ val GradientOrange = listOf(Color(0xFFFF8E53), Color(0xFFFE6B8B))
 val GradientBlue = listOf(Color(0xFF4285F4), Color(0xFF34A853))
 val GradientSunset = listOf(Color(0xFF6C4DFF), Color(0xFF00D4AA), Color(0xFFFF6B6B))
 
-// Monochrome base: white paper, near-black ink, neutral greys.
-val AriInk = Color(0xFF111111)
-val AriPaper = Color(0xFFF4F5FA)  // very light cool tint, cards stay white
-val AriMuted = Color(0x8A111111)
-val AriLine = Color(0x14000000)
-val AriTint = Color(0xFFF3F3F3)
 
 // Soft brand colours for providers and tags (kept light, like the reference).
 val AriOpenAI = Color(0xFF2E9E84)

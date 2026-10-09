@@ -117,6 +117,13 @@ class AppViewModel(
         viewModelScope.launch { repository.deleteAgent(id) }
     }
 
+    /** First enabled model that generates images, as (providerId, modelId). */
+    fun firstImageModel(): Pair<String, String>? =
+        providers.value.asSequence()
+            .filter { it.enabled }
+            .flatMap { p -> p.models.asSequence().filter { isImageModel(it) }.map { p.id to it.id } }
+            .firstOrNull()
+
     fun createNewChat(providerId: String? = null, modelId: String? = null, agentId: String? = null): String {
         val id = java.util.UUID.randomUUID().toString()
         val chat = Chat(

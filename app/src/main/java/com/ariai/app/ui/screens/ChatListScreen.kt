@@ -46,7 +46,7 @@ fun ChatListScreen(
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.size(56.dp)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "New Chat", tint = Color.White)
+                    Icon(Icons.Default.Edit, contentDescription = "New Chat", tint = AriCard)
                 }
             }
         ) { padding ->
@@ -82,8 +82,8 @@ fun ChatListScreen(
                             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
+                                focusedContainerColor = AriCard,
+                                unfocusedContainerColor = AriCard,
                                 focusedBorderColor = AriInk.copy(alpha = 0.3f),
                                 unfocusedBorderColor = Color.Black.copy(alpha = 0.08f)
                             ),
@@ -114,7 +114,7 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
 
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = AriCard),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 2.dp)
     ) {

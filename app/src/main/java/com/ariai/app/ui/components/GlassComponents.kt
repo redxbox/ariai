@@ -20,9 +20,10 @@ fun GlassCard(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+        color = com.ariai.app.ui.theme.AriCard,
         tonalElevation = 0.dp,
-        shadowElevation = 8.dp
+        shadowElevation = 0.dp,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, com.ariai.app.ui.theme.AriLine)
     ) {
         Box(
             modifier = Modifier

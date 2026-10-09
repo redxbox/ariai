@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -20,9 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Accent = AriInk
-private val Ink = Color(0xFF1C1B1F)
-
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 enum class McpTransport(val label: String) { SSE("SSE"), STREAMABLE_HTTP("Streamable HTTP") }
 
 data class McpServerItem(
@@ -57,7 +58,7 @@ fun SimpleMcpScreen(
             ExtendedFloatingActionButton(
                 onClick = { showAdd = true },
                 containerColor = Accent,
-                contentColor = Color.White,
+                contentColor = AriCard,
                 shape = RoundedCornerShape(18.dp),
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Add server", fontWeight = FontWeight.SemiBold) }
@@ -70,7 +71,7 @@ fun SimpleMcpScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Model Context Protocol", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Ink)
                         Text("Connect MCP servers so the model can call external tools. Only enabled servers are used.", fontSize = 12.sp, color = Ink.copy(alpha = 0.6f))
@@ -94,7 +95,7 @@ fun SimpleMcpScreen(
             }
 
             itemsIndexed(servers, key = { i, s -> "${s.id}_$i" }) { _, server ->
-                Surface(shape = RoundedCornerShape(18.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                Surface(shape = RoundedCornerShape(18.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(server.name, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = Ink)

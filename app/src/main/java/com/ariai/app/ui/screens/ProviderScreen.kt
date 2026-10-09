@@ -201,7 +201,7 @@ fun GlassProviderCard(
                         else -> provider.name.firstOrNull()?.toString() ?: "A"
                     },
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = AriCard,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -249,7 +249,7 @@ fun PopularProviderRow(
                 modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(colors = colors)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(letter, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text(letter, color = AriCard, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -369,8 +369,8 @@ fun AddProviderScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFF1C1B1F)) } },
-                title = { Text(if (isEdit) "Edit provider" else "Add provider", fontWeight = FontWeight.SemiBold, color = Color(0xFF1C1B1F)) }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AriInk) } },
+                title = { Text(if (isEdit) "Edit provider" else "Add provider", fontWeight = FontWeight.SemiBold, color = AriInk) }
             )
         }
     ) { padding ->
@@ -389,7 +389,7 @@ fun AddProviderScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
-                                .background(if (selected) preset.color.copy(alpha = 0.12f) else Color.White)
+                                .background(if (selected) preset.color.copy(alpha = 0.12f) else AriCard)
                                 .clickable {
                                     selectedType = preset.type
                                     baseUrl = preset.baseUrl
@@ -398,9 +398,9 @@ fun AddProviderScreen(
                                 .padding(vertical = 12.dp, horizontal = 4.dp)
                         ) {
                             Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(preset.color), contentAlignment = Alignment.Center) {
-                                Text(preset.label.first().toString(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(preset.label.first().toString(), color = AriCard, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
-                            Text(preset.label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) preset.color else Color(0xFF1C1B1F).copy(alpha = 0.7f), maxLines = 1)
+                            Text(preset.label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) preset.color else AriInk.copy(alpha = 0.7f), maxLines = 1)
                         }
                     }
                 }
@@ -409,7 +409,7 @@ fun AddProviderScreen(
             // Connection
             item { SectionLabel("Connection") }
             item {
-                Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = name,
@@ -435,13 +435,13 @@ fun AddProviderScreen(
                             visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
                             trailingIcon = {
                                 IconButton(onClick = { reveal = !reveal }) {
-                                    Icon(Icons.Default.Visibility, contentDescription = if (reveal) "Hide key" else "Show key", tint = Color(0xFF1C1B1F).copy(alpha = 0.5f))
+                                    Icon(Icons.Default.Visibility, contentDescription = if (reveal) "Hide key" else "Show key", tint = AriInk.copy(alpha = 0.5f))
                                 }
                             },
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Text("Stored only on this device.", fontSize = 12.sp, color = Color(0xFF1C1B1F).copy(alpha = 0.5f))
+                        Text("Stored only on this device.", fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
                     }
                 }
             }
@@ -452,7 +452,7 @@ fun AddProviderScreen(
                 val visibleModels = models.filter {
                     modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
                 }
-                Surface(shape = RoundedCornerShape(22.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
+                Surface(shape = RoundedCornerShape(22.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
                     Column {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp),
@@ -502,7 +502,7 @@ fun AddProviderScreen(
             // Advanced: headers and body sent to every model of this provider.
             item { SectionLabel("Advanced") }
             item {
-                Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("Custom headers", fontWeight = FontWeight.Medium, color = AriInk)
                         KeyValueEditor(items = headers, onChange = { headers = it })
@@ -773,5 +773,5 @@ private fun AddModelSheet(
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1C1B1F).copy(alpha = 0.5f), modifier = Modifier.padding(start = 6.dp))
+    Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(start = 6.dp))
 }

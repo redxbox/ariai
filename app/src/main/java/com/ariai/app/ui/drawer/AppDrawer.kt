@@ -1,5 +1,12 @@
 package com.ariai.app.ui.drawer
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -27,8 +34,7 @@ import com.ariai.app.data.models.Chat
 import java.util.Calendar
 
 
-private val Ink = AriInk
-
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private enum class DayBucket(val label: String) { PINNED("Pinned"), TODAY("Today"), YESTERDAY("Yesterday"), EARLIER("Earlier") }
 
 private fun bucketOf(timestamp: Long, now: Long = System.currentTimeMillis()): DayBucket {
@@ -59,6 +65,7 @@ fun ColumnScope.AppDrawerContent(
     currentChatId: String?,
     currentRoute: String,
     onNewChat: () -> Unit,
+    onNewImageChat: () -> Unit = onNewChat,
     onChatClick: (Chat) -> Unit,
     onPinChat: (Chat) -> Unit,
     onDeleteChat: (Chat) -> Unit,
@@ -90,15 +97,31 @@ fun ColumnScope.AppDrawerContent(
     Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
     Spacer(Modifier.height(12.dp))
 
-    Button(
-        onClick = onNewChat,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("New chat", fontWeight = FontWeight.SemiBold)
+        Button(
+            onClick = onNewChat,
+            modifier = Modifier.weight(1f).height(48.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("New chat", fontWeight = FontWeight.SemiBold)
+        }
+        OutlinedButton(
+            onClick = onNewImageChat,
+            modifier = Modifier.weight(1f).height(48.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = AriInk),
+            border = BorderStroke(1.dp, AriLine)
+        ) {
+            Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("عکس", fontWeight = FontWeight.SemiBold)
+        }
     }
 
     OutlinedTextField(
@@ -109,8 +132,8 @@ fun ColumnScope.AppDrawerContent(
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(18.dp)) },
         shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
+            focusedContainerColor = AriCard,
+            unfocusedContainerColor = AriCard,
             focusedBorderColor = AriInk.copy(alpha = 0.35f),
             unfocusedBorderColor = Color.Black.copy(alpha = 0.06f)
         ),

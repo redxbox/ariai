@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import android.content.Intent
@@ -26,9 +28,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Accent = AriInk
-private val Ink = Color(0xFF1C1B1F)
-
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 /** Local data overview with a chat list export and a guarded "clear all". */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,7 +69,7 @@ fun StorageScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Row(modifier = Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.Storage, contentDescription = null, tint = Accent)
@@ -83,8 +84,8 @@ fun StorageScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp,
+                    color = AriCard,
+                    shadowElevation = 0.dp,
                     modifier = Modifier.fillMaxWidth().clickable {
                         val text = buildString {
                             appendLine("AriAI chat list")
@@ -113,8 +114,8 @@ fun StorageScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp,
+                    color = AriCard,
+                    shadowElevation = 0.dp,
                     modifier = Modifier.fillMaxWidth().clickable(enabled = chats.isNotEmpty()) { confirmClear = true }
                 ) {
                     Row(modifier = Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {

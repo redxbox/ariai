@@ -36,7 +36,7 @@ fun SimpleSearchScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = AriCard),
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.Black)
@@ -70,8 +70,8 @@ fun SimpleSearchScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
+                            focusedContainerColor = AriCard,
+                            unfocusedContainerColor = AriCard,
                             focusedBorderColor = AriInk.copy(alpha = 0.3f),
                             unfocusedBorderColor = Color.Black.copy(alpha = 0.08f)
                         ),
@@ -87,7 +87,7 @@ fun SimpleSearchScreen(
                         val item = recentSearches[i]
                         Card(
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = AriCard),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                             modifier = Modifier.fillMaxWidth().clickable { onSearch(item) }
                         ) {
@@ -102,7 +102,7 @@ fun SimpleSearchScreen(
                     }
 
                     item {
-                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = AriCard), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("Search providers", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Color.Black)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -115,6 +115,13 @@ fun AppRoot(viewModel: AppViewModel) {
         navController.navigate("chat/$id") { launchSingleTop = true }
     }
 
+    fun newImageChat() {
+        scope.launch { drawerState.close() }
+        val (providerId, modelId) = viewModel.firstImageModel() ?: (null to null)
+        val id = viewModel.createNewChat(providerId, modelId)
+        navController.navigate("chat/$id") { launchSingleTop = true }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = true,
@@ -129,6 +136,7 @@ fun AppRoot(viewModel: AppViewModel) {
                     currentChatId = currentChatId,
                     currentRoute = currentRoute,
                     onNewChat = { newChat() },
+                    onNewImageChat = { newImageChat() },
                     onChatClick = { openChat(it.id) },
                     onPinChat = { viewModel.pinChat(it) },
                     onDeleteChat = { viewModel.deleteChat(it.id) },

@@ -143,13 +143,13 @@ fun CodeBlock(
                     Text(
                         text = language,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = AriCard.copy(alpha = 0.7f),
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "code",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.5f)
+                        color = AriCard.copy(alpha = 0.5f)
                     )
                 }
             }

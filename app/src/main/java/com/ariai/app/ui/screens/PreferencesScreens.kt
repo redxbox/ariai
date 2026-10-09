@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.clickable
@@ -20,8 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
 
-private val Accent = AriInk
-private val Ink = Color(0xFF1C1B1F)
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Surface0 = AriPaper
 
 @Composable
@@ -31,7 +33,7 @@ private fun SectionTitle(text: String) {
 
 @Composable
 private fun SettingCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
@@ -163,7 +165,7 @@ fun DefaultModelScreen(
                     placeholder = { Text("Search models") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+                    colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = AriCard, unfocusedContainerColor = AriCard),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -183,7 +185,7 @@ fun DefaultModelScreen(
                     val selected = model.id == defaultModelId
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = if (selected) Accent.copy(alpha = 0.10f) else Color.White,
+                        color = if (selected) Accent.copy(alpha = 0.10f) else AriCard,
                         modifier = Modifier.fillMaxWidth().clickable { onSelect(provider.id, model.id) }
                     ) {
                         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {

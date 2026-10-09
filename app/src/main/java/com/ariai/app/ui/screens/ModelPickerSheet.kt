@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.clickable
@@ -27,9 +29,8 @@ import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.favoriteKey
 
-private val Accent = AriInk
-private val Ink = Color(0xFF1C1B1F)
-
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 /**
  * Bottom sheet to pick the model for the current chat. Shows favorites first, then
  * models grouped by provider, with capability tags and a provider filter.
@@ -79,8 +80,8 @@ fun ModelPickerSheet(
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.4f)) },
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = AriCard,
+                    unfocusedContainerColor = AriCard,
                     focusedBorderColor = Accent.copy(alpha = 0.35f),
                     unfocusedBorderColor = Color.Black.copy(alpha = 0.06f)
                 ),
@@ -181,7 +182,7 @@ private fun ProviderCard(
     onToggle: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    Surface(shape = RoundedCornerShape(16.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(16.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(
                 modifier = Modifier
@@ -267,7 +268,7 @@ private fun ModelRow(
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = if (selected) Accent.copy(alpha = 0.10f) else Color.White,
+        color = if (selected) Accent.copy(alpha = 0.10f) else AriCard,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect)
     ) {
         Row(

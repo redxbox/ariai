@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -16,25 +17,25 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = Color(0xFF111111),
     secondary = Color(0xFFBDBDBD),
     tertiary = AriAccent,
-    background = Color(0xFF000000),
-    surface = Color(0xFF000000),
-    surfaceVariant = Color(0xFF1C1C1C),
-    onBackground = Color(0xFFF2F2F2),
-    onSurface = Color(0xFFF2F2F2),
-    outline = Color(0x33FFFFFF)
+    background = DarkAriPalette.paper,
+    surface = DarkAriPalette.paper,
+    surfaceVariant = DarkAriPalette.tint,
+    onBackground = DarkAriPalette.ink,
+    onSurface = DarkAriPalette.ink,
+    outline = DarkAriPalette.line
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = AriInk,
+    primary = LightAriPalette.ink,
     onPrimary = Color.White,
     secondary = Color(0xFF555555),
     tertiary = AriAccent,
-    background = AriPaper,
-    surface = AriPaper,
-    surfaceVariant = AriTint,
-    onBackground = AriInk,
-    onSurface = AriInk,
-    outline = AriLine
+    background = LightAriPalette.paper,
+    surface = LightAriPalette.paper,
+    surfaceVariant = LightAriPalette.tint,
+    onBackground = LightAriPalette.ink,
+    onSurface = LightAriPalette.ink,
+    outline = LightAriPalette.line
 )
 
 @Composable
@@ -56,9 +57,11 @@ fun AriAiTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalAriPalette provides if (darkTheme) DarkAriPalette else LightAriPalette) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
