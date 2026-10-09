@@ -273,7 +273,7 @@ class AIClient {
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .apply { if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey}") }
             .build()
-        client.newCall(httpRequest).execute().use { response ->
+        return client.newCall(httpRequest).execute().use { response ->
             val text = response.body?.string().orEmpty()
             if (!response.isSuccessful) throw Exception("Image gen failed: ${response.code}")
             val message = JSONObject(text).optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
