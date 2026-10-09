@@ -314,7 +314,8 @@ class AIClient {
             ProviderType.GEMINI -> "$base/models?key=${provider.apiKey.trim()}"
             // Anthropic's models endpoint is /v1/models. The base URL may or may not already end in /v1.
             ProviderType.ANTHROPIC -> "${base.removeSuffix("/v1")}/v1/models"
-            else -> "$base/models"
+            // OpenRouter lists only text models by default; ask for every output type.
+            else -> if (base.contains("openrouter.ai")) "$base/models?output_modalities=all" else "$base/models"
         }
 
         val builder = Request.Builder().url(url).get()
@@ -353,7 +354,22 @@ class AIClient {
                 for (i in 0 until arr.length()) {
                     val m = arr.getJSONObject(i)
                     val id = m.getString("id")
-                    models.add(AIModel(id, id, provider.id, id.contains("vision") || id.contains("4o"), true, id.contains("dall-e") || id.contains("image"), 128000))
+                    val arch = m.optJSONObject("architecture")
+                    val inputs = modalityList(arch?.optJSONArray("input_modalities"))
+                    val outputs = modalityList(arch?.optJSONArray("output_modalities"))
+                    models.add(
+                        AIModel(
+                            id = id,
+                            displayName = id,
+                            providerId = provider.id,
+                            supportsVision = if (inputs.isEmpty()) id.contains("vision") || id.contains("4o") else "image" in inputs,
+                            supportsFunctionCalling = true,
+                            supportsImageGen = "image" in outputs,
+                            contextWindow = 128000,
+                            supportsVideoGen = "video" in outputs,
+                            outputsText = outputs.isEmpty() || "text" in outputs
+                        )
+                    )
                 }
             }
             if (models.isEmpty()) throw IllegalStateException("No models returned")
@@ -590,6 +606,42 @@ class AIClient {
             parts.getJSONObject(0).optString("text", "")
         } catch (e: Exception) {
             ""
+        }
+    }
+
+    private fun modalityList(arr: JSONArray?): List<String> =
+        arr?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+
+    /** Starts an async video job, polls until it finishes and returns the MP4 bytes. */
+    suspend fun generateVideo(provider: Provider, modelId: String, prompt: String): ByteArray = withContext(Dispatchers.IO) {
+        val base = provider.baseUrl.trim().trimEnd('/')
+        fun auth(b: Request.Builder): Request.Builder = b.apply {
+            if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey.trim()}")
+        }
+        val submitBody = JSONObject().put("model", modelId).put("prompt", prompt)
+            .toString().toRequestBody("application/json".toMediaType())
+        val jobId = client.newCall(auth(Request.Builder().url("$base/videos").post(submitBody)).build()).execute().use { r ->
+            val text = r.body?.string().orEmpty()
+            if (!r.isSuccessful) throw IllegalStateException("Video submit failed: ${r.code} ${text.take(160)}")
+            JSONObject(text).optString("id").ifBlank { throw IllegalStateException("No job id returned") }
+        }
+        val deadline = System.currentTimeMillis() + 15 * 60_000L
+        while (true) {
+            Thread.sleep(5_000)
+            if (System.currentTimeMillis() > deadline) throw IllegalStateException("Video timed out")
+            val status = client.newCall(auth(Request.Builder().url("$base/videos/$jobId").get()).build()).execute().use { r ->
+                if (!r.isSuccessful) throw IllegalStateException("Video status failed: ${r.code}")
+                JSONObject(r.body?.string().orEmpty())
+            }
+            when (val state = status.optString("status")) {
+                "completed" -> break
+                "failed", "cancelled", "expired" ->
+                    throw IllegalStateException(status.optString("error").ifBlank { "Video generation $state" })
+            }
+        }
+        client.newCall(auth(Request.Builder().url("$base/videos/$jobId/content?index=0").get()).build()).execute().use { r ->
+            if (!r.isSuccessful) throw IllegalStateException("Video download failed: ${r.code}")
+            r.body?.bytes() ?: throw IllegalStateException("Empty video")
         }
     }
 }

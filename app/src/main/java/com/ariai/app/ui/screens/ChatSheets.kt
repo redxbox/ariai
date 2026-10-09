@@ -40,6 +40,7 @@ fun AttachmentSheet(
     onCompress: () -> Unit,
     onExtensions: () -> Unit,
     onImage: () -> Unit,
+    onVideo: () -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SheetBg) {
@@ -55,7 +56,8 @@ fun AttachmentSheet(
             }
             HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
             Text("Generate", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
-            SheetRow(Icons.Default.Image, "Image", "Switch this chat to an image model") { onDismiss(); onImage() }
+            SheetRow(Icons.Default.Image, "Image", "Next message makes an image") { onDismiss(); onImage() }
+            SheetRow(Icons.Default.Movie, "Video", "Next message makes a video") { onDismiss(); onVideo() }
             HorizontalDivider(color = Color.Black.copy(alpha = 0.06f))
             Text("Conversation", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
             SheetRow(Icons.Default.Archive, "Compress history", "Summarize older messages to save context") { onDismiss(); onCompress() }

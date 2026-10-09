@@ -80,6 +80,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val providers by viewModel.providers.collectAsState()
     val chats by viewModel.chats.collectAsState()
     val modelOverrides by viewModel.modelOverrides.collectAsState()
+    val chatModes by viewModel.chatModes.collectAsState()
     val messages by viewModel.messages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
     val streamingContent by viewModel.streamingContent.collectAsState()
@@ -119,6 +120,7 @@ fun AppRoot(viewModel: AppViewModel) {
         scope.launch { drawerState.close() }
         val (providerId, modelId) = viewModel.firstImageModel() ?: (null to null)
         val id = viewModel.createNewChat(providerId, modelId)
+        viewModel.setChatMode(id, ChatMode.IMAGE)
         navController.navigate("chat/$id") { launchSingleTop = true }
     }
 
@@ -211,9 +213,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         onSearchModeChange = { viewModel.setSearchMode(it) },
                         onCompressHistory = { done -> viewModel.compressHistory(done) },
                         onNewImageChat = { newImageChat() },
-                        onUseImageModel = {
-                            viewModel.firstImageModel()?.let { (pid, mid) -> viewModel.updateChatProvider(chatId, pid, mid) }
-                        },
+                        chatMode = chatModes[chatId] ?: ChatMode.TEXT,
+                        onChatModeChange = { viewModel.setChatMode(chatId, it) },
                         onOpenExtensions = { navController.navigate("mcp") },
                         onOpenSearchSettings = { navController.navigate("search_service") },
                         fontSize = fontSize,

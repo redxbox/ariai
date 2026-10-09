@@ -41,7 +41,11 @@ data class AIModel(
     /** Extra HTTP headers sent only for this model. */
     val headers: Map<String, String> = emptyMap(),
     /** Extra JSON merged into the request body for this model. */
-    val customBody: String? = null
+    val customBody: String? = null,
+    /** Model returns video (from provider metadata). */
+    val supportsVideoGen: Boolean = false,
+    /** Model returns text. False for image-only models. */
+    val outputsText: Boolean = true
 ) : Parcelable
 
 fun getDefaultModelsForType(type: ProviderType, providerId: String): List<AIModel> {

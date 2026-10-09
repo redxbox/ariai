@@ -8,6 +8,9 @@ import com.ariai.app.data.repository.ChatRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+/** What the next message in a chat produces. */
+enum class ChatMode { TEXT, IMAGE, VIDEO }
+
 class AppViewModel(
     private val repository: ChatRepository,
     private val prefs: PreferencesManager
@@ -60,6 +63,21 @@ class AppViewModel(
     // chatId -> (providerId, modelId) chosen in the chat screen this session.
     private val _modelOverrides = MutableStateFlow<Map<String, Pair<String, String>>>(emptyMap())
     val modelOverrides = _modelOverrides.asStateFlow()
+    private val _chatModes = MutableStateFlow<Map<String, ChatMode>>(emptyMap())
+    val chatModes = _chatModes.asStateFlow()
+
+    fun setChatMode(chatId: String, mode: ChatMode) {
+        _chatModes.value = _chatModes.value + (chatId to mode)
+    }
+
+    /** Finds a model matching [pred]; the chat's own provider is preferred. */
+    private fun findModel(preferred: Provider, pred: (com.ariai.app.data.models.AIModel) -> Boolean): Pair<Provider, com.ariai.app.data.models.AIModel>? {
+        preferred.models.firstOrNull(pred)?.let { return preferred to it }
+        return providers.value.asSequence()
+            .filter { it.enabled }
+            .mapNotNull { p -> p.models.firstOrNull(pred)?.let { p to it } }
+            .firstOrNull()
+    }
     val currentChatId = _currentChatId.asStateFlow()
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -215,6 +233,28 @@ class AppViewModel(
         }
     }
 
+    private suspend fun generateVideoReply(chatId: String, provider: Provider, modelId: String, prompt: String) {
+        _isStreaming.value = true
+        try {
+            val bytes = repository.generateVideo(provider, modelId, prompt)
+            val file = com.ariai.app.data.local.ImageStore.saveVideo(bytes)
+            val reply = ChatMessage(
+                chatId = chatId,
+                role = MessageRole.ASSISTANT,
+                content = "",
+                modelId = modelId,
+                providerId = provider.id,
+                imagePath = file.absolutePath
+            )
+            repository.saveMessage(reply)
+            _messages.value = _messages.value + reply
+        } catch (e: Exception) {
+            postAssistantError(chatId, "❌ Video error: ${e.message ?: e::class.java.simpleName}")
+        } finally {
+            _isStreaming.value = false
+        }
+    }
+
     /** Sends an edit request for a generated image; the result is a separate image message. */
     fun editGeneratedImage(source: ChatMessage, instruction: String) {
         val path = source.imagePath ?: return
@@ -277,13 +317,34 @@ class AppViewModel(
                 repository.saveMessage(userMessage)
                 _messages.value = _messages.value + userMessage
 
-                // Image models answer with an image instead of text.
                 val targetModelId = _modelOverrides.value[chatId]?.second
                     ?: getCurrentChat()?.modelId
                     ?: provider.models.firstOrNull()?.id
-                if (targetModelId != null && provider.models.any { it.id == targetModelId && isImageModel(it) }) {
-                    generateImageReply(chatId, provider, targetModelId, content, null)
-                    return@launch
+                val current = provider.models.firstOrNull { it.id == targetModelId }
+                when (_chatModes.value[chatId] ?: ChatMode.TEXT) {
+                    ChatMode.IMAGE -> {
+                        val found = findModel(provider) { it.supportsImageGen }
+                        if (found == null) {
+                            postAssistantError(chatId, "⚠️ No image model found. Fetch the models of a provider that has one.")
+                            return@launch
+                        }
+                        generateImageReply(chatId, found.first, found.second.id, content, null)
+                        return@launch
+                    }
+                    ChatMode.VIDEO -> {
+                        val found = findModel(provider) { it.supportsVideoGen }
+                        if (found == null) {
+                            postAssistantError(chatId, "⚠️ No video model found. Fetch the models of a provider that has one.")
+                            return@launch
+                        }
+                        generateVideoReply(chatId, found.first, found.second.id, content)
+                        return@launch
+                    }
+                    ChatMode.TEXT -> if (current != null && current.supportsImageGen && !current.outputsText) {
+                        // Image-only model: text cannot work, so it generates an image.
+                        generateImageReply(chatId, provider, current.id, content, null)
+                        return@launch
+                    }
                 }
 
                 var searchContext: String? = null
@@ -549,6 +610,4 @@ class AppViewModel(
 }
 
 /** A model makes images if the provider flagged it or its name says so. */
-fun isImageModel(model: com.ariai.app.data.models.AIModel): Boolean =
-    model.supportsImageGen ||
-        Regex("image|dall-e|imagen|flux|stable-diffusion|sdxl", RegexOption.IGNORE_CASE).containsMatchIn(model.id)
+fun isImageModel(model: com.ariai.app.data.models.AIModel): Boolean = model.supportsImageGen

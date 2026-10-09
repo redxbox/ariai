@@ -11,6 +11,12 @@ object ImageStore {
         dir = File(filesDir, "generated").apply { mkdirs() }
     }
 
+    fun saveVideo(bytes: ByteArray): File {
+        val target = File(requireNotNull(dir) { "ImageStore not initialised" }, "${UUID.randomUUID()}.mp4")
+        target.writeBytes(bytes)
+        return target
+    }
+
     fun save(bytes: ByteArray): File {
         val target = File(requireNotNull(dir) { "ImageStore not initialised" }, "${UUID.randomUUID()}.png")
         target.writeBytes(bytes)

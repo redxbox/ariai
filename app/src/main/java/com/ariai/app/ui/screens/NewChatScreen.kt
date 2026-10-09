@@ -35,6 +35,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -105,7 +106,8 @@ fun NewChatScreen(
     onSearchModeChange: (SearchMode) -> Unit = {},
     onCompressHistory: ((String) -> Unit) -> Unit = {},
     onNewImageChat: () -> Unit = {},
-    onUseImageModel: () -> Unit = {},
+    chatMode: ChatMode = ChatMode.TEXT,
+    onChatModeChange: (ChatMode) -> Unit = {},
     onOpenExtensions: () -> Unit = {},
     onOpenSearchSettings: () -> Unit = {},
     onAddProvider: () -> Unit = {},
@@ -242,8 +244,12 @@ fun NewChatScreen(
             onCompress = { onCompressHistory { showNote(it) } },
             onExtensions = onOpenExtensions,
             onImage = {
-                if (providers.any { p -> p.enabled && p.models.any { isImageModel(it) } }) onUseImageModel()
-                else showNote("No image model. Add one in provider settings.")
+                if (providers.any { p -> p.enabled && p.models.any { it.supportsImageGen } }) onChatModeChange(ChatMode.IMAGE)
+                else showNote("No image model. Fetch models in provider settings.")
+            },
+            onVideo = {
+                if (providers.any { p -> p.enabled && p.models.any { it.supportsVideoGen } }) onChatModeChange(ChatMode.VIDEO)
+                else showNote("No video model. Fetch models in provider settings.")
             },
             onDismiss = { showAttachments = false }
         )
@@ -376,7 +382,7 @@ fun NewChatScreen(
                             onValueChange = { inputText = it },
                             placeholder = { Text("Message AriAI", color = Muted) },
                             modifier = Modifier.fillMaxWidth(),
-                            maxLines = 5,
+                            maxLines = 12,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
@@ -437,9 +443,10 @@ fun NewChatScreen(
                 }
             }
         } else {
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
@@ -585,7 +592,7 @@ private fun AssistantBlock(
 ) {
     Column(modifier = Modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (imagePath != null) {
-            GeneratedImageView(imagePath)
+            if (isVideoPath(imagePath)) VideoCard(imagePath) else GeneratedImageView(imagePath)
         }
         if (text.isNotBlank()) {
             // SelectionContainer lets the user select and copy part of the reply.
@@ -595,7 +602,7 @@ private fun AssistantBlock(
         }
         if (streaming) {
             TypingDots()
-        } else if (imagePath != null) {
+        } else if (imagePath != null && !isVideoPath(imagePath)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onEdit?.invoke() }) {
                     Text("Edit", color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
@@ -747,6 +754,64 @@ private fun FullScreenMessageEditor(
                     )
                 )
             }
+        }
+    }
+}
+
+private fun isVideoPath(path: String) = path.endsWith(".mp4", ignoreCase = true)
+
+/** Small thin label in the chat's top-left corner: shows the active mode, closes back to text. */
+@Composable
+private fun ModeChip(mode: ChatMode, onClose: () -> Unit, modifier: Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(AriCard)
+            .border(0.5.dp, AriLine, RoundedCornerShape(50))
+            .padding(start = 10.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            if (mode == ChatMode.VIDEO) "Video" else "Image",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Light,
+            color = AriInk
+        )
+        IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+            Icon(Icons.Default.Close, contentDescription = "Close", tint = AriMuted, modifier = Modifier.size(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun VideoCard(path: String) {
+    val context = LocalContext.current
+    Surface(shape = RoundedCornerShape(16.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(AriTint),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = AriInk)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Video", fontWeight = FontWeight.SemiBold, color = AriInk)
+                Text("Generated video", fontSize = 12.sp, color = AriMuted)
+            }
+            TextButton(onClick = {
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", java.io.File(path)
+                )
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(uri, "video/mp4")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                )
+            }) { Text("Open", color = AriInk, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
