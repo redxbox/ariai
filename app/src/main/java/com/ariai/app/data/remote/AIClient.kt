@@ -453,7 +453,6 @@ class AIClient {
                 }
                 json.put("generationConfig", JSONObject().apply {
                     put("temperature", temperature.toDouble())
-                    put("maxOutputTokens", 8192)
                     reasoning.geminiBudget?.let { put("thinkingConfig", JSONObject().put("thinkingBudget", it)) }
                 })
                 val tools = modelTools(provider, modelId)
@@ -501,7 +500,6 @@ class AIClient {
                 json.put("model", actualModel)
                 json.put("temperature", temperature.toDouble().coerceIn(0.0, 2.0))
                 json.put("stream", isStream)
-                json.put("max_tokens", 2048)
                 reasoning.effort?.let { json.put("reasoning_effort", it) }
 
                 val msgs = JSONArray()

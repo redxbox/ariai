@@ -317,7 +317,7 @@ fun NewChatScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("عکس") },
+                                text = { Text("Image chat") },
                                 leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
                                 onClick = { showTopMenu = false; onNewImageChat() }
                             )
