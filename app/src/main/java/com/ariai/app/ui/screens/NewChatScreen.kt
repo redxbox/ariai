@@ -374,6 +374,11 @@ fun NewChatScreen(
                                 )
                             }
                         }
+                        if (chatMode != ChatMode.TEXT) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 4.dp)) {
+                                ModeChip(mode = chatMode, onClose = { onChatModeChange(ChatMode.TEXT) }, modifier = Modifier)
+                            }
+                        }
                         TextField(
                             value = inputText,
                             onValueChange = { inputText = it },
@@ -397,8 +402,8 @@ fun NewChatScreen(
                         ) {
                             IconCircle(Icons.Default.Add, "Add to message", active = false) { showAttachments = true }
                             Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Lightbulb, "Thinking depth", active = reasoning != ReasoningLevel.AUTO) {
-                                showThinking = true
+                            IconCircle(Icons.Default.Image, "Image mode", active = chatMode == ChatMode.IMAGE) {
+                                onChatModeChange(if (chatMode == ChatMode.IMAGE) ChatMode.TEXT else ChatMode.IMAGE)
                             }
                             Spacer(Modifier.width(6.dp))
                             IconCircle(Icons.Default.Public, "Web search", active = searchMode != SearchMode.OFF) {
@@ -473,13 +478,11 @@ fun NewChatScreen(
                     }
                 }
             }
-            if (chatMode != ChatMode.TEXT) {
-                ModeChip(
-                    mode = chatMode,
-                    onClose = { onChatModeChange(ChatMode.TEXT) },
-                    modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 6.dp)
-                )
-            }
+            ThinkingChip(
+                level = reasoning,
+                onClick = { showThinking = true },
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 6.dp)
+            )
             }
         }
     }
@@ -858,5 +861,28 @@ private fun RemoteImage(url: String) {
         contentAlignment = Alignment.Center
     ) {
         Text("Loading image…", fontSize = 12.sp, color = AriMuted)
+    }
+}
+
+/** Thin label in the chat's top-left corner: current thinking depth, opens the depth sheet. */
+@Composable
+private fun ThinkingChip(level: ReasoningLevel, onClick: () -> Unit, modifier: Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(AriCard)
+            .border(0.5.dp, AriLine, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Default.Lightbulb, contentDescription = null, tint = AriMuted, modifier = Modifier.size(12.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(
+            level.name.lowercase().replaceFirstChar { it.uppercaseChar() },
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Light,
+            color = AriInk
+        )
     }
 }
