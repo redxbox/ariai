@@ -24,8 +24,7 @@ import com.ariai.app.data.models.Provider
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private val Surface0 = AriPaper
-
+private val Surface0: Color @Composable @ReadOnlyComposable get() = AriPaper
 @Composable
 private fun SectionTitle(text: String) {
     Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Ink.copy(alpha = 0.5f), modifier = Modifier.padding(start = 6.dp, top = 8.dp))

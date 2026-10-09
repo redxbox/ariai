@@ -26,9 +26,8 @@ import kotlin.math.roundToInt
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private val SheetBg = AriPaper
-private val Tile = AriTint
-
+private val SheetBg: Color @Composable @ReadOnlyComposable get() = AriPaper
+private val Tile: Color @Composable @ReadOnlyComposable get() = AriTint
 /** Actions offered by the "+" button above the chat input. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -78,8 +78,7 @@ import kotlinx.coroutines.withContext
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Muted: Color @Composable @ReadOnlyComposable get() = AriMuted
-private val PageBg = AriPaper
-
+private val PageBg: Color @Composable @ReadOnlyComposable get() = AriPaper
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewChatScreen(
