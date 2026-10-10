@@ -1,7 +1,7 @@
 package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
-import com.ariai.app.util.ReadAloud
+import com.ariai.app.util.formatReply
 import com.ariai.app.util.UiLang
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ariai.app.data.remote.supportsNativeSearch
@@ -689,13 +689,12 @@ private fun AssistantBlock(
             if (isVideoPath(imagePath)) VideoCard(imagePath) else GeneratedImageView(imagePath)
         }
         // Models often answer with image links; show those as pictures instead of raw URLs.
-        val ctx = LocalContext.current
         val imageUrls = remember(text) { extractImageUrls(text) }
         val visibleText = remember(text) { if (imageUrls.isEmpty()) text else stripImageUrls(text) }
         if (visibleText.isNotBlank()) {
             // SelectionContainer lets the user select and copy part of the reply.
             SelectionContainer {
-                Text(visibleText, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
+                Text(remember(visibleText) { formatReply(visibleText) }, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
             }
         }
         imageUrls.forEach { RemoteImage(it) }
@@ -716,7 +715,6 @@ private fun AssistantBlock(
                 ActionIcon(Icons.Default.Share, tx("Share"), onShare ?: {})
                 ActionIcon(Icons.Default.CallSplit, tx("Branch"), onBranch ?: {})
                 ActionIcon(Icons.Default.Refresh, tx("Retry"), onRetry ?: {})
-                ActionIcon(Icons.Default.VolumeUp, tx("Read aloud")) { ReadAloud.speak(ctx, text, UiLang.code) }
             }
         }
     }
