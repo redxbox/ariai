@@ -365,7 +365,11 @@ class AppViewModel(
                         generateVideoReply(chatId, found.first, found.second.id, content)
                         return@launch
                     }
-                    ChatMode.TEXT -> if (current != null && current.supportsImageGen && !current.outputsText) {
+                    ChatMode.TEXT -> if (current != null && current.supportsVideoGen && !current.outputsText) {
+                        // Video-only model selected in text mode: generate a video instead of calling chat.
+                        generateVideoReply(chatId, provider, current.id, content)
+                        return@launch
+                    } else if (current != null && current.supportsImageGen && !current.outputsText) {
                         // Image-only model: text cannot work, so it generates an image.
                         generateImageReply(chatId, provider, current.id, content, null)
                         return@launch

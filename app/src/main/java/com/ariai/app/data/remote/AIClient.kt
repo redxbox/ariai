@@ -375,8 +375,40 @@ class AIClient {
                     )
                 }
             }
+            // OpenRouter lists video models on their own endpoint, not in /models.
+            if (base.contains("openrouter.ai")) models.addAll(openRouterVideoModels(provider, base))
             if (models.isEmpty()) throw IllegalStateException("No models returned")
             models
+        }
+    }
+
+    /** Video models from OpenRouter's /videos/models endpoint. Returns empty on any failure. */
+    private fun openRouterVideoModels(provider: Provider, base: String): List<AIModel> {
+        return try {
+            val builder = Request.Builder().url("$base/videos/models").get()
+            val key = provider.apiKey.trim()
+            if (key.isNotBlank()) builder.addHeader("Authorization", "Bearer $key")
+            client.newCall(builder.build()).execute().use { r ->
+                if (!r.isSuccessful) return emptyList()
+                val arr = JSONObject(r.body?.string() ?: return emptyList()).optJSONArray("data") ?: return emptyList()
+                (0 until arr.length()).mapNotNull { i ->
+                    val m = arr.optJSONObject(i) ?: return@mapNotNull null
+                    val id = m.optString("id").ifBlank { return@mapNotNull null }
+                    AIModel(
+                        id = id,
+                        displayName = m.optString("name").ifBlank { id },
+                        providerId = provider.id,
+                        supportsVision = false,
+                        supportsFunctionCalling = false,
+                        supportsImageGen = false,
+                        contextWindow = 0,
+                        supportsVideoGen = true,
+                        outputsText = false
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
