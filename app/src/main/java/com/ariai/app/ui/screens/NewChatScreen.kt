@@ -870,12 +870,20 @@ private fun VideoCard(path: String) {
     if (playing) VideoPlayerDialog(path) { playing = false }
 }
 
-/** Plays a generated video inside the app with the built-in Android player and controls. */
+/** Plays a generated video inside the app with the Media3 player and its standard controls. */
 @Composable
 private fun VideoPlayerDialog(path: String, onDismiss: () -> Unit) {
-    val videoRef = remember { mutableStateOf<android.widget.VideoView?>(null) }
-    DisposableEffect(path) {
-        onDispose { videoRef.value?.stopPlayback() }
+    val context = LocalContext.current
+    val player = remember(path) {
+        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(android.net.Uri.fromFile(java.io.File(path))))
+            repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
+            prepare()
+            playWhenReady = true
+        }
+    }
+    DisposableEffect(player) {
+        onDispose { player.release() }
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(
@@ -884,13 +892,10 @@ private fun VideoPlayerDialog(path: String, onDismiss: () -> Unit) {
         ) {
             AndroidView(
                 factory = { ctx ->
-                    android.widget.VideoView(ctx).also { view ->
-                        view.setVideoPath(path)
-                        val controller = android.widget.MediaController(ctx)
-                        controller.setAnchorView(view)
-                        view.setMediaController(controller)
-                        view.setOnPreparedListener { player -> player.isLooping = false; view.start() }
-                        videoRef.value = view
+                    androidx.media3.ui.PlayerView(ctx).apply {
+                        this.player = player
+                        useController = true
+                        setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                     }
                 },
                 modifier = Modifier.fillMaxSize()

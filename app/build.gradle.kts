@@ -98,6 +98,10 @@ dependencies {
     
     // Coil for images
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Media3 player for in-app video playback with controls.
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
     
     // QR Code
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
