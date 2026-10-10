@@ -460,10 +460,17 @@ class AIClient {
     }
 
     /** Message text with extracted text-file contents appended. */
-    private fun ChatMessage.promptText(): String {
+    private fun ChatMessage.promptText(gemini: Boolean = false): String {
         val files = attachments.mapNotNull { a -> a.textContent?.let { "\n\n[File: ${a.name}]\n$it" } }
-        return content + files.joinToString("")
+        // Only Gemini receives video bytes here; other models get a note so they do not guess.
+        val videoNotes = attachments
+            .filter { it.type == AttachmentType.VIDEO && (!gemini || it.base64Data.isNullOrBlank()) }
+            .map { "\n\n[Video attached: ${it.name}. This model cannot watch videos.]" }
+        return content + files.joinToString("") + videoNotes.joinToString("")
     }
+
+    private fun ChatMessage.videoParts(): List<Attachment> =
+        attachments.filter { it.type == AttachmentType.VIDEO && !it.base64Data.isNullOrBlank() }
 
     /** Images that carry base64 data and can be sent to vision models. */
     private fun ChatMessage.imageParts(): List<Attachment> =
@@ -489,13 +496,16 @@ class AIClient {
                 messages.forEach { msg ->
                     if (msg.role == MessageRole.SYSTEM) return@forEach
                     val parts = JSONArray()
-                    var text = msg.promptText()
+                    var text = msg.promptText(gemini = true)
                     if (searchContext != null && msg == lastMessage) {
                         text = "Web search results:\n$searchContext\n\nUser question: $text\n\nAnswer using the search results when relevant."
                     }
                     if (text.isNotBlank()) parts.put(JSONObject().put("text", text))
                     msg.imageParts().forEach { img ->
                         parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", img.mimeType).put("data", img.base64Data)))
+                    }
+                    msg.videoParts().forEach { vid ->
+                        parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", vid.mimeType).put("data", vid.base64Data)))
                     }
                     if (parts.length() == 0) return@forEach
                     contents.put(JSONObject().apply {

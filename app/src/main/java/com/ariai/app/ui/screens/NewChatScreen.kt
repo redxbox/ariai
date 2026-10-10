@@ -290,20 +290,22 @@ fun NewChatScreen(
             .onFailure { showNote(tx("Save failed")) }
     }
 
-    fun addFile(uri: Uri) {
+    fun addFiles(uris: List<Uri>) {
         scope.launch {
-            when (val result = withContext(Dispatchers.IO) { readAttachment(context, uri) }) {
-                is ReadResult.Ok -> pending = pending + result.attachment
-                is ReadResult.Error -> showNote(result.message)
+            for (uri in uris) {
+                when (val result = withContext(Dispatchers.IO) { readAttachment(context, uri) }) {
+                    is ReadResult.Ok -> pending = pending + result.attachment
+                    is ReadResult.Error -> showNote(result.message)
+                }
             }
         }
     }
 
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) addFile(uri)
+    val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(10)) { uris ->
+        if (uris.isNotEmpty()) addFiles(uris)
     }
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) addFile(uri)
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) addFiles(uris)
     }
     val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
         if (bitmap != null) {
@@ -334,7 +336,7 @@ fun NewChatScreen(
     }
     if (showAttachments) {
         AttachmentSheet(
-            onPhoto = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            onPhoto = { mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
             onCamera = { cameraPicker.launch(null) },
             onFile = { filePicker.launch(arrayOf("text/*", "application/json", "image/*")) },
             onCompress = { onCompressHistory { showNote(it) } },
@@ -635,7 +637,11 @@ private fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
             modifier = Modifier.padding(start = 10.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val icon = if (attachment.type == AttachmentType.IMAGE) Icons.Default.Image else Icons.Default.Description
+            val icon = when (attachment.type) {
+                AttachmentType.IMAGE -> Icons.Default.Image
+                AttachmentType.VIDEO -> Icons.Default.PlayArrow
+                else -> Icons.Default.Description
+            }
             Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(

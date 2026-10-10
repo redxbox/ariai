@@ -8,10 +8,12 @@ import android.provider.OpenableColumns
 import android.util.Base64
 import com.ariai.app.data.models.Attachment
 import com.ariai.app.data.models.AttachmentType
+import com.ariai.app.util.tx
 import java.io.ByteArrayOutputStream
 
 private const val MAX_IMAGE_EDGE = 1280
 private const val MAX_TEXT_CHARS = 60_000
+private const val MAX_VIDEO_BYTES = 12L * 1024 * 1024
 private val TEXT_EXTENSIONS = setOf(
     "txt", "md", "json", "csv", "xml", "html", "kt", "java", "py", "js", "ts", "yaml", "yml", "log", "sql", "toml"
 )
@@ -48,7 +50,22 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
                     )
                 )
             }
-            else -> ReadResult.Error("$name is not supported yet. Pick an image or a text file.")
+            mime.startsWith("video/") -> {
+                val size = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+                if (size > MAX_VIDEO_BYTES) return ReadResult.Error(tx("Video is larger than 12 MB"))
+                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: return ReadResult.Error("Could not open $name")
+                if (bytes.size > MAX_VIDEO_BYTES) return ReadResult.Error(tx("Video is larger than 12 MB"))
+                ReadResult.Ok(
+                    Attachment(
+                        type = AttachmentType.VIDEO,
+                        name = name,
+                        mimeType = mime,
+                        base64Data = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    )
+                )
+            }
+            else -> ReadResult.Error("$name is not supported yet. Pick an image, a video or a text file.")
         }
     } catch (e: Exception) {
         ReadResult.Error("Could not read $name")

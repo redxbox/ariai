@@ -218,6 +218,13 @@ class AppViewModel(
         null
     }
 
+    /** The first attached photo, saved as a file so image models can edit it. */
+    private fun List<Attachment>.firstImageFile(): java.io.File? {
+        val image = firstOrNull { it.type == AttachmentType.IMAGE && !it.base64Data.isNullOrBlank() } ?: return null
+        val bytes = android.util.Base64.decode(image.base64Data, android.util.Base64.DEFAULT)
+        return com.ariai.app.data.local.ImageStore.save(bytes)
+    }
+
     /** Creates an image (or edits [source]) and stores it as its own assistant message. */
     private suspend fun generateImageReply(
         chatId: String,
@@ -353,10 +360,14 @@ class AppViewModel(
                             postAssistantError(chatId, tx("No image model found. Add an image model, or fetch the models in provider settings."))
                             return@launch
                         }
-                        generateImageReply(chatId, found.first, found.second.id, content, null)
+                        generateImageReply(chatId, found.first, found.second.id, content, attachments.firstImageFile())
                         return@launch
                     }
                     ChatMode.VIDEO -> {
+                        if (attachments.isNotEmpty()) {
+                            postAssistantError(chatId, tx("Photos and videos are not used in video mode yet. Switch to text mode to send them."))
+                            return@launch
+                        }
                         val found = findModel(provider) { it.supportsVideoGen }
                         if (found == null) {
                             postAssistantError(chatId, "⚠️ No video model found. Fetch the models of a provider that has one.")
@@ -371,7 +382,7 @@ class AppViewModel(
                         return@launch
                     } else if (current != null && current.supportsImageGen && !current.outputsText) {
                         // Image-only model: text cannot work, so it generates an image.
-                        generateImageReply(chatId, provider, current.id, content, null)
+                        generateImageReply(chatId, provider, current.id, content, attachments.firstImageFile())
                         return@launch
                     }
                 }

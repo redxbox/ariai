@@ -24,7 +24,7 @@ data class Attachment(
 ) : Parcelable
 
 enum class AttachmentType {
-    IMAGE, PDF, DOCX, TEXT, AUDIO
+    IMAGE, VIDEO, PDF, DOCX, TEXT, AUDIO
 }
 
 @Parcelize

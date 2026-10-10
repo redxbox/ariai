@@ -2,6 +2,8 @@ package com.ariai.app.util
 
 // Persian UI strings keyed by the English text used in the code.
 internal val faStrings: Map<String, String> = mapOf(
+        "Video is larger than 12 MB" to "ویدیو بزرگ‌تر از ۱۲ مگابایت است",
+        "Photos and videos are not used in video mode yet. Switch to text mode to send them." to "عکس و ویدیو در حالت ویدیو هنوز استفاده نمی‌شوند. برای ارسال آن‌ها به حالت متن برگردید.",
         "Copy code" to "کپی کد",
         "Code" to "کد",
         "Voice input" to "ورودی صوتی",
