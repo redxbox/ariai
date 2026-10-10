@@ -7,6 +7,8 @@ import com.ariai.app.data.remote.SearchClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.emitAll
+import com.ariai.app.data.models.AttachmentType
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -100,7 +102,10 @@ class ChatRepository(
 
     suspend fun saveMessage(message: ChatMessage) {
         try {
-            db.messageDao().insertMessage(message.toEntity())
+            val stored = withContext(Dispatchers.IO) {
+                message.copy(attachments = message.attachments.map { it.persisted() })
+            }
+            db.messageDao().insertMessage(stored.toEntity())
             // Update chat timestamp
             try {
                 db.chatDao().getChatById(message.chatId)?.let { chat ->
@@ -159,7 +164,11 @@ class ChatRepository(
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false
-    ): Flow<String> = aiClient.chatCompletionStream(provider, messages, modelId, systemPrompt, temperature, searchContext != null, searchContext, reasoning, nativeSearch)
+    ): Flow<String> = kotlinx.coroutines.flow.flow {
+        // Load stored attachment bytes here, off the main thread, right before the request.
+        val ready = messages.map { m -> m.copy(attachments = m.attachments.map { it.hydrated() }) }
+        emitAll(aiClient.chatCompletionStream(provider, ready, modelId, systemPrompt, temperature, searchContext != null, searchContext, reasoning, nativeSearch))
+    }
         // Network work must not run on the main thread.
         .flowOn(Dispatchers.IO)
 
@@ -253,6 +262,62 @@ class ChatRepository(
         memoryEnabled = memoryEnabled
     )
 
+    /** Writes the attachment bytes to app storage once; the database keeps only the file path. */
+    private fun Attachment.persisted(): Attachment {
+        val data = base64Data ?: return this
+        if (uri != null) return copy(base64Data = null)
+        return try {
+            val bytes = android.util.Base64.decode(data, android.util.Base64.DEFAULT)
+            val file = if (type == AttachmentType.VIDEO) ImageStore.saveVideo(bytes) else ImageStore.save(bytes)
+            copy(uri = file.absolutePath, base64Data = null)
+        } catch (e: Exception) {
+            this
+        }
+    }
+
+    /** Loads the bytes of a stored attachment so a model can receive it. */
+    private fun Attachment.hydrated(): Attachment {
+        if (base64Data != null || uri == null) return this
+        return try {
+            val bytes = java.io.File(uri).readBytes()
+            copy(base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+        } catch (e: Exception) {
+            this
+        }
+    }
+
+    private fun parseAttachments(json: String): List<Attachment> = try {
+        val array = org.json.JSONArray(json)
+        (0 until array.length()).map { i ->
+            val o = array.getJSONObject(i)
+            Attachment(
+                id = o.getString("id"),
+                type = AttachmentType.valueOf(o.getString("type")),
+                name = o.getString("name"),
+                uri = o.optString("uri").ifBlank { null },
+                mimeType = o.optString("mimeType"),
+                textContent = o.optString("textContent").ifBlank { null }
+            )
+        }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    private fun List<Attachment>.toJson(): String {
+        val array = org.json.JSONArray()
+        forEach { a ->
+            array.put(org.json.JSONObject().apply {
+                put("id", a.id)
+                put("type", a.type.name)
+                put("name", a.name)
+                put("uri", a.uri ?: "")
+                put("mimeType", a.mimeType)
+                put("textContent", a.textContent ?: "")
+            })
+        }
+        return array.toString()
+    }
+
     private fun MessageEntity.toModel() = try {
         ChatMessage(
             id = id,
@@ -266,7 +331,8 @@ class ChatRepository(
             parentId = parentId,
             branchChildren = if (branchChildren.isEmpty()) emptyList() else branchChildren.split("|||"),
             reasoning = reasoning,
-            imagePath = imagePath
+            imagePath = imagePath,
+            attachments = parseAttachments(attachmentsJson)
         )
     } catch (e: Exception) {
         ChatMessage(id = id, chatId = chatId, role = MessageRole.USER, content = content, timestamp = timestamp)
@@ -284,7 +350,8 @@ class ChatRepository(
         parentId = parentId,
         branchChildren = branchChildren.joinToString("|||"),
         reasoning = reasoning,
-        imagePath = imagePath
+        imagePath = imagePath,
+        attachmentsJson = attachments.toJson()
     )
 
     private fun AgentEntity.toModel() = Agent(

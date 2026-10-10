@@ -672,6 +672,35 @@ private fun CompressedNotice() {
     }
 }
 
+/** Shows a sent photo inside the bubble, read from its stored file or from the in-memory bytes. */
+@Composable
+private fun AttachmentThumb(attachment: Attachment) {
+    val bitmap = remember(attachment.uri, attachment.base64Data) {
+        runCatching {
+            val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+            val uri = attachment.uri
+            if (uri != null && java.io.File(uri).exists()) {
+                android.graphics.BitmapFactory.decodeFile(uri, options)
+            } else {
+                attachment.base64Data?.let {
+                    val bytes = android.util.Base64.decode(it, android.util.Base64.DEFAULT)
+                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                }
+            }
+        }.getOrNull()?.asImageBitmap()
+    }
+    if (bitmap != null) {
+        androidx.compose.foundation.Image(
+            bitmap = bitmap,
+            contentDescription = attachment.name,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.size(180.dp).clip(RoundedCornerShape(14.dp))
+        )
+    } else {
+        Text(attachment.name, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
 @Composable
 private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: Int) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -686,9 +715,11 @@ private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: In
                         Text(text, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 7).sp)
                     }
                 }
-                if (attachments.isNotEmpty()) {
+                attachments.filter { it.type == AttachmentType.IMAGE }.forEach { AttachmentThumb(it) }
+                val others = attachments.filter { it.type != AttachmentType.IMAGE }
+                if (others.isNotEmpty()) {
                     Text(
-                        attachments.joinToString(" · ") { it.name },
+                        others.joinToString(" · ") { it.name },
                         color = Muted,
                         fontSize = 12.sp,
                         maxLines = 2,

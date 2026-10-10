@@ -84,7 +84,8 @@ data class MessageEntity(
     val parentId: String?,
     val branchChildren: String,
     val reasoning: String?,
-    val imagePath: String? = null
+    val imagePath: String? = null,
+    @ColumnInfo(defaultValue = "[]") val attachmentsJson: String = "[]"
 )
 
 @Entity(tableName = "agents")
@@ -170,7 +171,7 @@ interface AgentDao {
 
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
