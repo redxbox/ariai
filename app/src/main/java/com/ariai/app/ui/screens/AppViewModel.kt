@@ -347,13 +347,14 @@ class AppViewModel(
                 val current = provider.models.firstOrNull { it.id == targetModelId }
                 when (_chatModes.value[chatId] ?: ChatMode.TEXT) {
                     ChatMode.IMAGE -> {
-                        // A model flagged for images generates directly. Otherwise the chat's
-                        // model answers normally, and image links in its reply are shown as pictures.
+                        // Only a model flagged for image output generates; nothing else is guessed.
                         val found = findImageModel(provider)
-                        if (found != null) {
-                            generateImageReply(chatId, found.first, found.second.id, content, null)
+                        if (found == null) {
+                            postAssistantError(chatId, tx("No image model found. Add an image model, or fetch the models in provider settings."))
                             return@launch
                         }
+                        generateImageReply(chatId, found.first, found.second.id, content, null)
+                        return@launch
                     }
                     ChatMode.VIDEO -> {
                         val found = findModel(provider) { it.supportsVideoGen }

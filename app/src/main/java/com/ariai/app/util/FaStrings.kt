@@ -2,6 +2,7 @@ package com.ariai.app.util
 
 // Persian UI strings keyed by the English text used in the code.
 internal val faStrings: Map<String, String> = mapOf(
+        "No image model found. Add an image model, or fetch the models in provider settings." to "مدل تصویری پیدا نشد. یک مدل تصویری اضافه کنید، یا در تنظیمات ارائه‌دهنده مدل‌ها را دریافت کنید.",
         "Built into the provider" to "داخل خود ارائه‌دهنده",
         "Rename chat" to "تغییر نام گفتگو",
         "Chat title" to "عنوان گفتگو",
