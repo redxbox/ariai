@@ -626,6 +626,16 @@ class AppViewModel(
             .replace("{date}", java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()))
     }
 
+    /** Renames a chat; blank titles are ignored. */
+    fun renameChat(chatId: String, newTitle: String) {
+        val title = newTitle.trim()
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            val chat = repository.getChatById(chatId) ?: return@launch
+            repository.saveChat(chat.copy(title = title))
+        }
+    }
+
     private fun updateChatTitle(chatId: String, newTitle: String) {
         viewModelScope.launch {
             val chat = repository.getChatById(chatId) ?: return@launch

@@ -97,6 +97,7 @@ fun NewChatScreen(
     localSearchConfigured: Boolean = false,
     onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode) -> Unit,
     onBack: () -> Unit,
+    onRenameChat: (String) -> Unit = {},
     onBranchMessage: (ChatMessage) -> Unit,
     onRegenerate: (ChatMessage) -> Unit,
     onCopyMessage: (String) -> Unit,
@@ -130,6 +131,30 @@ fun NewChatScreen(
             }
         )
     }
+    if (showRename) {
+        AlertDialog(
+            onDismissRequest = { showRename = false },
+            title = { Text(tx("Rename chat")) },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    placeholder = { Text(tx("Chat title")) }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRenameChat(renameText)
+                    showRename = false
+                }) { Text(tx("Save")) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRename = false }) { Text(tx("Cancel")) }
+            }
+        )
+    }
+
     if (showFullEditor) {
         FullScreenMessageEditor(
             text = inputText,
@@ -141,6 +166,8 @@ fun NewChatScreen(
     var showThinking by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
+    var showRename by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -302,8 +329,11 @@ fun NewChatScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.Edit, contentDescription = tx("New chat"), tint = Ink)
+                    IconButton(onClick = {
+                        renameText = chat?.title.orEmpty()
+                        showRename = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = tx("Rename chat"), tint = Ink)
                     }
                     Box {
                         IconButton(onClick = { showTopMenu = true }) {
