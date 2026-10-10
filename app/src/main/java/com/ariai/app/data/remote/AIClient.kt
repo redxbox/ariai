@@ -345,8 +345,11 @@ class AIClient {
                 for (i in 0 until arr.length()) {
                     val m = arr.getJSONObject(i)
                     val name = m.getString("name").removePrefix("models/")
-                    if (name.contains("gemini") || name.contains("imagen")) {
-                        models.add(AIModel(name, name, provider.id, true, true, name.contains("imagen"), 1000000))
+                    // Image models are the ones that offer the "predict" method (Imagen), not by name.
+                    val methods = m.optJSONArray("supportedGenerationMethods")
+                    val imageGen = (0 until (methods?.length() ?: 0)).any { methods?.optString(it) == "predict" }
+                    if (name.contains("gemini") || imageGen) {
+                        models.add(AIModel(name, name, provider.id, true, true, imageGen, 1000000))
                     }
                 }
             } else {

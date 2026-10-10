@@ -14,9 +14,6 @@ import kotlinx.coroutines.launch
 /** What the next message in a chat produces. */
 enum class ChatMode { TEXT, IMAGE, VIDEO }
 
-/** Used only when a provider did not flag image models: matches names like "...-image-...". */
-private val imageNameHint = Regex("image|dall-e|imagen|flux|stable-diffusion|sdxl", RegexOption.IGNORE_CASE)
-
 class AppViewModel(
     private val repository: ChatRepository,
     private val prefs: PreferencesManager
@@ -82,10 +79,9 @@ class AppViewModel(
         }
     }
 
-    /** Flagged image models first; otherwise a model whose name says image. */
+    /** Only models whose output modalities include image (never decided by name). */
     private fun findImageModel(preferred: Provider?): Pair<Provider, com.ariai.app.data.models.AIModel>? =
         findModel(preferred) { it.supportsImageGen }
-            ?: findModel(preferred) { imageNameHint.containsMatchIn(it.id) }
 
     /** Adds a message unless it is already in the list (the DB flow can deliver it first). */
     private fun appendMessage(message: ChatMessage) {
