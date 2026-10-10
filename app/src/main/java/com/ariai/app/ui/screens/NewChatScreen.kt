@@ -330,7 +330,7 @@ fun NewChatScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        renameText = chat?.title.orEmpty()
+                        renameText = chat?.title ?: ""
                         showRename = true
                     }) {
                         Icon(Icons.Default.Edit, contentDescription = tx("Rename chat"), tint = Ink)
