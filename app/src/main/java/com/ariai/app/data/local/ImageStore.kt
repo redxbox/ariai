@@ -17,6 +17,16 @@ object ImageStore {
         return target
     }
 
+    /** Total size of generated images and videos on this device. */
+    fun generatedBytes(): Long = dir?.listFiles()?.sumOf { it.length() } ?: 0L
+
+    /** Deletes every generated file. Returns how many were removed. */
+    fun clearGenerated(): Int {
+        val files = dir?.listFiles().orEmpty()
+        files.forEach { it.delete() }
+        return files.size
+    }
+
     fun save(bytes: ByteArray): File {
         val target = File(requireNotNull(dir) { "ImageStore not initialised" }, "${UUID.randomUUID()}.png")
         target.writeBytes(bytes)

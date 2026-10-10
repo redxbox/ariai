@@ -1,6 +1,7 @@
 package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
+import androidx.compose.ui.viewinterop.AndroidView
 import com.ariai.app.data.remote.supportsNativeSearch
 
 import androidx.compose.runtime.Composable
@@ -846,6 +847,7 @@ private fun ModeChip(mode: ChatMode, onClose: () -> Unit, modifier: Modifier) {
 @Composable
 private fun VideoCard(path: String) {
     val context = LocalContext.current
+    var playing by remember { mutableStateOf(false) }
     Surface(shape = RoundedCornerShape(16.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -862,16 +864,40 @@ private fun VideoCard(path: String) {
                 Text(tx("Video"), fontWeight = FontWeight.SemiBold, color = AriInk)
                 Text(tx("Generated video"), fontSize = 12.sp, color = AriMuted)
             }
-            TextButton(onClick = {
-                val uri = androidx.core.content.FileProvider.getUriForFile(
-                    context, "${context.packageName}.fileprovider", java.io.File(path)
-                )
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(uri, "video/mp4")
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                )
-            }) { Text(tx("Open"), color = AriInk, fontWeight = FontWeight.SemiBold) }
+            TextButton(onClick = { playing = true }) { Text(tx("Open"), color = AriInk, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+    if (playing) VideoPlayerDialog(path) { playing = false }
+}
+
+/** Plays a generated video inside the app with the built-in Android player and controls. */
+@Composable
+private fun VideoPlayerDialog(path: String, onDismiss: () -> Unit) {
+    val videoRef = remember { mutableStateOf<android.widget.VideoView?>(null) }
+    DisposableEffect(path) {
+        onDispose { videoRef.value?.stopPlayback() }
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    android.widget.VideoView(ctx).also { view ->
+                        view.setVideoPath(path)
+                        val controller = android.widget.MediaController(ctx)
+                        controller.setAnchorView(view)
+                        view.setMediaController(controller)
+                        view.setOnPreparedListener { player -> player.isLooping = false; view.start() }
+                        videoRef.value = view
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
+                Icon(Icons.Default.Close, contentDescription = tx("Close"), tint = Color.White)
+            }
         }
     }
 }

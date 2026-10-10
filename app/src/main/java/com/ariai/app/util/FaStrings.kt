@@ -2,6 +2,11 @@ package com.ariai.app.util
 
 // Persian UI strings keyed by the English text used in the code.
 internal val faStrings: Map<String, String> = mapOf(
+        "Delete generated files" to "حذف فایل‌های ساخته‌شده",
+        "Delete generated files?" to "فایل‌های ساخته‌شده حذف شود؟",
+        "Generated images and videos" to "تصاویر و ویدیوهای ساخته‌شده",
+        "Generated images and videos will be removed. Chats stay, but these files will no longer open." to "تصاویر و ویدیوهای ساخته‌شده حذف می‌شوند. گفتگوها می‌مانند، اما این فایل‌ها دیگر باز نمی‌شوند.",
+        "Generated files deleted" to "فایل‌های ساخته‌شده حذف شد",
         "No image model found. Add an image model, or fetch the models in provider settings." to "مدل تصویری پیدا نشد. یک مدل تصویری اضافه کنید، یا در تنظیمات ارائه‌دهنده مدل‌ها را دریافت کنید.",
         "Built into the provider" to "داخل خود ارائه‌دهنده",
         "Rename chat" to "تغییر نام گفتگو",

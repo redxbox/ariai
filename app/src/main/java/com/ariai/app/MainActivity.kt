@@ -325,7 +325,12 @@ fun AppRoot(viewModel: AppViewModel) {
                             chats.forEach { viewModel.deleteChat(it.id) }
                             scope.launch { snackbarHostState.showSnackbar(tx("All chats deleted")) }
                         },
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        generatedBytes = com.ariai.app.data.local.ImageStore.generatedBytes(),
+                        onClearGenerated = {
+                            com.ariai.app.data.local.ImageStore.clearGenerated()
+                            scope.launch { snackbarHostState.showSnackbar(tx("Generated files deleted")) }
+                        }
                     )
                 }
 
