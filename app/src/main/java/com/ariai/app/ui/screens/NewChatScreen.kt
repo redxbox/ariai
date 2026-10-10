@@ -131,6 +131,8 @@ fun NewChatScreen(
             }
         )
     }
+    var showRename by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
     if (showRename) {
         AlertDialog(
             onDismissRequest = { showRename = false },
@@ -166,8 +168,6 @@ fun NewChatScreen(
     var showThinking by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
-    var showRename by remember { mutableStateOf(false) }
-    var renameText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
