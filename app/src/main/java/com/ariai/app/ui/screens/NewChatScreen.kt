@@ -224,7 +224,9 @@ fun NewChatScreen(
     var followStream by remember { mutableStateOf(true) }
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
-            if (!scrolling) followStream = !listState.canScrollForward
+            if (!scrolling) {
+                followStream = !listState.canScrollForward
+            }
         }
     }
     LaunchedEffect(messages.size, currentStreamingContent.length) {
@@ -234,12 +236,14 @@ fun NewChatScreen(
         if (!followStream) return@LaunchedEffect
         val target = last - 1
         val info = listState.layoutInfo
-        val item = info.visibleItemsInfo.firstOrNull { it.index == target }
-        if (item == null) {
+        val visible = info.visibleItemsInfo.firstOrNull { it.index == target }
+        if (visible == null) {
             listState.scrollToItem(target)
-        } else {
-            val overflow = item.offset + item.size - info.viewportEndOffset
-            if (overflow > 0) listState.scrollBy(overflow.toFloat())
+            return@LaunchedEffect
+        }
+        val overflow = visible.offset + visible.size - info.viewportEndOffset
+        if (overflow > 0) {
+            listState.scrollBy(overflow.toFloat())
         }
     }
 
