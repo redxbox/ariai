@@ -1,5 +1,6 @@
 package com.ariai.app.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -63,7 +64,8 @@ fun ReplyContent(text: String, fontSizeSp: Float, color: Color) {
 @Composable
 private fun CodeBlock(language: String, code: String, color: Color) {
     val clipboard = LocalClipboardManager.current
-    Surface(shape = RoundedCornerShape(12.dp), color = AriTint, modifier = Modifier.fillMaxWidth()) {
+    // A plain Box, not Surface: Surface adds a tonal (beige) overlay in Material 3.
+    Box(modifier = Modifier.fillMaxWidth().background(AriTint, RoundedCornerShape(12.dp))) {
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 2.dp),

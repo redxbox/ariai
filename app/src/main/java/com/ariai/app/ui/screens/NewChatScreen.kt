@@ -220,9 +220,27 @@ fun NewChatScreen(
     val currentProvider = providers.find { it.id == chat?.providerId } ?: providers.firstOrNull()
     val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
 
+    // Follow the newest text only while the user is at the bottom. Once they scroll up, stay where they are.
+    var followStream by remember { mutableStateOf(true) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
+            if (!scrolling) followStream = !listState.canScrollForward
+        }
+    }
     LaunchedEffect(messages.size, currentStreamingContent.length) {
         val last = messages.size + if (currentStreamingContent.isNotEmpty()) 1 else 0
-        if (last > 0) listState.animateScrollToItem(last - 1)
+        if (last <= 0) return@LaunchedEffect
+        if (currentStreamingContent.isEmpty() && messages.lastOrNull()?.role == MessageRole.USER) followStream = true
+        if (!followStream) return@LaunchedEffect
+        val target = last - 1
+        val info = listState.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.index == target }
+        if (item == null) {
+            listState.scrollToItem(target)
+        } else {
+            val overflow = item.offset + item.size - info.viewportEndOffset
+            if (overflow > 0) listState.scrollBy(overflow.toFloat())
+        }
     }
 
     fun showNote(text: String) {
