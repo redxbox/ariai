@@ -694,7 +694,14 @@ private fun AssistantBlock(
         if (visibleText.isNotBlank()) {
             // SelectionContainer lets the user select and copy part of the reply.
             SelectionContainer {
-                Text(remember(visibleText) { formatReply(visibleText) }, color = Ink, fontSize = fontSize.sp, lineHeight = (fontSize + 8).sp)
+                Text(
+                    remember(visibleText) { formatReply(visibleText) },
+                    color = Ink,
+                    fontSize = fontSize.sp,
+                    lineHeight = (fontSize + 8).sp,
+                    // Each paragraph takes its direction from its first letter, so mixed Persian and English lines keep their order.
+                    style = androidx.compose.ui.text.TextStyle(textDirection = androidx.compose.ui.text.style.TextDirection.Content)
+                )
             }
         }
         imageUrls.forEach { RemoteImage(it) }

@@ -60,7 +60,7 @@ fun formatReply(raw: String): AnnotatedString {
 
 private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInline(line: String) {
     val cleaned = line
-        .replace(linkRegex) { it.groupValues[1] }
+        .replace(linkRegex) { "${it.groupValues[1]} (${it.groupValues[2]})" }
         .replace(codeRegex) { it.groupValues[1] }
     var last = 0
     for (match in boldRegex.findAll(cleaned)) {
