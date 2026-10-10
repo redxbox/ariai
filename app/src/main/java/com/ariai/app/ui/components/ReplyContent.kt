@@ -66,17 +66,14 @@ private fun CodeBlock(language: String, code: String, color: Color) {
     Surface(shape = RoundedCornerShape(12.dp), color = AriTint, modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    language.ifBlank { tx("Code") },
-                    fontSize = 12.sp,
-                    color = color.copy(alpha = 0.6f),
-                    modifier = Modifier.weight(1f)
-                )
                 IconButton(onClick = { clipboard.setText(AnnotatedString(code)) }) {
                     Icon(Icons.Default.ContentCopy, contentDescription = tx("Copy code"), tint = color, modifier = Modifier.size(18.dp))
+                }
+                if (language.isNotBlank()) {
+                    Text(language, fontSize = 12.sp, color = color.copy(alpha = 0.6f))
                 }
             }
             Text(
