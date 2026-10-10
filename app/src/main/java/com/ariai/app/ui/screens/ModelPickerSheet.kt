@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
@@ -76,7 +78,7 @@ fun ModelPickerSheet(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                placeholder = { Text("Search models", color = Ink.copy(alpha = 0.4f)) },
+                placeholder = { Text(tx("Search models"), color = Ink.copy(alpha = 0.4f)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.4f)) },
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -94,10 +96,10 @@ fun ModelPickerSheet(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("No models available", fontWeight = FontWeight.SemiBold, color = Ink)
-                    Text("Add a provider with at least one model.", color = Ink.copy(alpha = 0.5f), fontSize = 13.sp)
+                    Text(tx("No models available"), fontWeight = FontWeight.SemiBold, color = Ink)
+                    Text(tx("Add a provider with at least one model."), color = Ink.copy(alpha = 0.5f), fontSize = 13.sp)
                     Button(onClick = onAddProvider, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent)) {
-                        Text("Add provider")
+                        Text(tx("Add provider"))
                     }
                 }
             } else {
@@ -106,7 +108,7 @@ fun ModelPickerSheet(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (providerFilter == null && favoriteEntries.isNotEmpty()) {
-                        item(key = "h_favorites") { SectionTitle("Favorites") }
+                        item(key = "h_favorites") { SectionTitle(tx("Favorites")) }
                         items(favoriteEntries, key = { (p, m) -> "fav_${p.id}_${m.id}" }) { (p, m) ->
                             ModelRow(
                                 model = m,
@@ -159,7 +161,7 @@ fun ModelPickerSheet(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    FilterChip(selected = providerFilter == null, onClick = { providerFilter = null }, label = { Text("All") })
+                    FilterChip(selected = providerFilter == null, onClick = { providerFilter = null }, label = { Text(tx("All")) })
                     enabled.forEach { p ->
                         FilterChip(
                             selected = providerFilter == p.id,
@@ -202,7 +204,7 @@ private fun ProviderCard(
                     Text("$count", fontSize = 12.sp, color = Ink.copy(alpha = 0.4f))
                     Icon(
                         if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (open) "Collapse" else "Expand",
+                        contentDescription = if (open) tx("Collapse") else tx("Expand"),
                         tint = Ink.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
@@ -239,7 +241,7 @@ private fun ProviderHeader(
             Text("$count", fontSize = 12.sp, color = Ink.copy(alpha = 0.4f))
             Icon(
                 if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (open) "Collapse" else "Expand",
+                contentDescription = if (open) tx("Collapse") else tx("Expand"),
                 tint = Ink.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
             )
@@ -292,18 +294,18 @@ private fun ModelRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (model.supportsVision) CapabilityTag("Vision")
-                    if (model.supportsFunctionCalling) CapabilityTag("Tools")
-                    if (model.supportsImageGen) CapabilityTag("Image")
+                    if (model.supportsVision) CapabilityTag(tx("Vision"))
+                    if (model.supportsFunctionCalling) CapabilityTag(tx("Tools"))
+                    if (model.supportsImageGen) CapabilityTag(tx("Image"))
                 }
             }
             if (selected) {
-                Icon(Icons.Default.Star, contentDescription = "Selected", tint = Accent, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Star, contentDescription = tx("Selected"), tint = Accent, modifier = Modifier.size(16.dp))
             }
             IconButton(onClick = onToggleFavorite) {
                 Icon(
                     if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = if (favorite) "Remove from favorites" else "Add to favorites",
+                    contentDescription = if (favorite) tx("Remove from favorites") else tx("Add to favorites"),
                     tint = if (favorite) AriAccent else Ink.copy(alpha = 0.4f),
                     modifier = Modifier.size(20.dp)
                 )

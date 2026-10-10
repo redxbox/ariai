@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.compose.runtime.ReadOnlyComposable
 
 import com.ariai.app.ui.theme.*
@@ -48,20 +50,20 @@ fun AttachmentSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Add to message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+            Text(tx("Add to message"), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Ink)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                SheetTile(Icons.Default.Image, "Photo", Modifier.weight(1f)) { onDismiss(); onPhoto() }
-                SheetTile(Icons.Default.CameraAlt, "Camera", Modifier.weight(1f)) { onDismiss(); onCamera() }
-                SheetTile(Icons.Default.Description, "Text file", Modifier.weight(1f)) { onDismiss(); onFile() }
+                SheetTile(Icons.Default.Image, tx("Photo"), Modifier.weight(1f)) { onDismiss(); onPhoto() }
+                SheetTile(Icons.Default.CameraAlt, tx("Camera"), Modifier.weight(1f)) { onDismiss(); onCamera() }
+                SheetTile(Icons.Default.Description, tx("Text file"), Modifier.weight(1f)) { onDismiss(); onFile() }
             }
             HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-            Text("Generate", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
-            SheetRow(Icons.Default.Image, "Image", "Next message makes an image") { onDismiss(); onImage() }
-            SheetRow(Icons.Default.Movie, "Video", "Next message makes a video") { onDismiss(); onVideo() }
+            Text(tx("Generate"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+            SheetRow(Icons.Default.Image, tx("Image"), tx("Next message makes an image")) { onDismiss(); onImage() }
+            SheetRow(Icons.Default.Movie, tx("Video"), tx("Next message makes a video")) { onDismiss(); onVideo() }
             HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-            Text("Conversation", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
-            SheetRow(Icons.Default.Archive, "Compress history", "Summarize older messages to save context") { onDismiss(); onCompress() }
-            SheetRow(Icons.Default.Extension, "Extensions", "Manage MCP tool servers") { onDismiss(); onExtensions() }
+            Text(tx("Conversation"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+            SheetRow(Icons.Default.Archive, tx("Compress history"), tx("Summarize older messages to save context")) { onDismiss(); onCompress() }
+            SheetRow(Icons.Default.Extension, tx("Extensions"), tx("Manage MCP tool servers")) { onDismiss(); onExtensions() }
         }
     }
 }
@@ -117,7 +119,7 @@ fun ThinkingDepthSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Thinking depth", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+            Text(tx("Thinking depth"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
             Text(
                 "Not every model supports this. If nothing changes, check your provider's documentation.",
                 fontSize = 13.sp,
@@ -168,20 +170,20 @@ fun SearchSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("Web search", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+            Text(tx("Web search"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 SearchCard(
                     icon = Icons.Default.AutoAwesome,
-                    title = "Model search",
-                    subtitle = if (modelSearchAvailable) "Built into the provider (Gemini)" else "Only for Gemini providers",
+                    title = tx("Model search"),
+                    subtitle = if (modelSearchAvailable) tx("Built into the provider (Gemini)") else tx("Only for Gemini providers"),
                     selected = mode == SearchMode.MODEL,
                     enabled = modelSearchAvailable,
                     modifier = Modifier.weight(1f)
                 ) { onModeChange(SearchMode.MODEL); onDismiss() }
                 SearchCard(
                     icon = Icons.Default.Public,
-                    title = "Local search",
-                    subtitle = if (localSearchConfigured) "Uses your search service" else "No key yet. Tap to set up",
+                    title = tx("Local search"),
+                    subtitle = if (localSearchConfigured) tx("Uses your search service") else tx("No key yet. Tap to set up"),
                     selected = mode == SearchMode.LOCAL,
                     enabled = true,
                     modifier = Modifier.weight(1f)
@@ -195,7 +197,7 @@ fun SearchSheet(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = mode != SearchMode.OFF
             ) {
-                Text("Turn off search", color = if (mode != SearchMode.OFF) Accent else Ink.copy(alpha = 0.35f))
+                Text(tx("Turn off search"), color = if (mode != SearchMode.OFF) Accent else Ink.copy(alpha = 0.35f))
             }
         }
     }
@@ -222,7 +224,7 @@ private fun SearchCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(22.dp))
-            if (selected) Icon(Icons.Default.CheckCircle, contentDescription = "Selected", tint = Accent, modifier = Modifier.size(18.dp))
+            if (selected) Icon(Icons.Default.CheckCircle, contentDescription = tx("Selected"), tint = Accent, modifier = Modifier.size(18.dp))
         }
         Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (selected) Accent else Ink)
         Text(subtitle, fontSize = 12.sp, color = Ink.copy(alpha = 0.55f))

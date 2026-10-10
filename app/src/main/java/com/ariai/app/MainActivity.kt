@@ -14,6 +14,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,7 +33,9 @@ import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
 import com.ariai.app.util.LocalStrings
 import com.ariai.app.data.models.SearchMode
+import com.ariai.app.util.UiLang
 import com.ariai.app.util.getStringsForLanguage
+import com.ariai.app.util.tx
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -53,8 +56,9 @@ class MainActivity : ComponentActivity() {
                 else -> isSystemInDarkTheme()
             }
 
-            // The app is English-only: force LTR so menus and text never mirror on RTL devices.
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            SideEffect { UiLang.code = language }
+            val direction = if (language == "fa" || language == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 CompositionLocalProvider(LocalStrings provides strings) {
                     AriAiTheme(darkTheme = isDarkTheme) {
                         AppRoot(viewModel = viewModel)
@@ -97,7 +101,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val fontSize by viewModel.fontSize.collectAsState()
     val defaultModelName = providers.firstOrNull { it.id == defaultProviderId }?.let { p ->
         p.models.firstOrNull { it.id == defaultModelId }?.let { "${it.displayName} · ${p.name}" }
-    } ?: "Not chosen"
+    } ?: tx("Not chosen")
 
     fun go(route: String) {
         scope.launch { drawerState.close() }
@@ -145,7 +149,7 @@ fun AppRoot(viewModel: AppViewModel) {
                     onAbout = {
                         scope.launch {
                             drawerState.close()
-                            snackbarHostState.showSnackbar("AriAI v1.0 - Personal AI")
+                            snackbarHostState.showSnackbar(tx("AriAI v1.0 - Personal AI"))
                         }
                     }
                 )
@@ -318,7 +322,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         chats = chats,
                         onClearAll = {
                             chats.forEach { viewModel.deleteChat(it.id) }
-                            scope.launch { snackbarHostState.showSnackbar("All chats deleted") }
+                            scope.launch { snackbarHostState.showSnackbar(tx("All chats deleted")) }
                         },
                         onBack = { navController.popBackStack() }
                     )

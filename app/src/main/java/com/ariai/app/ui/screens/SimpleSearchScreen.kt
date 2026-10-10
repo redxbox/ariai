@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -28,7 +30,7 @@ fun SimpleSearchScreen(
     var query by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val recentSearches = remember { mutableStateListOf("AI news today", "Python best practices", "Quantum computing") }
+    val recentSearches = remember { mutableStateListOf(tx("AI news today"), tx("Python best practices"), tx("Quantum computing")) }
 
     Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
         Scaffold(
@@ -39,10 +41,10 @@ fun SimpleSearchScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = AriCard),
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AriInk)
+                            Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = AriInk)
                         }
                     },
-                    title = { Text("Search", fontWeight = FontWeight.SemiBold, color = AriInk) }
+                    title = { Text(tx("Search"), fontWeight = FontWeight.SemiBold, color = AriInk) }
                 )
             }
         ) { padding ->
@@ -55,7 +57,7 @@ fun SimpleSearchScreen(
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("Search web or chat history", color = AriInk.copy(alpha = 0.4f)) },
+                        placeholder = { Text(tx("Search web or chat history"), color = AriInk.copy(alpha = 0.4f)) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriInk.copy(alpha = 0.4f)) },
                         trailingIcon = {
                             if (query.isNotBlank()) {
@@ -63,7 +65,7 @@ fun SimpleSearchScreen(
                                     recentSearches.add(0, query)
                                     onSearch(query)
                                 }) {
-                                    Icon(Icons.Default.ArrowForward, contentDescription = "Search", tint = AriInk)
+                                    Icon(Icons.Default.ArrowForward, contentDescription = tx("Search"), tint = AriInk)
                                 }
                             }
                         },
@@ -81,7 +83,7 @@ fun SimpleSearchScreen(
 
                 if (query.isBlank()) {
                     item {
-                        Text("Recent searches", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(top = 8.dp))
+                        Text(tx("Recent searches"), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(top = 8.dp))
                     }
                     items(count = recentSearches.size, key = { i -> recentSearches[i] }) { i ->
                         val item = recentSearches[i]
@@ -104,9 +106,9 @@ fun SimpleSearchScreen(
                     item {
                         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = AriCard), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Search providers", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = AriInk)
+                                Text(tx("Search providers"), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = AriInk)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf("Web", "Chats", "Docs").forEach { type ->
+                                    listOf(tx("Web"), tx("Chats"), tx("Docs")).forEach { type ->
                                         Surface(shape = RoundedCornerShape(20.dp), color = AriTint, modifier = Modifier.clickable { scope.launch { snackbarHostState.showSnackbar("$type search") } }) {
                                             Text(type, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontSize = 12.sp, color = AriInk.copy(alpha = 0.7f))
                                         }
@@ -121,8 +123,8 @@ fun SimpleSearchScreen(
                             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Icon(Icons.Default.Search, contentDescription = null, tint = AriInk)
                                 Column {
-                                    Text("Search for \"$query\"", fontWeight = FontWeight.Medium, color = AriInk, fontSize = 14.sp)
-                                    Text("Press to search with AI", color = AriInk.copy(alpha = 0.6f), fontSize = 12.sp)
+                                    Text(tx("Search for") + " \"$query\"", fontWeight = FontWeight.Medium, color = AriInk, fontSize = 14.sp)
+                                    Text(tx("Press to search with AI"), color = AriInk.copy(alpha = 0.6f), fontSize = 12.sp)
                                 }
                             }
                         }

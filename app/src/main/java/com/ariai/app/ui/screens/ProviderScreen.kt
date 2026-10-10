@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -44,13 +46,13 @@ fun ProviderListScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("AI Providers", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("Connect. Mix. Create.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tx("AI Providers"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(tx("Connect. Mix. Create."), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
                     IconButton(onClick = onAddProvider) {
-                        Icon(Icons.Default.Add, contentDescription = "Add")
+                        Icon(Icons.Default.Add, contentDescription = tx("Add"))
                     }
                 }
             )
@@ -74,7 +76,7 @@ fun ProviderListScreen(
             // Filter chips simple
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf("All", "Cloud", "Local", "Custom").forEachIndexed { index, label ->
+                    listOf(tx("All"), tx("Cloud"), tx("Local"), tx("Custom")).forEachIndexed { index, label ->
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = if (index == 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
@@ -106,12 +108,12 @@ fun ProviderListScreen(
                             ) {
                                 Text("🔌", style = MaterialTheme.typography.displaySmall)
                             }
-                            Text("No providers yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("Add your first AI provider to start chatting", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tx("No providers yet"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(tx("Add your first AI provider to start chatting"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Button(onClick = onAddProvider, shape = RoundedCornerShape(12.dp)) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Add Provider")
+                                Text(tx("Add Provider"))
                             }
                         }
                     }
@@ -129,7 +131,7 @@ fun ProviderListScreen(
             }
 
             item {
-                Text("Popular Providers", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                Text(tx("Popular Providers"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
             }
 
             item {
@@ -140,7 +142,7 @@ fun ProviderListScreen(
                     PopularProviderRow(name = "Meta", subtitle = "Llama 3.3, 3.1", letter = "M", colors = listOf(AriMuted, AriMuted), onClick = onAddProvider)
                     PopularProviderRow(name = "DeepSeek", subtitle = "R1, V3", letter = "D", colors = listOf(AriMuted, AriMuted), onClick = onAddProvider)
                     PopularProviderRow(name = "Qwen", subtitle = "Qwen3, Qwen2.5", letter = "Q", colors = listOf(AriCustom, AriCustom.copy(alpha = 0.55f)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Mistral", subtitle = "Large, Medium, Small", letter = "Mi", colors = listOf(AriAccent, AriAccent.copy(alpha = 0.55f)), onClick = onAddProvider)
+                    PopularProviderRow(name = "Mistral", subtitle = tx("Large, Medium, Small"), letter = "Mi", colors = listOf(AriAccent, AriAccent.copy(alpha = 0.55f)), onClick = onAddProvider)
                 }
             }
 
@@ -152,7 +154,7 @@ fun ProviderListScreen(
                 ) {
                     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Add Custom Provider", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text(tx("Add Custom Provider"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -221,9 +223,9 @@ fun GlassProviderCard(
                     Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("Test") }, onClick = { showMenu = false; onTest() }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) })
-                    DropdownMenuItem(text = { Text("Edit") }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) })
-                    DropdownMenuItem(text = { Text("Delete") }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
+                    DropdownMenuItem(text = { Text(tx("Test")) }, onClick = { showMenu = false; onTest() }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) })
+                    DropdownMenuItem(text = { Text(tx("Edit")) }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) })
+                    DropdownMenuItem(text = { Text(tx("Delete")) }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
                 }
             }
         }
@@ -269,7 +271,7 @@ internal val providerPresets = listOf(
     ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", AriGemini),
     ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", AriAnthropic),
     ProviderPreset("Ollama", ProviderType.OLLAMA, "http://localhost:11434/v1", AriOllama),
-    ProviderPreset("Custom", ProviderType.OPENAI_COMPATIBLE, "", AriCustom)
+    ProviderPreset(tx("Custom"), ProviderType.OPENAI_COMPATIBLE, "", AriCustom)
 )
 
 /**
@@ -358,10 +360,10 @@ fun AddProviderScreen(
     if (confirmDelete && initialProvider != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete provider?") },
+            title = { Text(tx("Delete provider?")) },
             text = { Text("${initialProvider.name} and its models will be removed.") },
-            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete(initialProvider.id) }) { Text("Delete", color = AriAccent) } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete(initialProvider.id) }) { Text(tx("Delete"), color = AriAccent) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tx("Cancel")) } }
         )
     }
 
@@ -370,8 +372,8 @@ fun AddProviderScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AriInk) } },
-                title = { Text(if (isEdit) "Edit provider" else "Add provider", fontWeight = FontWeight.SemiBold, color = AriInk) }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = AriInk) } },
+                title = { Text(if (isEdit) tx("Edit provider") else tx("Add provider"), fontWeight = FontWeight.SemiBold, color = AriInk) }
             )
         }
     ) { padding ->
@@ -381,7 +383,7 @@ fun AddProviderScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Brand presets
-            item { SectionLabel("Provider") }
+            item { SectionLabel(tx("Provider")) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     providerPresets.forEach { preset ->
@@ -408,14 +410,14 @@ fun AddProviderScreen(
             }
 
             // Connection
-            item { SectionLabel("Connection") }
+            item { SectionLabel(tx("Connection")) }
             item {
                 Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            label = { Text("Name") },
+                            label = { Text(tx("Name")) },
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -423,7 +425,7 @@ fun AddProviderScreen(
                         OutlinedTextField(
                             value = baseUrl,
                             onValueChange = { baseUrl = it },
-                            label = { Text("Base URL") },
+                            label = { Text(tx("Base URL")) },
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -431,24 +433,24 @@ fun AddProviderScreen(
                         OutlinedTextField(
                             value = apiKey,
                             onValueChange = { apiKey = it },
-                            label = { Text("API key") },
+                            label = { Text(tx("API key")) },
                             singleLine = true,
                             visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
                             trailingIcon = {
                                 IconButton(onClick = { reveal = !reveal }) {
-                                    Icon(Icons.Default.Visibility, contentDescription = if (reveal) "Hide key" else "Show key", tint = AriInk.copy(alpha = 0.5f))
+                                    Icon(Icons.Default.Visibility, contentDescription = if (reveal) tx("Hide key") else tx("Show key"), tint = AriInk.copy(alpha = 0.5f))
                                 }
                             },
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Text("Stored only on this device.", fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
+                        Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
                     }
                 }
             }
 
             // Models: one grouped list. Fetch fills it from the API; rows can be removed.
-            item { SectionLabel(if (models.isEmpty()) "Models" else "Models · ${models.size}") }
+            item { SectionLabel(if (models.isEmpty()) tx("Models") else "Models · ${models.size}") }
             item {
                 val visibleModels = models.filter {
                     modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
@@ -460,27 +462,27 @@ fun AddProviderScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                fetchError ?: "Loaded from the API on save",
+                                fetchError ?: tx("Loaded from the API on save"),
                                 fontSize = 12.sp,
                                 color = if (fetchError != null) AriAccent else AriMuted,
                                 modifier = Modifier.weight(1f)
                             )
                             TextButton(onClick = { fetchAndMerge {} }, enabled = !fetching && baseUrl.isNotBlank()) {
-                                Text(if (fetching) "Loading…" else "Fetch", color = AriInk, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text(if (fetching) tx("Loading…") else tx("Fetch"), color = AriInk, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                             }
                         }
                         if (models.size > 8) {
                             OutlinedTextField(
                                 value = modelFilter,
                                 onValueChange = { modelFilter = it },
-                                placeholder = { Text("Filter models") },
+                                placeholder = { Text(tx("Filter models")) },
                                 singleLine = true,
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
                             )
                         }
                         if (models.isEmpty()) {
-                            Text("No models yet", fontSize = 13.sp, color = AriMuted, modifier = Modifier.padding(16.dp))
+                            Text(tx("No models yet"), fontSize = 13.sp, color = AriMuted, modifier = Modifier.padding(16.dp))
                         }
                         // Only a few rows are composed by default; the rest load on expand.
                         val collapsible = visibleModels.size > 5 && modelFilter.isBlank()
@@ -498,13 +500,13 @@ fun AddProviderScreen(
                             TextButton(onClick = { modelsExpanded = !modelsExpanded }, modifier = Modifier.fillMaxWidth()) {
                                 Icon(
                                     if (modelsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = if (modelsExpanded) "Collapse" else "Expand",
+                                    contentDescription = if (modelsExpanded) tx("Collapse") else tx("Expand"),
                                     tint = AriInk,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    if (modelsExpanded) "Show less" else "Show all ${visibleModels.size}",
+                                    if (modelsExpanded) tx("Show less") else "Show all ${visibleModels.size}",
                                     color = AriInk,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -514,27 +516,27 @@ fun AddProviderScreen(
                         TextButton(onClick = { showAddModel = true }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.Add, contentDescription = null, tint = AriInk, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Add model", color = AriInk, fontWeight = FontWeight.SemiBold)
+                            Text(tx("Add model"), color = AriInk, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
 
             // Advanced: headers and body sent to every model of this provider.
-            item { SectionLabel("Advanced") }
+            item { SectionLabel(tx("Advanced")) }
             item {
                 Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Custom headers", fontWeight = FontWeight.Medium, color = AriInk)
+                        Text(tx("Custom headers"), fontWeight = FontWeight.Medium, color = AriInk)
                         KeyValueEditor(items = headers, onChange = { headers = it })
                         OutlinedTextField(
                             value = customBody,
                             onValueChange = { customBody = it },
-                            label = { Text("Custom body (JSON)") },
+                            label = { Text(tx("Custom body (JSON)")) },
                             minLines = 2,
                             maxLines = 6,
                             isError = !isValidJsonObject(customBody),
-                            supportingText = { if (!isValidJsonObject(customBody)) Text("Must be a JSON object") },
+                            supportingText = { if (!isValidJsonObject(customBody)) Text(tx("Must be a JSON object")) },
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -559,7 +561,7 @@ fun AddProviderScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AriInk),
                     modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) { Text(if (fetching) "Loading models…" else "Save", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+                ) { Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
             }
 
             if (isEdit) {
@@ -568,7 +570,7 @@ fun AddProviderScreen(
                         onClick = { confirmDelete = true },
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) { Text("Delete provider", color = AriAccent, fontWeight = FontWeight.SemiBold) }
+                    ) { Text(tx("Delete provider"), color = AriAccent, fontWeight = FontWeight.SemiBold) }
                 }
             }
             item { Spacer(Modifier.height(24.dp)) }
@@ -593,10 +595,10 @@ private fun ModelRow(model: AIModel, color: Color, onRemove: () -> Unit) {
             Text(model.displayName, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(model.id, fontSize = 11.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val tags = buildList {
-                if (model.supportsVision) add(Triple("Vision", AriTagBlueBg, AriTagBlueFg))
-                if (model.supportsFunctionCalling) add(Triple("Tools", AriTagGreenBg, AriTagGreenFg))
-                if (model.supportsImageGen) add(Triple("Image", AriTagAmberBg, AriTagAmberFg))
-                if ("google_search" in model.builtInTools) add(Triple("Search", AriTagAmberBg, AriTagAmberFg))
+                if (model.supportsVision) add(Triple(tx("Vision"), AriTagBlueBg, AriTagBlueFg))
+                if (model.supportsFunctionCalling) add(Triple(tx("Tools"), AriTagGreenBg, AriTagGreenFg))
+                if (model.supportsImageGen) add(Triple(tx("Image"), AriTagAmberBg, AriTagAmberFg))
+                if ("google_search" in model.builtInTools) add(Triple(tx("Search"), AriTagAmberBg, AriTagAmberFg))
                 if ("url_context" in model.builtInTools) add(Triple("URL", AriTagAmberBg, AriTagAmberFg))
             }
             if (tags.isNotEmpty()) {
@@ -606,7 +608,7 @@ private fun ModelRow(model: AIModel, color: Color, onRemove: () -> Unit) {
             }
         }
         IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Default.Close, contentDescription = "Remove model", tint = AriMuted, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Close, contentDescription = tx("Remove model"), tint = AriMuted, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -627,7 +629,7 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
                 OutlinedTextField(
                     value = pair.first,
                     onValueChange = { key -> onChange(items.toMutableList().also { it[index] = key to pair.second }) },
-                    label = { Text("Header") },
+                    label = { Text(tx("Header")) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.weight(1f)
@@ -635,13 +637,13 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
                 OutlinedTextField(
                     value = pair.second,
                     onValueChange = { value -> onChange(items.toMutableList().also { it[index] = pair.first to value }) },
-                    label = { Text("Value") },
+                    label = { Text(tx("Value")) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = { onChange(items.toMutableList().also { it.removeAt(index) }) }) {
-                    Icon(Icons.Default.Close, contentDescription = "Remove header", tint = AriMuted)
+                    Icon(Icons.Default.Close, contentDescription = tx("Remove header"), tint = AriMuted)
                 }
             }
         }
@@ -652,7 +654,7 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
         ) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Add header")
+            Text(tx("Add header"))
         }
     }
 }
@@ -709,9 +711,9 @@ private fun AddModelSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("Add model", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
+            Text(tx("Add model"), fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
             TabRow(selectedTabIndex = tab, containerColor = AriPaper) {
-                listOf("Built-in Tools", "Advanced", "Basic").forEachIndexed { index, label ->
+                listOf(tx("Built-in Tools"), tx("Advanced"), tx("Basic")).forEachIndexed { index, label ->
                     Tab(selected = tab == index, onClick = { tab = index }, text = { Text(label, fontSize = 12.sp) })
                 }
             }
@@ -719,44 +721,44 @@ private fun AddModelSheet(
             when (tab) {
                 0 -> {
                     Text(
-                        if (isGemini) "Tools the API runs for this model." else "Built-in tools need the official Gemini API. Turn on a Gemini provider to use them.",
+                        if (isGemini) tx("Tools the API runs for this model.") else "Built-in tools need the official Gemini API. Turn on a Gemini provider to use them.",
                         fontSize = 12.sp, color = AriMuted
                     )
-                    ToolToggleRow("Search", "Google Search grounding", search, enabled = isGemini) { search = it }
-                    ToolToggleRow("URL context", "Read the links in the message", urlContext, enabled = isGemini) { urlContext = it }
+                    ToolToggleRow(tx("Search"), tx("Google Search grounding"), search, enabled = isGemini) { search = it }
+                    ToolToggleRow(tx("URL context"), tx("Read the links in the message"), urlContext, enabled = isGemini) { urlContext = it }
                 }
                 1 -> {
-                    Text("Extra headers for this model only.", fontSize = 12.sp, color = AriMuted)
+                    Text(tx("Extra headers for this model only."), fontSize = 12.sp, color = AriMuted)
                     KeyValueEditor(items = headers, onChange = { headers = it })
                     OutlinedTextField(
                         value = customBody,
                         onValueChange = { customBody = it },
-                        label = { Text("Custom body (JSON)") },
+                        label = { Text(tx("Custom body (JSON)")) },
                         placeholder = { Text("{\"temperature\": 0.2}") },
                         minLines = 3,
                         maxLines = 6,
                         isError = !bodyValid,
-                        supportingText = { if (!bodyValid) Text("Must be a JSON object") },
+                        supportingText = { if (!bodyValid) Text(tx("Must be a JSON object")) },
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
                 else -> {
                     OutlinedTextField(
-                        value = modelId, onValueChange = { modelId = it }, label = { Text("Model ID") },
+                        value = modelId, onValueChange = { modelId = it }, label = { Text(tx("Model ID")) },
                         singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = displayName, onValueChange = { displayName = it }, label = { Text("Display name (optional)") },
+                        value = displayName, onValueChange = { displayName = it }, label = { Text(tx("Display name (optional)")) },
                         singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
                     )
-                    Text("Type", fontSize = 12.sp, color = AriMuted)
+                    Text(tx("Type"), fontSize = 12.sp, color = AriMuted)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = !isImage, onClick = { isImage = false }, label = { Text("Chat") })
-                        FilterChip(selected = isImage, onClick = { isImage = true }, label = { Text("Image") })
+                        FilterChip(selected = !isImage, onClick = { isImage = false }, label = { Text(tx("Chat")) })
+                        FilterChip(selected = isImage, onClick = { isImage = true }, label = { Text(tx("Image")) })
                     }
-                    ToolToggleRow("Accepts images", "Vision input", vision, enabled = true) { vision = it }
-                    ToolToggleRow("Tool calling", "Function calling", tools, enabled = true) { tools = it }
+                    ToolToggleRow(tx("Accepts images"), tx("Vision input"), vision, enabled = true) { vision = it }
+                    ToolToggleRow(tx("Tool calling"), tx("Function calling"), tools, enabled = true) { tools = it }
                 }
             }
 
@@ -786,7 +788,7 @@ private fun AddModelSheet(
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AriInk),
                 modifier = Modifier.fillMaxWidth().height(50.dp)
-            ) { Text("Add", fontWeight = FontWeight.SemiBold) }
+            ) { Text(tx("Add"), fontWeight = FontWeight.SemiBold) }
             Spacer(Modifier.height(16.dp))
         }
     }

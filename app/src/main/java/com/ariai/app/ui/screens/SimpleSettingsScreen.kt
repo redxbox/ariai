@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -33,7 +35,7 @@ fun SimpleSettingsScreen(
     onStorageClick: () -> Unit = {},
     onDefaultModelClick: () -> Unit = {},
     onPreferencesClick: () -> Unit = {},
-    defaultModelName: String = "Not chosen",
+    defaultModelName: String = tx("Not chosen"),
     onClearAll: () -> Unit = {},
     onMcpClick: () -> Unit = {},
     currentTheme: String,
@@ -56,10 +58,10 @@ fun SimpleSettingsScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = AriCard),
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AriInk)
+                            Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = AriInk)
                         }
                     },
-                    title = { Text("Settings", fontWeight = FontWeight.SemiBold, color = AriInk) }
+                    title = { Text(tx("Settings"), fontWeight = FontWeight.SemiBold, color = AriInk) }
                 )
             }
         ) { padding ->
@@ -69,17 +71,17 @@ fun SimpleSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item {
-                    SimpleGroup(title = "General") {
-                        Text("Theme", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AriInk, modifier = Modifier.padding(bottom = 8.dp))
+                    SimpleGroup(title = tx("General")) {
+                        Text(tx("Theme"), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AriInk, modifier = Modifier.padding(bottom = 8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            SimpleChip(label = "Light", selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
-                            SimpleChip(label = "Dark", selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
-                            SimpleChip(label = "System", selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
+                            SimpleChip(label = tx("Light"), selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
+                            SimpleChip(label = tx("Dark"), selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
+                            SimpleChip(label = tx("System"), selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
                         }
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Settings, title = "Preferences", subtitle = "Chat options, text size, theme", onClick = onPreferencesClick)
+                        SimpleRow(icon = Icons.Default.Settings, title = tx("Preferences"), subtitle = tx("Chat options, text size, theme"), onClick = onPreferencesClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Language, title = "Language", subtitle = if (currentLanguage == "en") "English" else currentLanguage, onClick = {
+                        SimpleRow(icon = Icons.Default.Language, title = tx("Language"), subtitle = if (currentLanguage == "en") tx("English") else currentLanguage, onClick = {
                             val newLang = if (currentLanguage == "en") "fa" else "en"
                             onLanguageChange(newLang)
                         })
@@ -87,30 +89,30 @@ fun SimpleSettingsScreen(
                 }
 
                 item {
-                    SimpleGroup(title = "Models & services") {
-                        SimpleRow(icon = Icons.Default.Star, title = "Default model", subtitle = defaultModelName, onClick = onDefaultModelClick)
+                    SimpleGroup(title = tx("Models & services")) {
+                        SimpleRow(icon = Icons.Default.Star, title = tx("Default model"), subtitle = defaultModelName, onClick = onDefaultModelClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Storage, title = "Providers", subtitle = "OpenAI, Gemini, Claude and more", onClick = onProvidersClick)
+                        SimpleRow(icon = Icons.Default.Storage, title = tx("Providers"), subtitle = tx("OpenAI, Gemini, Claude and more"), onClick = onProvidersClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Search, title = "Search service", subtitle = "Web search for answers", onClick = onSearchServiceClick)
+                        SimpleRow(icon = Icons.Default.Search, title = tx("Search service"), subtitle = tx("Web search for answers"), onClick = onSearchServiceClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Settings, title = "MCP servers", subtitle = "Connect local tools", onClick = onMcpClick)
+                        SimpleRow(icon = Icons.Default.Settings, title = tx("MCP servers"), subtitle = tx("Connect local tools"), onClick = onMcpClick)
                     }
                 }
 
                 item {
-                    SimpleGroup(title = "Data") {
-                        SimpleRow(icon = Icons.Default.Storage, title = "Data & storage", subtitle = "Export list, storage overview", onClick = onStorageClick)
+                    SimpleGroup(title = tx("Data")) {
+                        SimpleRow(icon = Icons.Default.Storage, title = tx("Data & storage"), subtitle = tx("Export list, storage overview"), onClick = onStorageClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Delete, title = "Delete all chats", subtitle = "Remove every conversation", onClick = onClearAll)
+                        SimpleRow(icon = Icons.Default.Delete, title = tx("Delete all chats"), subtitle = tx("Remove every conversation"), onClick = onClearAll)
                     }
                 }
 
                 item {
-                    SimpleGroup(title = "About") {
-                        SimpleRow(icon = Icons.Default.Info, title = "About AriAI", subtitle = "Version 1.0", onClick = {
-                            scope.launch { snackbarHostState.showSnackbar("AriAI v1.0 - Personal AI") }
+                    SimpleGroup(title = tx("About")) {
+                        SimpleRow(icon = Icons.Default.Info, title = tx("About AriAI"), subtitle = tx("Version 1.0"), onClick = {
+                            scope.launch { snackbarHostState.showSnackbar(tx("AriAI v1.0 - Personal AI")) }
                         })
                     }
                 }

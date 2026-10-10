@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
@@ -66,8 +68,8 @@ fun PreferencesScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Surface0),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
-                title = { Text("Preferences", fontWeight = FontWeight.SemiBold, color = Ink) }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
+                title = { Text(tx("Preferences"), fontWeight = FontWeight.SemiBold, color = Ink) }
             )
         }
     ) { padding ->
@@ -76,23 +78,23 @@ fun PreferencesScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item { SectionTitle("Appearance") }
+            item { SectionTitle(tx("Appearance")) }
             item {
                 SettingCard {
-                    Text("Theme", fontWeight = FontWeight.Medium, color = Ink)
+                    Text(tx("Theme"), fontWeight = FontWeight.Medium, color = Ink)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (key, label) ->
+                        listOf("system" to tx("System"), "light" to tx("Light"), "dark" to tx("Dark")).forEach { (key, label) ->
                             FilterChip(selected = theme == key, onClick = { onThemeChange(key) }, label = { Text(label) }, modifier = Modifier.weight(1f))
                         }
                     }
                 }
             }
 
-            item { SectionTitle("Chat") }
+            item { SectionTitle(tx("Chat")) }
             item {
                 SettingCard {
-                    Text("Default thinking depth", fontWeight = FontWeight.Medium, color = Ink)
-                    Text("Used for new messages. You can change it per message in the chat.", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+                    Text(tx("Default thinking depth"), fontWeight = FontWeight.Medium, color = Ink)
+                    Text(tx("Used for new messages. You can change it per message in the chat."), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                         ReasoningLevel.values().forEach { level ->
                             FilterChip(
@@ -104,21 +106,21 @@ fun PreferencesScreen(
                         }
                     }
                     HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                    Text("Message text size", fontWeight = FontWeight.Medium, color = Ink)
+                    Text(tx("Message text size"), fontWeight = FontWeight.Medium, color = Ink)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        listOf(13 to "Small", 15 to "Medium", 17 to "Large").forEach { (size, label) ->
+                        listOf(13 to tx("Small"), 15 to tx("Medium"), 17 to tx("Large")).forEach { (size, label) ->
                             FilterChip(selected = fontSize == size, onClick = { onFontSizeChange(size) }, label = { Text(label) }, modifier = Modifier.weight(1f))
                         }
                     }
-                    Text("Preview: the quick brown fox jumps over the lazy dog.", fontSize = fontSize.sp, color = Ink.copy(alpha = 0.7f))
+                    Text(tx("Preview: the quick brown fox jumps over the lazy dog."), fontSize = fontSize.sp, color = Ink.copy(alpha = 0.7f))
                 }
             }
 
-            item { SectionTitle("Language") }
+            item { SectionTitle(tx("Language")) }
             item {
                 SettingCard {
-                    Text("English", fontWeight = FontWeight.Medium, color = Ink)
-                    Text("AriAI currently ships in English only.", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+                    Text(tx("English"), fontWeight = FontWeight.Medium, color = Ink)
+                    Text(tx("AriAI currently ships in English only."), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                 }
             }
         }
@@ -145,8 +147,8 @@ fun DefaultModelScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Surface0),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
-                title = { Text("Default model", fontWeight = FontWeight.SemiBold, color = Ink) }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
+                title = { Text(tx("Default model"), fontWeight = FontWeight.SemiBold, color = Ink) }
             )
         }
     ) { padding ->
@@ -156,12 +158,12 @@ fun DefaultModelScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                Text("New chats start with this model.", fontSize = 13.sp, color = Ink.copy(alpha = 0.6f), modifier = Modifier.padding(bottom = 4.dp))
+                Text(tx("New chats start with this model."), fontSize = 13.sp, color = Ink.copy(alpha = 0.6f), modifier = Modifier.padding(bottom = 4.dp))
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     singleLine = true,
-                    placeholder = { Text("Search models") },
+                    placeholder = { Text(tx("Search models")) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = AriCard, unfocusedContainerColor = AriCard),
@@ -171,8 +173,8 @@ fun DefaultModelScreen(
             if (groups.isEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("No models yet", fontWeight = FontWeight.SemiBold, color = Ink)
-                        Button(onClick = onAddProvider, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text("Add provider") }
+                        Text(tx("No models yet"), fontWeight = FontWeight.SemiBold, color = Ink)
+                        Button(onClick = onAddProvider, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text(tx("Add provider")) }
                     }
                 }
             }

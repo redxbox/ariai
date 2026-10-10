@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.BorderStroke
@@ -39,7 +41,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                title = { Text(tx("Settings"), fontWeight = FontWeight.Bold) },
                 actions = { IconButton(onClick = {}) { Icon(Icons.Default.Search, contentDescription = null) } }
             )
         }
@@ -65,14 +67,14 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("AriAI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("Personal Workspace", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tx("Personal Workspace"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
                     }
                 }
             }
 
-            item { Text("Appearance", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
+            item { Text(tx("Appearance"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
 
             item {
                 Card(
@@ -82,12 +84,12 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            AppearanceOption(title = "Light", selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
-                            AppearanceOption(title = "Dark", selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
-                            AppearanceOption(title = "System", selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
+                            AppearanceOption(title = tx("Light"), selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
+                            AppearanceOption(title = tx("Dark"), selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
+                            AppearanceOption(title = tx("System"), selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
                         }
                         HorizontalDivider()
-                        Text("Accent Color", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(tx("Accent Color"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                             listOf(AriInk, AriInk, AriAccent, AriAccent, AriInk).forEach { color ->
                                 Box(
@@ -107,17 +109,17 @@ fun SettingsScreen(
             item {
                 Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)), modifier = Modifier.fillMaxWidth()) {
                     Column {
-                        SettingsItem(icon = Icons.Default.Language, title = "Language", subtitle = "English", onClick = {})
+                        SettingsItem(icon = Icons.Default.Language, title = tx("Language"), subtitle = tx("English"), onClick = {})
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsItem(icon = Icons.Default.Chat, title = "Chat", onClick = {})
+                        SettingsItem(icon = Icons.Default.Chat, title = tx("Chat"), onClick = {})
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsItem(icon = Icons.Default.Lock, title = "Privacy", onClick = {})
+                        SettingsItem(icon = Icons.Default.Lock, title = tx("Privacy"), onClick = {})
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsItem(icon = Icons.Default.Cloud, title = "Data & Sync", onClick = {})
+                        SettingsItem(icon = Icons.Default.Cloud, title = tx("Data & Sync"), onClick = {})
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsItem(icon = Icons.Default.Settings, title = "Advanced", onClick = {})
+                        SettingsItem(icon = Icons.Default.Settings, title = tx("Advanced"), onClick = {})
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SettingsItem(icon = Icons.Default.Info, title = "About", onClick = {})
+                        SettingsItem(icon = Icons.Default.Info, title = tx("About"), onClick = {})
                     }
                 }
             }
@@ -125,15 +127,15 @@ fun SettingsScreen(
             item {
                 Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)), modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Small settings.", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("A more personal AI.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tx("Small settings."), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(tx("A more personal AI."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                                Text("Premium", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
+                                Text(tx("Premium"), modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
                             }
                             Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.tertiaryContainer) {
-                                Text("Glass Design", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
+                                Text(tx("Glass Design"), modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }

@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.components.GlassCard
@@ -36,9 +38,9 @@ fun providerTypeLabel(type: ProviderType): String = when (type) {
     ProviderType.OPENAI -> "OpenAI"
     ProviderType.GEMINI -> "Google Gemini"
     ProviderType.ANTHROPIC -> "Anthropic"
-    ProviderType.OPENAI_COMPATIBLE -> "OpenAI compatible"
-    ProviderType.OLLAMA -> "Ollama (local)"
-    ProviderType.CUSTOM -> "Custom"
+    ProviderType.OPENAI_COMPATIBLE -> tx("OpenAI compatible")
+    ProviderType.OLLAMA -> tx("Ollama (local)")
+    ProviderType.CUSTOM -> tx("Custom")
 }
 
 /** Each provider type has its own brand colour. */
@@ -97,12 +99,12 @@ fun NewProvidersScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
                 title = {},
                 actions = {
-                    IconButton(onClick = onAddProvider) { Icon(Icons.Default.Add, contentDescription = "Add provider", tint = Ink) }
-                    IconButton(onClick = { showImport = true }) { Icon(Icons.Default.FileOpen, contentDescription = "Import provider", tint = Ink) }
-                    IconButton(onClick = { showRecommended = true }) { Icon(Icons.Default.AutoAwesome, contentDescription = "Recommended providers", tint = Ink) }
+                    IconButton(onClick = onAddProvider) { Icon(Icons.Default.Add, contentDescription = tx("Add provider"), tint = Ink) }
+                    IconButton(onClick = { showImport = true }) { Icon(Icons.Default.FileOpen, contentDescription = tx("Import provider"), tint = Ink) }
+                    IconButton(onClick = { showRecommended = true }) { Icon(Icons.Default.AutoAwesome, contentDescription = tx("Recommended providers"), tint = Ink) }
                 }
             )
         }
@@ -114,7 +116,7 @@ fun NewProvidersScreen(
         ) {
             item {
                 Text(
-                    "Providers",
+                    tx("Providers"),
                     fontSize = 34.sp,
                     fontWeight = FontWeight.Normal,
                     color = Ink,
@@ -126,7 +128,7 @@ fun NewProvidersScreen(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Search providers", color = Ink.copy(alpha = 0.45f)) },
+                    placeholder = { Text(tx("Search providers"), color = Ink.copy(alpha = 0.45f)) },
                     trailingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.5f)) },
                     singleLine = true,
                     shape = RoundedCornerShape(50),
@@ -147,9 +149,9 @@ fun NewProvidersScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(if (providers.isEmpty()) "No providers yet" else "No match", fontWeight = FontWeight.SemiBold, color = Ink)
+                        Text(if (providers.isEmpty()) tx("No providers yet") else tx("No match"), fontWeight = FontWeight.SemiBold, color = Ink)
                         Text(
-                            if (providers.isEmpty()) "Tap the star icon for recommended providers, or + to add one." else "Try another name.",
+                            if (providers.isEmpty()) tx("Tap the star icon for recommended providers, or + to add one.") else tx("Try another name."),
                             color = Ink.copy(alpha = 0.5f),
                             fontSize = 13.sp
                         )
@@ -199,7 +201,7 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    if (provider.models.isEmpty()) "No models" else "${provider.models.size} models",
+                    if (provider.models.isEmpty()) tx("No models") else "${provider.models.size} models",
                     fontSize = 12.sp,
                     color = AriMuted
                 )
@@ -239,11 +241,11 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
         containerColor = AriCard,
-        title = { Text("Import provider", fontWeight = FontWeight.SemiBold, color = Ink) },
+        title = { Text(tx("Import provider"), fontWeight = FontWeight.SemiBold, color = Ink) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Paste a provider as JSON with name, type, baseUrl and apiKey.",
+                    tx("Paste a provider as JSON with name, type, baseUrl and apiKey."),
                     fontSize = 13.sp,
                     color = Ink.copy(alpha = 0.6f)
                 )
@@ -253,7 +255,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
                     minLines = 4,
                     maxLines = 8,
                     isError = text.isNotBlank() && parsed == null,
-                    supportingText = { if (text.isNotBlank() && parsed == null) Text("Not a valid provider JSON") },
+                    supportingText = { if (text.isNotBlank() && parsed == null) Text(tx("Not a valid provider JSON")) },
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -261,10 +263,10 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
         },
         confirmButton = {
             TextButton(onClick = { parsed?.let(onImport) }, enabled = parsed != null) {
-                Text("Import", color = Ink, fontWeight = FontWeight.SemiBold)
+                Text(tx("Import"), color = Ink, fontWeight = FontWeight.SemiBold)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Ink) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tx("Cancel"), color = Ink) } }
     )
 }
 
@@ -273,17 +275,17 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
 private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss: () -> Unit) {
     val descriptions = mapOf(
         ProviderType.OPENAI to "GPT-4o and o-series models",
-        ProviderType.GEMINI to "Gemini models, with Search and URL tools",
-        ProviderType.ANTHROPIC to "Claude models",
-        ProviderType.OLLAMA to "Models that run on your own computer",
-        ProviderType.OPENAI_COMPATIBLE to "Any OpenAI-compatible API"
+        ProviderType.GEMINI to tx("Gemini models, with Search and URL tools"),
+        ProviderType.ANTHROPIC to tx("Claude models"),
+        ProviderType.OLLAMA to tx("Models that run on your own computer"),
+        ProviderType.OPENAI_COMPATIBLE to tx("Any OpenAI-compatible API")
     )
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Recommended providers", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+            Text(tx("Recommended providers"), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
             providerPresets.forEach { preset ->
                 Surface(
                     shape = RoundedCornerShape(20.dp),

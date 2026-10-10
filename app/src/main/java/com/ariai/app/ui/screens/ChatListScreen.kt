@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -46,7 +48,7 @@ fun ChatListScreen(
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.size(56.dp)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "New Chat", tint = AriCard)
+                    Icon(Icons.Default.Edit, contentDescription = tx("New Chat"), tint = AriCard)
                 }
             }
         ) { padding ->
@@ -57,13 +59,13 @@ fun ChatListScreen(
                             Icon(Icons.Default.Chat, contentDescription = null, tint = AriInk, modifier = Modifier.size(36.dp))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("No conversations yet", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
-                            Text("Start a new chat to begin", color = AriInk.copy(alpha = 0.5f), fontSize = 14.sp)
+                            Text(tx("No conversations yet"), fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
+                            Text(tx("Start a new chat to begin"), color = AriInk.copy(alpha = 0.5f), fontSize = 14.sp)
                         }
                         Button(onClick = onNewChat, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = AriInk), modifier = Modifier.padding(top = 8.dp)) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("New Chat")
+                            Text(tx("New Chat"))
                         }
                     }
                 }
@@ -77,7 +79,7 @@ fun ChatListScreen(
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Search chats", color = AriInk.copy(alpha = 0.4f)) },
+                            placeholder = { Text(tx("Search chats"), color = AriInk.copy(alpha = 0.4f)) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriInk.copy(alpha = 0.4f), modifier = Modifier.size(20.dp)) },
                             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                             shape = RoundedCornerShape(16.dp),
@@ -95,7 +97,7 @@ fun ChatListScreen(
 
                     if (filtered.isNotEmpty()) {
                         item {
-                            Text("Today", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
+                            Text(tx("Today"), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(count = filtered.size, key = { i -> filtered[i].id }) { i ->
                             val chat = filtered[i]
@@ -131,8 +133,8 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
                     Icon(Icons.Default.MoreVert, contentDescription = null, tint = AriInk.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("Pin") }, onClick = { showMenu = false; onPin() }, leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) })
-                    DropdownMenuItem(text = { Text("Delete") }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
+                    DropdownMenuItem(text = { Text(tx("Pin")) }, onClick = { showMenu = false; onPin() }, leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) })
+                    DropdownMenuItem(text = { Text(tx("Delete")) }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
                 }
             }
         }

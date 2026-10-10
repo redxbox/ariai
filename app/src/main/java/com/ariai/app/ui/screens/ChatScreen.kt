@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -61,7 +63,7 @@ fun ChatScreen(
                 title = {
                     Column {
                         Text(
-                            text = chat?.title ?: "New Chat",
+                            text = chat?.title ?: tx("New Chat"),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1
                         )
@@ -76,15 +78,15 @@ fun ChatScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"))
                     }
                 },
                 actions = {
                     IconButton(onClick = { showProviders = !showProviders }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Provider")
+                        Icon(Icons.Default.Settings, contentDescription = tx("Provider"))
                     }
                     IconButton(onClick = onVoiceClick) {
-                        Icon(Icons.Default.Mic, contentDescription = "Voice")
+                        Icon(Icons.Default.Mic, contentDescription = tx("Voice"))
                     }
                 }
             )
@@ -110,9 +112,9 @@ fun ChatScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceEvenly
                                 ) {
-                                    AttachmentOption(icon = Icons.Default.AttachFile, label = "Upload File", onClick = { showAttachments = false })
-                                    AttachmentOption(icon = Icons.Default.Image, label = "Photo", onClick = { showAttachments = false })
-                                    AttachmentOption(icon = Icons.Default.CameraAlt, label = "Take Picture", onClick = { showAttachments = false })
+                                    AttachmentOption(icon = Icons.Default.AttachFile, label = tx("Upload File"), onClick = { showAttachments = false })
+                                    AttachmentOption(icon = Icons.Default.Image, label = tx("Photo"), onClick = { showAttachments = false })
+                                    AttachmentOption(icon = Icons.Default.CameraAlt, label = tx("Take Picture"), onClick = { showAttachments = false })
                                 }
                                 HorizontalDivider()
                                 Row(
@@ -132,7 +134,7 @@ fun ChatScreen(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
                                             Icon(Icons.Default.Extension, contentDescription = null)
-                                            Text("Extensions", style = MaterialTheme.typography.titleSmall)
+                                            Text(tx("Extensions"), style = MaterialTheme.typography.titleSmall)
                                         }
                                     }
                                     Surface(
@@ -148,7 +150,7 @@ fun ChatScreen(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
                                             Icon(Icons.Default.Archive, contentDescription = null)
-                                            Text("Compress History", style = MaterialTheme.typography.titleSmall)
+                                            Text(tx("Compress History"), style = MaterialTheme.typography.titleSmall)
                                         }
                                     }
                                 }
@@ -163,7 +165,7 @@ fun ChatScreen(
                         verticalAlignment = androidx.compose.ui.Alignment.Bottom
                     ) {
                         IconButton(onClick = { showAttachments = !showAttachments }) {
-                            Icon(Icons.Default.Add, contentDescription = "Attachments")
+                            Icon(Icons.Default.Add, contentDescription = tx("Attachments"))
                         }
                         OutlinedTextField(
                             value = inputText,
@@ -206,7 +208,7 @@ fun ChatScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Providers:", style = MaterialTheme.typography.titleSmall)
+                    Text(tx("Providers:"), style = MaterialTheme.typography.titleSmall)
                     providers.forEach { provider ->
                         Card(
                             modifier = Modifier
@@ -388,8 +390,8 @@ fun SuggestionChips(
         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
     ) {
         val suggestions = listOf(
-            "Explain quantum computing simply",
-            "Write a Python function"
+            tx("Explain quantum computing simply"),
+            tx("Write a Python function")
         )
         suggestions.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

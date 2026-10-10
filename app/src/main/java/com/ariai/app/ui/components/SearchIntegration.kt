@@ -1,5 +1,7 @@
 package com.ariai.app.ui.components
 
+import com.ariai.app.util.tx
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,7 +31,7 @@ fun SearchResultsCard(
                 Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Web search: \"$query\"",
+                    text = tx("Web search:") + " \"$query\"",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
@@ -84,7 +86,7 @@ fun WebSearchToggle(
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
-            text = "Web Search",
+            text = tx("Web Search"),
             style = MaterialTheme.typography.labelMedium
         )
         Spacer(modifier = Modifier.width(8.dp))

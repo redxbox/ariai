@@ -1,5 +1,7 @@
 package com.ariai.app.ui.drawer
 
+import com.ariai.app.util.tx
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.filled.Image
@@ -35,7 +37,7 @@ import java.util.Calendar
 
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private enum class DayBucket(val label: String) { PINNED("Pinned"), TODAY("Today"), YESTERDAY("Yesterday"), EARLIER("Earlier") }
+private enum class DayBucket(val label: String) { PINNED(tx("Pinned")), TODAY(tx("Today")), YESTERDAY(tx("Yesterday")), EARLIER(tx("Earlier")) }
 
 private fun bucketOf(timestamp: Long, now: Long = System.currentTimeMillis()): DayBucket {
     val nowCal = Calendar.getInstance().apply { timeInMillis = now }
@@ -104,14 +106,14 @@ fun ColumnScope.AppDrawerContent(
     ) {
         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text("New chat", fontWeight = FontWeight.SemiBold)
+        Text(tx("New chat"), fontWeight = FontWeight.SemiBold)
     }
 
     OutlinedTextField(
         value = query,
         onValueChange = { query = it },
         singleLine = true,
-        placeholder = { Text("Search conversations", color = Ink.copy(alpha = 0.4f), fontSize = 14.sp) },
+        placeholder = { Text(tx("Search conversations"), color = Ink.copy(alpha = 0.4f), fontSize = 14.sp) },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(18.dp)) },
         shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(
@@ -132,7 +134,7 @@ fun ColumnScope.AppDrawerContent(
         if (rows.isEmpty()) {
             item {
                 Text(
-                    if (query.isBlank()) "No conversations yet" else "No matches",
+                    if (query.isBlank()) tx("No conversations yet") else tx("No matches"),
                     color = Ink.copy(alpha = 0.45f),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(16.dp)
@@ -171,11 +173,11 @@ fun ColumnScope.AppDrawerContent(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        FooterAction(Icons.Default.Storage, "Providers", currentRoute == "providers") { onNavigate("providers") }
+        FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }
         FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }
-        FooterAction(Icons.Default.Public, "Search", currentRoute == "search_service") { onNavigate("search_service") }
-        FooterAction(Icons.Default.Settings, "Settings", currentRoute == "settings") { onNavigate("settings") }
-        FooterAction(Icons.Default.Info, "About", false, onAbout)
+        FooterAction(Icons.Default.Public, tx("Search"), currentRoute == "search_service") { onNavigate("search_service") }
+        FooterAction(Icons.Default.Settings, tx("Settings"), currentRoute == "settings") { onNavigate("settings") }
+        FooterAction(Icons.Default.Info, tx("About"), false, onAbout)
     }
     Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
 }
@@ -202,7 +204,7 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
             Spacer(Modifier.width(6.dp))
         }
         Text(
-            chat.title.ifBlank { "New chat" },
+            chat.title.ifBlank { tx("New chat") },
             color = Ink,
             fontSize = 14.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
@@ -212,16 +214,16 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
         )
         Box {
             IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Chat options", tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.MoreVert, contentDescription = tx("Chat options"), tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
-                    text = { Text(if (chat.isPinned) "Unpin" else "Pin") },
+                    text = { Text(if (chat.isPinned) tx("Unpin") else tx("Pin")) },
                     leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) },
                     onClick = { menu = false; onPin() }
                 )
                 DropdownMenuItem(
-                    text = { Text("Delete") },
+                    text = { Text(tx("Delete")) },
                     leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                     onClick = { menu = false; onDelete() }
                 )

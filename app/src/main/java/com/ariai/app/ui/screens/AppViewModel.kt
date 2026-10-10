@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ariai.app.data.local.PreferencesManager
@@ -234,7 +236,7 @@ class AppViewModel(
             } else {
                 repository.editImage(provider, modelId, source, prompt)
             }
-            val first = response.images.firstOrNull() ?: throw Exception("No image returned")
+            val first = response.images.firstOrNull() ?: throw Exception(tx("No image returned"))
             val file = com.ariai.app.data.local.ImageStore.save(repository.imageBytes(first))
             val reply = ChatMessage(
                 chatId = chatId,
@@ -255,7 +257,7 @@ class AppViewModel(
 
     private suspend fun generateVideoReply(chatId: String, provider: Provider, modelId: String, prompt: String) {
         _isStreaming.value = true
-        _streamingContent.value = "Generating video…"
+        _streamingContent.value = tx("Generating video…")
         try {
             // The progress line shows in the reply bubble until the video is ready.
             val bytes = repository.generateVideo(provider, modelId, prompt) { _streamingContent.value = it }
@@ -425,7 +427,7 @@ class AppViewModel(
                     _streamingContent.value = fullResponse
 
                     if (fullResponse.isBlank()) {
-                        throw Exception("Empty response from API")
+                        throw Exception(tx("Empty response from API"))
                     }
 
                     val assistantMessage = ChatMessage(
@@ -444,9 +446,9 @@ class AppViewModel(
 
                 } catch (e: Exception) {
                     val errorMsg = when {
-                        e.message?.contains("API Error 401") == true -> "🔑 Invalid API key. Please check your provider settings in AI Providers."
-                        e.message?.contains("API Error 429") == true -> "⏳ Rate limit exceeded. Please wait a moment or try another provider."
-                        e.message?.contains("Unable to resolve host") == true -> "🌐 No internet connection. Please check your network."
+                        e.message?.contains("API Error 401") == true -> tx("🔑 Invalid API key. Please check your provider settings in AI Providers.")
+                        e.message?.contains("API Error 429") == true -> tx("⏳ Rate limit exceeded. Please wait a moment or try another provider.")
+                        e.message?.contains("Unable to resolve host") == true -> tx("🌐 No internet connection. Please check your network.")
                         else -> "❌ Error: ${e.message?.take(300)}\n\nPlease check your API key and provider settings."
                     }
 
@@ -478,17 +480,17 @@ class AppViewModel(
     fun compressHistory(onDone: (String) -> Unit) {
         val chatId = _currentChatId.value ?: return
         if (_isStreaming.value) {
-            onDone("Wait for the reply to finish first")
+            onDone(tx("Wait for the reply to finish first"))
             return
         }
         val provider = resolveProvider()
         if (provider == null) {
-            onDone("Add a provider first")
+            onDone(tx("Add a provider first"))
             return
         }
         val (previousSummary, history) = activeContext(_messages.value)
         if (history.size < 2) {
-            onDone("Not enough messages to compress yet")
+            onDone(tx("Not enough messages to compress yet"))
             return
         }
         viewModelScope.launch {
@@ -514,7 +516,7 @@ class AppViewModel(
                 val marker = ChatMessage(chatId = chatId, role = MessageRole.SYSTEM, content = text)
                 repository.saveMessage(marker)
                 appendMessage(marker)
-                onDone("Older messages compressed")
+                onDone(tx("Older messages compressed"))
             } catch (e: Exception) {
                 onDone("Compression failed: ${e.message?.take(120)}")
             } finally {
@@ -620,7 +622,7 @@ class AppViewModel(
         val agent = agents.value.find { it.id == agentId } ?: return null
         return agent.systemPrompt
             .replace("{time}", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date()))
-            .replace("{model}", chat.modelId ?: "AI")
+            .replace("{model}", chat.modelId ?: tx("AI"))
             .replace("{date}", java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()))
     }
 

@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
@@ -158,8 +160,8 @@ fun NewChatScreen(
 
     fun copyToClipboard(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Message", text))
-        showNote("Copied")
+        clipboard.setPrimaryClip(ClipData.newPlainText(tx("Message"), text))
+        showNote(tx("Copied"))
         onCopyMessage(text)
     }
 
@@ -173,7 +175,7 @@ fun NewChatScreen(
 
     fun saveImage(path: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            showNote("Saving needs Android 10 or newer")
+            showNote(tx("Saving needs Android 10 or newer"))
             return
         }
         val values = ContentValues().apply {
@@ -183,15 +185,15 @@ fun NewChatScreen(
         }
         val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
         if (uri == null) {
-            showNote("Save failed")
+            showNote(tx("Save failed"))
             return
         }
         runCatching {
             context.contentResolver.openOutputStream(uri)?.use { out ->
                 File(path).inputStream().use { it.copyTo(out) }
             }
-        }.onSuccess { showNote("Saved to Pictures/AriAI") }
-            .onFailure { showNote("Save failed") }
+        }.onSuccess { showNote(tx("Saved to Pictures/AriAI")) }
+            .onFailure { showNote(tx("Save failed")) }
     }
 
     fun addFile(uri: Uri) {
@@ -246,7 +248,7 @@ fun NewChatScreen(
             onImage = { onChatModeChange(ChatMode.IMAGE) },
             onVideo = {
                 if (providers.any { p -> p.enabled && p.models.any { it.supportsVideoGen } }) onChatModeChange(ChatMode.VIDEO)
-                else showNote("No video model. Fetch models in provider settings.")
+                else showNote(tx("No video model. Fetch models in provider settings."))
             },
             onDismiss = { showAttachments = false }
         )
@@ -274,7 +276,7 @@ fun NewChatScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "Open menu", tint = Ink)
+                        Icon(Icons.Default.Menu, contentDescription = tx("Open menu"), tint = Ink)
                     }
                 },
                 title = {
@@ -283,7 +285,7 @@ fun NewChatScreen(
                         modifier = Modifier.fillMaxWidth().clickable { showModelSheet = true }
                     ) {
                         Text(
-                            chat?.title?.takeIf { it.isNotBlank() } ?: "New chat",
+                            chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat"),
                             color = Ink,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -291,7 +293,7 @@ fun NewChatScreen(
                             fontSize = 16.sp
                         )
                         Text(
-                            selectedModel ?: "Tap to choose a model",
+                            selectedModel ?: tx("Tap to choose a model"),
                             color = Muted,
                             fontSize = 11.sp,
                             maxLines = 1,
@@ -301,15 +303,15 @@ fun NewChatScreen(
                 },
                 actions = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.Edit, contentDescription = "New chat", tint = Ink)
+                        Icon(Icons.Default.Edit, contentDescription = tx("New chat"), tint = Ink)
                     }
                     Box {
                         IconButton(onClick = { showTopMenu = true }) {
-                            Icon(Icons.Default.MoreHoriz, contentDescription = "More", tint = Ink)
+                            Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
                         }
                         DropdownMenu(expanded = showTopMenu, onDismissRequest = { showTopMenu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Copy conversation") },
+                                text = { Text(tx("Copy conversation")) },
                                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
                                 onClick = {
                                     showTopMenu = false
@@ -317,17 +319,17 @@ fun NewChatScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Image chat") },
+                                text = { Text(tx("Image chat")) },
                                 leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
                                 onClick = { showTopMenu = false; onNewImageChat() }
                             )
                             DropdownMenuItem(
-                                text = { Text("Choose model") },
+                                text = { Text(tx("Choose model")) },
                                 leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
                                 onClick = { showTopMenu = false; showModelSheet = true }
                             )
                             DropdownMenuItem(
-                                text = { Text("Compress history") },
+                                text = { Text(tx("Compress history")) },
                                 leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
                                 onClick = {
                                     showTopMenu = false
@@ -368,7 +370,7 @@ fun NewChatScreen(
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 Icon(
                                     Icons.Default.OpenInFull,
-                                    contentDescription = "Expand message",
+                                    contentDescription = tx("Expand message"),
                                     tint = Ink.copy(alpha = 0.55f),
                                     modifier = Modifier.size(20.dp).clickable { showFullEditor = true }
                                 )
@@ -382,7 +384,7 @@ fun NewChatScreen(
                         TextField(
                             value = inputText,
                             onValueChange = { inputText = it },
-                            placeholder = { Text("Message AriAI", color = Muted) },
+                            placeholder = { Text(tx("Message AriAI"), color = Muted) },
                             modifier = Modifier.fillMaxWidth(),
                             maxLines = 12,
                             colors = TextFieldDefaults.colors(
@@ -400,17 +402,17 @@ fun NewChatScreen(
                             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconCircle(Icons.Default.Add, "Add to message", active = false) { showAttachments = true }
+                            IconCircle(Icons.Default.Add, tx("Add to message"), active = false) { showAttachments = true }
                             Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Image, "Image mode", active = chatMode == ChatMode.IMAGE) {
+                            IconCircle(Icons.Default.Image, tx("Image mode"), active = chatMode == ChatMode.IMAGE) {
                                 onChatModeChange(if (chatMode == ChatMode.IMAGE) ChatMode.TEXT else ChatMode.IMAGE)
                             }
                             Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Public, "Web search", active = searchMode != SearchMode.OFF) {
+                            IconCircle(Icons.Default.Public, tx("Web search"), active = searchMode != SearchMode.OFF) {
                                 showSearch = true
                             }
                             Spacer(Modifier.weight(1f))
-                            ModelChip(text = selectedModel?.substringAfterLast('/') ?: "Choose model") {
+                            ModelChip(text = selectedModel?.substringAfterLast('/') ?: tx("Choose model")) {
                                 showModelSheet = true
                             }
                             Spacer(Modifier.width(6.dp))
@@ -423,7 +425,7 @@ fun NewChatScreen(
                             ) {
                                 Icon(
                                     Icons.Default.ArrowUpward,
-                                    contentDescription = "Send",
+                                    contentDescription = tx("Send"),
                                     tint = if (canSend) AriCard else Ink.copy(alpha = 0.35f),
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -440,8 +442,8 @@ fun NewChatScreen(
                     Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(Accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.Chat, contentDescription = null, tint = Accent, modifier = Modifier.size(30.dp))
                     }
-                    Text("How can I help you?", color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-                    Text("Type a message below to start.", color = Muted, fontSize = 13.sp)
+                    Text(tx("How can I help you?"), color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+                    Text(tx("Type a message below to start."), color = Muted, fontSize = 13.sp)
                 }
             }
         } else {
@@ -511,7 +513,7 @@ private fun ModelChip(text: String, onClick: () -> Unit) {
             // Small arrow: opens the list with all models of the provider.
             Icon(
                 Icons.Default.KeyboardArrowDown,
-                contentDescription = "Open models",
+                contentDescription = tx("Open models"),
                 tint = Ink.copy(alpha = 0.5f),
                 modifier = Modifier.size(16.dp)
             )
@@ -538,7 +540,7 @@ private fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
                 modifier = Modifier.widthIn(max = 140.dp)
             )
             IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Remove attachment", tint = Ink.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Close, contentDescription = tx("Remove attachment"), tint = Ink.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -552,7 +554,7 @@ private fun CompressedNotice() {
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         HorizontalDivider(modifier = Modifier.weight(1f), color = AriInk.copy(alpha = 0.08f))
-        Text("Earlier messages compressed", fontSize = 11.sp, color = Muted)
+        Text(tx("Earlier messages compressed"), fontSize = 11.sp, color = Muted)
         HorizontalDivider(modifier = Modifier.weight(1f), color = AriInk.copy(alpha = 0.08f))
     }
 }
@@ -617,18 +619,18 @@ private fun AssistantBlock(
         } else if (imagePath != null && !isVideoPath(imagePath)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onEdit?.invoke() }) {
-                    Text("Edit", color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
+                    Text(tx("Edit"), color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
                 }
                 TextButton(onClick = { onSave?.invoke() }) {
-                    Text("Save", color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
+                    Text(tx("Save"), color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
                 }
             }
         } else if (onCopy != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                ActionIcon(Icons.Default.ContentCopy, "Copy", onCopy)
-                ActionIcon(Icons.Default.Share, "Share", onShare ?: {})
-                ActionIcon(Icons.Default.CallSplit, "Branch", onBranch ?: {})
-                ActionIcon(Icons.Default.Refresh, "Retry", onRetry ?: {})
+                ActionIcon(Icons.Default.ContentCopy, tx("Copy"), onCopy)
+                ActionIcon(Icons.Default.Share, tx("Share"), onShare ?: {})
+                ActionIcon(Icons.Default.CallSplit, tx("Branch"), onBranch ?: {})
+                ActionIcon(Icons.Default.Refresh, tx("Retry"), onRetry ?: {})
             }
         }
     }
@@ -647,7 +649,7 @@ private fun GeneratedImageView(path: String) {
     bitmap?.let { bmp ->
         Image(
             bitmap = bmp,
-            contentDescription = "Generated image",
+            contentDescription = tx("Generated image"),
             contentScale = ContentScale.FillWidth,
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { full = true }
         )
@@ -673,21 +675,21 @@ private fun EditImageDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) 
     var text by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit image") },
+        title = { Text(tx("Edit image")) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                placeholder = { Text("What should change?") },
+                placeholder = { Text(tx("What should change?")) },
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
-            TextButton(onClick = { if (text.isNotBlank()) onConfirm(text.trim()) }) { Text("Send") }
+            TextButton(onClick = { if (text.isNotBlank()) onConfirm(text.trim()) }) { Text(tx("Send")) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(tx("Cancel")) }
         }
     )
 }
@@ -761,14 +763,14 @@ private fun FullScreenMessageEditor(
             Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Icon(
                     Icons.Default.CloseFullscreen,
-                    contentDescription = "Collapse",
+                    contentDescription = tx("Collapse"),
                     tint = Ink,
                     modifier = Modifier.size(24.dp).clickable { onCollapse() }
                 )
                 TextField(
                     value = text,
                     onValueChange = onTextChange,
-                    placeholder = { Text("Message AriAI", color = Muted) },
+                    placeholder = { Text(tx("Message AriAI"), color = Muted) },
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
@@ -799,13 +801,13 @@ private fun ModeChip(mode: ChatMode, onClose: () -> Unit, modifier: Modifier) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            if (mode == ChatMode.VIDEO) "Video" else "Image",
+            if (mode == ChatMode.VIDEO) tx("Video") else tx("Image"),
             fontSize = 12.sp,
             fontWeight = FontWeight.Light,
             color = AriInk
         )
         IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-            Icon(Icons.Default.Close, contentDescription = "Close", tint = AriMuted, modifier = Modifier.size(12.dp))
+            Icon(Icons.Default.Close, contentDescription = tx("Close"), tint = AriMuted, modifier = Modifier.size(12.dp))
         }
     }
 }
@@ -826,8 +828,8 @@ private fun VideoCard(path: String) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null, tint = AriInk)
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("Video", fontWeight = FontWeight.SemiBold, color = AriInk)
-                Text("Generated video", fontSize = 12.sp, color = AriMuted)
+                Text(tx("Video"), fontWeight = FontWeight.SemiBold, color = AriInk)
+                Text(tx("Generated video"), fontSize = 12.sp, color = AriMuted)
             }
             TextButton(onClick = {
                 val uri = androidx.core.content.FileProvider.getUriForFile(
@@ -838,7 +840,7 @@ private fun VideoCard(path: String) {
                         .setDataAndType(uri, "video/mp4")
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 )
-            }) { Text("Open", color = AriInk, fontWeight = FontWeight.SemiBold) }
+            }) { Text(tx("Open"), color = AriInk, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
@@ -876,7 +878,7 @@ private fun RemoteImage(url: String) {
         modifier = Modifier.fillMaxWidth().height(180.dp).clip(shape).background(AriTint),
         contentAlignment = Alignment.Center
     ) {
-        Text("Loading image…", fontSize = 12.sp, color = AriMuted)
+        Text(tx("Loading image…"), fontSize = 12.sp, color = AriMuted)
     }
     if (full) bitmap?.let { FullImageDialog(it) { full = false } }
 }

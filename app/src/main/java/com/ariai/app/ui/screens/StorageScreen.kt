@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
@@ -44,12 +46,12 @@ fun StorageScreen(
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("Delete all chats?") },
-            text = { Text("This removes every conversation on this device. It cannot be undone.") },
+            title = { Text(tx("Delete all chats?")) },
+            text = { Text(tx("This removes every conversation on this device. It cannot be undone.")) },
             confirmButton = {
-                TextButton(onClick = { confirmClear = false; onClearAll() }) { Text("Delete all", color = AriAccent) }
+                TextButton(onClick = { confirmClear = false; onClearAll() }) { Text(tx("Delete all"), color = AriAccent) }
             },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(tx("Cancel")) } }
         )
     }
 
@@ -58,8 +60,8 @@ fun StorageScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
-                title = { Text("Data & storage", fontWeight = FontWeight.SemiBold, color = Ink) }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
+                title = { Text(tx("Data & storage"), fontWeight = FontWeight.SemiBold, color = Ink) }
             )
         }
     ) { padding ->
@@ -76,7 +78,7 @@ fun StorageScreen(
                         }
                         Column {
                             Text("${chats.size} conversations", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 16.sp)
-                            Text("Stored locally on this device", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+                            Text(tx("Stored locally on this device"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                         }
                     }
                 }
@@ -88,25 +90,25 @@ fun StorageScreen(
                     shadowElevation = 0.dp,
                     modifier = Modifier.fillMaxWidth().clickable {
                         val text = buildString {
-                            appendLine("AriAI chat list")
+                            appendLine(tx("AriAI chat list"))
                             appendLine("Exported: ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())}")
                             appendLine()
                             chats.sortedByDescending { it.updatedAt }.forEach {
-                                appendLine("- ${it.title.ifBlank { "New chat" }} (${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(it.updatedAt))})")
+                                appendLine("- ${it.title.ifBlank { tx("New chat") }} (${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(it.updatedAt))})")
                             }
                         }
                         val send = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(Intent.EXTRA_TEXT, text)
                         }
-                        context.startActivity(Intent.createChooser(send, "Export chat list"))
+                        context.startActivity(Intent.createChooser(send, tx("Export chat list")))
                     }
                 ) {
                     Row(modifier = Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Share, contentDescription = null, tint = Accent)
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Export chat list", fontWeight = FontWeight.Medium, color = Ink)
-                            Text("Share a text list of your conversations", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+                            Text(tx("Export chat list"), fontWeight = FontWeight.Medium, color = Ink)
+                            Text(tx("Share a text list of your conversations"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                         }
                     }
                 }
@@ -121,8 +123,8 @@ fun StorageScreen(
                     Row(modifier = Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Delete, contentDescription = null, tint = AriAccent)
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Delete all chats", fontWeight = FontWeight.Medium, color = AriAccent)
-                            Text("Removes every conversation on this device", fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+                            Text(tx("Delete all chats"), fontWeight = FontWeight.Medium, color = AriAccent)
+                            Text(tx("Removes every conversation on this device"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                         }
                     }
                 }

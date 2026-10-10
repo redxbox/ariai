@@ -1,5 +1,7 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.util.tx
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
@@ -30,10 +32,10 @@ private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private data class SearchService(val key: String, val name: String, val description: String)
 
 private val searchServices = listOf(
-    SearchService("tavily", "Tavily", "Research-focused search API"),
-    SearchService("brave", "Brave Search", "Independent web index"),
-    SearchService("exa", "Exa", "Semantic neural search"),
-    SearchService("serper", "Serper", "Google results via API")
+    SearchService("tavily", "Tavily", tx("Research-focused search API")),
+    SearchService("brave", "Brave Search", tx("Independent web index")),
+    SearchService("exa", "Exa", tx("Semantic neural search")),
+    SearchService("serper", "Serper", tx("Google results via API"))
 )
 
 /**
@@ -55,8 +57,8 @@ fun SearchServiceScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Ink) } },
-                title = { Text("Search service", fontWeight = FontWeight.SemiBold, color = Ink) }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
+                title = { Text(tx("Search service"), fontWeight = FontWeight.SemiBold, color = Ink) }
             )
         }
     ) { padding ->
@@ -94,9 +96,9 @@ fun SearchServiceScreen(
                             }
                             Text(
                                 when {
-                                    isActive -> "Active"
-                                    key.isNotBlank() -> "Saved"
-                                    else -> "No key"
+                                    isActive -> tx("Active")
+                                    key.isNotBlank() -> tx("Saved")
+                                    else -> tx("No key")
                                 },
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -109,12 +111,12 @@ fun SearchServiceScreen(
                             OutlinedTextField(
                                 value = draft,
                                 onValueChange = { draft = it },
-                                label = { Text("API key") },
+                                label = { Text(tx("API key")) },
                                 singleLine = true,
                                 visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
                                 trailingIcon = {
                                     IconButton(onClick = { reveal = !reveal }) {
-                                        Icon(Icons.Default.Visibility, contentDescription = "Show key", tint = Ink.copy(alpha = 0.5f))
+                                        Icon(Icons.Default.Visibility, contentDescription = tx("Show key"), tint = Ink.copy(alpha = 0.5f))
                                     }
                                 },
                                 shape = RoundedCornerShape(14.dp),
@@ -126,14 +128,14 @@ fun SearchServiceScreen(
                                     enabled = key.isNotBlank(),
                                     shape = RoundedCornerShape(14.dp),
                                     modifier = Modifier.weight(1f)
-                                ) { Text("Remove") }
+                                ) { Text(tx("Remove")) }
                                 Button(
                                     onClick = { onSaveKey(service.key, draft.trim()); expanded = null },
                                     enabled = draft.isNotBlank() && draft.trim() != key,
                                     shape = RoundedCornerShape(14.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = Accent),
                                     modifier = Modifier.weight(1f)
-                                ) { Text("Save") }
+                                ) { Text(tx("Save")) }
                             }
                         }
                     }
