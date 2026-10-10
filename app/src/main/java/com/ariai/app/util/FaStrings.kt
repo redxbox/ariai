@@ -2,6 +2,8 @@ package com.ariai.app.util
 
 // Persian UI strings keyed by the English text used in the code.
 internal val faStrings: Map<String, String> = mapOf(
+        "Copy code" to "کپی کد",
+        "Code" to "کد",
         "Voice input" to "ورودی صوتی",
         "Delete generated files" to "حذف فایل‌های ساخته‌شده",
         "Delete generated files?" to "فایل‌های ساخته‌شده حذف شود؟",

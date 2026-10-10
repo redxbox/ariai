@@ -1,7 +1,7 @@
 package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
-import com.ariai.app.util.formatReply
+import com.ariai.app.ui.components.ReplyContent
 import com.ariai.app.util.UiLang
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ariai.app.data.remote.supportsNativeSearch
@@ -694,14 +694,7 @@ private fun AssistantBlock(
         if (visibleText.isNotBlank()) {
             // SelectionContainer lets the user select and copy part of the reply.
             SelectionContainer {
-                Text(
-                    remember(visibleText) { formatReply(visibleText) },
-                    color = Ink,
-                    fontSize = fontSize.sp,
-                    lineHeight = (fontSize + 8).sp,
-                    // Each paragraph takes its direction from its first letter, so mixed Persian and English lines keep their order.
-                    style = androidx.compose.ui.text.TextStyle(textDirection = androidx.compose.ui.text.style.TextDirection.Content)
-                )
+                ReplyContent(visibleText, fontSize.toFloat(), Ink)
             }
         }
         imageUrls.forEach { RemoteImage(it) }

@@ -1,25 +1,67 @@
 package com.ariai.app.util
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 
-private val linkRegex = Regex("""\[([^\]]+)\]\((https?://[^)\s]+)\)""")
+/** A reply is a list of normal text paragraphs and code blocks. */
+sealed class ReplyPart {
+    data class Text(val raw: String) : ReplyPart()
+    data class Code(val language: String, val code: String) : ReplyPart()
+}
+
 private val boldRegex = Regex("""\*\*(.+?)\*\*|__(.+?)__""")
 private val codeRegex = Regex("""`([^`]+)`""")
+private val linkOrUrl = Regex("""\[([^\]]+)\]\((https?://[^)\s]+)\)|(https?://[^\s)\]]+)""")
 private val tableSeparator = Regex("""^\|?[\s:|-]+\|?$""")
 private val ruleLine = Regex("""^(-{3,}|\*{3,}|_{3,})$""")
 private val bulletPrefix = Regex("""^[-*+]\s+""")
+private val linkColor = Color(0xFF2563EB)
+
+/** Splits a reply into text paragraphs and fenced code blocks. */
+fun splitReply(raw: String): List<ReplyPart> {
+    val parts = mutableListOf<ReplyPart>()
+    val text = StringBuilder()
+    val code = StringBuilder()
+    var inCode = false
+    var language = ""
+    fun flushText() {
+        if (text.isNotBlank()) parts.add(ReplyPart.Text(text.toString()))
+        text.clear()
+    }
+    for (line in raw.lines()) {
+        val trimmed = line.trim()
+        if (trimmed.startsWith("```")) {
+            if (inCode) {
+                parts.add(ReplyPart.Code(language, code.toString().trimEnd('\n')))
+                code.clear()
+                inCode = false
+            } else {
+                flushText()
+                inCode = true
+                language = trimmed.removePrefix("```").trim()
+            }
+        } else if (inCode) {
+            code.append(line).append('\n')
+        } else {
+            text.append(line).append('\n')
+        }
+    }
+    if (inCode) parts.add(ReplyPart.Code(language, code.toString().trimEnd('\n'))) else flushText()
+    return parts
+}
 
 /**
- * Turns a model reply (which often uses Markdown) into clean, readable text:
- * bold is shown in bold, links keep only their label, tables become one line per row,
- * and stray Markdown symbols are removed.
+ * Turns Markdown text into readable text: bold is bold, headings are bold without '#',
+ * tables become one line per row, bullets get a dot, links keep their label and are tagged
+ * with their address (annotation tag "URL") so they can be opened on tap.
  */
 fun formatReply(raw: String): AnnotatedString {
-    val lines = mutableListOf<Pair<String, Boolean>>() // text to show, is heading
+    val lines = mutableListOf<Pair<String, Boolean>>() // text, is heading
     var pendingBlank = false
     for (original in raw.lines()) {
         var line = original.trim()
@@ -58,16 +100,28 @@ fun formatReply(raw: String): AnnotatedString {
     }
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInline(line: String) {
-    val cleaned = line
-        .replace(linkRegex) { "${it.groupValues[1]} (${it.groupValues[2]})" }
-        .replace(codeRegex) { it.groupValues[1] }
+private fun AnnotatedString.Builder.appendInline(line: String) {
+    val cleaned = line.replace(codeRegex) { it.groupValues[1] }
     var last = 0
-    for (match in boldRegex.findAll(cleaned)) {
-        append(cleaned.substring(last, match.range.first).replace("*", ""))
-        val inner = match.groupValues[1].ifEmpty { match.groupValues[2] }
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(inner.replace("*", "")) }
-        last = match.range.last + 1
+    for (m in linkOrUrl.findAll(cleaned)) {
+        appendBold(cleaned.substring(last, m.range.first))
+        val url = m.groupValues[2].ifEmpty { m.groupValues[3] }
+        val label = m.groupValues[1].ifEmpty { url }
+        pushStringAnnotation(tag = "URL", annotation = url)
+        withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) { appendBold(label) }
+        pop()
+        last = m.range.last + 1
     }
-    append(cleaned.substring(last).replace("*", ""))
+    appendBold(cleaned.substring(last))
+}
+
+private fun AnnotatedString.Builder.appendBold(segment: String) {
+    var last = 0
+    for (m in boldRegex.findAll(segment)) {
+        append(segment.substring(last, m.range.first).replace("*", ""))
+        val inner = m.groupValues[1].ifEmpty { m.groupValues[2] }
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(inner.replace("*", "")) }
+        last = m.range.last + 1
+    }
+    append(segment.substring(last).replace("*", ""))
 }
