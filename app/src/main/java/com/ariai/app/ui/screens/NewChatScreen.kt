@@ -243,7 +243,8 @@ fun NewChatScreen(
         }
         val overflow = visible.offset + visible.size - info.viewportEndOffset
         if (overflow > 0) {
-            listState.scrollBy(overflow.toFloat())
+            // Scroll by the overflow relative to the current position (LazyListState has no scrollBy here).
+            listState.scrollToItem(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset + overflow)
         }
     }
 
