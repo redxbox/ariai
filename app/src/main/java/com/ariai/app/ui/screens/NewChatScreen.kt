@@ -1,6 +1,8 @@
 package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
+import com.ariai.app.util.ReadAloud
+import com.ariai.app.util.UiLang
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ariai.app.data.remote.supportsNativeSearch
 
@@ -120,6 +122,46 @@ fun NewChatScreen(
     modifier: Modifier = Modifier
 ) {
     var inputText by remember { mutableStateOf("") }
+    // Voice input with the device's built-in speech recognizer. Spoken text is added to the input box.
+    var listening by remember { mutableStateOf(false) }
+    val voiceContext = LocalContext.current
+    val recognizer = remember {
+        if (android.speech.SpeechRecognizer.isRecognitionAvailable(voiceContext)) {
+            android.speech.SpeechRecognizer.createSpeechRecognizer(voiceContext)
+        } else {
+            null
+        }
+    }
+    DisposableEffect(recognizer) { onDispose { recognizer?.destroy() } }
+    fun startListening() {
+        val engine = recognizer ?: return
+        engine.setRecognitionListener(object : android.speech.RecognitionListener {
+            override fun onResults(results: android.os.Bundle?) {
+                val spoken = results?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                if (spoken.isNotBlank()) {
+                    inputText = listOf(inputText.trim(), spoken.trim()).filter { it.isNotEmpty() }.joinToString(" ")
+                }
+                listening = false
+            }
+            override fun onError(error: Int) { listening = false }
+            override fun onReadyForSpeech(params: android.os.Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onPartialResults(partialResults: android.os.Bundle?) {}
+            override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+        })
+        engine.startListening(
+            android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, if (UiLang.code == "fa") "fa-IR" else "en-US")
+        )
+        listening = true
+    }
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startListening()
+    }
     var pending by remember { mutableStateOf<List<Attachment>>(emptyList()) }
     var showModelSheet by remember { mutableStateOf(false) }
     var showFullEditor by remember { mutableStateOf(false) }
@@ -443,6 +485,16 @@ fun NewChatScreen(
                             IconCircle(Icons.Default.Public, tx("Web search"), active = searchMode != SearchMode.OFF) {
                                 showSearch = true
                             }
+                            Spacer(Modifier.width(6.dp))
+                            IconCircle(Icons.Default.Mic, tx("Voice input"), active = listening) {
+                                when {
+                                    listening -> recognizer?.stopListening()
+                                    androidx.core.content.ContextCompat.checkSelfPermission(
+                                        context, android.Manifest.permission.RECORD_AUDIO
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED -> startListening()
+                                    else -> micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
                             Spacer(Modifier.weight(1f))
                             ModelChip(text = selectedModel?.substringAfterLast('/') ?: tx("Choose model")) {
                                 showModelSheet = true
@@ -637,6 +689,7 @@ private fun AssistantBlock(
             if (isVideoPath(imagePath)) VideoCard(imagePath) else GeneratedImageView(imagePath)
         }
         // Models often answer with image links; show those as pictures instead of raw URLs.
+        val ctx = LocalContext.current
         val imageUrls = remember(text) { extractImageUrls(text) }
         val visibleText = remember(text) { if (imageUrls.isEmpty()) text else stripImageUrls(text) }
         if (visibleText.isNotBlank()) {
@@ -663,6 +716,7 @@ private fun AssistantBlock(
                 ActionIcon(Icons.Default.Share, tx("Share"), onShare ?: {})
                 ActionIcon(Icons.Default.CallSplit, tx("Branch"), onBranch ?: {})
                 ActionIcon(Icons.Default.Refresh, tx("Retry"), onRetry ?: {})
+                ActionIcon(Icons.Default.VolumeUp, tx("Read aloud")) { ReadAloud.speak(ctx, text, UiLang.code) }
             }
         }
     }
