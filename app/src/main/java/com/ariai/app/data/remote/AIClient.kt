@@ -359,7 +359,7 @@ class AIClient {
                     val id = m.getString("id")
                     val arch = m.optJSONObject("architecture")
                     val inputs = modalityList(arch?.optJSONArray("input_modalities"))
-                    val outputs = modalityList(arch?.optJSONArray("output_modalities"))
+                    val outputs = modalityList(arch?.optJSONArray("output_modalities") ?: m.optJSONArray("output_modalities"))
                     models.add(
                         AIModel(
                             id = id,
@@ -376,40 +376,61 @@ class AIClient {
                 }
             }
             // OpenRouter lists video models on their own endpoint, not in /models.
-            if (base.contains("openrouter.ai")) models.addAll(openRouterVideoModels(provider, base))
+            if (base.contains("openrouter.ai")) {
+                models.addCatalog(catalogModels(provider, "$base/videos/models", listOf("video")))
+            }
+            if (base.contains("pollinations.ai")) {
+                val origin = base.removeSuffix("/v1")
+                models.addCatalog(catalogModels(provider, "$origin/video/models"))
+                models.addCatalog(catalogModels(provider, "$origin/image/models"))
+            }
             if (models.isEmpty()) throw IllegalStateException("No models returned")
             models
         }
     }
 
-    /** Video models from OpenRouter's /videos/models endpoint. Returns empty on any failure. */
-    private fun openRouterVideoModels(provider: Provider, base: String): List<AIModel> {
+    /**
+     * Models from an extra catalog endpoint (OpenRouter /videos/models, Pollinations /video/models).
+     * Type comes from output_modalities; [fixedOutputs] is used when the endpoint only lists one type.
+     */
+    private fun catalogModels(provider: Provider, url: String, fixedOutputs: List<String>? = null): List<AIModel> {
         return try {
-            val builder = Request.Builder().url("$base/videos/models").get()
+            val builder = Request.Builder().url(url).get()
             val key = provider.apiKey.trim()
             if (key.isNotBlank()) builder.addHeader("Authorization", "Bearer $key")
             client.newCall(builder.build()).execute().use { r ->
                 if (!r.isSuccessful) return emptyList()
-                val arr = JSONObject(r.body?.string() ?: return emptyList()).optJSONArray("data") ?: return emptyList()
+                val text = r.body?.string() ?: return emptyList()
+                val arr = if (text.trimStart().startsWith("[")) JSONArray(text)
+                    else JSONObject(text).optJSONArray("data") ?: return emptyList()
                 (0 until arr.length()).mapNotNull { i ->
                     val m = arr.optJSONObject(i) ?: return@mapNotNull null
-                    val id = m.optString("id").ifBlank { return@mapNotNull null }
+                    val id = m.optString("id").ifBlank { m.optString("name") }.ifBlank { return@mapNotNull null }
+                    val outputs = fixedOutputs ?: modalityList(m.optJSONArray("output_modalities"))
+                    if (outputs.isEmpty()) return@mapNotNull null
                     AIModel(
                         id = id,
-                        displayName = m.optString("name").ifBlank { id },
+                        displayName = m.optString("title").ifBlank { m.optString("name").ifBlank { id } },
                         providerId = provider.id,
-                        supportsVision = false,
+                        supportsVision = "image" in modalityList(m.optJSONArray("input_modalities")),
                         supportsFunctionCalling = false,
-                        supportsImageGen = false,
+                        supportsImageGen = "image" in outputs,
                         contextWindow = 0,
-                        supportsVideoGen = true,
-                        outputsText = false
+                        supportsVideoGen = "video" in outputs,
+                        outputsText = "text" in outputs
                     )
                 }
             }
         } catch (_: Exception) {
             emptyList()
         }
+    }
+
+    /** Adds catalog models, replacing any entry with the same id. */
+    private fun MutableList<AIModel>.addCatalog(extra: List<AIModel>) {
+        val ids = extra.map { it.id }.toSet()
+        removeAll { it.id in ids }
+        addAll(extra)
     }
 
     /** Built-in tool names enabled for this model. Only Gemini supports them. */
@@ -664,6 +685,21 @@ class AIClient {
         val base = provider.baseUrl.trim().trimEnd('/')
         fun auth(b: Request.Builder): Request.Builder = b.apply {
             if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey.trim()}")
+        }
+        if (base.contains("pollinations.ai")) {
+            onProgress("Rendering")
+            val origin = base.removeSuffix("/v1")
+            val encodedPrompt = java.net.URLEncoder.encode(prompt, "UTF-8").replace("+", "%20")
+            val encodedModel = java.net.URLEncoder.encode(modelId, "UTF-8")
+            val longClient = client.newBuilder()
+                .readTimeout(10, java.util.concurrent.TimeUnit.MINUTES)
+                .callTimeout(15, java.util.concurrent.TimeUnit.MINUTES)
+                .build()
+            val request = auth(Request.Builder().url("$origin/video/$encodedPrompt?model=$encodedModel").get()).build()
+            longClient.newCall(request).execute().use { r ->
+                if (!r.isSuccessful) throw IllegalStateException("API Error ${r.code}: ${r.body?.string()?.take(200)}")
+                return@withContext r.body?.bytes() ?: throw IllegalStateException("Empty video response")
+            }
         }
         onProgress("Sending request")
         val submitBody = JSONObject().put("model", modelId).put("prompt", prompt)
