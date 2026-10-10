@@ -466,6 +466,9 @@ class AIClient {
                 json.put("model", if (modelId.isNotBlank()) modelId else "claude-3-5-sonnet-20241022")
                 json.put("max_tokens", if (budget != null) budget + 4096 else 4096)
                 json.put("stream", isStream)
+                if (nativeSearch) {
+                    json.put("tools", JSONArray().put(JSONObject().put("type", "web_search_20250305").put("name", "web_search")))
+                }
                 if (budget != null) {
                     // Extended thinking requires temperature 1 (the API default), so it is omitted here.
                     json.put("thinking", JSONObject().put("type", "enabled").put("budget_tokens", budget))
@@ -501,6 +504,9 @@ class AIClient {
                 json.put("temperature", temperature.toDouble().coerceIn(0.0, 2.0))
                 json.put("stream", isStream)
                 reasoning.effort?.let { json.put("reasoning_effort", it) }
+                if (nativeSearch && provider.baseUrl.contains("openrouter.ai")) {
+                    json.put("plugins", JSONArray().put(JSONObject().put("id", "web")))
+                }
 
                 val msgs = JSONArray()
                 if (systemPrompt != null && systemPrompt.isNotBlank()) {
@@ -668,3 +674,7 @@ class AIClient {
         }
     }
 }
+
+/** True when the provider can search the web itself (Gemini, Anthropic, OpenRouter). */
+fun supportsNativeSearch(provider: Provider): Boolean =
+    provider.type == ProviderType.GEMINI || provider.type == ProviderType.ANTHROPIC || provider.baseUrl.contains("openrouter.ai")

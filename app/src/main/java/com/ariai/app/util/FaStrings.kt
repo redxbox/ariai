@@ -2,6 +2,7 @@ package com.ariai.app.util
 
 // Persian UI strings keyed by the English text used in the code.
 internal val faStrings: Map<String, String> = mapOf(
+        "Built into the provider" to "داخل خود ارائه‌دهنده",
         "Rename chat" to "تغییر نام گفتگو",
         "Chat title" to "عنوان گفتگو",
         "A more personal AI." to "یک هوش مصنوعی شخصی‌تر.",

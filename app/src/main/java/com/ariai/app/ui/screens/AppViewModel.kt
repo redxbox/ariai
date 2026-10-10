@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.models.*
+import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.data.repository.ChatRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -321,7 +322,7 @@ class AppViewModel(
             return
         }
 
-        val localSearchKey = if (searchMode == SearchMode.LOCAL) {
+        val localSearchKey = if (searchMode == SearchMode.LOCAL || (searchMode == SearchMode.MODEL && !supportsNativeSearch(provider))) {
             searchKeys.value.entries.firstOrNull { it.value.isNotBlank() }
         } else {
             null
@@ -414,7 +415,7 @@ class AppViewModel(
                         systemPrompt = systemPrompt,
                         searchContext = searchContext,
                         reasoning = reasoning,
-                        nativeSearch = searchMode == SearchMode.MODEL
+                        nativeSearch = searchMode == SearchMode.MODEL && supportsNativeSearch(provider)
                     ).collect { chunk ->
                         fullResponse += chunk
                         // Publish at most ~16 times per second; each publish recomposes and re-renders markdown.

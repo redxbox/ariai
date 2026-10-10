@@ -1,6 +1,7 @@
 package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
+import com.ariai.app.data.remote.supportsNativeSearch
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -174,7 +175,7 @@ fun NewChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentProvider = providers.find { it.id == chat?.providerId } ?: providers.firstOrNull()
-    val modelSearchAvailable = currentProvider?.type == ProviderType.GEMINI
+    val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
 
     LaunchedEffect(messages.size, currentStreamingContent.length) {
         val last = messages.size + if (currentStreamingContent.isNotEmpty()) 1 else 0

@@ -175,11 +175,18 @@ fun SearchSheet(
                 SearchCard(
                     icon = Icons.Default.AutoAwesome,
                     title = tx("Model search"),
-                    subtitle = if (modelSearchAvailable) tx("Built into the provider (Gemini)") else tx("Only for Gemini providers"),
+                    subtitle = when {
+                        modelSearchAvailable -> tx("Built into the provider")
+                        localSearchConfigured -> tx("Uses your search service")
+                        else -> tx("No key yet. Tap to set up")
+                    },
                     selected = mode == SearchMode.MODEL,
-                    enabled = modelSearchAvailable,
+                    enabled = true,
                     modifier = Modifier.weight(1f)
-                ) { onModeChange(SearchMode.MODEL); onDismiss() }
+                ) {
+                    if (modelSearchAvailable || localSearchConfigured) onModeChange(SearchMode.MODEL) else onConfigureLocal()
+                    onDismiss()
+                }
                 SearchCard(
                     icon = Icons.Default.Public,
                     title = tx("Local search"),
