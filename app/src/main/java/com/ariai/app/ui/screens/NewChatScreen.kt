@@ -503,10 +503,6 @@ fun NewChatScreen(
                         ) {
                             IconCircle(Icons.Default.Add, tx("Add to message"), active = false) { showAttachments = true }
                             Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Image, tx("Image mode"), active = chatMode == ChatMode.IMAGE) {
-                                onChatModeChange(if (chatMode == ChatMode.IMAGE) ChatMode.TEXT else ChatMode.IMAGE)
-                            }
-                            Spacer(Modifier.width(6.dp))
                             IconCircle(Icons.Default.Public, tx("Web search"), active = searchMode != SearchMode.OFF) {
                                 showSearch = true
                             }
