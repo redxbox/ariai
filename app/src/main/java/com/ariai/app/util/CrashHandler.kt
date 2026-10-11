@@ -41,7 +41,7 @@ object CrashHandler {
                 output.write("\n\n--- CRASH ---\n".toByteArray())
                 output.write(crashLog.toByteArray())
             }
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     fun getCoroutineExceptionHandler(): CoroutineExceptionHandler {
@@ -53,6 +53,6 @@ object CrashHandler {
     fun logError(tag: String, message: String, throwable: Throwable? = null) {
         try {
             Log.e(tag, message, throwable)
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 }

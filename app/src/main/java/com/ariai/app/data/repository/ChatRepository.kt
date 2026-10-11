@@ -49,7 +49,7 @@ class ChatRepository(
     suspend fun deleteProvider(id: String) {
         try {
             db.providerDao().deleteById(id)
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     // Chats
@@ -72,14 +72,14 @@ class ChatRepository(
     suspend fun saveChat(chat: Chat) {
         try {
             db.chatDao().insertChat(chat.toEntity())
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     suspend fun deleteChat(id: String) {
         try {
             db.messageDao().deleteMessagesForChat(id)
             db.chatDao().deleteById(id)
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     // Messages
@@ -100,25 +100,30 @@ class ChatRepository(
         emptyList()
     }
 
-    suspend fun saveMessage(message: ChatMessage) {
+    /** Returns false when the message could not be stored, so the caller can tell the user. */
+    suspend fun saveMessage(message: ChatMessage): Boolean = try {
+        val stored = withContext(Dispatchers.IO) {
+            message.copy(attachments = message.attachments.map { it.persisted() })
+        }
+        db.messageDao().insertMessage(stored.toEntity())
+        // Update chat timestamp
         try {
-            val stored = withContext(Dispatchers.IO) {
-                message.copy(attachments = message.attachments.map { it.persisted() })
+            db.chatDao().getChatById(message.chatId)?.let { chat ->
+                db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
             }
-            db.messageDao().insertMessage(stored.toEntity())
-            // Update chat timestamp
-            try {
-                db.chatDao().getChatById(message.chatId)?.let { chat ->
-                    db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
-                }
-            } catch (e: Exception) {}
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "chat timestamp")
+        }
+        true
+    } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "saveMessage")
+        false
     }
 
     suspend fun deleteMessage(id: String) {
         try {
             db.messageDao().deleteById(id)
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     // Agents
@@ -131,7 +136,7 @@ class ChatRepository(
                         getBuiltInAgents().forEach { agent ->
                             db.agentDao().insertAgent(agent.toEntity())
                         }
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
                     getBuiltInAgents()
                 } else {
                     list.map { it.toModel() }
@@ -145,13 +150,13 @@ class ChatRepository(
     suspend fun saveAgent(agent: Agent) {
         try {
             db.agentDao().insertAgent(agent.toEntity())
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     suspend fun deleteAgent(id: String) {
         try {
             db.agentDao().deleteById(id)
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     // AI Operations - with error handling
@@ -207,7 +212,7 @@ class ChatRepository(
             name = name,
             type = try { ProviderType.valueOf(type) } catch (e: Exception) { ProviderType.OPENAI_COMPATIBLE },
             baseUrl = baseUrl,
-            apiKey = apiKey,
+            apiKey = com.ariai.app.util.KeyVault.decrypt(apiKey),
             enabled = enabled,
             customHeaders = try { Converters().toStringMap(customHeaders) } catch (e: Exception) { emptyMap() },
             customBody = customBody,
@@ -218,7 +223,7 @@ class ChatRepository(
             }
         )
     } catch (e: Exception) {
-        Provider(id = id, name = name.ifBlank { "Unknown" }, type = ProviderType.OPENAI_COMPATIBLE, baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" }, apiKey = apiKey)
+        Provider(id = id, name = name.ifBlank { "Unknown" }, type = ProviderType.OPENAI_COMPATIBLE, baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" }, apiKey = com.ariai.app.util.KeyVault.decrypt(apiKey))
     }
 
     private fun Provider.toEntity() = ProviderEntity(
@@ -226,7 +231,7 @@ class ChatRepository(
         name = name,
         type = type.name,
         baseUrl = baseUrl,
-        apiKey = apiKey,
+        apiKey = com.ariai.app.util.KeyVault.encrypt(apiKey),
         enabled = enabled,
         customHeaders = try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { "" },
         customBody = customBody,

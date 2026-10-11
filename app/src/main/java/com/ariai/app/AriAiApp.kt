@@ -21,7 +21,6 @@ class AriAiApp : Application() {
             "ariai_db"
         )
             .addMigrations(com.ariai.app.data.local.MIGRATION_1_2, com.ariai.app.data.local.MIGRATION_2_3, com.ariai.app.data.local.MIGRATION_3_4)
-            .fallbackToDestructiveMigration()
             .build()
     }
 

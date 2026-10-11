@@ -145,6 +145,6 @@ class VoiceManager(private val context: Context) {
             speechRecognizer?.destroy()
             textToSpeech?.stop()
             textToSpeech?.shutdown()
-        } catch (e: Exception) {}
+        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 }

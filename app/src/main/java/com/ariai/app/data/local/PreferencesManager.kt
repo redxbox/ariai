@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import com.ariai.app.util.KeyVault
 
 val Context.dataStore by preferencesDataStore(name = "ariai_prefs")
 
@@ -49,10 +50,10 @@ class PreferencesManager(private val context: Context) {
 
     val searchKeysFlow: Flow<Map<String, String>> = context.dataStore.data.map { prefs ->
         mapOf(
-            "tavily" to (prefs[TAVILY_API_KEY] ?: ""),
-            "brave" to (prefs[BRAVE_API_KEY] ?: ""),
-            "exa" to (prefs[EXA_API_KEY] ?: ""),
-            "serper" to (prefs[SERPER_API_KEY] ?: "")
+            "tavily" to KeyVault.decrypt(prefs[TAVILY_API_KEY] ?: ""),
+            "brave" to KeyVault.decrypt(prefs[BRAVE_API_KEY] ?: ""),
+            "exa" to KeyVault.decrypt(prefs[EXA_API_KEY] ?: ""),
+            "serper" to KeyVault.decrypt(prefs[SERPER_API_KEY] ?: "")
         )
     }
 
@@ -84,7 +85,7 @@ class PreferencesManager(private val context: Context) {
             "serper" -> SERPER_API_KEY
             else -> SEARCH_API_KEY
         }
-        context.dataStore.edit { it[prefKey] = key }
+        context.dataStore.edit { it[prefKey] = KeyVault.encrypt(key) }
     }
 
     suspend fun setFirstLaunchDone() {

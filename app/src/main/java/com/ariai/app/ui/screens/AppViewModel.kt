@@ -305,7 +305,7 @@ class AppViewModel(
             try {
                 repository.saveMessage(message)
                 appendMessage(message)
-            } catch (_: Exception) {}
+            } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
         }
     }
 
@@ -345,7 +345,10 @@ class AppViewModel(
                     content = content,
                     attachments = attachments
                 )
-                repository.saveMessage(userMessage)
+                if (!repository.saveMessage(userMessage)) {
+                    postAssistantError(chatId, tx("Could not save your message. Check free storage and try again."))
+                    return@launch
+                }
                 appendMessage(userMessage)
 
                 val targetModelId = _modelOverrides.value[chatId]?.second
@@ -450,7 +453,9 @@ class AppViewModel(
                         modelId = getCurrentChat()?.modelId,
                         providerId = provider.id
                     )
-                    repository.saveMessage(assistantMessage)
+                    if (!repository.saveMessage(assistantMessage)) {
+                        postAssistantError(chatId, tx("Could not save the reply. Check free storage."))
+                    }
                     appendMessage(assistantMessage)
 
                     if (_messages.value.size <= 3) {
@@ -558,7 +563,7 @@ class AppViewModel(
             try {
                 val chat = chats.value.find { it.id == chatId } ?: repository.getChatById(chatId)
                 if (chat != null) repository.saveChat(chat.copy(providerId = providerId, modelId = modelId))
-            } catch (e: Exception) {}
+            } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
         }
     }
 

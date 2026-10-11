@@ -55,7 +55,9 @@ class AIClient {
                         requestBuilder.addHeader("anthropic-version", "2023-06-01")
                     }
                 }
-                ProviderType.GEMINI -> {}
+                ProviderType.GEMINI -> {
+                    if (provider.apiKey.isNotBlank()) requestBuilder.addHeader("x-goog-api-key", provider.apiKey.trim())
+                }
             }
 
             val modelHeaders = provider.models.find { it.id == modelId }?.headers.orEmpty()
@@ -204,7 +206,7 @@ class AIClient {
                 throw Exception("Image gen failed: $code")
             }
 
-            val json = JSONObject(response.body!!.string())
+            val json = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
             val dataArray = json.optJSONArray("data") ?: JSONArray()
             val images = mutableListOf<GeneratedImage>()
             for (i in 0 until dataArray.length()) {
@@ -311,7 +313,7 @@ class AIClient {
     suspend fun listModels(provider: Provider): List<AIModel> = withContext(Dispatchers.IO) {
         val base = provider.baseUrl.trim().trimEnd('/')
         val url = when (provider.type) {
-            ProviderType.GEMINI -> "$base/models?key=${provider.apiKey.trim()}"
+            ProviderType.GEMINI -> "$base/models"
             // Anthropic's models endpoint is /v1/models. The base URL may or may not already end in /v1.
             ProviderType.ANTHROPIC -> "${base.removeSuffix("/v1")}/v1/models"
             // OpenRouter lists only text models by default; ask for every output type.
@@ -322,7 +324,7 @@ class AIClient {
         val key = provider.apiKey.trim()
         if (key.isNotBlank()) {
             when (provider.type) {
-                ProviderType.GEMINI -> {}
+                ProviderType.GEMINI -> builder.addHeader("x-goog-api-key", key)
                 ProviderType.ANTHROPIC -> {
                     builder.addHeader("x-api-key", key)
                     builder.addHeader("anthropic-version", "2023-06-01")
@@ -447,9 +449,9 @@ class AIClient {
             ProviderType.GEMINI -> {
                 val model = if (modelId.isNotBlank() && !modelId.contains("/")) modelId else "gemini-1.5-flash"
                 if (forceNonStream) {
-                    "$base/models/$model:generateContent?key=${provider.apiKey}"
+                    "$base/models/$model:generateContent"
                 } else {
-                    "$base/models/$model:streamGenerateContent?alt=sse&key=${provider.apiKey}"
+                    "$base/models/$model:streamGenerateContent?alt=sse"
                 }
             }
             ProviderType.ANTHROPIC -> "$base/v1/messages"
@@ -626,7 +628,7 @@ class AIClient {
                         json.put(key, customJson.get(key))
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
         }
 
         return json.toString().toRequestBody("application/json".toMediaType())

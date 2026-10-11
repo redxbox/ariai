@@ -42,7 +42,7 @@ class SearchClient {
             .post(json.toString().toRequestBody("application/json".toMediaType()))
             .build()
         val response = client.newCall(request).execute()
-        val body = JSONObject(response.body!!.string())
+        val body = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
         val results = mutableListOf<SearchResult>()
         val arr = body.optJSONArray("results") ?: return SearchResponse(query, emptyList(), SearchProviderType.TAVILY)
         for (i in 0 until arr.length()) {
@@ -65,7 +65,7 @@ class SearchClient {
             .get()
             .build()
         val response = client.newCall(request).execute()
-        val body = JSONObject(response.body!!.string())
+        val body = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
         val results = mutableListOf<SearchResult>()
         val web = body.optJSONObject("web")?.optJSONArray("results") ?: return SearchResponse(query, emptyList(), SearchProviderType.BRAVE)
         for (i in 0 until web.length()) {
@@ -93,7 +93,7 @@ class SearchClient {
             .addHeader("Content-Type", "application/json")
             .build()
         val response = client.newCall(request).execute()
-        val body = JSONObject(response.body!!.string())
+        val body = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
         val results = mutableListOf<SearchResult>()
         val arr = body.optJSONArray("results") ?: return SearchResponse(query, emptyList(), SearchProviderType.EXA)
         for (i in 0 until arr.length()) {
@@ -119,7 +119,7 @@ class SearchClient {
             .addHeader("X-API-KEY", apiKey)
             .build()
         val response = client.newCall(request).execute()
-        val body = JSONObject(response.body!!.string())
+        val body = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
         val results = mutableListOf<SearchResult>()
         val arr = body.optJSONArray("organic") ?: return SearchResponse(query, emptyList(), SearchProviderType.SERPER)
         for (i in 0 until arr.length()) {
