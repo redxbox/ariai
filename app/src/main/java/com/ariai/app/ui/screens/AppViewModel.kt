@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.models.*
+import kotlinx.coroutines.flow.first
 import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.data.repository.ChatRepository
 import kotlinx.coroutines.flow.*
@@ -57,8 +58,21 @@ class AppViewModel(
     val agents = repository.getAgents().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
-        // No auto demo - user must add provider manually to avoid crash
-        // Free demo removed per user request to fix crash
+        // One-time upgrade: keys saved before encryption existed are rewritten, so they are stored encrypted.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.getProviders().first().forEach { repository.saveProvider(it) }
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "provider key upgrade")
+            }
+            try {
+                prefs.searchKeysFlow.first().forEach { (name, key) ->
+                    if (key.isNotBlank()) prefs.setSearchApiKey(name, key)
+                }
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "search key upgrade")
+            }
+        }
     }
 
     // Chat state
