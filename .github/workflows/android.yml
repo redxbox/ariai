@@ -31,6 +31,12 @@ jobs:
       run: ./gradlew clean --stacktrace
       continue-on-error: true
     
+    - name: Unit tests
+      run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+    - name: Build release APK (checks R8 and resource shrinking)
+      run: ./gradlew :app:assembleRelease --stacktrace
+
     - name: Build Debug APK
       run: |
         set -o pipefail

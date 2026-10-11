@@ -107,8 +107,12 @@ private fun AnnotatedString.Builder.appendInline(line: String) {
         appendBold(cleaned.substring(last, m.range.first))
         val url = m.groupValues[2].ifEmpty { m.groupValues[3] }
         val label = m.groupValues[1].ifEmpty { url }
+        // The whole "label (address)" is tappable and shows the full address, as requested.
         pushStringAnnotation(tag = "URL", annotation = url)
-        withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) { appendBold(label) }
+        withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
+            appendBold(label)
+            if (label != url) append(" ($url)")
+        }
         pop()
         last = m.range.last + 1
     }
