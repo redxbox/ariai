@@ -30,6 +30,11 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.favoriteKey
+import com.ariai.app.data.remote.ConnectionResult
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
@@ -46,6 +51,7 @@ fun ModelPickerSheet(
     onToggleFavorite: (providerId: String, modelId: String) -> Unit,
     onSelect: (providerId: String, modelId: String) -> Unit,
     onAddProvider: () -> Unit,
+    onCheckProvider: suspend (Provider) -> ConnectionResult,
     onDismiss: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
@@ -159,6 +165,9 @@ fun ModelPickerSheet(
                         }
                     }
                 }
+
+                // A single provider is selected: its connection can be checked from here.
+                enabled.firstOrNull { it.id == providerFilter }?.let { ProviderCheckRow(provider = it, check = onCheckProvider) }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     FilterChip(selected = providerFilter == null, onClick = { providerFilter = null }, label = { Text(tx("All")) })
@@ -324,5 +333,45 @@ private fun CapabilityTag(label: String) {
             fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
         )
+    }
+}
+
+@Composable
+private fun ProviderCheckRow(provider: Provider, check: suspend (Provider) -> ConnectionResult) {
+    var checking by remember(provider.id) { mutableStateOf(false) }
+    var result by remember(provider.id) { mutableStateOf<ConnectionResult?>(null) }
+    val scope = rememberCoroutineScope()
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedButton(
+            onClick = {
+                checking = true
+                result = null
+                scope.launch {
+                    result = check(provider)
+                    checking = false
+                }
+            },
+            enabled = !checking,
+            shape = RoundedCornerShape(50),
+            border = androidx.compose.foundation.BorderStroke(1.dp, AriLine)
+        ) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = AriInk, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (checking) tx("Checking…") else tx("Check connection"), color = AriInk, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        }
+        when (val r = result) {
+            is ConnectionResult.Ok -> Text(
+                "${tx("Connected")} · ${r.models} ${tx("models")}",
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AriInk
+            )
+            is ConnectionResult.Failed -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    r.problem + (r.code?.let { " (HTTP $it)" } ?: ""),
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AriAccent
+                )
+                Text(r.hint, fontSize = 12.sp, color = AriMuted)
+            }
+            null -> Unit
+        }
     }
 }

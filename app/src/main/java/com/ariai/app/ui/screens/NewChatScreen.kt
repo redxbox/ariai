@@ -118,6 +118,7 @@ fun NewChatScreen(
     onOpenExtensions: () -> Unit = {},
     onOpenSearchSettings: () -> Unit = {},
     onAddProvider: () -> Unit = {},
+    onCheckProvider: suspend (Provider) -> com.ariai.app.data.remote.ConnectionResult,
     fontSize: Int = 15,
     modifier: Modifier = Modifier
 ) {
@@ -331,6 +332,7 @@ fun NewChatScreen(
             onToggleFavorite = onToggleFavorite,
             onSelect = onSelectModel,
             onAddProvider = { showModelSheet = false; onAddProvider() },
+            onCheckProvider = onCheckProvider,
             onDismiss = { showModelSheet = false }
         )
     }

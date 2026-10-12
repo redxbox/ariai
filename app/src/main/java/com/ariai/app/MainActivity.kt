@@ -223,7 +223,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         onOpenExtensions = { navController.navigate("mcp") },
                         onOpenSearchSettings = { navController.navigate("search_service") },
                         fontSize = fontSize,
-                        onAddProvider = { navController.navigate("add_provider") }
+                        onAddProvider = { navController.navigate("add_provider") },
+                        onCheckProvider = { provider -> com.ariai.app.data.remote.checkConnection(provider) { viewModel.fetchModels(it) } }
                     )
                 }
 
