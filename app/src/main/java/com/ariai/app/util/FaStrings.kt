@@ -2,6 +2,10 @@ package com.ariai.app.util
 
 // Persian UI strings keyed by the English text used in the code.
 internal val faStrings: Map<String, String> = mapOf(
+        "Turned off" to "خاموش",
+        "active" to "فعال",
+        "models" to "مدل",
+        "Connect a provider to start" to "برای شروع یک ارائه‌دهنده وصل کنید",
         "Could not save your message. Check free storage and try again." to "پیام شما ذخیره نشد. فضای خالی گوشی را بررسی کنید و دوباره تلاش کنید.",
         "Could not save the reply. Check free storage." to "پاسخ ذخیره نشد. فضای خالی گوشی را بررسی کنید.",
         "Video is larger than 12 MB" to "ویدیو بزرگ‌تر از ۱۲ مگابایت است",
