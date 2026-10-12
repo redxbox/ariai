@@ -43,6 +43,7 @@ fun AttachmentSheet(
     onExtensions: () -> Unit,
     onImage: () -> Unit,
     onVideo: () -> Unit,
+    onAudio: () -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SheetBg) {
@@ -60,6 +61,7 @@ fun AttachmentSheet(
             Text(tx("Generate"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
             SheetRow(Icons.Default.Image, tx("Image"), tx("Next message makes an image")) { onDismiss(); onImage() }
             SheetRow(Icons.Default.Movie, tx("Video"), tx("Next message makes a video")) { onDismiss(); onVideo() }
+            SheetRow(Icons.Default.MusicNote, tx("Audio"), tx("Next message makes audio")) { onDismiss(); onAudio() }
             HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
             Text(tx("Conversation"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
             SheetRow(Icons.Default.Archive, tx("Compress history"), tx("Summarize older messages to save context")) { onDismiss(); onCompress() }

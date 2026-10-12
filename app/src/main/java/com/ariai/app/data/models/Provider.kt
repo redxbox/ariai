@@ -44,6 +44,8 @@ data class AIModel(
     val customBody: String? = null,
     /** Model returns video (from provider metadata). */
     val supportsVideoGen: Boolean = false,
+    /** Model returns audio (speech or music). */
+    val supportsAudioGen: Boolean = false,
     /** Model returns text. False for image-only models. */
     val outputsText: Boolean = true
 ) : Parcelable

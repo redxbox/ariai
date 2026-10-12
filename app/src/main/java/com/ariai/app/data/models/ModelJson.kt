@@ -22,6 +22,7 @@ fun modelsToJson(models: List<AIModel>): String {
                 put("customBody", m.customBody ?: JSONObject.NULL)
                 put("supportsVideoGen", m.supportsVideoGen)
                 put("outputsText", m.outputsText)
+                put("supportsAudioGen", m.supportsAudioGen)
             }
         )
     }
@@ -47,7 +48,8 @@ fun modelsFromJson(raw: String): List<AIModel> = try {
             headers = headers?.let { h -> h.keys().asSequence().associateWith { h.getString(it) } } ?: emptyMap(),
             customBody = if (o.isNull("customBody")) null else o.optString("customBody"),
             supportsVideoGen = o.optBoolean("supportsVideoGen"),
-            outputsText = o.optBoolean("outputsText", true)
+            outputsText = o.optBoolean("outputsText", true),
+            supportsAudioGen = o.optBoolean("supportsAudioGen")
         )
     }
 } catch (e: Exception) {

@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 /** What the next message in a chat produces. */
-enum class ChatMode { TEXT, IMAGE, VIDEO }
+enum class ChatMode { TEXT, IMAGE, VIDEO, AUDIO }
 
 class AppViewModel(
     private val repository: ChatRepository,
@@ -89,7 +89,11 @@ class AppViewModel(
         // Picking Image or Video switches the chat to a matching model automatically.
         if (mode != ChatMode.TEXT) {
             val preferred = resolveProvider(chatId)
-            val found = if (mode == ChatMode.IMAGE) findImageModel(preferred) else findModel(preferred) { it.supportsVideoGen }
+            val found = when (mode) {
+                ChatMode.IMAGE -> findImageModel(preferred)
+                ChatMode.AUDIO -> findModel(preferred) { it.supportsAudioGen }
+                else -> findModel(preferred) { it.supportsVideoGen }
+            }
             found?.let { (p, m) -> updateChatProvider(chatId, p.id, m.id) }
         }
     }
@@ -274,6 +278,30 @@ class AppViewModel(
         }
     }
 
+    private suspend fun generateAudioReply(chatId: String, provider: Provider, modelId: String, prompt: String) {
+        _isStreaming.value = true
+        _streamingContent.value = tx("Generating audio…")
+        try {
+            val bytes = repository.generateAudio(provider, modelId, prompt) { _streamingContent.value = it }
+            val file = com.ariai.app.data.local.ImageStore.saveAudio(bytes)
+            val reply = ChatMessage(
+                chatId = chatId,
+                role = MessageRole.ASSISTANT,
+                content = "",
+                modelId = modelId,
+                providerId = provider.id,
+                imagePath = file.absolutePath
+            )
+            repository.saveMessage(reply)
+            appendMessage(reply)
+        } catch (e: Exception) {
+            postAssistantError(chatId, "❌ Audio error: ${e.message ?: e::class.java.simpleName}")
+        } finally {
+            _streamingContent.value = ""
+            _isStreaming.value = false
+        }
+    }
+
     private suspend fun generateVideoReply(chatId: String, provider: Provider, modelId: String, prompt: String) {
         _isStreaming.value = true
         _streamingContent.value = tx("Generating video…")
@@ -381,6 +409,19 @@ class AppViewModel(
                         generateImageReply(chatId, found.first, found.second.id, content, attachments.firstImageFile())
                         return@launch
                     }
+                    ChatMode.AUDIO -> {
+                        if (attachments.isNotEmpty()) {
+                            postAssistantError(chatId, tx("Photos and videos are not used in audio mode. Switch to text mode to send them."))
+                            return@launch
+                        }
+                        val found = findModel(provider) { it.supportsAudioGen }
+                        if (found == null) {
+                            postAssistantError(chatId, tx("No audio model found. Fetch the models of a provider that has one."))
+                            return@launch
+                        }
+                        generateAudioReply(chatId, found.first, found.second.id, content)
+                        return@launch
+                    }
                     ChatMode.VIDEO -> {
                         if (attachments.isNotEmpty()) {
                             postAssistantError(chatId, tx("Photos and videos are not used in video mode yet. Switch to text mode to send them."))
@@ -394,7 +435,11 @@ class AppViewModel(
                         generateVideoReply(chatId, found.first, found.second.id, content)
                         return@launch
                     }
-                    ChatMode.TEXT -> if (current != null && ((current.supportsVideoGen && !current.outputsText) || looksLikeVideoModel(current.id))) {
+                    ChatMode.TEXT -> if (current != null && current.supportsAudioGen && !current.outputsText) {
+                        // Audio-only model selected in text mode: generate audio instead of calling chat.
+                        generateAudioReply(chatId, provider, current.id, content)
+                        return@launch
+                    } else if (current != null && ((current.supportsVideoGen && !current.outputsText) || looksLikeVideoModel(current.id))) {
                         // Video-only model selected in text mode: generate a video instead of calling chat.
                         generateVideoReply(chatId, provider, current.id, content)
                         return@launch

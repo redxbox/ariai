@@ -10,6 +10,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONArray
+import com.ariai.app.util.tx
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -23,6 +24,10 @@ private val videoModelName = Regex(
 )
 
 fun looksLikeVideoModel(id: String): Boolean = videoModelName.containsMatchIn(id)
+
+private val audioModelName = Regex("tts|speech|music|lyria|stable-audio|sound-effect|text-to-sound|elevenlabs", RegexOption.IGNORE_CASE)
+
+fun looksLikeAudioModel(id: String): Boolean = audioModelName.containsMatchIn(id)
 
 /**
  * Some relays only accept requests from known coding clients. AgentRouter rejects the default
@@ -374,6 +379,8 @@ class AIClient {
                 for (i in 0 until arr.length()) {
                     val m = arr.getJSONObject(i)
                     val name = m.getString("name").removePrefix("models/")
+                    // Gemini TTS uses a different API from chat; it is not offered as a chat model.
+                    if (looksLikeAudioModel(name)) continue
                     // Image models are the ones that offer the "predict" method (Imagen), not by name.
                     val methods = m.optJSONArray("supportedGenerationMethods")
                     val imageGen = (0 until (methods?.length() ?: 0)).any { methods?.optString(it) == "predict" }
@@ -392,6 +399,7 @@ class AIClient {
                     val inputs = modalityList(arch?.optJSONArray("input_modalities"))
                     val outputs = modalityList(arch?.optJSONArray("output_modalities") ?: m.optJSONArray("output_modalities"))
                     val videoOut = "video" in outputs || looksLikeVideoModel(id)
+                    val audioOut = ("audio" in outputs || looksLikeAudioModel(id)) && "text" !in outputs
                     models.add(
                         AIModel(
                             id = id,
@@ -402,7 +410,8 @@ class AIClient {
                             supportsImageGen = "image" in outputs,
                             contextWindow = 128000,
                             supportsVideoGen = videoOut,
-                            outputsText = (outputs.isEmpty() || "text" in outputs) && !videoOut
+                            supportsAudioGen = audioOut,
+                            outputsText = (outputs.isEmpty() || "text" in outputs) && !videoOut && !audioOut
                         )
                     )
                 }
@@ -410,11 +419,13 @@ class AIClient {
             // OpenRouter lists video models on their own endpoint, not in /models.
             if (base.contains("openrouter.ai")) {
                 models.addCatalog(catalogModels(provider, "$base/videos/models", listOf("video")))
+                models.addCatalog(catalogModels(provider, "$base/models?output_modalities=speech", listOf("audio")))
             }
             if (base.contains("pollinations.ai")) {
                 val origin = base.removeSuffix("/v1")
                 models.addCatalog(catalogModels(provider, "$origin/video/models"))
                 models.addCatalog(catalogModels(provider, "$origin/image/models"))
+                models.addCatalog(catalogModels(provider, "$origin/audio/models", listOf("audio")))
             }
             if (models.isEmpty()) throw IllegalStateException("No models returned")
             models
@@ -449,7 +460,8 @@ class AIClient {
                         supportsImageGen = "image" in outputs,
                         contextWindow = 0,
                         supportsVideoGen = "video" in outputs,
-                        outputsText = "text" in outputs && "video" !in outputs
+                        supportsAudioGen = "audio" in outputs,
+                        outputsText = "text" in outputs && "video" !in outputs && "audio" !in outputs
                     )
                 }
             }
@@ -713,6 +725,39 @@ class AIClient {
 
     private fun modalityList(arr: JSONArray?): List<String> =
         arr?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+
+    /** Speech or music from text. Pollinations uses GET /audio/{text}; OpenAI-style APIs use POST /audio/speech. */
+    suspend fun generateAudio(
+        provider: Provider,
+        modelId: String,
+        prompt: String,
+        onProgress: (String) -> Unit = {}
+    ): ByteArray = withContext(Dispatchers.IO) {
+        val base = provider.baseUrl.trim().trimEnd('/')
+        val key = provider.apiKey.trim()
+        val isMusic = Regex("music|lyria|stable-audio|sound", RegexOption.IGNORE_CASE).containsMatchIn(modelId)
+        val longClient = client.newBuilder()
+            .readTimeout(5, TimeUnit.MINUTES)
+            .callTimeout(10, TimeUnit.MINUTES)
+            .build()
+        onProgress(tx("Generating audio"))
+        val request = if (base.contains("pollinations.ai")) {
+            val origin = base.removeSuffix("/v1")
+            val encodedPrompt = java.net.URLEncoder.encode(prompt, "UTF-8").replace("+", "%20")
+            val encodedModel = java.net.URLEncoder.encode(modelId, "UTF-8")
+            val voice = if (isMusic) "" else "&voice=alloy"
+            Request.Builder().url("$origin/audio/$encodedPrompt?model=$encodedModel$voice").get()
+        } else {
+            val body = JSONObject().put("model", modelId).put("input", prompt).put("voice", "alloy")
+                .toString().toRequestBody("application/json".toMediaType())
+            Request.Builder().url("$base/audio/speech").post(body)
+        }
+        if (key.isNotBlank()) request.addHeader("Authorization", "Bearer $key")
+        longClient.newCall(request.build()).execute().use { r ->
+            if (!r.isSuccessful) throw IllegalStateException("API Error ${r.code}: ${r.body?.string()?.take(200)}")
+            r.body?.bytes() ?: throw IllegalStateException("Empty audio response")
+        }
+    }
 
     /** Veo on the Gemini API: start a long-running operation, poll it, then download the MP4. */
     private fun generateVeo(provider: Provider, modelId: String, prompt: String, onProgress: (String) -> Unit): ByteArray {

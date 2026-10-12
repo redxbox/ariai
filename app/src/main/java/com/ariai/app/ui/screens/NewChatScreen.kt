@@ -346,6 +346,10 @@ fun NewChatScreen(
                 if (providers.any { p -> p.enabled && p.models.any { it.supportsVideoGen } }) onChatModeChange(ChatMode.VIDEO)
                 else showNote(tx("No video model. Fetch models in provider settings."))
             },
+            onAudio = {
+                if (providers.any { p -> p.enabled && p.models.any { it.supportsAudioGen } }) onChatModeChange(ChatMode.AUDIO)
+                else showNote(tx("No audio model. Fetch models in provider settings."))
+            },
             onDismiss = { showAttachments = false }
         )
     }
@@ -742,7 +746,11 @@ private fun AssistantBlock(
 ) {
     Column(modifier = Modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (imagePath != null) {
-            if (isVideoPath(imagePath)) VideoCard(imagePath) else GeneratedImageView(imagePath)
+            when {
+                isVideoPath(imagePath) -> VideoCard(imagePath)
+                isAudioPath(imagePath) -> AudioCard(imagePath)
+                else -> GeneratedImageView(imagePath)
+            }
         }
         // Models often answer with image links; show those as pictures instead of raw URLs.
         val imageUrls = remember(text) { extractImageUrls(text) }
@@ -756,7 +764,7 @@ private fun AssistantBlock(
         imageUrls.forEach { RemoteImage(it) }
         if (streaming) {
             TypingDots()
-        } else if (imagePath != null && !isVideoPath(imagePath)) {
+        } else if (imagePath != null && !isVideoPath(imagePath) && !isAudioPath(imagePath)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onEdit?.invoke() }) {
                     Text(tx("Edit"), color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
@@ -928,6 +936,7 @@ private fun FullScreenMessageEditor(
 }
 
 private fun isVideoPath(path: String) = path.endsWith(".mp4", ignoreCase = true)
+private fun isAudioPath(path: String) = path.endsWith(".mp3", ignoreCase = true)
 
 /** Small thin label in the chat's top-left corner: shows the active mode, closes back to text. */
 @Composable
@@ -941,7 +950,11 @@ private fun ModeChip(mode: ChatMode, onClose: () -> Unit, modifier: Modifier) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            if (mode == ChatMode.VIDEO) tx("Video") else tx("Image"),
+            when (mode) {
+                ChatMode.VIDEO -> tx("Video")
+                ChatMode.AUDIO -> tx("Audio")
+                else -> tx("Image")
+            },
             fontSize = 12.sp,
             fontWeight = FontWeight.Light,
             color = AriInk
@@ -976,6 +989,53 @@ private fun VideoCard(path: String) {
         }
     }
     if (playing) VideoPlayerDialog(path) { playing = false }
+}
+
+/** Generated audio: play and pause in place. */
+@Composable
+private fun AudioCard(path: String) {
+    val context = LocalContext.current
+    val player = remember(path) {
+        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(android.net.Uri.fromFile(java.io.File(path))))
+            prepare()
+        }
+    }
+    var playing by remember(path) { mutableStateOf(false) }
+    DisposableEffect(player) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playing = isPlaying
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+    Surface(shape = RoundedCornerShape(16.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconButton(
+                onClick = { if (player.isPlaying) player.pause() else player.play() },
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(AriTint)
+            ) {
+                Icon(
+                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (playing) tx("Pause") else tx("Play"),
+                    tint = AriInk
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(tx("Audio"), fontWeight = FontWeight.SemiBold, color = AriInk)
+                Text(tx("Generated audio"), fontSize = 12.sp, color = AriMuted)
+            }
+        }
+    }
 }
 
 /** Plays a generated video inside the app with the Media3 player and its standard controls. */

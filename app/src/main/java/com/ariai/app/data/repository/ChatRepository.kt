@@ -183,6 +183,13 @@ class ChatRepository(
     suspend fun imageBytes(image: com.ariai.app.data.models.GeneratedImage): ByteArray =
         aiClient.imageBytes(image)
 
+    suspend fun generateAudio(
+        provider: Provider,
+        modelId: String,
+        prompt: String,
+        onProgress: (String) -> Unit = {}
+    ): ByteArray = withContext(Dispatchers.IO) { aiClient.generateAudio(provider, modelId, prompt, onProgress) }
+
     suspend fun generateVideo(
         provider: Provider,
         modelId: String,
