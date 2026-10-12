@@ -412,7 +412,14 @@ fun NewChatScreen(
                         IconButton(onClick = { showTopMenu = true }) {
                             Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
                         }
-                        DropdownMenu(expanded = showTopMenu, onDismissRequest = { showTopMenu = false }) {
+                        DropdownMenu(
+                            expanded = showTopMenu,
+                            onDismissRequest = { showTopMenu = false },
+                            shape = RoundedCornerShape(18.dp),
+                            containerColor = AriCard,
+                            shadowElevation = 6.dp,
+                            modifier = Modifier.border(0.5.dp, AriLine, RoundedCornerShape(18.dp))
+                        ) {
                             DropdownMenuItem(
                                 text = { Text(tx("Copy conversation")) },
                                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
@@ -423,12 +430,12 @@ fun NewChatScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text(tx("Image chat")) },
-                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = AriAccent) },
                                 onClick = { showTopMenu = false; onNewImageChat() }
                             )
                             DropdownMenuItem(
                                 text = { Text(tx("Choose model")) },
-                                leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null, tint = AriAccent) },
                                 onClick = { showTopMenu = false; showModelSheet = true }
                             )
                             DropdownMenuItem(
