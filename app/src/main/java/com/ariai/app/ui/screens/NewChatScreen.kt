@@ -415,9 +415,9 @@ fun NewChatScreen(
                         DropdownMenu(
                             expanded = showTopMenu,
                             onDismissRequest = { showTopMenu = false },
-                            shape = RoundedCornerShape(18.dp),
-                            containerColor = AriCard,
-                            modifier = Modifier.border(0.5.dp, AriLine, RoundedCornerShape(18.dp))
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .border(0.5.dp, AriLine, RoundedCornerShape(18.dp))
                         ) {
                             DropdownMenuItem(
                                 text = { Text(tx("Copy conversation")) },
