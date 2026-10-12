@@ -8,6 +8,7 @@ import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.models.*
 import kotlinx.coroutines.flow.first
 import com.ariai.app.data.remote.supportsNativeSearch
+import com.ariai.app.data.remote.looksLikeVideoModel
 import com.ariai.app.data.repository.ChatRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -393,7 +394,7 @@ class AppViewModel(
                         generateVideoReply(chatId, found.first, found.second.id, content)
                         return@launch
                     }
-                    ChatMode.TEXT -> if (current != null && current.supportsVideoGen && !current.outputsText) {
+                    ChatMode.TEXT -> if (current != null && ((current.supportsVideoGen && !current.outputsText) || looksLikeVideoModel(current.id))) {
                         // Video-only model selected in text mode: generate a video instead of calling chat.
                         generateVideoReply(chatId, provider, current.id, content)
                         return@launch

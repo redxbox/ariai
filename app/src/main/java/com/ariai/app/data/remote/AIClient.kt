@@ -14,6 +14,17 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
+ * Name-based video detection. Used together with API metadata, because many providers
+ * (OpenAI, Gemini, relays) do not say which modalities a model produces.
+ */
+private val videoModelName = Regex(
+    "sora|veo|video|\\bwan[-.]?\\d|kling|seedance|hailuo|runway|luma|ray-?2|pika|\\bltx|cogvideo|hunyuan.?video|mochi|vidu|i2v|t2v",
+    RegexOption.IGNORE_CASE
+)
+
+fun looksLikeVideoModel(id: String): Boolean = videoModelName.containsMatchIn(id)
+
+/**
  * Some relays only accept requests from known coding clients. AgentRouter rejects the default
  * OkHttp User-Agent with 401 even when the key is valid, so those hosts get a client-style UA.
  * Other hosts keep the default.
@@ -366,7 +377,9 @@ class AIClient {
                     // Image models are the ones that offer the "predict" method (Imagen), not by name.
                     val methods = m.optJSONArray("supportedGenerationMethods")
                     val imageGen = (0 until (methods?.length() ?: 0)).any { methods?.optString(it) == "predict" }
-                    if (name.contains("gemini") || imageGen) {
+                    if (looksLikeVideoModel(name)) {
+                        models.add(AIModel(name, name, provider.id, false, false, false, 0, supportsVideoGen = true, outputsText = false))
+                    } else if (name.contains("gemini") || imageGen) {
                         models.add(AIModel(name, name, provider.id, true, true, imageGen, 1000000))
                     }
                 }
@@ -378,6 +391,7 @@ class AIClient {
                     val arch = m.optJSONObject("architecture")
                     val inputs = modalityList(arch?.optJSONArray("input_modalities"))
                     val outputs = modalityList(arch?.optJSONArray("output_modalities") ?: m.optJSONArray("output_modalities"))
+                    val videoOut = "video" in outputs || looksLikeVideoModel(id)
                     models.add(
                         AIModel(
                             id = id,
@@ -387,8 +401,8 @@ class AIClient {
                             supportsFunctionCalling = true,
                             supportsImageGen = "image" in outputs,
                             contextWindow = 128000,
-                            supportsVideoGen = "video" in outputs,
-                            outputsText = outputs.isEmpty() || "text" in outputs
+                            supportsVideoGen = videoOut,
+                            outputsText = (outputs.isEmpty() || "text" in outputs) && !videoOut
                         )
                     )
                 }
@@ -435,7 +449,7 @@ class AIClient {
                         supportsImageGen = "image" in outputs,
                         contextWindow = 0,
                         supportsVideoGen = "video" in outputs,
-                        outputsText = "text" in outputs
+                        outputsText = "text" in outputs && "video" !in outputs
                     )
                 }
             }
@@ -700,6 +714,60 @@ class AIClient {
     private fun modalityList(arr: JSONArray?): List<String> =
         arr?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
 
+    /** Veo on the Gemini API: start a long-running operation, poll it, then download the MP4. */
+    private fun generateVeo(provider: Provider, modelId: String, prompt: String, onProgress: (String) -> Unit): ByteArray {
+        val base = provider.baseUrl.trim().trimEnd('/')
+        val key = provider.apiKey.trim()
+        fun keyed(b: Request.Builder): Request.Builder = b.apply {
+            if (key.isNotBlank()) addHeader("x-goog-api-key", key)
+        }
+        onProgress("Sending request")
+        val body = JSONObject()
+            .put("instances", JSONArray().put(JSONObject().put("prompt", prompt)))
+            .toString().toRequestBody("application/json".toMediaType())
+        val opName = client.newCall(keyed(Request.Builder().url("$base/models/$modelId:predictLongRunning").post(body)).build()).execute().use { r ->
+            val text = r.body?.string().orEmpty()
+            if (!r.isSuccessful) throw IllegalStateException("Video submit failed: ${r.code} ${text.take(160)}")
+            JSONObject(text).optString("name").ifBlank { throw IllegalStateException("No operation returned") }
+        }
+
+        val started = System.currentTimeMillis()
+        val timeoutMs = 15 * 60_000L
+        var lastPoll = 0L
+        var bytes: ByteArray? = null
+        while (bytes == null) {
+            Thread.sleep(1_000)
+            val now = System.currentTimeMillis()
+            if (now - started > timeoutMs) throw IllegalStateException("Video timed out")
+            if (now - lastPoll >= 5_000) {
+                lastPoll = now
+                val op = client.newCall(keyed(Request.Builder().url("$base/$opName").get()).build()).execute().use { r ->
+                    if (!r.isSuccessful) throw IllegalStateException("Video status failed: ${r.code}")
+                    JSONObject(r.body?.string().orEmpty())
+                }
+                op.optJSONObject("error")?.let { err ->
+                    throw IllegalStateException(err.optString("message").ifBlank { "Video generation failed" })
+                }
+                if (op.optBoolean("done")) {
+                    val response = op.optJSONObject("response")
+                    val first = (response?.optJSONObject("generateVideoResponse")?.optJSONArray("generatedSamples")
+                        ?: response?.optJSONArray("generatedVideos"))?.optJSONObject(0)
+                    val uri = first?.optJSONObject("video")?.optString("uri").orEmpty()
+                    if (uri.isBlank()) throw IllegalStateException("No video in the response. It may have been blocked by the safety filter.")
+                    bytes = client.newCall(keyed(Request.Builder().url(uri).get()).build()).execute().use { r ->
+                        if (!r.isSuccessful) throw IllegalStateException("Video download failed: ${r.code}")
+                        r.body?.bytes() ?: throw IllegalStateException("Empty video")
+                    }
+                }
+            }
+            if (bytes == null) {
+                val secs = ((now - started) / 1000).toInt()
+                onProgress("Generating video · Rendering · %02d:%02d".format(secs / 60, secs % 60))
+            }
+        }
+        return bytes ?: throw IllegalStateException("Video timed out")
+    }
+
     /**
      * Starts an async video job, then waits until it finishes and returns the MP4 bytes.
      * [onProgress] gets a short status line with the elapsed time, updated every second.
@@ -728,6 +796,9 @@ class AIClient {
                 if (!r.isSuccessful) throw IllegalStateException("API Error ${r.code}: ${r.body?.string()?.take(200)}")
                 return@withContext r.body?.bytes() ?: throw IllegalStateException("Empty video response")
             }
+        }
+        if (provider.type == ProviderType.GEMINI) {
+            return@withContext generateVeo(provider, modelId, prompt, onProgress)
         }
         onProgress("Sending request")
         val submitBody = JSONObject().put("model", modelId).put("prompt", prompt)

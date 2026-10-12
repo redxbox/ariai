@@ -745,7 +745,10 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
 /** Replaces the list with the API's models, keeping settings already set for the same IDs and custom models. */
 private fun mergeFetched(current: List<AIModel>, fetched: List<AIModel>): List<AIModel> {
     val byId = current.associateBy { it.id }
-    val fromApi = fetched.map { byId[it.id] ?: it }
+    // Capability flags come from the fresh fetch; the user's own tools, headers and body are kept.
+    val fromApi = fetched.map { f ->
+        byId[f.id]?.let { old -> f.copy(builtInTools = old.builtInTools, headers = old.headers, customBody = old.customBody) } ?: f
+    }
     val customOnly = current.filter { it.isCustom && fetched.none { f -> f.id == it.id } }
     return fromApi + customOnly
 }
