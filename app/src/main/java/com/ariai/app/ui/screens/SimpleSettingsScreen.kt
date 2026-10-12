@@ -79,9 +79,9 @@ fun SimpleSettingsScreen(
                             SimpleChip(label = tx("System"), selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
                         }
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Settings, title = tx("Preferences"), subtitle = tx("Chat options, text size, theme"), onClick = onPreferencesClick)
+                        SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriGemini, title = tx("Preferences"), subtitle = tx("Chat options, text size, theme"), onClick = onPreferencesClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Language, title = tx("Language"), subtitle = if (currentLanguage == "en") tx("English") else currentLanguage, onClick = {
+                        SimpleRow(icon = Icons.Default.Language, tint = com.ariai.app.ui.theme.AriAnthropic, title = tx("Language"), subtitle = if (currentLanguage == "en") tx("English") else currentLanguage, onClick = {
                             val newLang = if (currentLanguage == "en") "fa" else "en"
                             onLanguageChange(newLang)
                         })
@@ -90,28 +90,28 @@ fun SimpleSettingsScreen(
 
                 item {
                     SimpleGroup(title = tx("Models & services")) {
-                        SimpleRow(icon = Icons.Default.Star, title = tx("Default model"), subtitle = defaultModelName, onClick = onDefaultModelClick)
+                        SimpleRow(icon = Icons.Default.Star, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Default model"), subtitle = defaultModelName, onClick = onDefaultModelClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Storage, title = tx("Providers"), subtitle = tx("OpenAI, Gemini, Claude and more"), onClick = onProvidersClick)
+                        SimpleRow(icon = Icons.Default.Storage, tint = com.ariai.app.ui.theme.AriOpenAI, title = tx("Providers"), subtitle = tx("OpenAI, Gemini, Claude and more"), onClick = onProvidersClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Search, title = tx("Search service"), subtitle = tx("Web search for answers"), onClick = onSearchServiceClick)
+                        SimpleRow(icon = Icons.Default.Search, tint = com.ariai.app.ui.theme.AriGemini, title = tx("Search service"), subtitle = tx("Web search for answers"), onClick = onSearchServiceClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Settings, title = tx("MCP servers"), subtitle = tx("Connect local tools"), onClick = onMcpClick)
+                        SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriCustom, title = tx("MCP servers"), subtitle = tx("Connect local tools"), onClick = onMcpClick)
                     }
                 }
 
                 item {
                     SimpleGroup(title = tx("Data")) {
-                        SimpleRow(icon = Icons.Default.Storage, title = tx("Data & storage"), subtitle = tx("Export list, storage overview"), onClick = onStorageClick)
+                        SimpleRow(icon = Icons.Default.Storage, tint = com.ariai.app.ui.theme.AriAnthropic, title = tx("Data & storage"), subtitle = tx("Export list, storage overview"), onClick = onStorageClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Delete, title = tx("Delete all chats"), subtitle = tx("Remove every conversation"), onClick = onClearAll)
+                        SimpleRow(icon = Icons.Default.Delete, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Delete all chats"), subtitle = tx("Remove every conversation"), onClick = onClearAll)
                     }
                 }
 
                 item {
                     SimpleGroup(title = tx("About")) {
-                        SimpleRow(icon = Icons.Default.Info, title = tx("About AriAI"), subtitle = tx("Version 1.0"), onClick = {
+                        SimpleRow(icon = Icons.Default.Info, tint = com.ariai.app.ui.theme.AriGemini, title = tx("About AriAI"), subtitle = tx("Version 1.0"), onClick = {
                             scope.launch { snackbarHostState.showSnackbar(tx("AriAI v1.0 - Personal AI")) }
                         })
                     }
@@ -149,10 +149,10 @@ fun SimpleChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: 
 }
 
 @Composable
-fun SimpleRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+fun SimpleRow(icon: ImageVector, title: String, subtitle: String, tint: Color? = null, onClick: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(AriTint), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = AriInk.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
+        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(tint?.copy(alpha = 0.16f) ?: AriTint), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = tint ?: AriInk.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontSize = 14.sp, color = AriInk, fontWeight = FontWeight.Medium)

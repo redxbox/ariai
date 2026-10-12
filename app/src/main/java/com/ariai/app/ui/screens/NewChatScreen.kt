@@ -548,8 +548,8 @@ fun NewChatScreen(
         if (messages.isEmpty() && currentStreamingContent.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(Accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Chat, contentDescription = null, tint = Accent, modifier = Modifier.size(30.dp))
+                    Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(com.ariai.app.ui.theme.AriGemini.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Chat, contentDescription = null, tint = com.ariai.app.ui.theme.AriGemini, modifier = Modifier.size(30.dp))
                     }
                     Text(tx("How can I help you?"), color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
                     Text(tx("Type a message below to start."), color = Muted, fontSize = 13.sp)
