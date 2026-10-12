@@ -417,7 +417,6 @@ fun NewChatScreen(
                             onDismissRequest = { showTopMenu = false },
                             shape = RoundedCornerShape(18.dp),
                             containerColor = AriCard,
-                            shadowElevation = 6.dp,
                             modifier = Modifier.border(0.5.dp, AriLine, RoundedCornerShape(18.dp))
                         ) {
                             DropdownMenuItem(
