@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.*
 import com.ariai.app.util.LocalStrings
 import kotlinx.coroutines.launch
+import com.ariai.app.data.remote.ConnectionResult
+import com.ariai.app.data.remote.checkConnection
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -308,6 +310,8 @@ fun AddProviderScreen(
     var customBody by remember { mutableStateOf(initialProvider?.customBody.orEmpty()) }
     val scope = rememberCoroutineScope()
     var fetching by remember { mutableStateOf(false) }
+    var checking by remember { mutableStateOf(false) }
+    var connectionResult by remember { mutableStateOf<ConnectionResult?>(null) }
     var fetchError by remember { mutableStateOf<String?>(null) }
     // Key of the URL/key/type the models were last fetched for. Save fetches again when it changes.
     fun sourceKey() = "${baseUrl.trim()}|${apiKey.trim()}|$selectedType"
@@ -445,6 +449,18 @@ fun AddProviderScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
+                        ConnectionCheckRow(
+                            checking = checking,
+                            result = connectionResult,
+                            onCheck = {
+                                checking = true
+                                connectionResult = null
+                                scope.launch {
+                                    connectionResult = checkConnection(draftProvider(models), fetchModels)
+                                    checking = false
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -797,4 +813,41 @@ private fun AddModelSheet(
 @Composable
 private fun SectionLabel(text: String) {
     Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(start = 6.dp))
+}
+
+/** "Check connection" button with a plain result: connected, or what to fix. */
+@Composable
+private fun ConnectionCheckRow(checking: Boolean, result: ConnectionResult?, onCheck: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(
+                onClick = onCheck,
+                enabled = !checking,
+                shape = RoundedCornerShape(50),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AriLine)
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = AriInk, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (checking) tx("Checking…") else tx("Check connection"), color = AriInk, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+        }
+        when (result) {
+            is ConnectionResult.Ok -> Text(
+                "${tx("Connected")} · ${result.models} ${tx("models")}",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AriInk
+            )
+            is ConnectionResult.Failed -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    result.problem + (result.code?.let { " (HTTP $it)" } ?: ""),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AriAccent
+                )
+                Text(result.hint, fontSize = 12.sp, color = AriMuted)
+            }
+            null -> Unit
+        }
+    }
 }
