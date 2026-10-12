@@ -317,4 +317,7 @@ internal val faStrings: Map<String, String> = mapOf(
         "🔑 Invalid API key. Please check your provider settings in AI Providers." to "🔑 کلید API نامعتبر است. تنظیمات ارائه‌دهنده را بررسی کنید.",
         "⏳ Rate limit exceeded. Please wait a moment or try another provider." to "⏳ محدودیت تعداد درخواست. کمی صبر کنید یا ارائه‌دهنده‌ی دیگری را امتحان کنید.",
         "🌐 No internet connection. Please check your network." to "🌐 اتصال اینترنت برقرار نیست. شبکه را بررسی کنید.",
+        "Show all" to "نمایش همه",
+        "Fetch models" to "دریافت مدل‌ها",
+        "New provider" to "ارائه‌دهنده‌ی جدید",
     )

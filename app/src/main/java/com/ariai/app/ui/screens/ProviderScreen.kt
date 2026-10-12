@@ -292,14 +292,15 @@ fun AddProviderScreen(
     modifier: Modifier = Modifier
 ) {
     val isEdit = initialProvider != null
-    val initialPreset = providerPresets.firstOrNull { it.type == initialProvider?.type } ?: providerPresets.last()
     var name by remember { mutableStateOf(initialProvider?.name ?: providerPresets.firstOrNull { it.type == presetType }?.label.orEmpty()) }
     var baseUrl by remember { mutableStateOf(initialProvider?.baseUrl ?: providerPresets.firstOrNull { it.type == presetType }?.baseUrl ?: "https://api.openai.com/v1") }
     var apiKey by remember { mutableStateOf(initialProvider?.apiKey ?: "") }
     var selectedType by remember { mutableStateOf(initialProvider?.type ?: presetType ?: ProviderType.OPENAI) }
     var reveal by remember { mutableStateOf(false) }
+    var tab by remember { mutableStateOf(0) }
+    var advancedOpen by remember { mutableStateOf(false) }
+    var enabled by remember { mutableStateOf(initialProvider?.enabled ?: true) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val accent = providerPresets.firstOrNull { it.type == selectedType }?.color ?: initialPreset.color
     val providerId = remember { initialProvider?.id ?: java.util.UUID.randomUUID().toString() }
     var models by remember { mutableStateOf(initialProvider?.models ?: emptyList()) }
     var modelsEdited by remember { mutableStateOf(initialProvider != null) }
@@ -325,7 +326,7 @@ fun AddProviderScreen(
         baseUrl = baseUrl.trim(),
         apiKey = apiKey.trim(),
         models = list.map { it.copy(providerId = providerId) },
-        enabled = initialProvider?.enabled ?: true,
+        enabled = enabled,
         customHeaders = headers.filter { it.first.isNotBlank() }.toMap(),
         customBody = customBody.trim().ifBlank { null },
         createdAt = initialProvider?.createdAt ?: System.currentTimeMillis()
@@ -379,24 +380,60 @@ fun AddProviderScreen(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = AriInk) } },
                 title = { Text(if (isEdit) tx("Edit provider") else tx("Add provider"), fontWeight = FontWeight.SemiBold, color = AriInk) }
             )
+        },
+        bottomBar = {
+            Box(modifier = Modifier.fillMaxWidth().background(AriPaper).navigationBarsPadding().padding(16.dp)) {
+                Button(
+                    onClick = {
+                        if (sourceKey() != fetchedKey) {
+                            // URL, key or type changed: load the models from the API first.
+                            fetchAndMerge { list -> onSave(draftProvider(list ?: models)) }
+                        } else {
+                            onSave(draftProvider(models))
+                        }
+                    },
+                    enabled = canSave && !fetching,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AriInk),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) { Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+            }
         }
     ) { padding ->
         LazyColumn(
             modifier = modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Brand presets
+            item {
+                ProviderEditHeader(
+                    name = name,
+                    type = selectedType,
+                    baseUrl = baseUrl,
+                    enabled = enabled,
+                    onToggle = { enabled = it }
+                )
+            }
+            item {
+                SegmentedTabs(
+                    labels = listOf(tx("Connection"), tx("Models")),
+                    selected = tab,
+                    onSelect = { tab = it }
+                )
+            }
+
+            if (tab == 0) {
+            // Provider type: one pill row, the selected type is solid ink
             item { SectionLabel(tx("Provider")) }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     providerPresets.forEach { preset ->
                         val selected = selectedType == preset.type
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
-                                .background(if (selected) preset.color.copy(alpha = 0.12f) else AriCard)
+                                .background(if (selected) AriInk else AriCard)
                                 .clickable {
                                     selectedType = preset.type
                                     baseUrl = preset.baseUrl
@@ -404,17 +441,25 @@ fun AddProviderScreen(
                                 }
                                 .padding(vertical = 12.dp, horizontal = 4.dp)
                         ) {
-                            Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(preset.color), contentAlignment = Alignment.Center) {
-                                Text(preset.label.first().toString(), color = AriCard, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Box(
+                                modifier = Modifier.size(34.dp).clip(CircleShape).background(if (selected) AriPaper else AriTint),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(preset.label.first().toString(), color = AriInk, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
-                            Text(preset.label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) preset.color else AriInk.copy(alpha = 0.7f), maxLines = 1)
+                            Text(
+                                preset.label,
+                                fontSize = 11.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (selected) AriPaper else AriInk.copy(alpha = 0.7f),
+                                maxLines = 1
+                            )
                         }
                     }
                 }
             }
 
             // Connection
-            item { SectionLabel(tx("Connection")) }
             item {
                 Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -424,6 +469,7 @@ fun AddProviderScreen(
                             label = { Text(tx("Name")) },
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
+                            colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
@@ -432,6 +478,7 @@ fun AddProviderScreen(
                             label = { Text(tx("Base URL")) },
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
+                            colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
@@ -446,6 +493,7 @@ fun AddProviderScreen(
                                 }
                             },
                             shape = RoundedCornerShape(14.dp),
+                            colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
@@ -465,8 +513,59 @@ fun AddProviderScreen(
                 }
             }
 
+
+            // Advanced: collapsed by default. Headers and body are sent to every model of this provider.
+            item {
+                Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { advancedOpen = !advancedOpen }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(tx("Advanced"), fontWeight = FontWeight.SemiBold, color = AriInk, modifier = Modifier.weight(1f))
+                            Icon(
+                                if (advancedOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = AriInk
+                            )
+                        }
+                        if (advancedOpen) {
+                            Column(
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(tx("Custom headers"), fontWeight = FontWeight.Medium, color = AriInk)
+                                KeyValueEditor(items = headers, onChange = { headers = it })
+                                OutlinedTextField(
+                                    value = customBody,
+                                    onValueChange = { customBody = it },
+                                    label = { Text(tx("Custom body (JSON)")) },
+                                    minLines = 2,
+                                    maxLines = 6,
+                                    isError = !isValidJsonObject(customBody),
+                                    supportingText = { if (!isValidJsonObject(customBody)) Text(tx("Must be a JSON object")) },
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = providerFieldColors(),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+                if (isEdit) {
+                    item {
+                        OutlinedButton(
+                            onClick = { confirmDelete = true },
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth().height(52.dp)
+                        ) { Text(tx("Delete provider"), color = AriAccent, fontWeight = FontWeight.SemiBold) }
+                    }
+                }
+            } else {
             // Models: one grouped list. Fetch fills it from the API; rows can be removed.
-            item { SectionLabel(if (models.isEmpty()) tx("Models") else "Models · ${models.size}") }
             item {
                 val visibleModels = models.filter {
                     modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
@@ -474,17 +573,31 @@ fun AddProviderScreen(
                 Surface(shape = RoundedCornerShape(22.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
                     Column {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp),
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                fetchError ?: tx("Loaded from the API on save"),
-                                fontSize = 12.sp,
-                                color = if (fetchError != null) AriAccent else AriMuted,
-                                modifier = Modifier.weight(1f)
-                            )
-                            TextButton(onClick = { fetchAndMerge {} }, enabled = !fetching && baseUrl.isNotBlank()) {
-                                Text(if (fetching) tx("Loading…") else tx("Fetch"), color = AriInk, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    if (models.isEmpty()) tx("No models yet") else "${models.size} ${tx("models")}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AriInk
+                                )
+                                Text(
+                                    fetchError ?: tx("Loaded from the API on save"),
+                                    fontSize = 12.sp,
+                                    color = if (fetchError != null) AriAccent else AriMuted
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { fetchAndMerge {} },
+                                enabled = !fetching && baseUrl.isNotBlank(),
+                                shape = RoundedCornerShape(50),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, AriLine)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = AriInk, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (fetching) tx("Loading…") else tx("Fetch models"), color = AriInk, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                             }
                         }
                         if (models.size > 8) {
@@ -507,7 +620,7 @@ fun AddProviderScreen(
                             if (index > 0) HorizontalDivider(color = AriTint, modifier = Modifier.padding(horizontal = 16.dp))
                             ModelRow(
                                 model = model,
-                                color = accent,
+                                color = AriInk,
                                 onRemove = { models = models.filterNot { it.id == model.id } }
                             )
                         }
@@ -522,7 +635,7 @@ fun AddProviderScreen(
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    if (modelsExpanded) tx("Show less") else "Show all ${visibleModels.size}",
+                                    if (modelsExpanded) tx("Show less") else "${tx("Show all")} ${visibleModels.size}",
                                     color = AriInk,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -538,58 +651,9 @@ fun AddProviderScreen(
                 }
             }
 
-            // Advanced: headers and body sent to every model of this provider.
-            item { SectionLabel(tx("Advanced")) }
-            item {
-                Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(tx("Custom headers"), fontWeight = FontWeight.Medium, color = AriInk)
-                        KeyValueEditor(items = headers, onChange = { headers = it })
-                        OutlinedTextField(
-                            value = customBody,
-                            onValueChange = { customBody = it },
-                            label = { Text(tx("Custom body (JSON)")) },
-                            minLines = 2,
-                            maxLines = 6,
-                            isError = !isValidJsonObject(customBody),
-                            supportingText = { if (!isValidJsonObject(customBody)) Text(tx("Must be a JSON object")) },
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
             }
 
-            item { Spacer(Modifier.height(4.dp)) }
-
-            // Actions
-            item {
-                Button(
-                    onClick = {
-                        if (sourceKey() != fetchedKey) {
-                            // URL, key or type changed: load the models from the API first.
-                            fetchAndMerge { list -> onSave(draftProvider(list ?: models)) }
-                        } else {
-                            onSave(draftProvider(models))
-                        }
-                    },
-                    enabled = canSave && !fetching,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriInk),
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) { Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-            }
-
-            if (isEdit) {
-                item {
-                    OutlinedButton(
-                        onClick = { confirmDelete = true },
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) { Text(tx("Delete provider"), color = AriAccent, fontWeight = FontWeight.SemiBold) }
-                }
-            }
-            item { Spacer(Modifier.height(24.dp)) }
+            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 }
@@ -848,6 +912,106 @@ private fun ConnectionCheckRow(checking: Boolean, result: ConnectionResult?, onC
                 Text(result.hint, fontSize = 12.sp, color = AriMuted)
             }
             null -> Unit
+        }
+    }
+}
+
+@Composable
+private fun providerFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = AriInk,
+    unfocusedBorderColor = AriLine,
+    focusedLabelColor = AriInk,
+    unfocusedLabelColor = AriMuted,
+    cursorColor = AriInk,
+    focusedContainerColor = AriPaper,
+    unfocusedContainerColor = AriPaper,
+    errorBorderColor = AriAccent,
+    errorLabelColor = AriAccent,
+    errorSupportingTextColor = AriAccent
+)
+
+@Composable
+private fun ProviderEditHeader(
+    name: String,
+    type: ProviderType,
+    baseUrl: String,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    val host = remember(baseUrl) {
+        runCatching { java.net.URI(baseUrl.trim()).host }.getOrNull()?.removePrefix("www.").orEmpty()
+    }
+    Surface(shape = RoundedCornerShape(20.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(AriInk),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    name.trim().firstOrNull()?.uppercase() ?: "?",
+                    color = AriPaper,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    name.trim().ifBlank { tx("New provider") },
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.sp,
+                    color = AriInk,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    listOf(providerTypeLabel(type), host).filter { it.isNotBlank() }.joinToString(" · "),
+                    fontSize = 13.sp,
+                    color = AriMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = AriPaper,
+                    checkedTrackColor = AriInk,
+                    uncheckedThumbColor = AriMuted,
+                    uncheckedTrackColor = AriTint,
+                    uncheckedBorderColor = AriLine
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun SegmentedTabs(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(AriTint).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        labels.forEachIndexed { index, label ->
+            val isSelected = index == selected
+            Box(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(50))
+                    .background(if (isSelected) AriInk else androidx.compose.ui.graphics.Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    label,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = if (isSelected) AriPaper else AriInk
+                )
+            }
         }
     }
 }
