@@ -444,10 +444,10 @@ fun AddProviderScreen(
                                 .padding(vertical = 12.dp, horizontal = 4.dp)
                         ) {
                             Box(
-                                modifier = Modifier.size(34.dp).clip(CircleShape).background(if (selected) AriPaper else AriTint),
+                                modifier = Modifier.size(34.dp).clip(CircleShape).background(preset.color),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(preset.label.first().toString(), color = AriInk, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(preset.label.first().toString(), color = AriPaper, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
                             Text(
                                 preset.label,
@@ -964,13 +964,14 @@ private fun ProviderEditHeader(
     val host = remember(baseUrl) {
         runCatching { java.net.URI(baseUrl.trim()).host }.getOrNull()?.removePrefix("www.").orEmpty()
     }
+    val brand = providerPresets.firstOrNull { it.type == type }?.color ?: AriInk
     Surface(shape = RoundedCornerShape(20.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(AriInk),
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(brand),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -1003,7 +1004,7 @@ private fun ProviderEditHeader(
                 onCheckedChange = onToggle,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = AriPaper,
-                    checkedTrackColor = AriInk,
+                    checkedTrackColor = brand,
                     uncheckedThumbColor = AriMuted,
                     uncheckedTrackColor = AriTint,
                     uncheckedBorderColor = AriLine

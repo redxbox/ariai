@@ -53,9 +53,9 @@ fun AttachmentSheet(
         ) {
             Text(tx("Add to message"), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Ink)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                SheetTile(Icons.Default.Image, tx("Photo"), Modifier.weight(1f)) { onDismiss(); onPhoto() }
-                SheetTile(Icons.Default.CameraAlt, tx("Camera"), Modifier.weight(1f)) { onDismiss(); onCamera() }
-                SheetTile(Icons.Default.Description, tx("Text file"), Modifier.weight(1f)) { onDismiss(); onFile() }
+                SheetTile(Icons.Default.Image, tx("Photo"), Modifier.weight(1f), com.ariai.app.ui.theme.AriGemini) { onDismiss(); onPhoto() }
+                SheetTile(Icons.Default.CameraAlt, tx("Camera"), Modifier.weight(1f), com.ariai.app.ui.theme.AriOpenAI) { onDismiss(); onCamera() }
+                SheetTile(Icons.Default.Description, tx("Text file"), Modifier.weight(1f), com.ariai.app.ui.theme.AriAnthropic) { onDismiss(); onFile() }
             }
             HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
             Text(tx("Generate"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
@@ -71,7 +71,7 @@ fun AttachmentSheet(
 }
 
 @Composable
-private fun SheetTile(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
+private fun SheetTile(icon: ImageVector, label: String, modifier: Modifier, tint: Color? = null, onClick: () -> Unit) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -81,7 +81,7 @@ private fun SheetTile(icon: ImageVector, label: String, modifier: Modifier, onCl
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(icon, contentDescription = label, tint = Accent, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = label, tint = tint ?: Accent, modifier = Modifier.size(24.dp))
         Text(label, fontSize = 13.sp, color = Ink)
     }
 }

@@ -75,7 +75,13 @@ fun SearchServiceScreen(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            itemsIndexed(searchServices, key = { i, s -> "${s.key}_$i" }) { _, service ->
+            itemsIndexed(searchServices, key = { i, s -> "${s.key}_$i" }) { index, service ->
+                val brand = listOf(
+                    com.ariai.app.ui.theme.AriGemini,
+                    com.ariai.app.ui.theme.AriOpenAI,
+                    com.ariai.app.ui.theme.AriAnthropic,
+                    com.ariai.app.ui.theme.AriCustom
+                )[index % 4]
                 val key = searchKeys[service.key].orEmpty()
                 val isOpen = expanded == service.key
                 val isActive = activeKey == service.key
@@ -87,8 +93,8 @@ fun SearchServiceScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = Accent, modifier = Modifier.size(20.dp))
+                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(brand), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Search, contentDescription = null, tint = com.ariai.app.ui.theme.AriPaper, modifier = Modifier.size(20.dp))
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(service.name, fontWeight = FontWeight.SemiBold, color = Ink)
