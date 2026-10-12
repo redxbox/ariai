@@ -7,7 +7,13 @@ APK=app/build/outputs/apk/debug/app-debug.apk
 OUT=smoke-out
 mkdir -p "$OUT"
 FAILED=0
-shot() { adb exec-out screencap -p > "$OUT/$1.png"; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb pull /sdcard/ui.xml "$OUT/$1.xml" >/dev/null 2>&1; }
+shot() {
+  adb exec-out screencap -p > "$OUT/$1.png"
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  adb pull /sdcard/ui.xml "$OUT/$1.xml" >/dev/null 2>&1
+  # Put the visible texts in the run log as annotations, so results can be read without downloading artifacts.
+  python3 .github/scripts/screen_texts.py "$OUT/$1.xml" "$1"
+}
 step() { echo "== $1"; }
 
 adb wait-for-device
