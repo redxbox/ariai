@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -773,7 +775,7 @@ private fun AddModelSheet(
     onAdd: (AIModel) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var tab by remember { mutableStateOf(2) }
+    var tab by remember { mutableStateOf(0) }
     var modelId by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var isImage by remember { mutableStateOf(false) }
@@ -787,89 +789,107 @@ private fun AddModelSheet(
     val isGemini = providerType == ProviderType.GEMINI
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(tx("Add model"), fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
-            TabRow(selectedTabIndex = tab, containerColor = AriPaper) {
-                listOf(tx("Built-in Tools"), tx("Advanced"), tx("Basic")).forEachIndexed { index, label ->
-                    Tab(selected = tab == index, onClick = { tab = index }, text = { Text(label, fontSize = 12.sp) })
-                }
-            }
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
+            Text(
+                tx("Add model"),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp,
+                color = AriInk,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp)
+            )
+            // Scrollable body: long forms scroll, the footer below stays put.
+            Column(
+                modifier = Modifier.weight(1f, fill = false).fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                SegmentedTabs(
+                    labels = listOf(tx("Basic"), tx("Advanced"), tx("Built-in Tools")),
+                    selected = tab,
+                    onSelect = { tab = it }
+                )
 
-            when (tab) {
-                0 -> {
-                    Text(
-                        if (isGemini) tx("Tools the API runs for this model.") else "Built-in tools need the official Gemini API. Turn on a Gemini provider to use them.",
-                        fontSize = 12.sp, color = AriMuted
-                    )
-                    ToolToggleRow(tx("Search"), tx("Google Search grounding"), search, enabled = isGemini) { search = it }
-                    ToolToggleRow(tx("URL context"), tx("Read the links in the message"), urlContext, enabled = isGemini) { urlContext = it }
-                }
-                1 -> {
-                    Text(tx("Extra headers for this model only."), fontSize = 12.sp, color = AriMuted)
-                    KeyValueEditor(items = headers, onChange = { headers = it })
-                    OutlinedTextField(
-                        value = customBody,
-                        onValueChange = { customBody = it },
-                        label = { Text(tx("Custom body (JSON)")) },
-                        placeholder = { Text("{\"temperature\": 0.2}") },
-                        minLines = 3,
-                        maxLines = 6,
-                        isError = !bodyValid,
-                        supportingText = { if (!bodyValid) Text(tx("Must be a JSON object")) },
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                else -> {
-                    OutlinedTextField(
-                        value = modelId, onValueChange = { modelId = it }, label = { Text(tx("Model ID")) },
-                        singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = displayName, onValueChange = { displayName = it }, label = { Text(tx("Display name (optional)")) },
-                        singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(tx("Type"), fontSize = 12.sp, color = AriMuted)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = !isImage, onClick = { isImage = false }, label = { Text(tx("Chat")) })
-                        FilterChip(selected = isImage, onClick = { isImage = true }, label = { Text(tx("Image")) })
-                    }
-                    ToolToggleRow(tx("Accepts images"), tx("Vision input"), vision, enabled = true) { vision = it }
-                    ToolToggleRow(tx("Tool calling"), tx("Function calling"), tools, enabled = true) { tools = it }
-                }
-            }
-
-            Button(
-                onClick = {
-                    val id = modelId.trim()
-                    onAdd(
-                        AIModel(
-                            id = id,
-                            displayName = displayName.trim().ifBlank { id },
-                            providerId = providerId,
-                            supportsVision = vision,
-                            supportsFunctionCalling = tools,
-                            supportsImageGen = isImage,
-                            contextWindow = 8192,
-                            isCustom = true,
-                            builtInTools = listOfNotNull(
-                                "google_search".takeIf { search && isGemini },
-                                "url_context".takeIf { urlContext && isGemini }
-                            ),
-                            headers = headers.filter { it.first.isNotBlank() }.toMap(),
-                            customBody = customBody.trim().ifBlank { null }
+                when (tab) {
+                    2 -> {
+                        Text(
+                            if (isGemini) tx("Tools the API runs for this model.") else tx("Built-in tools need the official Gemini API. Turn on a Gemini provider to use them."),
+                            fontSize = 12.sp, color = AriMuted
                         )
-                    )
-                },
-                enabled = modelId.isNotBlank() && bodyValid,
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AriInk),
-                modifier = Modifier.fillMaxWidth().height(50.dp)
-            ) { Text(tx("Add"), fontWeight = FontWeight.SemiBold) }
-            Spacer(Modifier.height(16.dp))
+                        ToolToggleRow(tx("Search"), tx("Google Search grounding"), search, enabled = isGemini) { search = it }
+                        ToolToggleRow(tx("URL context"), tx("Read the links in the message"), urlContext, enabled = isGemini) { urlContext = it }
+                    }
+                    1 -> {
+                        Text(tx("Extra headers for this model only."), fontSize = 12.sp, color = AriMuted)
+                        KeyValueEditor(items = headers, onChange = { headers = it })
+                        OutlinedTextField(
+                            value = customBody,
+                            onValueChange = { customBody = it },
+                            label = { Text(tx("Custom body (JSON)")) },
+                            placeholder = { Text("{\"temperature\": 0.2}") },
+                            minLines = 3,
+                            maxLines = 6,
+                            isError = !bodyValid,
+                            supportingText = { if (!bodyValid) Text(tx("Must be a JSON object")) },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = providerFieldColors(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    else -> {
+                        OutlinedTextField(
+                            value = modelId, onValueChange = { modelId = it }, label = { Text(tx("Model ID")) },
+                            singleLine = true, shape = RoundedCornerShape(14.dp), colors = providerFieldColors(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = displayName, onValueChange = { displayName = it }, label = { Text(tx("Display name (optional)")) },
+                            singleLine = true, shape = RoundedCornerShape(14.dp), colors = providerFieldColors(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(tx("Type"), fontSize = 12.sp, color = AriMuted)
+                        SegmentedTabs(
+                            labels = listOf(tx("Chat"), tx("Image")),
+                            selected = if (isImage) 1 else 0,
+                            onSelect = { isImage = it == 1 }
+                        )
+                        ToolToggleRow(tx("Accepts images"), tx("Vision input"), vision, enabled = true) { vision = it }
+                        ToolToggleRow(tx("Tool calling"), tx("Function calling"), tools, enabled = true) { tools = it }
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+
+            // Fixed footer: always visible above the navigation bar.
+            Box(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                Button(
+                    onClick = {
+                        val id = modelId.trim()
+                        onAdd(
+                            AIModel(
+                                id = id,
+                                displayName = displayName.trim().ifBlank { id },
+                                providerId = providerId,
+                                supportsVision = vision,
+                                supportsFunctionCalling = tools,
+                                supportsImageGen = isImage,
+                                contextWindow = 8192,
+                                isCustom = true,
+                                builtInTools = listOfNotNull(
+                                    "google_search".takeIf { search && isGemini },
+                                    "url_context".takeIf { urlContext && isGemini }
+                                ),
+                                headers = headers.filter { it.first.isNotBlank() }.toMap(),
+                                customBody = customBody.trim().ifBlank { null }
+                            )
+                        )
+                    },
+                    enabled = modelId.isNotBlank() && bodyValid,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AriInk),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) { Text(tx("Add"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+            }
         }
     }
 }

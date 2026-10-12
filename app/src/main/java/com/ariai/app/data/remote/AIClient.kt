@@ -13,12 +13,28 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
+/**
+ * Some relays only accept requests from known coding clients. AgentRouter rejects the default
+ * OkHttp User-Agent with 401 even when the key is valid, so those hosts get a client-style UA.
+ * Other hosts keep the default.
+ */
+private val clientIdentityInterceptor = Interceptor { chain ->
+    val request = chain.request()
+    val host = request.url.host
+    if (host == "agentrouter.org" || host.endsWith(".agentrouter.org")) {
+        chain.proceed(request.newBuilder().header("User-Agent", "opencode/1.18.31 (android; okhttp)").build())
+    } else {
+        chain.proceed(request)
+    }
+}
+
 class AIClient {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
+        .addNetworkInterceptor(clientIdentityInterceptor)
         .build()
 
     fun chatCompletionStream(
