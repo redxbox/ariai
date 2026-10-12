@@ -169,15 +169,15 @@ fun ColumnScope.AppDrawerContent(
     HorizontalDivider(color = AriInk.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
 
     // Footer: quick access to the main areas. Each button opens a real screen.
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+    Column(
+        modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers", com.ariai.app.ui.theme.AriOpenAI) { onNavigate("providers") }
-        FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp", com.ariai.app.ui.theme.AriCustom) { onNavigate("mcp") }
-        FooterAction(Icons.Default.Public, tx("Search"), currentRoute == "search_service", com.ariai.app.ui.theme.AriGemini) { onNavigate("search_service") }
-        FooterAction(Icons.Default.Settings, tx("Settings"), currentRoute == "settings", com.ariai.app.ui.theme.AriAnthropic) { onNavigate("settings") }
-        FooterAction(Icons.Default.Info, tx("About"), false, com.ariai.app.ui.theme.AriAccent, onAbout)
+        FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }
+        FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }
+        FooterAction(Icons.Default.Public, tx("Search"), currentRoute == "search_service") { onNavigate("search_service") }
+        FooterAction(Icons.Default.Settings, tx("Settings"), currentRoute == "settings") { onNavigate("settings") }
+        FooterAction(Icons.Default.Info, tx("About"), false, onAbout)
     }
     Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
 }
@@ -233,19 +233,16 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
 }
 
 @Composable
-private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, tint: Color? = null, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .background(if (selected) AriTint else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Box(
-            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp))
-                .background(tint?.copy(alpha = 0.16f) ?: if (selected) AriTint else AriPaper),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = label, tint = tint ?: Ink, modifier = Modifier.size(20.dp))
-        }
-        Text(label, fontSize = 11.sp, color = Ink, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Icon(icon, contentDescription = label, tint = AriAccent, modifier = Modifier.size(22.dp))
+        Text(label, fontSize = 15.sp, color = Ink, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
