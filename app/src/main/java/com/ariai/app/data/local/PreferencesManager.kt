@@ -85,7 +85,20 @@ class PreferencesManager(private val context: Context) {
             "serper" -> SERPER_API_KEY
             else -> SEARCH_API_KEY
         }
-        context.dataStore.edit { it[prefKey] = KeyVault.encrypt(key) }
+        context.dataStore.edit { it[prefKey] = key.trim() }
+    }
+
+    /**
+     * One-time move of search keys saved in the old encrypted form to plain text.
+     * A value that can no longer be decrypted is cleared so the user sees it as empty.
+     */
+    suspend fun migrateSearchKeysToPlain() {
+        context.dataStore.edit { prefs ->
+            listOf(TAVILY_API_KEY, BRAVE_API_KEY, EXA_API_KEY, SERPER_API_KEY, SEARCH_API_KEY).forEach { k ->
+                val raw = prefs[k] ?: return@forEach
+                if (raw.startsWith("enc1:")) prefs[k] = KeyVault.decrypt(raw)
+            }
+        }
     }
 
     suspend fun setFirstLaunchDone() {

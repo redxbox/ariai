@@ -1,6 +1,7 @@
 package com.ariai.app
 
 import android.app.Application
+import kotlinx.coroutines.launch
 import androidx.room.Room
 import com.ariai.app.data.local.AppDatabase
 import com.ariai.app.data.local.PreferencesManager
@@ -12,6 +13,9 @@ class AriAiApp : Application() {
     override fun onCreate() {
         super.onCreate()
         com.ariai.app.data.local.ImageStore.init(filesDir)
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try { preferencesManager.migrateSearchKeysToPlain() } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e, "search key migration") }
+        }
     }
 
     val database by lazy {

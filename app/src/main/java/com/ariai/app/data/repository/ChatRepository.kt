@@ -238,7 +238,9 @@ class ChatRepository(
         name = name,
         type = type.name,
         baseUrl = baseUrl,
-        apiKey = com.ariai.app.util.KeyVault.encrypt(apiKey),
+        // Stored as plain text in the app-private database. Keystore keys can be lost on some devices,
+        // which made saved keys unreadable; see KeyVault for reading older encrypted values.
+        apiKey = apiKey,
         enabled = enabled,
         customHeaders = try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { "" },
         customBody = customBody,
