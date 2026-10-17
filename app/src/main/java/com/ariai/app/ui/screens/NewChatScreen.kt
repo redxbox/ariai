@@ -33,10 +33,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -224,6 +220,22 @@ fun NewChatScreen(
 
     val currentProvider = providers.find { it.id == chat?.providerId } ?: providers.firstOrNull()
     val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
+    val selectedModelCapabilities = currentProvider?.models?.firstOrNull { it.id == selectedModel }
+    val selectedModelIsImageOnly = selectedModelCapabilities?.let { it.supportsImageGen && !it.outputsText } == true
+    val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
+    val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
+    val hasStreamingText = currentStreamingContent.isNotBlank()
+    val showWaitingStatus = isSending && !hasStreamingText
+    val waitingStatus = when {
+        chatMode == ChatMode.IMAGE || selectedModelIsImageOnly ->
+            tx("Preparing image generation…")
+        chatMode == ChatMode.VIDEO || selectedModelIsVideoOnly ->
+            tx("Preparing video generation…")
+        chatMode == ChatMode.AUDIO || selectedModelIsAudioOnly ->
+            tx("Preparing audio generation…")
+        searchMode != SearchMode.OFF -> tx("Searching the web…")
+        else -> tx("Thinking…")
+    }
     val imageGenerationAvailable = providers.any { provider ->
         provider.enabled && provider.models.any { it.supportsImageGen }
     }
@@ -240,7 +252,7 @@ fun NewChatScreen(
     // Wait for the streamed text to be measured, then keep the bottom of its row inside the viewport.
     // Streaming rows do not animate their size: an animated height would make the scroll chase stale layout.
     suspend fun followToEnd() {
-        val itemCount = messages.size + if (currentStreamingContent.isNotEmpty()) 1 else 0
+        val itemCount = messages.size + if (hasStreamingText || showWaitingStatus) 1 else 0
         val target = itemCount - 1
         if (target < 0) return
 
@@ -265,8 +277,8 @@ fun NewChatScreen(
         }
     }
 
-    LaunchedEffect(messages.size, currentStreamingContent.length) {
-        if (currentStreamingContent.isEmpty() && messages.lastOrNull()?.role == MessageRole.USER) followStream = true
+    LaunchedEffect(messages.size, currentStreamingContent.length, showWaitingStatus) {
+        if (!hasStreamingText && messages.lastOrNull()?.role == MessageRole.USER) followStream = true
         if (followStream) followToEnd()
     }
     // The keyboard shrinks the list. If the user was at the bottom, keep the newest text visible.
@@ -622,7 +634,7 @@ fun NewChatScreen(
             }
         }
     ) { padding ->
-        if (messages.isEmpty() && currentStreamingContent.isEmpty()) {
+        if (messages.isEmpty() && !hasStreamingText && !isSending) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(AriTint), contentAlignment = Alignment.Center) {
@@ -660,10 +672,12 @@ fun NewChatScreen(
                         }
                     }
                 }
-                if (currentStreamingContent.isNotEmpty()) {
+                if (hasStreamingText) {
                     item(key = "streaming") {
                         AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
                     }
+                } else if (showWaitingStatus) {
+                    item(key = "waiting-status") { WaitingStatus(waitingStatus) }
                 }
             }
             ThinkingChip(
@@ -816,6 +830,22 @@ private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: In
 }
 
 @Composable
+private fun WaitingStatus(label: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(start = 4.dp)) {
+        Surface(shape = RoundedCornerShape(18.dp), color = AriTint) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Accent)
+                Spacer(Modifier.width(9.dp))
+                Text(label, color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+@Composable
 private fun AssistantBlock(
     text: String,
     fontSize: Int,
@@ -849,9 +879,7 @@ private fun AssistantBlock(
             }
         }
         imageUrls.forEach { RemoteImage(it) }
-        if (streaming) {
-            TypingDots()
-        } else if (imagePath != null && !isVideoPath(imagePath) && !isAudioPath(imagePath)) {
+        if (imagePath != null && !isVideoPath(imagePath) && !isAudioPath(imagePath)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onEdit?.invoke() }) {
                     Text(tx("Edit"), color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
@@ -964,23 +992,6 @@ private fun AppearIn(key: String, content: @Composable () -> Unit) {
         enter = fadeIn(tween(220)) + slideInVertically(tween(260, easing = FastOutSlowInEasing)) { it / 6 }
     ) {
         content()
-    }
-}
-
-/** Three pulsing dots shown while the model is generating. */
-@Composable
-private fun TypingDots() {
-    val transition = rememberInfiniteTransition(label = "typing")
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(top = 4.dp)) {
-        repeat(3) { i ->
-            val alpha by transition.animateFloat(
-                initialValue = 0.2f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(600, delayMillis = i * 150), RepeatMode.Reverse),
-                label = "dot$i"
-            )
-            Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Accent.copy(alpha = alpha)))
-        }
     }
 }
 

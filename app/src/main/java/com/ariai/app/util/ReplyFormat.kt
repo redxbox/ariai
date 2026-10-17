@@ -2,11 +2,14 @@ package com.ariai.app.util
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextIndent
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
 
 /** A reply is a list of normal text paragraphs and code blocks. */
 sealed class ReplyPart {
@@ -14,12 +17,21 @@ sealed class ReplyPart {
     data class Code(val language: String, val code: String) : ReplyPart()
 }
 
+private data class ReplyLine(
+    val text: String,
+    val headingLevel: Int = 0,
+    val listIndent: Int? = null,
+    val isBlank: Boolean = false
+)
+
 private val boldRegex = Regex("""\*\*(.+?)\*\*|__(.+?)__""")
 private val codeRegex = Regex("""`([^`]+)`""")
 private val linkOrUrl = Regex("""\[([^\]]+)\]\((https?://[^)\s]+)\)|(https?://[^\s)\]]+)""")
 private val tableSeparator = Regex("""^\|?[\s:|-]+\|?$""")
 private val ruleLine = Regex("""^(-{3,}|\*{3,}|_{3,})$""")
 private val bulletPrefix = Regex("""^[-*+]\s+""")
+private val numberedPrefix = Regex("""^(\d+)[.)]\s+""")
+private val headingPrefix = Regex("""^(#{1,6})\s*(.*)$""")
 private val linkColor = Color(0xFF2563EB)
 
 /** Splits a reply into text paragraphs and fenced code blocks. */
@@ -56,12 +68,11 @@ fun splitReply(raw: String): List<ReplyPart> {
 }
 
 /**
- * Turns Markdown text into readable text: bold is bold, headings are bold without '#',
- * tables become one line per row, bullets get a dot, links keep their label and are tagged
- * with their address (annotation tag "URL") so they can be opened on tap.
+ * Turns Markdown into mobile-friendly rich text: section headings gain hierarchy, lists wrap with
+ * a hanging indent, tables become compact rows, and links remain tappable.
  */
-fun formatReply(raw: String): AnnotatedString {
-    val lines = mutableListOf<Pair<String, Boolean>>() // text, is heading
+fun formatReply(raw: String, baseFontSizeSp: Float = 15f): AnnotatedString {
+    val lines = mutableListOf<ReplyLine>()
     var pendingBlank = false
     for (original in raw.lines()) {
         var line = original.trim()
@@ -70,31 +81,62 @@ fun formatReply(raw: String): AnnotatedString {
             continue
         }
         if (ruleLine.matches(line) || (tableSeparator.matches(line) && line.contains('-'))) continue
-        var heading = false
-        if (line.startsWith("#")) {
-            heading = true
-            line = line.trimStart('#').trim()
+
+        var headingLevel = 0
+        headingPrefix.find(line)?.let { heading ->
+            headingLevel = heading.groupValues[1].length
+            line = heading.groupValues[2].trim()
         }
         if (line.startsWith(">")) line = line.removePrefix(">").trim()
+
+        var listIndent: Int? = null
+        val sourceIndent = original.takeWhile { it == ' ' || it == '\t' }.length / 2
+        val numbered = numberedPrefix.find(line)
+        val bullet = bulletPrefix.find(line)
+        when {
+            numbered != null -> {
+                line = "${numbered.groupValues[1]}.  " + line.removeRange(numbered.range)
+                listIndent = sourceIndent
+            }
+            bullet != null -> {
+                line = "•  " + line.removeRange(bullet.range)
+                listIndent = sourceIndent
+            }
+        }
         if (line.startsWith("|") && line.endsWith("|")) {
             line = line.trim('|').split("|").map { it.trim() }.filter { it.isNotEmpty() }.joinToString("  ·  ")
-        } else if (bulletPrefix.containsMatchIn(line)) {
-            line = "•  " + line.replaceFirst(bulletPrefix, "")
         }
         if (line.isEmpty()) continue
         if (pendingBlank) {
-            lines.add("" to false)
+            lines.add(ReplyLine(text = "", isBlank = true))
             pendingBlank = false
         }
-        lines.add(line to heading)
+        lines.add(ReplyLine(line, headingLevel, listIndent))
     }
+
     return buildAnnotatedString {
-        lines.forEachIndexed { index, (line, heading) ->
+        lines.forEachIndexed { index, line ->
             if (index > 0) append("\n")
-            if (heading) {
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { appendInline(line) }
-            } else {
-                appendInline(line)
+            if (line.isBlank) return@forEachIndexed
+
+            val paragraphStyle = line.listIndent?.let { indent ->
+                val firstLine = (baseFontSizeSp * 1.15f * indent).sp
+                val continuation = (baseFontSizeSp * 1.35f * (indent + 1)).sp
+                ParagraphStyle(textIndent = TextIndent(firstLine = firstLine, restLine = continuation))
+            } ?: ParagraphStyle()
+            withStyle(paragraphStyle) {
+                if (line.headingLevel > 0) {
+                    val scale = when (line.headingLevel) {
+                        1 -> 1.20f
+                        2 -> 1.13f
+                        else -> 1.06f
+                    }
+                    withStyle(SpanStyle(fontSize = (baseFontSizeSp * scale).sp, fontWeight = FontWeight.Bold)) {
+                        appendInline(line.text)
+                    }
+                } else {
+                    appendInline(line.text)
+                }
             }
         }
     }

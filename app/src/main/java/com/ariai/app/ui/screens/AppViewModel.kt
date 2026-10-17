@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 enum class ChatMode { TEXT, IMAGE, VIDEO, AUDIO }
 
 private const val MAX_MEDIA_BYTES_PER_REQUEST = 16L * 1024L * 1024L
+private const val DEFAULT_MOBILE_REPLY_STYLE =
+    "Reply in the same language as the user's latest message. For multi-part questions, begin with a short direct answer, then use clear Markdown headings and concise bullets. Use short paragraphs; avoid wide tables on phones unless they improve comparison. Keep simple answers brief and do not invent information."
 
 class AppViewModel(
     private val repository: ChatRepository,
@@ -629,8 +631,10 @@ class AppViewModel(
                     val history = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         recentForModel(allHistory, current?.contextWindow ?: 8192)
                     }
+                    val customSystemPrompt = getCurrentChat()?.systemPrompt?.takeIf { it.isNotBlank() }
+                        ?: getAgentSystemPrompt()
                     val systemPrompt = listOfNotNull(
-                        getCurrentChat()?.systemPrompt ?: getAgentSystemPrompt(),
+                        customSystemPrompt ?: DEFAULT_MOBILE_REPLY_STYLE,
                         summary?.let { "Summary of the earlier conversation:\n$it" }
                     ).joinToString("\n\n").ifBlank { null }
 

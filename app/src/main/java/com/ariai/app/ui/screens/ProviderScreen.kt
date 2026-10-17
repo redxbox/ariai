@@ -342,16 +342,31 @@ fun AddProviderScreen(
         customBody = customBody.trim().ifBlank { null },
         createdAt = initialProvider?.createdAt ?: System.currentTimeMillis()
     )
-    fun fetchAndMerge(onDone: (List<AIModel>?) -> Unit) {
+    fun fetchAndMerge(
+        onDone: (List<AIModel>?) -> Unit,
+        showModelsWhenFetched: Boolean = false
+    ) {
+        val requestedSourceKey = sourceKey()
+        val requestProvider = draftProvider(models)
         fetching = true
         fetchError = null
         scope.launch {
-            val result = runCatching { fetchModels(draftProvider(models)) }
+            val result = runCatching { fetchModels(requestProvider) }
             fetching = false
             result.onSuccess { fetched ->
+                if (sourceKey() != requestedSourceKey) {
+                    fetchError = tx("Connection changed while fetching. Fetch again.")
+                    onDone(null)
+                    return@onSuccess
+                }
                 val merged = mergeFetched(models, fetched)
                 models = merged
-                fetchedKey = sourceKey()
+                fetchedKey = requestedSourceKey
+                if (showModelsWhenFetched) {
+                    modelFilter = ""
+                    modelsExpanded = false
+                    tab = 1
+                }
                 onDone(merged)
             }.onFailure {
                 fetchError = "Could not load models: ${it.message ?: it::class.java.simpleName}"
@@ -520,7 +535,7 @@ fun AddProviderScreen(
                             canFetch = baseUrl.isNotBlank(),
                             status = fetchError ?: if (models.isEmpty()) null else "${models.size} ${tx("models")}",
                             isError = fetchError != null,
-                            onFetch = { fetchAndMerge {} }
+                            onFetch = { fetchAndMerge({}, showModelsWhenFetched = true) }
                         )
                     }
                 }
@@ -597,7 +612,11 @@ fun AddProviderScreen(
                                     color = AriInk
                                 )
                                 Text(
-                                    fetchError ?: tx("Loaded from the API on save"),
+                                    fetchError ?: when {
+                                        models.isEmpty() -> tx("Fetch models to preview available models")
+                                        fetchedKey == sourceKey() -> tx("Models are up to date")
+                                        else -> tx("Connection changed. Fetch or save to refresh models.")
+                                    },
                                     fontSize = 12.sp,
                                     color = if (fetchError != null) AriAccent else AriMuted
                                 )
@@ -634,6 +653,14 @@ fun AddProviderScreen(
                         }
                         if (collapsible) {
                             HorizontalDivider(color = AriTint)
+                            if (!modelsExpanded) {
+                                Text(
+                                    "${shownModels.size} ${tx("shown")} · ${visibleModels.size - shownModels.size} ${tx("more models")}",
+                                    fontSize = 12.sp,
+                                    color = AriMuted,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
                             TextButton(onClick = { modelsExpanded = !modelsExpanded }, modifier = Modifier.fillMaxWidth()) {
                                 Icon(
                                     if (modelsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,

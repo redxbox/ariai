@@ -37,14 +37,14 @@ fun ReplyContent(text: String, fontSizeSp: Float, color: Color) {
         parts.forEach { part ->
             when (part) {
                 is ReplyPart.Text -> {
-                    val annotated = remember(part.raw) { formatReply(part.raw) }
+                    val annotated = remember(part.raw, fontSizeSp) { formatReply(part.raw, fontSizeSp) }
                     if (annotated.text.isNotBlank()) {
                         ClickableText(
                             text = annotated,
                             style = TextStyle(
                                 color = color,
                                 fontSize = fontSizeSp.sp,
-                                lineHeight = (fontSizeSp + 8f).sp,
+                                lineHeight = (fontSizeSp * 1.55f).sp,
                                 textDirection = TextDirection.Content
                             ),
                             onClick = { offset ->

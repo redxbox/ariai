@@ -1,5 +1,6 @@
 package com.ariai.app.util
 
+import androidx.compose.ui.text.font.FontWeight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,6 +29,15 @@ class ReplyFormatTest {
     }
 
     @Test
+    fun headingsAreStyledAndSeparatedFromParagraphs() {
+        val formatted = formatReply("## Summary\nA short answer.\n\n### Details\nMore context.", 15f)
+        assertEquals("Summary\nA short answer.\n\nDetails\nMore context.", formatted.text)
+        val heading = formatted.spanStyles.first { it.start == 0 && it.end == "Summary".length }
+        assertEquals(FontWeight.Bold, heading.item.fontWeight)
+        assertEquals(16.95f, heading.item.fontSize.value, 0.01f)
+    }
+
+    @Test
     fun headingHashesAreRemoved() {
         assertEquals("Title", formatReply("# Title").text)
     }
@@ -51,7 +61,8 @@ class ReplyFormatTest {
     }
 
     @Test
-    fun bulletsBecomeDots() {
-        assertEquals("•  one\n•  two", formatReply("- one\n- two").text)
+    fun bulletsAndNumberedListsAreNormalized() {
+        assertEquals("•  one\n•  two", formatReply("- one\n* two").text)
+        assertEquals("1.  first\n2.  second", formatReply("1) first\n2. second").text)
     }
 }
