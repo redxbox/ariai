@@ -122,6 +122,12 @@ class AppViewModel(
 
     private val _isStreaming = MutableStateFlow(false)
     private var sendPending = false
+    private var sendJob: kotlinx.coroutines.Job? = null
+
+    /** Stops the reply being generated. The text received so far is kept as the reply. */
+    fun stopGeneration() {
+        sendJob?.cancel()
+    }
     val isStreaming = _isStreaming.asStateFlow()
 
     private val _streamingContent = MutableStateFlow("")
@@ -380,7 +386,7 @@ class AppViewModel(
 
         // Set before launching so a fast second tap cannot start a second send.
         sendPending = true
-        viewModelScope.launch {
+        sendJob = viewModelScope.launch {
             try {
                 val userMessage = ChatMessage(
                     chatId = chatId,
@@ -474,6 +480,7 @@ class AppViewModel(
                 _isStreaming.value = true
                 _streamingContent.value = ""
 
+                var fullResponse = ""
                 try {
                     val (summary, history) = activeContext(_messages.value)
                     val systemPrompt = listOfNotNull(
@@ -481,7 +488,6 @@ class AppViewModel(
                         summary?.let { "Summary of the earlier conversation:\n$it" }
                     ).joinToString("\n\n").ifBlank { null }
 
-                    var fullResponse = ""
                     var lastPublishMs = 0L
                     repository.streamChat(
                         provider = provider,
@@ -522,6 +528,22 @@ class AppViewModel(
                         updateChatTitle(chatId, content.ifBlank { attachments.first().name }.take(30))
                     }
 
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    // Stopped by the user: keep the text that has arrived so far as the reply.
+                    if (fullResponse.isNotBlank()) {
+                        val partial = ChatMessage(
+                            chatId = chatId,
+                            role = MessageRole.ASSISTANT,
+                            content = fullResponse,
+                            modelId = getCurrentChat()?.modelId,
+                            providerId = provider.id
+                        )
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                            repository.saveMessage(partial)
+                            appendMessage(partial)
+                        }
+                    }
+                    throw e
                 } catch (e: Exception) {
                     val errorMsg = when {
                         e.message?.contains("API Error 401") == true -> tx("🔑 Invalid API key. Please check your provider settings in AI Providers.")

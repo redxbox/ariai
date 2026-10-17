@@ -44,6 +44,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -100,6 +102,7 @@ fun NewChatScreen(
     favorites: Set<String> = emptySet(),
     localSearchConfigured: Boolean = false,
     onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode) -> Unit,
+    onStopGeneration: () -> Unit = {},
     onBack: () -> Unit,
     onRenameChat: (String) -> Unit = {},
     onBranchMessage: (ChatMessage) -> Unit,
@@ -230,23 +233,32 @@ fun NewChatScreen(
             }
         }
     }
-    LaunchedEffect(messages.size, currentStreamingContent.length) {
+    // Brings the last item into view. Used when text grows and when the keyboard opens or closes.
+    suspend fun followToEnd() {
         val last = messages.size + if (currentStreamingContent.isNotEmpty()) 1 else 0
-        if (last <= 0) return@LaunchedEffect
-        if (currentStreamingContent.isEmpty() && messages.lastOrNull()?.role == MessageRole.USER) followStream = true
-        if (!followStream) return@LaunchedEffect
+        if (last <= 0) return
         val target = last - 1
         val info = listState.layoutInfo
         val visible = info.visibleItemsInfo.firstOrNull { it.index == target }
         if (visible == null) {
             listState.scrollToItem(target)
-            return@LaunchedEffect
         }
-        val overflow = visible.offset + visible.size - info.viewportEndOffset
+        val current = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == target } ?: return
+        val overflow = current.offset + current.size - listState.layoutInfo.viewportEndOffset
         if (overflow > 0) {
             // Scroll by the overflow relative to the current position (LazyListState has no scrollBy here).
             listState.scrollToItem(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset + overflow)
         }
+    }
+
+    LaunchedEffect(messages.size, currentStreamingContent.length) {
+        if (currentStreamingContent.isEmpty() && messages.lastOrNull()?.role == MessageRole.USER) followStream = true
+        if (followStream) followToEnd()
+    }
+    // The keyboard shrinks the list. If the user was at the bottom, keep the newest text visible.
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(imeBottom) {
+        if (followStream) followToEnd()
     }
 
     fun showNote(text: String) {
@@ -534,18 +546,30 @@ fun NewChatScreen(
                             }
                             Spacer(Modifier.width(6.dp))
                             val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && !isStreaming
-                            Box(
-                                modifier = Modifier.size(40.dp).clip(CircleShape)
-                                    .background(animateColorAsState(if (canSend) AriAccent else AriTint, tween(200), label = "send").value)
-                                    .clickable(enabled = canSend) { send() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.ArrowUpward,
-                                    contentDescription = tx("Send"),
-                                    tint = if (canSend) AriCard else Ink.copy(alpha = 0.35f),
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            if (isStreaming) {
+                                // While a reply is coming in, the same button stops it.
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(CircleShape)
+                                        .background(AriInk)
+                                        .clickable { onStopGeneration() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Stop, contentDescription = tx("Stop"), tint = AriCard, modifier = Modifier.size(18.dp))
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(CircleShape)
+                                        .background(animateColorAsState(if (canSend) AriAccent else AriTint, tween(200), label = "send").value)
+                                        .clickable(enabled = canSend) { send() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.ArrowUpward,
+                                        contentDescription = tx("Send"),
+                                        tint = if (canSend) AriCard else Ink.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }

@@ -205,6 +205,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         favorites = favoriteModels,
                         localSearchConfigured = searchKeys.values.any { it.isNotBlank() },
                         onSendMessage = { text, files, level, mode -> viewModel.sendMessage(text, files, level, mode) },
+                        onStopGeneration = { viewModel.stopGeneration() },
                         onBack = { newChat() },
                         onRenameChat = { viewModel.renameChat(chatId, it) },
                         onBranchMessage = { viewModel.branchMessage(it) },
