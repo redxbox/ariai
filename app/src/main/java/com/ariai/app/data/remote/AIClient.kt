@@ -287,7 +287,7 @@ class AIClient {
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .addProviderHeaders(provider, request.model)
             .build()
-        client.newCall(httpRequest).execute().use { response ->
+        return client.newCall(httpRequest).execute().use { response ->
             val raw = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("Imagen request failed: HTTP ${response.code}: ${raw.take(500)}")

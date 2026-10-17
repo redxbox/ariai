@@ -752,9 +752,10 @@ private fun AttachmentThumb(attachment: Attachment) {
             }.getOrNull()?.asImageBitmap()
         }
     }
-    if (bitmap != null) {
+    val currentBitmap = bitmap
+    if (currentBitmap != null) {
         androidx.compose.foundation.Image(
-            bitmap = bitmap,
+            bitmap = currentBitmap,
             contentDescription = attachment.name,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier.size(180.dp).clip(RoundedCornerShape(14.dp))

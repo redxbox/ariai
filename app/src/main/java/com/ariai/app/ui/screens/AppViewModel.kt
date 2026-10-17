@@ -246,12 +246,12 @@ class AppViewModel(
         var usedMediaBytes = 0L
         val newestFirst = mutableListOf<ChatMessage>()
         for (message in history.takeLast(RECENT_MESSAGES_FOR_MODEL).asReversed()) {
-            val characters = message.content.length + message.attachments.sumOf { it.textContent?.length ?: 0 }
+            val characters = message.content.length.toLong() + message.attachments.sumOf { it.textContent?.length?.toLong() ?: 0L }
             val mediaTokens = message.attachments.sumOf { attachment ->
                 when (attachment.type) {
-                    AttachmentType.IMAGE -> 768
-                    AttachmentType.VIDEO -> 2048
-                    else -> 0
+                    AttachmentType.IMAGE -> 768L
+                    AttachmentType.VIDEO -> 2048L
+                    else -> 0L
                 }
             }
             val estimate = maxOf(1L, (characters + 3L) / 4L) + mediaTokens
