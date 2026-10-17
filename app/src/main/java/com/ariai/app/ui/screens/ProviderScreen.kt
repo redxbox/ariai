@@ -414,7 +414,7 @@ fun AddProviderScreen(
                     onClick = {
                         if (sourceKey() != fetchedKey) {
                             // URL, key or type changed: load the models from the API first.
-                            fetchAndMerge { list -> onSave(draftProvider(list ?: models)) }
+                            fetchAndMerge(onDone = { list -> onSave(draftProvider(list ?: models)) })
                         } else {
                             onSave(draftProvider(models))
                         }
