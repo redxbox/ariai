@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -375,6 +376,8 @@ fun AddProviderScreen(
         }
     }
     val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody)
+    val modelListState = rememberLazyListState()
+    LaunchedEffect(tab) { modelListState.scrollToItem(0) }
     if (showAddModel) {
         AddModelSheet(
             providerId = providerId,
@@ -408,31 +411,12 @@ fun AddProviderScreen(
                 title = { Text(if (isEdit) tx("Edit provider") else tx("Add provider"), fontWeight = FontWeight.SemiBold, color = AriInk) }
             )
         },
-        bottomBar = {
-            Box(modifier = Modifier.fillMaxWidth().background(AriPaper).navigationBarsPadding().padding(16.dp)) {
-                Button(
-                    onClick = {
-                        if (sourceKey() != fetchedKey) {
-                            // URL, key or type changed: load the models from the API first.
-                            fetchAndMerge(onDone = { list -> onSave(draftProvider(list ?: models)) })
-                        } else {
-                            onSave(draftProvider(models))
-                        }
-                    },
-                    enabled = canSave && !fetching,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriInk),
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) { Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-            }
-        }
     ) { padding ->
-        LazyColumn(
-            modifier = modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item {
+        Column(modifier = modifier.fillMaxSize().padding(padding)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 ProviderEditHeader(
                     name = name,
                     type = selectedType,
@@ -440,16 +424,19 @@ fun AddProviderScreen(
                     enabled = enabled,
                     onToggle = { enabled = it }
                 )
-            }
-            item {
                 SegmentedTabs(
                     labels = listOf(tx("Connection"), tx("Models")),
                     selected = tab,
                     onSelect = { tab = it }
                 )
             }
-
-            if (tab == 0) {
+            LazyColumn(
+                state = modelListState,
+                modifier = Modifier.weight(1f).fillMaxWidth().imePadding(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                if (tab == 0) {
             // Provider type: one pill row, the selected type is solid ink
             item { SectionLabel(tx("Provider")) }
             item {
@@ -688,7 +675,26 @@ fun AddProviderScreen(
 
             }
 
-            item { Spacer(Modifier.height(8.dp)) }
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            if (sourceKey() != fetchedKey) {
+                                // URL, key or type changed: refresh the models before saving.
+                                fetchAndMerge(onDone = { list -> onSave(draftProvider(list ?: models)) })
+                            } else {
+                                onSave(draftProvider(models))
+                            }
+                        },
+                        enabled = canSave && !fetching,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AriInk),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    }
+                }
+            }
         }
     }
 }
