@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -312,10 +313,13 @@ private fun MiniChip(text: String, bg: Color, fg: Color, onClick: (() -> Unit)? 
 private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
     val parsed = remember(text) { if (text.isBlank()) null else providerFromJson(text) }
+    val dialogShape = RoundedCornerShape(28.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
+        modifier = Modifier.border(BorderStroke(1.dp, AriLine), dialogShape),
+        shape = dialogShape,
         containerColor = AriCard,
+        tonalElevation = 8.dp,
         title = { Text(tx("Import provider"), fontWeight = FontWeight.SemiBold, color = Ink) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -355,7 +359,14 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
         ProviderType.OLLAMA to tx("Models that run on your own computer"),
         ProviderType.OPENAI_COMPATIBLE to tx("Any OpenAI-compatible API")
     )
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.border(BorderStroke(1.dp, AriCard.copy(alpha = 0.72f)), sheetShape),
+        shape = sheetShape,
+        containerColor = AriPaper.copy(alpha = 0.90f),
+        tonalElevation = 8.dp
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -365,6 +376,9 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = AriCard,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 1.dp,
+                    border = BorderStroke(0.5.dp, AriLine),
                     modifier = Modifier.fillMaxWidth().clickable { onPick(preset.type) }
                 ) {
                     Row(

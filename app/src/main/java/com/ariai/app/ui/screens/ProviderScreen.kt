@@ -376,6 +376,19 @@ fun AddProviderScreen(
         }
     }
     val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody)
+    val visibleModels = models.filter {
+        modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
+    }
+    // Keep Save near the screen edge only for genuinely short model lists.
+    val pinSaveToBottom = tab == 1 && models.size <= 2
+    fun saveProviderDraft() {
+        if (sourceKey() != fetchedKey) {
+            // URL, key or type changed: refresh the models before saving.
+            fetchAndMerge(onDone = { list -> onSave(draftProvider(list ?: models)) })
+        } else {
+            onSave(draftProvider(models))
+        }
+    }
     val modelListState = rememberLazyListState()
     LaunchedEffect(tab) { modelListState.scrollToItem(0) }
     if (showAddModel) {
@@ -411,6 +424,17 @@ fun AddProviderScreen(
                 title = { Text(if (isEdit) tx("Edit provider") else tx("Add provider"), fontWeight = FontWeight.SemiBold, color = AriInk) }
             )
         },
+        bottomBar = {
+            if (pinSaveToBottom) {
+                Box(modifier = Modifier.fillMaxWidth().background(AriPaper).navigationBarsPadding().padding(16.dp)) {
+                    ProviderSaveButton(
+                        fetching = fetching,
+                        enabled = canSave && !fetching,
+                        onClick = { saveProviderDraft() }
+                    )
+                }
+            }
+        }
     ) { padding ->
         Column(modifier = modifier.fillMaxSize().padding(padding)) {
             Column(
@@ -582,9 +606,6 @@ fun AddProviderScreen(
             } else {
             // Models: one grouped list. Fetch fills it from the API; rows can be removed.
             item {
-                val visibleModels = models.filter {
-                    modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
-                }
                 Surface(shape = RoundedCornerShape(22.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
                     Column {
                         Row(
@@ -675,27 +696,31 @@ fun AddProviderScreen(
 
             }
 
-                item {
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            if (sourceKey() != fetchedKey) {
-                                // URL, key or type changed: refresh the models before saving.
-                                fetchAndMerge(onDone = { list -> onSave(draftProvider(list ?: models)) })
-                            } else {
-                                onSave(draftProvider(models))
-                            }
-                        },
-                        enabled = canSave && !fetching,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AriInk),
-                        modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) {
-                        Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                if (!pinSaveToBottom) {
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        ProviderSaveButton(
+                            fetching = fetching,
+                            enabled = canSave && !fetching,
+                            onClick = { saveProviderDraft() }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProviderSaveButton(fetching: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = AriInk),
+        modifier = Modifier.fillMaxWidth().height(52.dp)
+    ) {
+        Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
     }
 }
 
