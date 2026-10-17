@@ -224,6 +224,9 @@ fun NewChatScreen(
 
     val currentProvider = providers.find { it.id == chat?.providerId } ?: providers.firstOrNull()
     val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
+    val imageGenerationAvailable = providers.any { provider ->
+        provider.enabled && provider.models.any { it.supportsImageGen }
+    }
 
     // Follow the newest text only while the user is at the bottom. Once they scroll up, stay where they are.
     var followStream by remember { mutableStateOf(true) }
@@ -234,21 +237,31 @@ fun NewChatScreen(
             }
         }
     }
-    // Brings the last item into view. Used when text grows and when the keyboard opens or closes.
+    // Wait for the streamed text to be measured, then keep the bottom of its row inside the viewport.
+    // Streaming rows do not animate their size: an animated height would make the scroll chase stale layout.
     suspend fun followToEnd() {
-        val last = messages.size + if (currentStreamingContent.isNotEmpty()) 1 else 0
-        if (last <= 0) return
-        val target = last - 1
-        val info = listState.layoutInfo
-        val visible = info.visibleItemsInfo.firstOrNull { it.index == target }
-        if (visible == null) {
-            listState.scrollToItem(target)
-        }
-        val current = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == target } ?: return
-        val overflow = current.offset + current.size - listState.layoutInfo.viewportEndOffset
-        if (overflow > 0) {
-            // Scroll by the overflow relative to the current position (LazyListState has no scrollBy here).
-            listState.scrollToItem(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset + overflow)
+        val itemCount = messages.size + if (currentStreamingContent.isNotEmpty()) 1 else 0
+        val target = itemCount - 1
+        if (target < 0) return
+
+        repeat(4) {
+            withFrameNanos { }
+            val info = listState.layoutInfo
+            if (target >= info.totalItemsCount) return@repeat
+            val lastItem = info.visibleItemsInfo.firstOrNull { it.index == target }
+            if (lastItem == null) {
+                listState.scrollToItem(target)
+                return@repeat
+            }
+            if (lastItem.size <= 0) return@repeat
+
+            val overflow = lastItem.offset + lastItem.size - info.viewportEndOffset
+            if (overflow <= 0) return
+            // scrollToItem's offset is relative to the first visible item, so add only the hidden tail.
+            listState.scrollToItem(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset + overflow
+            )
         }
     }
 
@@ -380,7 +393,10 @@ fun NewChatScreen(
             onFile = { filePicker.launch(arrayOf("text/*", "application/json", "image/*")) },
             onCompress = { onCompressHistory { showNote(it) } },
             onExtensions = onOpenExtensions,
-            onImage = { onChatModeChange(ChatMode.IMAGE) },
+            onImage = {
+                if (imageGenerationAvailable) onChatModeChange(ChatMode.IMAGE)
+                else showNote(tx("No image model found. Add an image model, or fetch the models in provider settings."))
+            },
             onVideo = {
                 if (providers.any { p -> p.enabled && p.models.any { it.supportsVideoGen } }) onChatModeChange(ChatMode.VIDEO)
                 else showNote(tx("No video model. Fetch models in provider settings."))
@@ -469,7 +485,11 @@ fun NewChatScreen(
                             DropdownMenuItem(
                                 text = { Text(tx("Image chat")) },
                                 leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = AriAccent) },
-                                onClick = { showTopMenu = false; onNewImageChat() }
+                                onClick = {
+                                    showTopMenu = false
+                                    if (imageGenerationAvailable) onNewImageChat()
+                                    else showNote(tx("No image model found. Add an image model, or fetch the models in provider settings."))
+                                }
                             )
                             DropdownMenuItem(
                                 text = { Text(tx("Choose model")) },
@@ -808,7 +828,10 @@ private fun AssistantBlock(
     onEdit: (() -> Unit)? = null,
     onSave: (() -> Unit)? = null
 ) {
-    Column(modifier = Modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = Modifier.fillMaxWidth().then(if (streaming) Modifier else Modifier.animateContentSize()),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         if (imagePath != null) {
             when {
                 isVideoPath(imagePath) -> VideoCard(imagePath)

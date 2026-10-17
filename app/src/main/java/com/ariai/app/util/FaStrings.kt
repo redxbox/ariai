@@ -47,6 +47,8 @@ internal val faStrings: Map<String, String> = mapOf(
         "Generated images and videos will be removed. Chats stay, but these files will no longer open." to "تصاویر و ویدیوهای ساخته‌شده حذف می‌شوند. گفتگوها می‌مانند، اما این فایل‌ها دیگر باز نمی‌شوند.",
         "Generated files deleted" to "فایل‌های ساخته‌شده حذف شد",
         "No image model found. Add an image model, or fetch the models in provider settings." to "مدل تصویری پیدا نشد. یک مدل تصویری اضافه کنید، یا در تنظیمات ارائه‌دهنده مدل‌ها را دریافت کنید.",
+        "Image generation is separate from Vision input. If API metadata is missing, mark this as Image only when the model can create images." to "تولید تصویر با ورودی Vision متفاوت است. اگر API این قابلیت را اعلام نکند، فقط وقتی «تصویر» را انتخاب کنید که مدل واقعاً بتواند تصویر بسازد.",
+        "Image mode uses provider output metadata when available. Vision input alone does not mean image generation." to "حالت تصویر در صورت دسترسی از فرادادهٔ خروجی ارائه‌دهنده استفاده می‌کند. پشتیبانی از ورودی تصویر به‌تنهایی به معنی تولید تصویر نیست.",
         "Built into the provider" to "داخل خود ارائه‌دهنده",
         "Rename chat" to "تغییر نام گفتگو",
         "Chat title" to "عنوان گفتگو",

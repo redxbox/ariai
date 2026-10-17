@@ -292,10 +292,23 @@ fun AddProviderScreen(
     modifier: Modifier = Modifier
 ) {
     val isEdit = initialProvider != null
-    var name by remember { mutableStateOf(initialProvider?.name ?: providerPresets.firstOrNull { it.type == presetType }?.label.orEmpty()) }
-    var baseUrl by remember { mutableStateOf(initialProvider?.baseUrl ?: providerPresets.firstOrNull { it.type == presetType }?.baseUrl ?: "https://api.openai.com/v1") }
-    var apiKey by remember { mutableStateOf(initialProvider?.apiKey ?: "") }
-    var selectedType by remember { mutableStateOf(initialProvider?.type ?: presetType ?: ProviderType.OPENAI) }
+    var name by remember(initialProvider?.id, presetType) {
+        mutableStateOf(initialProvider?.name ?: providerPresets.firstOrNull { it.type == presetType }?.label.orEmpty())
+    }
+    // Preset names follow the selected provider until the user supplies a custom name.
+    var nameManuallyEdited by remember(initialProvider?.id, presetType) {
+        mutableStateOf(
+            initialProvider != null &&
+                initialProvider.name != providerPresets.firstOrNull { it.type == initialProvider.type }?.label
+        )
+    }
+    var baseUrl by remember(initialProvider?.id, presetType) {
+        mutableStateOf(initialProvider?.baseUrl ?: providerPresets.firstOrNull { it.type == presetType }?.baseUrl ?: "https://api.openai.com/v1")
+    }
+    var apiKey by remember(initialProvider?.id, presetType) { mutableStateOf(initialProvider?.apiKey ?: "") }
+    var selectedType by remember(initialProvider?.id, presetType) {
+        mutableStateOf(initialProvider?.type ?: presetType ?: ProviderType.OPENAI)
+    }
     var reveal by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
     var advancedOpen by remember { mutableStateOf(false) }
@@ -352,7 +365,8 @@ fun AddProviderScreen(
             providerId = providerId,
             providerType = selectedType,
             onAdd = { model ->
-                models = models + model
+                // Re-adding a discovered model lets users correct capability flags when an API omits them.
+                models = models.filterNot { it.id == model.id } + model
                 modelsEdited = true
                 showAddModel = false
             },
@@ -435,7 +449,10 @@ fun AddProviderScreen(
                                 .clickable {
                                     selectedType = preset.type
                                     baseUrl = preset.baseUrl
-                                    if (name.isBlank() && preset.type != ProviderType.OPENAI_COMPATIBLE) name = preset.label
+                                    if (!nameManuallyEdited || name.isBlank()) {
+                                        name = preset.label
+                                        nameManuallyEdited = false
+                                    }
                                 }
                                 .padding(vertical = 12.dp, horizontal = 4.dp)
                         ) {
@@ -463,7 +480,10 @@ fun AddProviderScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = name,
-                            onValueChange = { name = it },
+                            onValueChange = {
+                                name = it
+                                nameManuallyEdited = true
+                            },
                             label = { Text(tx("Name")) },
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
@@ -580,6 +600,11 @@ fun AddProviderScreen(
                                     fetchError ?: tx("Loaded from the API on save"),
                                     fontSize = 12.sp,
                                     color = if (fetchError != null) AriAccent else AriMuted
+                                )
+                                Text(
+                                    tx("Image mode uses provider output metadata when available. Vision input alone does not mean image generation."),
+                                    fontSize = 11.sp,
+                                    color = AriMuted
                                 )
                             }
                         }
@@ -722,15 +747,30 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
     }
 }
 
-/** True when the text is empty or a JSON object. */
-/** Replaces the list with the API's models, keeping settings already set for the same IDs and custom models. */
-private fun mergeFetched(current: List<AIModel>, fetched: List<AIModel>): List<AIModel> {
+/** Replaces fetched models while retaining per-model settings and explicit custom capabilities. */
+internal fun mergeFetched(current: List<AIModel>, fetched: List<AIModel>): List<AIModel> {
     val byId = current.associateBy { it.id }
-    // Capability flags come from the fresh fetch; the user's own tools, headers and body are kept.
-    val fromApi = fetched.map { f ->
-        byId[f.id]?.let { old -> f.copy(builtInTools = old.builtInTools, headers = old.headers, customBody = old.customBody) } ?: f
+    val fromApi = fetched.map { fresh ->
+        val old = byId[fresh.id] ?: return@map fresh
+        if (old.isCustom) {
+            // A manually added model may intentionally override incomplete API modality metadata.
+            fresh.copy(
+                displayName = old.displayName,
+                supportsVision = old.supportsVision || fresh.supportsVision,
+                supportsFunctionCalling = old.supportsFunctionCalling || fresh.supportsFunctionCalling,
+                supportsImageGen = old.supportsImageGen || fresh.supportsImageGen,
+                isCustom = true,
+                builtInTools = old.builtInTools,
+                headers = old.headers,
+                customBody = old.customBody,
+                outputsText = old.outputsText && fresh.outputsText
+            )
+        } else {
+            // Capability flags come from the fresh fetch; only request customization is retained.
+            fresh.copy(builtInTools = old.builtInTools, headers = old.headers, customBody = old.customBody)
+        }
     }
-    val customOnly = current.filter { it.isCustom && fetched.none { f -> f.id == it.id } }
+    val customOnly = current.filter { it.isCustom && fetched.none { fresh -> fresh.id == it.id } }
     return fromApi + customOnly
 }
 
@@ -837,6 +877,11 @@ private fun AddModelSheet(
                             selected = if (isImage) 1 else 0,
                             onSelect = { isImage = it == 1 }
                         )
+                        Text(
+                            tx("Image generation is separate from Vision input. If API metadata is missing, mark this as Image only when the model can create images."),
+                            fontSize = 12.sp,
+                            color = AriMuted
+                        )
                         ToolToggleRow(tx("Accepts images"), tx("Vision input"), vision, enabled = true) { vision = it }
                         ToolToggleRow(tx("Tool calling"), tx("Function calling"), tools, enabled = true) { tools = it }
                     }
@@ -859,6 +904,7 @@ private fun AddModelSheet(
                                 supportsImageGen = isImage,
                                 contextWindow = 8192,
                                 isCustom = true,
+                                outputsText = !isImage,
                                 builtInTools = listOfNotNull(
                                     "google_search".takeIf { search && isGemini },
                                     "url_context".takeIf { urlContext && isGemini }
@@ -928,7 +974,11 @@ private fun ProviderEditHeader(
     val host = remember(baseUrl) {
         runCatching { java.net.URI(baseUrl.trim()).host }.getOrNull()?.removePrefix("www.").orEmpty()
     }
-    val brand = providerPresets.firstOrNull { it.type == type }?.color ?: AriInk
+    val providerPreset = providerPresets.firstOrNull { it.type == type }
+    val brand = providerPreset?.color ?: AriInk
+    val iconLetter = providerPreset?.label?.firstOrNull()?.uppercase()
+        ?: name.trim().firstOrNull()?.uppercase()
+        ?: "?"
     Surface(shape = RoundedCornerShape(20.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -939,7 +989,7 @@ private fun ProviderEditHeader(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    name.trim().firstOrNull()?.uppercase() ?: "?",
+                    iconLetter,
                     color = AriPaper,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp

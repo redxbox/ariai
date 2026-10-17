@@ -88,7 +88,9 @@ class AppViewModel(
 
     /** Finds a model matching [pred]; the chat's own provider is preferred. */
     private fun findModel(preferred: Provider?, pred: (com.ariai.app.data.models.AIModel) -> Boolean): Pair<Provider, com.ariai.app.data.models.AIModel>? {
-        preferred?.models?.firstOrNull(pred)?.let { return preferred to it }
+        if (preferred?.enabled == true) {
+            preferred.models.firstOrNull(pred)?.let { return preferred to it }
+        }
         return providers.value.asSequence()
             .filter { it.enabled }
             .mapNotNull { p -> p.models.firstOrNull(pred)?.let { p to it } }
