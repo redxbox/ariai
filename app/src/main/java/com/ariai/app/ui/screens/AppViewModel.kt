@@ -570,7 +570,7 @@ class AppViewModel(
                 _isStreaming.value = false
                 _streamingContent.value = ""
             }
-        }.invokeOnCompletion { sendPending = false }
+        }.also { job -> job.invokeOnCompletion { sendPending = false } }
     }
 
     /**
