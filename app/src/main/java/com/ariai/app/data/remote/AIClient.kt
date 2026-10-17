@@ -563,7 +563,7 @@ class AIClient {
                 }
                 json.put("generationConfig", JSONObject().apply {
                     put("temperature", temperature.toDouble())
-                    reasoning.geminiBudget?.let { put("thinkingConfig", JSONObject().put("thinkingBudget", it)) }
+                    reasoning.geminiBudget?.takeIf { it > 0 }?.let { put("thinkingConfig", JSONObject().put("thinkingBudget", it)) }
                 })
                 val tools = modelTools(provider, modelId)
                 if (nativeSearch && !tools.contains("google_search")) tools.add("google_search")
@@ -574,12 +574,13 @@ class AIClient {
             ProviderType.ANTHROPIC -> {
                 val budget = reasoning.budgetTokens
                 json.put("model", if (modelId.isNotBlank()) modelId else "claude-3-5-sonnet-20241022")
-                json.put("max_tokens", if (budget != null) budget + 4096 else 4096)
+                val thinking = budget != null && budget > 0
+                json.put("max_tokens", if (thinking) budget!! + 4096 else 4096)
                 json.put("stream", isStream)
                 if (nativeSearch) {
                     json.put("tools", JSONArray().put(JSONObject().put("type", "web_search_20250305").put("name", "web_search")))
                 }
-                if (budget != null) {
+                if (thinking) {
                     // Extended thinking requires temperature 1 (the API default), so it is omitted here.
                     json.put("thinking", JSONObject().put("type", "enabled").put("budget_tokens", budget))
                 } else {

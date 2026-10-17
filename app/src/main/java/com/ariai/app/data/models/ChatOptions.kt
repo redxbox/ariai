@@ -18,7 +18,7 @@ enum class ReasoningLevel(
     HIGH("High", "Deepest reasoning. Slower and uses more tokens.", "high", 16000, 24576);
 
     companion object {
-        fun fromName(name: String?): ReasoningLevel = values().firstOrNull { it.name == name } ?: AUTO
+        fun fromName(name: String?): ReasoningLevel = values().firstOrNull { it.name == name } ?: OFF
     }
 }
 

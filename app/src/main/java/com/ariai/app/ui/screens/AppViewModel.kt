@@ -32,7 +32,7 @@ class AppViewModel(
     val showReasoning = prefs.showReasoningFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val fontSize = prefs.fontSizeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 15)
     val reasoningLevel = prefs.reasoningLevelFlow.map { ReasoningLevel.fromName(it) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, ReasoningLevel.AUTO)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ReasoningLevel.OFF)
     val searchMode = prefs.searchModeFlow.map { SearchMode.fromName(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SearchMode.OFF)
     val favoriteModels = prefs.favoriteModelsFlow.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
@@ -122,6 +122,7 @@ class AppViewModel(
 
     private val _isStreaming = MutableStateFlow(false)
     private var sendPending = false
+    private val RECENT_MESSAGES_FOR_MODEL = 10
     private var sendJob: kotlinx.coroutines.Job? = null
 
     /** Stops the reply being generated. The text received so far is kept as the reply. */
@@ -227,6 +228,13 @@ class AppViewModel(
     }
 
     /** Summary of older turns (if any) and the messages that still go to the model. */
+    /** The newest messages sent with each request. Older text is covered by the compressed summary. */
+    private fun recentForModel(history: List<ChatMessage>): List<ChatMessage> {
+        val recent = history.takeLast(RECENT_MESSAGES_FOR_MODEL)
+        // Most providers expect the conversation to start with a user message.
+        return recent.dropWhile { it.role != MessageRole.USER }
+    }
+
     private fun activeContext(all: List<ChatMessage>): Pair<String?, List<ChatMessage>> {
         val idx = all.indexOfLast { it.role == MessageRole.SYSTEM }
         val summary = if (idx >= 0) all[idx].content else null
@@ -482,7 +490,8 @@ class AppViewModel(
 
                 var fullResponse = ""
                 try {
-                    val (summary, history) = activeContext(_messages.value)
+                    val (summary, allHistory) = activeContext(_messages.value)
+                    val history = recentForModel(allHistory)
                     val systemPrompt = listOfNotNull(
                         getCurrentChat()?.systemPrompt ?: getAgentSystemPrompt(),
                         summary?.let { "Summary of the earlier conversation:\n$it" }
