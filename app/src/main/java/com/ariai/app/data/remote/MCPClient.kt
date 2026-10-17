@@ -1,13 +1,11 @@
 package com.ariai.app.data.remote
 
-import com.ariai.app.data.models.ToolCall
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
- * MCP (Model Context Protocol) Client
- * Allows AI to call external tools via MCP servers
- * This is a placeholder for full MCP implementation
+ * Legacy MCP façade. Server discovery and tool execution are not implemented yet;
+ * this class must not pretend that remote calls have succeeded.
  */
 data class MCPServer(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -40,22 +38,10 @@ class MCPClient {
         return servers.filter { it.enabled }.flatMap { it.tools }
     }
 
-    // Simulate tool calling - in real implementation would call MCP server
     fun callTool(toolName: String, arguments: String): Flow<String> = flow {
-        // Placeholder - would make HTTP call to MCP server
-        emit("Tool $toolName called with $arguments - MCP integration coming soon!")
+        throw UnsupportedOperationException("MCP tool invocation is not implemented")
     }
 
-    fun formatToolsForPrompt(): String {
-        val tools = getAvailableTools()
-        if (tools.isEmpty()) return ""
-        return buildString {
-            appendLine("You have access to these tools via MCP:")
-            tools.forEach { tool ->
-                appendLine("- ${tool.name}: ${tool.description}")
-                appendLine("  Schema: ${tool.inputSchema}")
-            }
-            appendLine("\nTo use a tool, respond with JSON: {\"tool\": \"name\", \"args\": {...}}")
-        }
-    }
+    /** No tools are advertised to models until server discovery and invocation are wired up. */
+    fun formatToolsForPrompt(): String = ""
 }

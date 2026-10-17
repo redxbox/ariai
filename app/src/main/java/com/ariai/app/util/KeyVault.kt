@@ -12,7 +12,7 @@ import javax.crypto.spec.GCMParameterSpec
 /**
  * Encrypts API keys before they are written to disk. The AES key lives in the Android Keystore,
  * so the database and preference files hold only ciphertext. Values without the prefix are
- * plain text saved by an older version; they are read as they are and re-encrypted on the next save.
+ * legacy plain text; callers migrate those values after a successful read.
  */
 object KeyVault {
     private const val ALIAS = "ariai_key_vault"
@@ -34,7 +34,7 @@ object KeyVault {
     }
 
     fun encrypt(plain: String): String {
-        if (plain.isEmpty() || plain.startsWith(PREFIX)) return plain
+        if (plain.isEmpty()) return plain
         return try {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, secretKey())
@@ -42,7 +42,7 @@ object KeyVault {
             PREFIX + Base64.encodeToString(cipher.iv + data, Base64.NO_WRAP)
         } catch (e: Exception) {
             AppLog.warn(e, "KeyVault.encrypt")
-            plain
+            throw IllegalStateException("Could not encrypt API key with Android Keystore", e)
         }
     }
 

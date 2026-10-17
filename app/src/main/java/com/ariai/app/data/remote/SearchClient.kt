@@ -8,6 +8,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class SearchClient {
@@ -20,12 +22,18 @@ class SearchClient {
         query: String,
         provider: SearchProvider
     ): SearchResponse = withContext(Dispatchers.IO) {
+        if (query.isBlank()) throw IllegalArgumentException("Search query is empty")
+        if (!provider.enabled) throw IllegalArgumentException("Search service is disabled")
+        if (provider.type != SearchProviderType.CUSTOM && provider.apiKey.isBlank()) {
+            throw IllegalArgumentException("Search API key is missing")
+        }
         when (provider.type) {
             SearchProviderType.TAVILY -> searchTavily(query, provider.apiKey)
             SearchProviderType.BRAVE -> searchBrave(query, provider.apiKey)
             SearchProviderType.EXA -> searchExa(query, provider.apiKey)
             SearchProviderType.SERPER -> searchSerper(query, provider.apiKey)
-            else -> searchDuckDuckGo(query)
+            SearchProviderType.BOCHA -> throw IOException("Bocha search is not supported yet")
+            SearchProviderType.CUSTOM -> throw IOException("Custom search endpoints are not supported yet")
         }
     }
 
@@ -41,41 +49,39 @@ class SearchClient {
             .url("https://api.tavily.com/search")
             .post(json.toString().toRequestBody("application/json".toMediaType()))
             .build()
-        val response = client.newCall(request).execute()
-        val body = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
-        val results = mutableListOf<SearchResult>()
+        val body = executeJson(request, "Tavily")
         val arr = body.optJSONArray("results") ?: return SearchResponse(query, emptyList(), SearchProviderType.TAVILY)
-        for (i in 0 until arr.length()) {
-            val obj = arr.getJSONObject(i)
-            results.add(SearchResult(
+        val results = (0 until arr.length()).mapNotNull { index ->
+            val obj = arr.optJSONObject(index) ?: return@mapNotNull null
+            SearchResult(
                 title = obj.optString("title"),
                 url = obj.optString("url"),
                 content = obj.optString("content"),
                 score = obj.optDouble("score", 0.0)
-            ))
+            )
         }
         return SearchResponse(query, results, SearchProviderType.TAVILY)
     }
 
     private fun searchBrave(query: String, apiKey: String): SearchResponse {
+        val encodedQuery = URLEncoder.encode(query, Charsets.UTF_8.name())
         val request = Request.Builder()
-            .url("https://api.search.brave.com/res/v1/web/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&count=5")
-            .addHeader("X-Subscription-Token", apiKey)
-            .addHeader("Accept", "application/json")
+            .url("https://api.search.brave.com/res/v1/web/search?q=$encodedQuery&count=5")
+            .header("X-Subscription-Token", apiKey)
+            .header("Accept", "application/json")
             .get()
             .build()
-        val response = client.newCall(request).execute()
-        val body = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
-        val results = mutableListOf<SearchResult>()
-        val web = body.optJSONObject("web")?.optJSONArray("results") ?: return SearchResponse(query, emptyList(), SearchProviderType.BRAVE)
-        for (i in 0 until web.length()) {
-            val obj = web.getJSONObject(i)
-            results.add(SearchResult(
+        val body = executeJson(request, "Brave Search")
+        val web = body.optJSONObject("web")?.optJSONArray("results")
+            ?: return SearchResponse(query, emptyList(), SearchProviderType.BRAVE)
+        val results = (0 until web.length()).mapNotNull { index ->
+            val obj = web.optJSONObject(index) ?: return@mapNotNull null
+            SearchResult(
                 title = obj.optString("title"),
                 url = obj.optString("url"),
                 content = obj.optString("description"),
                 score = 0.0
-            ))
+            )
         }
         return SearchResponse(query, results, SearchProviderType.BRAVE)
     }
@@ -89,21 +95,19 @@ class SearchClient {
         val request = Request.Builder()
             .url("https://api.exa.ai/search")
             .post(json.toString().toRequestBody("application/json".toMediaType()))
-            .addHeader("x-api-key", apiKey)
-            .addHeader("Content-Type", "application/json")
+            .header("x-api-key", apiKey)
+            .header("Content-Type", "application/json")
             .build()
-        val response = client.newCall(request).execute()
-        val body = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
-        val results = mutableListOf<SearchResult>()
+        val body = executeJson(request, "Exa")
         val arr = body.optJSONArray("results") ?: return SearchResponse(query, emptyList(), SearchProviderType.EXA)
-        for (i in 0 until arr.length()) {
-            val obj = arr.getJSONObject(i)
-            results.add(SearchResult(
+        val results = (0 until arr.length()).mapNotNull { index ->
+            val obj = arr.optJSONObject(index) ?: return@mapNotNull null
+            SearchResult(
                 title = obj.optString("title"),
                 url = obj.optString("url"),
                 content = obj.optString("text", obj.optString("snippet", "")),
                 score = obj.optDouble("score", 0.0)
-            ))
+            )
         }
         return SearchResponse(query, results, SearchProviderType.EXA)
     }
@@ -116,35 +120,31 @@ class SearchClient {
         val request = Request.Builder()
             .url("https://google.serper.dev/search")
             .post(json.toString().toRequestBody("application/json".toMediaType()))
-            .addHeader("X-API-KEY", apiKey)
+            .header("X-API-KEY", apiKey)
             .build()
-        val response = client.newCall(request).execute()
-        val body = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
-        val results = mutableListOf<SearchResult>()
+        val body = executeJson(request, "Serper")
         val arr = body.optJSONArray("organic") ?: return SearchResponse(query, emptyList(), SearchProviderType.SERPER)
-        for (i in 0 until arr.length()) {
-            val obj = arr.getJSONObject(i)
-            results.add(SearchResult(
+        val results = (0 until arr.length()).mapNotNull { index ->
+            val obj = arr.optJSONObject(index) ?: return@mapNotNull null
+            SearchResult(
                 title = obj.optString("title"),
                 url = obj.optString("link"),
                 content = obj.optString("snippet"),
                 score = 0.0
-            ))
+            )
         }
         return SearchResponse(query, results, SearchProviderType.SERPER)
     }
 
-    private fun searchDuckDuckGo(query: String): SearchResponse {
-        // Fallback: use DuckDuckGo instant answer (limited but free)
-        return SearchResponse(query, listOf(
-            SearchResult(
-                title = "Web search disabled - add API key in settings",
-                url = "",
-                content = "Please configure Tavily, Brave, Exa or Serper API key in Settings > Search to enable real web search. Query was: $query",
-                score = 0.0
-            )
-        ), SearchProviderType.CUSTOM)
-    }
+    private fun executeJson(request: Request, service: String): JSONObject =
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("$service search failed: HTTP ${response.code}: ${body.take(300)}")
+            }
+            if (body.isBlank()) throw IOException("$service search returned an empty response")
+            JSONObject(body)
+        }
 
     fun formatResultsForLLM(response: SearchResponse): String {
         if (response.results.isEmpty()) return "No search results found for '${response.query}'"

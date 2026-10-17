@@ -65,7 +65,7 @@ fun AttachmentSheet(
             HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
             Text(tx("Conversation"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
             SheetRow(Icons.Default.Archive, tx("Compress history"), tx("Summarize older messages to save context")) { onDismiss(); onCompress() }
-            SheetRow(Icons.Default.Extension, tx("Extensions"), tx("Manage MCP tool servers")) { onDismiss(); onExtensions() }
+            SheetRow(Icons.Default.Extension, tx("Extensions"), tx("MCP preview; tool calls are not active yet")) { onDismiss(); onExtensions() }
         }
     }
 }

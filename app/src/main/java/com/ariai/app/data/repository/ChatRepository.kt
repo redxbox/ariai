@@ -4,6 +4,7 @@ import com.ariai.app.data.local.*
 import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.AIClient
 import com.ariai.app.data.remote.SearchClient
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -40,9 +41,27 @@ class ChatRepository(
 
     suspend fun saveProvider(provider: Provider) {
         try {
-            db.providerDao().insertProvider(provider.toEntity())
+            val entity = withContext(Dispatchers.IO) { provider.toEntity() }
+            db.providerDao().insertProvider(entity)
         } catch (e: Exception) {
-            // Log but don't crash
+            com.ariai.app.util.AppLog.warn(e, "saveProvider")
+        }
+    }
+
+    /** Safely upgrades legacy plain-text provider keys without decrypting or replacing ciphertext. */
+    suspend fun migrateProviderKeysToEncrypted() {
+        val providers = try {
+            db.providerDao().getAllProvidersSync()
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "provider key migration")
+            return
+        }
+        providers.forEach { entity ->
+            if (entity.apiKey.isNotBlank() && !entity.apiKey.startsWith("enc1:")) {
+                runCatching {
+                    db.providerDao().insertProvider(entity.copy(apiKey = com.ariai.app.util.KeyVault.encrypt(entity.apiKey)))
+                }.onFailure { com.ariai.app.util.AppLog.warn(it, "provider key migration") }
+            }
         }
     }
 
@@ -77,9 +96,16 @@ class ChatRepository(
 
     suspend fun deleteChat(id: String) {
         try {
-            db.messageDao().deleteMessagesForChat(id)
-            db.chatDao().deleteById(id)
-        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+            val removedPaths = db.withTransaction {
+                val removedMessages = db.messageDao().getMessagesForChatSync(id)
+                db.messageDao().deleteMessagesForChat(id)
+                db.chatDao().deleteById(id)
+                removedMessages.flatMap { it.storagePaths() }.toSet()
+            }
+            deleteUnreferencedMedia(removedPaths)
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "deleteChat")
+        }
     }
 
     // Messages
@@ -100,30 +126,70 @@ class ChatRepository(
         emptyList()
     }
 
-    /** Returns false when the message could not be stored, so the caller can tell the user. */
-    suspend fun saveMessage(message: ChatMessage): Boolean = try {
-        val stored = withContext(Dispatchers.IO) {
-            message.copy(attachments = message.attachments.map { it.persisted() })
-        }
-        db.messageDao().insertMessage(stored.toEntity())
-        // Update chat timestamp
-        try {
-            db.chatDao().getChatById(message.chatId)?.let { chat ->
-                db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
-            }
-        } catch (e: Exception) {
-            com.ariai.app.util.AppLog.warn(e, "chat timestamp")
-        }
-        true
+    suspend fun getMessageById(id: String): ChatMessage? = try {
+        db.messageDao().getMessageById(id)?.toModel()
     } catch (e: Exception) {
-        com.ariai.app.util.AppLog.warn(e, "saveMessage")
-        false
+        null
+    }
+
+    /** Returns false when the message could not be stored, so the caller can tell the user. */
+    suspend fun saveMessage(message: ChatMessage): Boolean {
+        val createdFiles = mutableListOf<java.io.File>()
+        return try {
+            val stored = withContext(Dispatchers.IO) {
+                message.copy(attachments = message.attachments.map { attachment ->
+                    attachment.persisted { createdFiles += it }
+                })
+            }
+            db.withTransaction {
+                db.messageDao().insertMessage(stored.toEntity())
+                db.chatDao().getChatById(message.chatId)?.let { chat ->
+                    db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
+                }
+            }
+            true
+        } catch (e: Exception) {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                createdFiles.forEach { it.delete() }
+            }
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            com.ariai.app.util.AppLog.warn(e, "saveMessage")
+            false
+        }
     }
 
     suspend fun deleteMessage(id: String) {
         try {
-            db.messageDao().deleteById(id)
-        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+            val removedPaths = db.withTransaction {
+                val removed = db.messageDao().getMessageById(id)
+                db.messageDao().deleteById(id)
+                removed?.storagePaths().orEmpty()
+            }
+            deleteUnreferencedMedia(removedPaths)
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "deleteMessage")
+        }
+    }
+
+    private suspend fun deleteUnreferencedMedia(paths: Set<String>) {
+        if (paths.isEmpty()) return
+        val remainingReferences = db.messageDao().getAllMessagesSync()
+            .flatMapTo(mutableSetOf()) { it.storagePaths() }
+        withContext(Dispatchers.IO) {
+            (paths - remainingReferences).forEach { ImageStore.deleteOwnedFile(it) }
+        }
+    }
+
+    suspend fun generatedMediaBytes(): Long = withContext(Dispatchers.IO) {
+        val legacyAttachments = db.messageDao().getAllMessagesSync()
+            .flatMapTo(mutableSetOf()) { parseAttachments(it.attachmentsJson).mapNotNull { a -> a.uri } }
+        ImageStore.generatedBytes(legacyAttachments)
+    }
+
+    suspend fun clearGeneratedMedia(): Int = withContext(Dispatchers.IO) {
+        val legacyAttachments = db.messageDao().getAllMessagesSync()
+            .flatMapTo(mutableSetOf()) { parseAttachments(it.attachmentsJson).mapNotNull { a -> a.uri } }
+        ImageStore.clearGenerated(legacyAttachments)
     }
 
     // Agents
@@ -168,11 +234,22 @@ class ChatRepository(
         temperature: Float = 0.7f,
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
-        nativeSearch: Boolean = false
+        nativeSearch: Boolean = false,
+        stream: Boolean = true
     ): Flow<String> = kotlinx.coroutines.flow.flow {
         // Load stored attachment bytes here, off the main thread, right before the request.
         val ready = messages.map { m -> m.copy(attachments = m.attachments.map { it.hydrated() }) }
-        emitAll(aiClient.chatCompletionStream(provider, ready, modelId, systemPrompt, temperature, searchContext != null, searchContext, reasoning, nativeSearch))
+        emitAll(aiClient.chatCompletionStream(
+            provider = provider,
+            messages = ready,
+            modelId = modelId,
+            systemPrompt = systemPrompt,
+            temperature = temperature,
+            searchContext = searchContext,
+            reasoning = reasoning,
+            nativeSearch = nativeSearch,
+            stream = stream
+        ))
     }
         // Network work must not run on the main thread.
         .flowOn(Dispatchers.IO)
@@ -200,11 +277,8 @@ class ChatRepository(
     suspend fun generateImage(provider: Provider, request: ImageGenRequest) = 
         withContext(Dispatchers.IO) { aiClient.generateImage(provider, request) }
 
-    suspend fun searchWeb(query: String, searchProvider: SearchProvider): SearchResponse = try {
+    suspend fun searchWeb(query: String, searchProvider: SearchProvider): SearchResponse =
         searchClient.search(query, searchProvider)
-    } catch (e: Exception) {
-        SearchResponse(query, emptyList(), searchProvider.type)
-    }
 
     fun formatSearchForLLM(response: SearchResponse) = try {
         searchClient.formatResultsForLLM(response)
@@ -238,9 +312,8 @@ class ChatRepository(
         name = name,
         type = type.name,
         baseUrl = baseUrl,
-        // Stored as plain text in the app-private database. Keystore keys can be lost on some devices,
-        // which made saved keys unreadable; see KeyVault for reading older encrypted values.
-        apiKey = apiKey,
+        // Encrypt at rest; KeyVault.decrypt() still reads legacy plain-text database rows.
+        apiKey = com.ariai.app.util.KeyVault.encrypt(apiKey),
         enabled = enabled,
         customHeaders = try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { "" },
         customBody = customBody,
@@ -276,16 +349,19 @@ class ChatRepository(
         memoryEnabled = memoryEnabled
     )
 
-    /** Writes the attachment bytes to app storage once; the database keeps only the file path. */
-    private fun Attachment.persisted(): Attachment {
+    /** Writes attachment data to its own storage area; failures must not silently drop the bytes. */
+    private fun Attachment.persisted(onFileSaved: (java.io.File) -> Unit): Attachment {
         val data = base64Data ?: return this
-        if (uri != null) return copy(base64Data = null)
-        return try {
-            val bytes = android.util.Base64.decode(data, android.util.Base64.DEFAULT)
-            val file = if (type == AttachmentType.VIDEO) ImageStore.saveVideo(bytes) else ImageStore.save(bytes)
-            copy(uri = file.absolutePath, base64Data = null)
-        } catch (e: Exception) {
-            this
+        val bytes = android.util.Base64.decode(data, android.util.Base64.DEFAULT)
+        val file = ImageStore.saveAttachment(bytes, mimeType, type)
+        onFileSaved(file)
+        return copy(uri = file.absolutePath, base64Data = null)
+    }
+
+    private fun MessageEntity.storagePaths(): Set<String> = buildSet {
+        imagePath?.let { add(it) }
+        parseAttachments(attachmentsJson).forEach { attachment ->
+            attachment.uri?.let { add(it) }
         }
     }
 

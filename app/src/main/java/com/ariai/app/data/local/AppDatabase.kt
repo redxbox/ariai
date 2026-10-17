@@ -56,7 +56,7 @@ data class ProviderEntity(
     @ColumnInfo(defaultValue = "[]") val modelsJson: String = "[]"
 )
 
-@Entity(tableName = "chats")
+@Entity(tableName = "chats", indices = [Index(value = ["updatedAt"], name = "index_chats_updatedAt")])
 data class ChatEntity(
     @PrimaryKey val id: String,
     val title: String,
@@ -71,7 +71,7 @@ data class ChatEntity(
     val memoryEnabled: Boolean
 )
 
-@Entity(tableName = "messages")
+@Entity(tableName = "messages", indices = [Index(value = ["chatId", "timestamp"], name = "index_messages_chatId_timestamp")])
 data class MessageEntity(
     @PrimaryKey val id: String,
     val chatId: String,
@@ -107,6 +107,9 @@ data class AgentEntity(
 interface ProviderDao {
     @Query("SELECT * FROM providers ORDER BY createdAt DESC")
     fun getAllProviders(): Flow<List<ProviderEntity>>
+
+    @Query("SELECT * FROM providers ORDER BY createdAt DESC")
+    suspend fun getAllProvidersSync(): List<ProviderEntity>
 
     @Query("SELECT * FROM providers WHERE id = :id")
     suspend fun getProviderById(id: String): ProviderEntity?
@@ -147,6 +150,12 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp ASC")
     suspend fun getMessagesForChatSync(chatId: String): List<MessageEntity>
 
+    @Query("SELECT * FROM messages WHERE id = :id")
+    suspend fun getMessageById(id: String): MessageEntity?
+
+    @Query("SELECT * FROM messages")
+    suspend fun getAllMessagesSync(): List<MessageEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity)
 
@@ -171,7 +180,7 @@ interface AgentDao {
 
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

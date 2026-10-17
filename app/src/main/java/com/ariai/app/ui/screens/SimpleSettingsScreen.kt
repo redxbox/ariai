@@ -97,7 +97,7 @@ fun SimpleSettingsScreen(
                         SimpleRow(icon = Icons.Default.Search, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Search service"), subtitle = tx("Web search for answers"), onClick = onSearchServiceClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriAccent, title = tx("MCP servers"), subtitle = tx("Connect local tools"), onClick = onMcpClick)
+                        SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriAccent, title = tx("MCP servers"), subtitle = tx("Preview only; tools are not connected yet"), onClick = onMcpClick)
                     }
                 }
 

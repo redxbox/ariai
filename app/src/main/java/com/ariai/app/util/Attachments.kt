@@ -39,8 +39,16 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
             }
             mime.startsWith("text/") || mime == "application/json" ||
                 name.substringAfterLast('.', "").lowercase() in TEXT_EXTENSIONS -> {
-                val text = resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                    ?: return ReadResult.Error("Could not open $name")
+                val text = resolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                    val result = StringBuilder()
+                    val buffer = CharArray(4096)
+                    while (result.length < MAX_TEXT_CHARS) {
+                        val count = reader.read(buffer, 0, minOf(buffer.size, MAX_TEXT_CHARS - result.length))
+                        if (count < 0) break
+                        result.append(buffer, 0, count)
+                    }
+                    result.toString()
+                } ?: return ReadResult.Error("Could not open $name")
                 ReadResult.Ok(
                     Attachment(
                         type = AttachmentType.TEXT,
@@ -53,8 +61,19 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
             mime.startsWith("video/") -> {
                 val size = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
                 if (size > MAX_VIDEO_BYTES) return ReadResult.Error(tx("Video is larger than 12 MB"))
-                val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
-                    ?: return ReadResult.Error("Could not open $name")
+                val bytes = resolver.openInputStream(uri)?.use { input ->
+                    val output = ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    var total = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        if (total > MAX_VIDEO_BYTES) return ReadResult.Error(tx("Video is larger than 12 MB"))
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: return ReadResult.Error("Could not open $name")
                 if (bytes.size > MAX_VIDEO_BYTES) return ReadResult.Error(tx("Video is larger than 12 MB"))
                 ReadResult.Ok(
                     Attachment(

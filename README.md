@@ -35,7 +35,6 @@
 - 🔄 **Streaming responses** - Real-time
 - 🌿 **Message branching** - Explore alternatives
 - 📝 **Markdown rendering** - Code highlighting, tables, quotes
-- 🧠 **Memory** - Remembers preferences
 - 🔀 **Regenerate & Branch**
 
 #### 🔍 **Real Web Search**
@@ -195,14 +194,16 @@ com.ariai.app
 - [x] Free demo providers (Pollinations, LLM7 - no key)
 - [x] Graphical provider cards with gradients
 - [x] 6 languages
-- [x] Material You + Dynamic Color + Premium animations
+- [x] Compose Material 3 chat UI
 - [x] Message branching & regenerate
 - [x] Real web search (Tavily, Brave, Exa, Serper)
 - [x] Image generation (DALL·E 3, Imagen, Pollinations free)
 - [x] Custom agents with prompt variables
 - [x] Premium UI - smooth, beautiful
 - [ ] LaTeX & Mermaid rendering
-- [ ] File attachments (PDF, DOCX, Vision)
+- [x] Image and plain-text attachments; video input for compatible Gemini models
+- [ ] PDF/DOCX text extraction
+- [ ] Persistent memory and reasoning-trace display
 - [ ] QR scanner UI
 - [ ] Export chats
 - [ ] MCP integration

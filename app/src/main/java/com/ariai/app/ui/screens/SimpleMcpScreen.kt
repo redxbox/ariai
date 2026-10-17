@@ -76,7 +76,7 @@ fun SimpleMcpScreen(
                 Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(tx("Model Context Protocol"), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Ink)
-                        Text(tx("Connect MCP servers so the model can call external tools. Only enabled servers are used."), fontSize = 12.sp, color = Ink.copy(alpha = 0.6f))
+                        Text(tx("MCP support is a preview: server URLs are not contacted and tools are not yet used in chats."), fontSize = 12.sp, color = Ink.copy(alpha = 0.6f))
                     }
                 }
             }
@@ -103,7 +103,7 @@ fun SimpleMcpScreen(
                             Text(server.name, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = Ink)
                             Text(server.transport.label, fontSize = 11.sp, color = Ink.copy(alpha = 0.5f))
                             Text(server.url, fontSize = 11.sp, color = Ink.copy(alpha = 0.4f), maxLines = 1)
-                            Text(if (server.enabled) tx("Connected") else tx("Disabled"), fontSize = 11.sp, color = if (server.enabled) AriInk else Ink.copy(alpha = 0.45f))
+                            Text(if (server.enabled) tx("Enabled locally · not connected") else tx("Disabled"), fontSize = 11.sp, color = if (server.enabled) AriInk else Ink.copy(alpha = 0.45f))
                         }
                         IconButton(onClick = { onRemove(server.id) }) { Icon(Icons.Default.Delete, contentDescription = tx("Remove server"), tint = Ink.copy(alpha = 0.45f)) }
                         Switch(checked = server.enabled, onCheckedChange = { onToggle(server.id) }, colors = SwitchDefaults.colors(checkedTrackColor = Accent))

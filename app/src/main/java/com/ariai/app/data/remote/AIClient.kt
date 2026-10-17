@@ -3,9 +3,15 @@ package com.ariai.app.data.remote
 import com.ariai.app.data.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 import okhttp3.*
+import okhttp3.sse.EventSource
+import okhttp3.sse.EventSourceListener
+import okhttp3.sse.EventSources
+import java.io.IOException
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -53,207 +59,252 @@ class AIClient {
         .addNetworkInterceptor(clientIdentityInterceptor)
         .build()
 
+    /** Applies provider auth, then custom headers so explicitly configured headers can override defaults. */
+    private fun Request.Builder.addProviderHeaders(provider: Provider, modelId: String? = null): Request.Builder {
+        val key = provider.apiKey.trim()
+        when (provider.type) {
+            ProviderType.GEMINI -> if (key.isNotBlank()) header("x-goog-api-key", key)
+            ProviderType.ANTHROPIC -> {
+                if (key.isNotBlank()) header("x-api-key", key)
+                header("anthropic-version", "2023-06-01")
+            }
+            else -> if (key.isNotBlank()) header("Authorization", "Bearer $key")
+        }
+        val modelHeaders = provider.models.find { it.id == modelId }?.headers.orEmpty()
+        (provider.customHeaders + modelHeaders).forEach { (name, value) ->
+            if (name.isNotBlank() && value.isNotBlank()) header(name, value)
+        }
+        return this
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun chatCompletionStream(
         provider: Provider,
         messages: List<ChatMessage>,
         modelId: String,
         systemPrompt: String? = null,
         temperature: Float = 0.7f,
-        useSearch: Boolean = false,
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
-        nativeSearch: Boolean = false
-    ): Flow<String> = flow {
-        try {
-            val url = buildChatUrl(provider, modelId)
-            val isStream = true
-            val body = buildRequestBody(provider, messages, modelId, systemPrompt, temperature, searchContext, isStream, reasoning, nativeSearch)
+        nativeSearch: Boolean = false,
+        stream: Boolean = true
+    ): Flow<String> = if (stream) callbackFlow {
+        val producer = this
+        val url = buildChatUrl(provider, modelId)
+        val body = buildRequestBody(
+            provider = provider,
+            messages = messages,
+            modelId = modelId,
+            systemPrompt = systemPrompt,
+            temperature = temperature,
+            searchContext = searchContext,
+            isStream = true,
+            reasoning = reasoning,
+            nativeSearch = nativeSearch
+        )
+        val request = Request.Builder()
+            .url(url)
+            .post(body)
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .addProviderHeaders(provider, modelId)
+            .build()
 
-            val requestBuilder = Request.Builder()
-                .url(url)
-                .post(body)
-                .addHeader("Content-Type", "application/json")
-                .addHeader("Accept", "text/event-stream, application/json")
-
-            when (provider.type) {
-                ProviderType.OPENAI, ProviderType.OPENAI_COMPATIBLE, ProviderType.OLLAMA, ProviderType.CUSTOM -> {
-                    if (provider.apiKey.isNotBlank()) {
-                        requestBuilder.addHeader("Authorization", "Bearer ${provider.apiKey}")
+        val eventSource = EventSources.createFactory(client).newEventSource(
+            request,
+            object : EventSourceListener() {
+                override fun onOpen(eventSource: EventSource, response: Response) {
+                    if (!response.isSuccessful) {
+                        producer.close(IOException("API Error ${response.code}: ${response.message}"))
+                        eventSource.cancel()
                     }
                 }
-                ProviderType.ANTHROPIC -> {
-                    if (provider.apiKey.isNotBlank()) {
-                        requestBuilder.addHeader("x-api-key", provider.apiKey)
-                        requestBuilder.addHeader("anthropic-version", "2023-06-01")
+
+                override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+                    if (data.trim() == "[DONE]") {
+                        producer.close()
+                        eventSource.cancel()
+                        return
                     }
-                }
-                ProviderType.GEMINI -> {
-                    if (provider.apiKey.isNotBlank()) requestBuilder.addHeader("x-goog-api-key", provider.apiKey.trim())
-                }
-            }
-
-            val modelHeaders = provider.models.find { it.id == modelId }?.headers.orEmpty()
-            (provider.customHeaders + modelHeaders).forEach { (k, v) ->
-                if (k.isNotBlank() && v.isNotBlank()) {
-                    requestBuilder.addHeader(k, v)
-                }
-            }
-
-            val request = requestBuilder.build()
-            val response = client.newCall(request).execute()
-
-            if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: "Unknown error"
-                val errorMsg = try {
-                    val json = JSONObject(errorBody)
-                    json.optString("error", json.optJSONObject("error")?.optString("message", errorBody) ?: errorBody)
-                } catch (e: Exception) {
-                    errorBody.take(500)
-                }
-                throw Exception("API Error ${response.code}: $errorMsg")
-            }
-
-            val responseBody = response.body ?: throw Exception("Empty response")
-
-            if (provider.type == ProviderType.GEMINI) {
-                val raw = responseBody.string()
-                try {
-                    if (raw.contains("\"candidates\"")) {
-                        val lines = raw.split("\n")
-                        var fullText = ""
-                        for (line in lines) {
-                            val trimmed = line.trim()
-                            if (trimmed.isEmpty() || trimmed == "[" || trimmed == "]" || trimmed == ",") continue
-                            try {
-                                val json = JSONObject(trimmed.removeSuffix(","))
-                                val text = parseGeminiResponse(json)
-                                if (text.isNotEmpty()) {
-                                    fullText += text
-                                    emit(text)
-                                }
-                            } catch (e: Exception) {
-                                continue
-                            }
-                        }
-                        if (fullText.isEmpty()) {
-                            val json = JSONObject(raw)
-                            val text = parseGeminiResponse(json)
-                            if (text.isNotEmpty()) emit(text)
-                        }
-                    } else {
-                        emit(raw)
-                    }
-                } catch (e: Exception) {
-                    if (raw.isNotBlank()) emit(raw) else throw e
-                }
-            } else {
-                val contentType = response.header("Content-Type") ?: ""
-                if (contentType.contains("text/event-stream") || isStream) {
-                    val source = responseBody.source()
-                    var hasEmitted = false
-                    while (!source.exhausted()) {
-                        val line = source.readUtf8Line() ?: break
-                        if (line.startsWith("data: ")) {
-                            val data = line.removePrefix("data: ").trim()
-                            if (data == "[DONE]" || data.isEmpty()) {
-                                if (data == "[DONE]") break
-                                continue
-                            }
-                            try {
-                                val json = JSONObject(data)
-                                val delta = parseOpenAIStreamChunk(json)
-                                if (delta.isNotEmpty()) {
-                                    hasEmitted = true
-                                    emit(delta)
-                                }
-                            } catch (e: Exception) {
-                                continue
-                            }
-                        } else if (line.trim().startsWith("{") && line.contains("\"choices\"")) {
-                            try {
-                                val json = JSONObject(line.trim())
-                                val delta = parseOpenAIStreamChunk(json)
-                                if (delta.isNotEmpty()) {
-                                    hasEmitted = true
-                                    emit(delta)
-                                }
-                            } catch (e: Exception) {
-                                continue
-                            }
-                        }
-                    }
-                    if (!hasEmitted) {
-                        throw Exception("No streaming data received")
-                    }
-                } else {
-                    val raw = responseBody.string()
                     try {
-                        val json = JSONObject(raw)
-                        val text = parseOpenAINonStreaming(json)
-                        if (text.isNotBlank()) emit(text) else emit(raw.take(2000))
+                        val json = JSONObject(data)
+                        if (json.optString("type") == "error" || json.has("error")) {
+                            val error = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                                ?: json.optString("error", "Provider returned an error")
+                            producer.close(IOException(error))
+                            eventSource.cancel()
+                            return
+                        }
+                        if (hasUnexecutedToolCalls(json, provider.type)) {
+                            producer.close(IOException("The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search."))
+                            eventSource.cancel()
+                            return
+                        }
+                        val text = if (provider.type == ProviderType.GEMINI) {
+                            parseGeminiResponse(json)
+                        } else {
+                            parseOpenAIStreamChunk(json)
+                        }
+                        if (text.isNotEmpty()) {
+                            val result = producer.trySend(text)
+                            if (result.isFailure) eventSource.cancel()
+                        }
                     } catch (e: Exception) {
-                        if (raw.isNotBlank()) emit(raw.take(4000))
-                        else throw Exception("Failed to parse response: ${e.message}")
+                        // Ignore non-JSON keep-alive events; real provider errors are handled above.
+                        com.ariai.app.util.AppLog.warn(e, "SSE event parse")
                     }
                 }
+
+                override fun onClosed(eventSource: EventSource) {
+                    producer.close()
+                }
+
+                override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                    val responseError = runCatching {
+                        response?.body?.string()?.take(500).orEmpty()
+                    }.getOrDefault("")
+                    val message = when {
+                        response != null && !response.isSuccessful -> "API Error ${response.code}: ${responseError.ifBlank { response.message }}"
+                        !responseError.isBlank() -> responseError
+                        else -> t?.message ?: "Streaming request failed"
+                    }
+                    response?.close()
+                    producer.close(IOException(message, t))
+                }
             }
-        } catch (e: Exception) {
-            throw e
+        )
+
+        awaitClose { eventSource.cancel() }
+    } else flow {
+        emit(requestNonStreaming(provider, messages, modelId, systemPrompt, temperature, searchContext, reasoning, nativeSearch))
+    }
+
+    private suspend fun requestNonStreaming(
+        provider: Provider,
+        messages: List<ChatMessage>,
+        modelId: String,
+        systemPrompt: String?,
+        temperature: Float,
+        searchContext: String?,
+        reasoning: ReasoningLevel,
+        nativeSearch: Boolean
+    ): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(buildChatUrl(provider, modelId, forceNonStream = true))
+            .post(buildRequestBody(provider, messages, modelId, systemPrompt, temperature, searchContext, false, reasoning, nativeSearch))
+            .header("Content-Type", "application/json")
+            .addProviderHeaders(provider, modelId)
+            .build()
+        client.newCall(request).execute().use { response ->
+            val raw = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("API Error ${response.code}: ${raw.ifBlank { response.message }.take(500)}")
+            }
+            if (raw.isBlank()) throw IOException("Empty response from API")
+            val json = JSONObject(raw)
+            if (json.has("error")) {
+                val error = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                    ?: json.optString("error", "Provider returned an error")
+                throw IOException(error)
+            }
+            if (hasUnexecutedToolCalls(json, provider.type)) {
+                throw IOException("The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search.")
+            }
+            val text = when (provider.type) {
+                ProviderType.GEMINI -> parseGeminiResponse(json)
+                ProviderType.ANTHROPIC -> parseAnthropicResponse(json)
+                else -> parseOpenAINonStreaming(json)
+            }
+            if (text.isBlank()) throw IOException("The provider returned no text response")
+            text
         }
     }
 
     suspend fun generateImage(
         provider: Provider,
         request: ImageGenRequest
-    ): ImageGenResponse {
-        return try {
-            val url = "${provider.baseUrl.trimEnd('/')}/images/generations"
-            val jsonBody = JSONObject().apply {
-                put("model", request.model)
-                put("prompt", request.prompt)
-                put("n", request.n)
-                put("size", request.size)
-                if (request.quality.isNotBlank()) put("quality", request.quality)
-                if (request.style != null) put("style", request.style)
-            }
+    ): ImageGenResponse = withContext(Dispatchers.IO) {
+        if (provider.type == ProviderType.GEMINI) {
+            return@withContext generateGeminiImage(provider, request)
+        }
 
-            val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
-            val httpRequest = Request.Builder()
-                .url(url)
-                .post(body)
-                .addHeader("Content-Type", "application/json")
-                .apply {
-                    if (provider.apiKey.isNotBlank()) {
-                        addHeader("Authorization", "Bearer ${provider.apiKey}")
-                    }
-                }
-                .build()
+        val url = "${provider.baseUrl.trimEnd('/')}/images/generations"
+        val jsonBody = JSONObject().apply {
+            put("model", request.model)
+            put("prompt", request.prompt)
+            put("n", request.n.coerceIn(1, 4))
+            put("size", request.size)
+            if (request.quality.isNotBlank()) put("quality", request.quality)
+            if (request.style != null) put("style", request.style)
+        }
+        val httpRequest = Request.Builder()
+            .url(url)
+            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+            .addProviderHeaders(provider, request.model)
+            .build()
 
-            val response = client.newCall(httpRequest).execute()
+        client.newCall(httpRequest).execute().use { response ->
+            val raw = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                val code = response.code
-                response.close()
-                // Some gateways (e.g. OpenRouter) make images through chat completions instead.
-                if (code in listOf(400, 404, 405, 422)) return generateImageViaChat(provider, request)
-                throw Exception("Image gen failed: $code")
+                // Some OpenAI-compatible gateways return image output through chat completions.
+                if (response.code in listOf(400, 404, 405, 422) && provider.type != ProviderType.ANTHROPIC) {
+                    return@withContext generateImageViaChat(provider, request)
+                }
+                throw IOException("Image generation failed: HTTP ${response.code}: ${raw.take(500)}")
             }
-
-            val json = JSONObject(response.body?.string() ?: throw Exception("Empty response"))
-            val dataArray = json.optJSONArray("data") ?: JSONArray()
-            val images = mutableListOf<GeneratedImage>()
-            for (i in 0 until dataArray.length()) {
+            val dataArray = JSONObject(raw).optJSONArray("data") ?: JSONArray()
+            val images = (0 until dataArray.length()).map { i ->
                 val obj = dataArray.getJSONObject(i)
-                images.add(
-                    GeneratedImage(
-                        url = obj.optString("url", null),
-                        base64 = obj.optString("b64_json", null),
-                        revisedPrompt = obj.optString("revised_prompt", null)
-                    )
+                GeneratedImage(
+                    url = obj.optString("url").takeIf { it.isNotBlank() },
+                    base64 = obj.optString("b64_json").takeIf { it.isNotBlank() },
+                    revisedPrompt = obj.optString("revised_prompt").takeIf { it.isNotBlank() }
                 )
             }
             ImageGenResponse(images, request.model)
-        } catch (e: Exception) {
-            throw e
+        }
+    }
+
+    /** Imagen uses Google's predict endpoint, not the OpenAI /images/generations protocol. */
+    private fun generateGeminiImage(provider: Provider, request: ImageGenRequest): ImageGenResponse {
+        val widthHeight = request.size.lowercase().split('x').mapNotNull { it.toIntOrNull() }
+        val ratio = if (widthHeight.size == 2 && widthHeight[1] != 0) {
+            val value = widthHeight[0].toDouble() / widthHeight[1]
+            when {
+                value > 1.2 -> "16:9"
+                value < 0.83 -> "9:16"
+                else -> "1:1"
+            }
+        } else "1:1"
+        val body = JSONObject()
+            .put("instances", JSONArray().put(JSONObject().put("prompt", request.prompt)))
+            .put("parameters", JSONObject()
+                .put("sampleCount", request.n.coerceIn(1, 4))
+                .put("aspectRatio", ratio))
+        val url = "${provider.baseUrl.trimEnd('/')}/models/${request.model}:predict"
+        val httpRequest = Request.Builder()
+            .url(url)
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .addProviderHeaders(provider, request.model)
+            .build()
+        client.newCall(httpRequest).execute().use { response ->
+            val raw = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("Imagen request failed: HTTP ${response.code}: ${raw.take(500)}")
+            }
+            val predictions = JSONObject(raw).optJSONArray("predictions") ?: JSONArray()
+            val images = (0 until predictions.length()).mapNotNull { i ->
+                val prediction = predictions.optJSONObject(i) ?: return@mapNotNull null
+                val encoded = prediction.optString("bytesBase64Encoded").takeIf { it.isNotBlank() }
+                val imageUrl = prediction.optString("url").takeIf { it.isNotBlank() }
+                if (encoded == null && imageUrl == null) return@mapNotNull null
+                GeneratedImage(
+                    url = imageUrl,
+                    base64 = encoded,
+                    revisedPrompt = prediction.optString("prompt").takeIf { it.isNotBlank() }
+                )
+            }
+            ImageGenResponse(images, request.model)
         }
     }
 
@@ -265,19 +316,23 @@ class AIClient {
         prompt: String
     ): ImageGenResponse = withContext(Dispatchers.IO) {
         val url = "${provider.baseUrl.trimEnd('/')}/images/edits"
+        val imageType = when (image.extension.lowercase()) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "webp" -> "image/webp"
+            "gif" -> "image/gif"
+            else -> "image/png"
+        }
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("model", model)
             .addFormDataPart("prompt", prompt)
             .addFormDataPart("n", "1")
-            .addFormDataPart("image", image.name, image.asRequestBody("image/png".toMediaType()))
+            .addFormDataPart("image", image.name, image.asRequestBody(imageType.toMediaType()))
             .build()
         val request = Request.Builder()
             .url(url)
             .post(body)
-            .apply {
-                if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey}")
-            }
+            .addProviderHeaders(provider, model)
             .build()
         client.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()
@@ -305,7 +360,7 @@ class AIClient {
         val httpRequest = Request.Builder()
             .url(url)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
-            .apply { if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey}") }
+            .addProviderHeaders(provider, request.model)
             .build()
         return client.newCall(httpRequest).execute().use { response ->
             val text = response.body?.string().orEmpty()
@@ -352,23 +407,13 @@ class AIClient {
             else -> if (base.contains("openrouter.ai")) "$base/models?output_modalities=all" else "$base/models"
         }
 
-        val builder = Request.Builder().url(url).get()
-        val key = provider.apiKey.trim()
-        if (key.isNotBlank()) {
-            when (provider.type) {
-                ProviderType.GEMINI -> builder.addHeader("x-goog-api-key", key)
-                ProviderType.ANTHROPIC -> {
-                    builder.addHeader("x-api-key", key)
-                    builder.addHeader("anthropic-version", "2023-06-01")
-                }
-                else -> builder.addHeader("Authorization", "Bearer $key")
-            }
-        }
-        provider.customHeaders.forEach { (k, v) ->
-            if (k.isNotBlank() && v.isNotBlank()) builder.addHeader(k, v)
-        }
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .addProviderHeaders(provider)
+            .build()
 
-        val response = client.newCall(builder.build()).execute()
+        val response = client.newCall(request).execute()
         response.use { r ->
             if (!r.isSuccessful) throw IllegalStateException("HTTP ${r.code} from ${url.substringBefore('?')}")
             val json = JSONObject(r.body?.string() ?: throw IllegalStateException("Empty response"))
@@ -387,7 +432,19 @@ class AIClient {
                     if (looksLikeVideoModel(name)) {
                         models.add(AIModel(name, name, provider.id, false, false, false, 0, supportsVideoGen = true, outputsText = false))
                     } else if (name.contains("gemini") || imageGen) {
-                        models.add(AIModel(name, name, provider.id, true, true, imageGen, 1000000))
+                        val chatModel = name.contains("gemini")
+                        models.add(
+                            AIModel(
+                                id = name,
+                                displayName = name,
+                                providerId = provider.id,
+                                supportsVision = chatModel,
+                                supportsFunctionCalling = chatModel,
+                                supportsImageGen = imageGen,
+                                contextWindow = if (chatModel) 1000000 else 8192,
+                                outputsText = chatModel
+                            )
+                        )
                     }
                 }
             } else {
@@ -438,10 +495,12 @@ class AIClient {
      */
     private fun catalogModels(provider: Provider, url: String, fixedOutputs: List<String>? = null): List<AIModel> {
         return try {
-            val builder = Request.Builder().url(url).get()
-            val key = provider.apiKey.trim()
-            if (key.isNotBlank()) builder.addHeader("Authorization", "Bearer $key")
-            client.newCall(builder.build()).execute().use { r ->
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .addProviderHeaders(provider)
+                .build()
+            client.newCall(request).execute().use { r ->
                 if (!r.isSuccessful) return emptyList()
                 val text = r.body?.string() ?: return emptyList()
                 val arr = if (text.trimStart().startsWith("[")) JSONArray(text)
@@ -496,7 +555,7 @@ class AIClient {
                     "$base/models/$model:streamGenerateContent?alt=sse"
                 }
             }
-            ProviderType.ANTHROPIC -> "$base/v1/messages"
+            ProviderType.ANTHROPIC -> "${base.removeSuffix("/v1")}/v1/messages"
             else -> {
                 "$base/chat/completions"
             }
@@ -507,10 +566,13 @@ class AIClient {
     private fun ChatMessage.promptText(gemini: Boolean = false): String {
         val files = attachments.mapNotNull { a -> a.textContent?.let { "\n\n[File: ${a.name}]\n$it" } }
         // Only Gemini receives video bytes here; other models get a note so they do not guess.
+        val imageNotes = attachments
+            .filter { it.type == AttachmentType.IMAGE && it.base64Data.isNullOrBlank() }
+            .map { "\n\n[Image attached: ${it.name}, but its local file data is unavailable.]" }
         val videoNotes = attachments
             .filter { it.type == AttachmentType.VIDEO && (!gemini || it.base64Data.isNullOrBlank()) }
             .map { "\n\n[Video attached: ${it.name}. This model cannot watch videos.]" }
-        return content + files.joinToString("") + videoNotes.joinToString("")
+        return content + files.joinToString("") + imageNotes.joinToString("") + videoNotes.joinToString("")
     }
 
     private fun ChatMessage.videoParts(): List<Attachment> =
@@ -677,21 +739,48 @@ class AIClient {
         return json.toString().toRequestBody("application/json".toMediaType())
     }
 
+    private fun hasUnexecutedToolCalls(json: JSONObject, providerType: ProviderType): Boolean = when (providerType) {
+        ProviderType.GEMINI -> {
+            val candidates = json.optJSONArray("candidates")
+            (0 until (candidates?.length() ?: 0)).any { candidateIndex ->
+                val parts = candidates?.optJSONObject(candidateIndex)?.optJSONObject("content")?.optJSONArray("parts")
+                (0 until (parts?.length() ?: 0)).any { partIndex ->
+                    val part = parts?.optJSONObject(partIndex)
+                    part?.has("functionCall") == true || part?.has("function_call") == true
+                }
+            }
+        }
+        ProviderType.ANTHROPIC -> {
+            val block = json.optJSONObject("content_block")
+            val blocks = json.optJSONArray("content")
+            json.optString("type") == "content_block_start" && block?.optString("type") == "tool_use" ||
+                (0 until (blocks?.length() ?: 0)).any { index -> blocks?.optJSONObject(index)?.optString("type") == "tool_use" }
+        }
+        else -> {
+            val choices = json.optJSONArray("choices")
+            (0 until (choices?.length() ?: 0)).any { index ->
+                val choice = choices?.optJSONObject(index) ?: return@any false
+                val delta = choice.optJSONObject("delta")
+                val message = choice.optJSONObject("message")
+                val tools = delta?.optJSONArray("tool_calls") ?: message?.optJSONArray("tool_calls")
+                (tools?.length() ?: 0) > 0 || delta?.has("function_call") == true || message?.has("function_call") == true
+            }
+        }
+    }
+
     private fun parseOpenAIStreamChunk(json: JSONObject): String {
         return try {
             // Anthropic streams text as content_block_delta events.
             if (json.optString("type") == "content_block_delta") {
-                return json.optJSONObject("delta")?.optString("text", "") ?: ""
+                val delta = json.optJSONObject("delta") ?: return ""
+                return if (delta.optString("type") == "text_delta") delta.optString("text", "") else ""
             }
             val choices = json.optJSONArray("choices") ?: return ""
             if (choices.length() == 0) return ""
-            val first = choices.getJSONObject(0)
+            val first = choices.optJSONObject(0) ?: return ""
             val delta = first.optJSONObject("delta")
-            if (delta != null) {
-                delta.optString("content", "")
-            } else {
-                first.optJSONObject("message")?.optString("content", "") ?: ""
-            }
+            if (delta != null) responseText(delta.opt("content"))
+            else responseText(first.optJSONObject("message")?.opt("content"))
         } catch (e: Exception) {
             ""
         }
@@ -701,13 +790,36 @@ class AIClient {
         return try {
             val choices = json.optJSONArray("choices") ?: return ""
             if (choices.length() == 0) return ""
-            val first = choices.getJSONObject(0)
-            first.optJSONObject("message")?.optString("content", "") 
-                ?: first.optString("text", "")
-                ?: json.optString("content", "")
+            val first = choices.optJSONObject(0) ?: return ""
+            val message = first.optJSONObject("message")
+            responseText(message?.opt("content")).ifBlank {
+                first.optString("text", json.optString("content", ""))
+            }
         } catch (e: Exception) {
             ""
         }
+    }
+
+    private fun parseAnthropicResponse(json: JSONObject): String {
+        val content = json.optJSONArray("content") ?: return ""
+        return buildString {
+            for (index in 0 until content.length()) {
+                val block = content.optJSONObject(index) ?: continue
+                if (block.optString("type") == "text") append(block.optString("text", ""))
+            }
+        }
+    }
+
+    private fun responseText(value: Any?): String = when (value) {
+        is String -> value
+        is JSONArray -> buildString {
+            for (index in 0 until value.length()) {
+                val part = value.optJSONObject(index) ?: continue
+                append(part.optString("text", ""))
+            }
+        }
+        is JSONObject -> value.optString("text", "")
+        else -> ""
     }
 
     private fun parseGeminiResponse(json: JSONObject): String {
@@ -718,7 +830,11 @@ class AIClient {
             val content = first.optJSONObject("content") ?: return ""
             val parts = content.optJSONArray("parts") ?: return ""
             if (parts.length() == 0) return ""
-            parts.getJSONObject(0).optString("text", "")
+            buildString {
+                for (i in 0 until parts.length()) {
+                    append(parts.optJSONObject(i)?.optString("text", "").orEmpty())
+                }
+            }
         } catch (e: Exception) {
             ""
         }
@@ -735,7 +851,6 @@ class AIClient {
         onProgress: (String) -> Unit = {}
     ): ByteArray = withContext(Dispatchers.IO) {
         val base = provider.baseUrl.trim().trimEnd('/')
-        val key = provider.apiKey.trim()
         val isMusic = Regex("music|lyria|stable-audio|sound", RegexOption.IGNORE_CASE).containsMatchIn(modelId)
         val longClient = client.newBuilder()
             .readTimeout(5, TimeUnit.MINUTES)
@@ -753,7 +868,7 @@ class AIClient {
                 .toString().toRequestBody("application/json".toMediaType())
             Request.Builder().url("$base/audio/speech").post(body)
         }
-        if (key.isNotBlank()) request.addHeader("Authorization", "Bearer $key")
+        request.addProviderHeaders(provider, modelId)
         longClient.newCall(request.build()).execute().use { r ->
             if (!r.isSuccessful) throw IllegalStateException("API Error ${r.code}: ${r.body?.string()?.take(200)}")
             r.body?.bytes() ?: throw IllegalStateException("Empty audio response")
@@ -761,12 +876,9 @@ class AIClient {
     }
 
     /** Veo on the Gemini API: start a long-running operation, poll it, then download the MP4. */
-    private fun generateVeo(provider: Provider, modelId: String, prompt: String, onProgress: (String) -> Unit): ByteArray {
+    private suspend fun generateVeo(provider: Provider, modelId: String, prompt: String, onProgress: (String) -> Unit): ByteArray {
         val base = provider.baseUrl.trim().trimEnd('/')
-        val key = provider.apiKey.trim()
-        fun keyed(b: Request.Builder): Request.Builder = b.apply {
-            if (key.isNotBlank()) addHeader("x-goog-api-key", key)
-        }
+        fun keyed(b: Request.Builder): Request.Builder = b.addProviderHeaders(provider, modelId)
         onProgress("Sending request")
         val body = JSONObject()
             .put("instances", JSONArray().put(JSONObject().put("prompt", prompt)))
@@ -782,7 +894,7 @@ class AIClient {
         var lastPoll = 0L
         var bytes: ByteArray? = null
         while (bytes == null) {
-            Thread.sleep(1_000)
+            kotlinx.coroutines.delay(1_000)
             val now = System.currentTimeMillis()
             if (now - started > timeoutMs) throw IllegalStateException("Video timed out")
             if (now - lastPoll >= 5_000) {
@@ -825,9 +937,7 @@ class AIClient {
         onProgress: (String) -> Unit = {}
     ): ByteArray = withContext(Dispatchers.IO) {
         val base = provider.baseUrl.trim().trimEnd('/')
-        fun auth(b: Request.Builder): Request.Builder = b.apply {
-            if (provider.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${provider.apiKey.trim()}")
-        }
+        fun auth(b: Request.Builder): Request.Builder = b.addProviderHeaders(provider, modelId)
         if (base.contains("pollinations.ai")) {
             onProgress("Rendering")
             val origin = base.removeSuffix("/v1")
@@ -860,7 +970,7 @@ class AIClient {
         var state = "queued"
         var lastPoll = 0L
         while (true) {
-            Thread.sleep(1_000)
+            kotlinx.coroutines.delay(1_000)
             val now = System.currentTimeMillis()
             if (now - started > timeoutMs) throw IllegalStateException("Video timed out")
             // Poll the job every 5 seconds; the elapsed timer still ticks every second.

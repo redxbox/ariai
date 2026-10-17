@@ -41,7 +41,6 @@ class PreferencesManager(private val context: Context) {
     val defaultModelFlow: Flow<String?> = context.dataStore.data.map { it[DEFAULT_MODEL_ID] }
     val streamResponseFlow: Flow<Boolean> = context.dataStore.data.map { it[STREAM_RESPONSE] ?: true }
     val memoryEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[MEMORY_ENABLED] ?: true }
-    val showReasoningFlow: Flow<Boolean> = context.dataStore.data.map { it[SHOW_REASONING] ?: false }
     val fontSizeFlow: Flow<Int> = context.dataStore.data.map { it[FONT_SIZE] ?: 15 }
     val firstLaunchFlow: Flow<Boolean> = context.dataStore.data.map { it[FIRST_LAUNCH] ?: true }
     val reasoningLevelFlow: Flow<String?> = context.dataStore.data.map { it[REASONING_LEVEL] }
@@ -85,18 +84,20 @@ class PreferencesManager(private val context: Context) {
             "serper" -> SERPER_API_KEY
             else -> SEARCH_API_KEY
         }
-        context.dataStore.edit { it[prefKey] = key.trim() }
+        val trimmed = key.trim()
+        context.dataStore.edit { it[prefKey] = KeyVault.encrypt(trimmed) }
     }
 
-    /**
-     * One-time move of search keys saved in the old encrypted form to plain text.
-     * A value that can no longer be decrypted is cleared so the user sees it as empty.
-     */
-    suspend fun migrateSearchKeysToPlain() {
+    /** Encrypts legacy plain-text keys in place; already-encrypted values are left untouched. */
+    suspend fun migrateSearchKeysToEncrypted() {
         context.dataStore.edit { prefs ->
-            listOf(TAVILY_API_KEY, BRAVE_API_KEY, EXA_API_KEY, SERPER_API_KEY, SEARCH_API_KEY).forEach { k ->
-                val raw = prefs[k] ?: return@forEach
-                if (raw.startsWith("enc1:")) prefs[k] = KeyVault.decrypt(raw)
+            listOf(TAVILY_API_KEY, BRAVE_API_KEY, EXA_API_KEY, SERPER_API_KEY, SEARCH_API_KEY).forEach { key ->
+                val raw = prefs[key] ?: return@forEach
+                if (raw.isNotBlank() && !raw.startsWith("enc1:")) {
+                    runCatching { KeyVault.encrypt(raw) }
+                        .onSuccess { prefs[key] = it }
+                        .onFailure { com.ariai.app.util.AppLog.warn(it, "search key migration") }
+                }
             }
         }
     }
@@ -114,10 +115,6 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setStreamResponse(enabled: Boolean) {
         context.dataStore.edit { it[STREAM_RESPONSE] = enabled }
-    }
-
-    suspend fun setShowReasoning(enabled: Boolean) {
-        context.dataStore.edit { it[SHOW_REASONING] = enabled }
     }
 
     suspend fun setFontSize(size: Int) {

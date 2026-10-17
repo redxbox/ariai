@@ -119,7 +119,7 @@ fun getBuiltInAgents(): List<Agent> = listOf(
         description = "Expert programmer for all languages",
         systemPrompt = "You are an expert programmer. You write clean, efficient, well-documented code. You explain complex concepts clearly. Always provide code examples when relevant. Current time: {time}",
         avatar = "💻",
-        tools = listOf(AgentTool.CODE_EXECUTION, AgentTool.WEB_SEARCH),
+        tools = listOf(AgentTool.WEB_SEARCH),
         isBuiltIn = true
     ),
     Agent(
@@ -145,7 +145,7 @@ fun getBuiltInAgents(): List<Agent> = listOf(
         description = "Deep research with web search",
         systemPrompt = "You are a research assistant. You provide thorough, well-sourced information. Use web search when needed. Always cite sources. Be objective and comprehensive. Time: {time}",
         avatar = "🔍",
-        tools = listOf(AgentTool.WEB_SEARCH, AgentTool.MEMORY),
+        tools = listOf(AgentTool.WEB_SEARCH),
         isBuiltIn = true
     ),
     Agent(

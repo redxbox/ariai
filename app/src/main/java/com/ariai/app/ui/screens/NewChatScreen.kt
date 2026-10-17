@@ -94,6 +94,7 @@ fun NewChatScreen(
     chat: Chat?,
     messages: List<ChatMessage>,
     isStreaming: Boolean,
+    isSending: Boolean = false,
     currentStreamingContent: String,
     selectedModel: String?,
     providers: List<Provider> = emptyList(),
@@ -101,7 +102,7 @@ fun NewChatScreen(
     searchMode: SearchMode = SearchMode.OFF,
     favorites: Set<String> = emptySet(),
     localSearchConfigured: Boolean = false,
-    onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode) -> Unit,
+    onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode, (Boolean) -> Unit) -> Boolean,
     onStopGeneration: () -> Unit = {},
     onBack: () -> Unit,
     onRenameChat: (String) -> Unit = {},
@@ -285,22 +286,42 @@ fun NewChatScreen(
             showNote(tx("Saving needs Android 10 or newer"))
             return
         }
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "ariai_${System.currentTimeMillis()}.png")
-            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AriAI")
-        }
-        val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        if (uri == null) {
-            showNote(tx("Save failed"))
-            return
-        }
-        runCatching {
-            context.contentResolver.openOutputStream(uri)?.use { out ->
-                File(path).inputStream().use { it.copyTo(out) }
+        scope.launch {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    val file = File(path)
+                    val extension = file.extension.lowercase().takeIf { it in setOf("png", "jpg", "jpeg", "webp", "gif") } ?: "png"
+                    val mimeType = when (extension) {
+                        "jpg", "jpeg" -> "image/jpeg"
+                        "webp" -> "image/webp"
+                        "gif" -> "image/gif"
+                        else -> "image/png"
+                    }
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, "ariai_${System.currentTimeMillis()}.$extension")
+                        put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AriAI")
+                    }
+                    val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                        ?: throw java.io.IOException("Could not create image in MediaStore")
+                    try {
+                        val output = context.contentResolver.openOutputStream(uri)
+                            ?: throw java.io.IOException("Could not open image output stream")
+                        output.use { out -> file.inputStream().use { it.copyTo(out) } }
+                    } catch (e: Exception) {
+                        context.contentResolver.delete(uri, null, null)
+                        throw e
+                    }
+                }
+                Result.success(Unit)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
             }
-        }.onSuccess { showNote(tx("Saved to Pictures/AriAI")) }
-            .onFailure { showNote(tx("Save failed")) }
+            result.onSuccess { showNote(tx("Saved to Pictures/AriAI")) }
+                .onFailure { showNote(tx("Save failed")) }
+        }
     }
 
     fun addFiles(uris: List<Uri>) {
@@ -330,10 +351,14 @@ fun NewChatScreen(
 
     fun send() {
         val text = inputText.trim()
-        if ((text.isBlank() && pending.isEmpty()) || isStreaming) return
-        onSendMessage(text, pending, reasoning, searchMode)
-        inputText = ""
-        pending = emptyList()
+        val submittedAttachments = pending
+        if ((text.isBlank() && submittedAttachments.isEmpty()) || isStreaming || isSending) return
+        onSendMessage(text, submittedAttachments, reasoning, searchMode) { saved ->
+            if (saved && inputText.trim() == text && pending == submittedAttachments) {
+                inputText = ""
+                pending = emptyList()
+            }
+        }
     }
 
     if (showModelSheet) {
@@ -545,9 +570,9 @@ fun NewChatScreen(
                                 showModelSheet = true
                             }
                             Spacer(Modifier.width(6.dp))
-                            val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && !isStreaming
-                            if (isStreaming) {
-                                // While a reply is coming in, the same button stops it.
+                            val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && !isStreaming && !isSending
+                            if (isStreaming || isSending) {
+                                // While a request is pending or a reply is coming in, allow cancellation.
                                 Box(
                                     modifier = Modifier.size(40.dp).clip(CircleShape)
                                         .background(AriInk)
@@ -707,19 +732,25 @@ private fun CompressedNotice() {
 /** Shows a sent photo inside the bubble, read from its stored file or from the in-memory bytes. */
 @Composable
 private fun AttachmentThumb(attachment: Attachment) {
-    val bitmap = remember(attachment.uri, attachment.base64Data) {
-        runCatching {
-            val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
-            val uri = attachment.uri
-            if (uri != null && java.io.File(uri).exists()) {
-                android.graphics.BitmapFactory.decodeFile(uri, options)
-            } else {
-                attachment.base64Data?.let {
-                    val bytes = android.util.Base64.decode(it, android.util.Base64.DEFAULT)
-                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+    val bitmap by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = attachment.uri,
+        key2 = attachment.base64Data
+    ) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+                val uri = attachment.uri
+                if (uri != null && java.io.File(uri).exists()) {
+                    android.graphics.BitmapFactory.decodeFile(uri, options)
+                } else {
+                    attachment.base64Data?.let {
+                        val bytes = android.util.Base64.decode(it, android.util.Base64.DEFAULT)
+                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                    }
                 }
-            }
-        }.getOrNull()?.asImageBitmap()
+            }.getOrNull()?.asImageBitmap()
+        }
     }
     if (bitmap != null) {
         androidx.compose.foundation.Image(

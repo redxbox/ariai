@@ -61,6 +61,8 @@ fun PreferencesScreen(
     onReasoningChange: (ReasoningLevel) -> Unit,
     fontSize: Int,
     onFontSizeChange: (Int) -> Unit,
+    streamResponse: Boolean,
+    onStreamResponseChange: (Boolean) -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -93,6 +95,13 @@ fun PreferencesScreen(
             item { SectionTitle(tx("Chat")) }
             item {
                 SettingCard {
+                    SwitchRow(
+                        title = tx("Stream replies"),
+                        subtitle = tx("Show text as the model generates it"),
+                        checked = streamResponse,
+                        onChange = onStreamResponseChange
+                    )
+                    HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                     Text(tx("Default thinking depth"), fontWeight = FontWeight.Medium, color = Ink)
                     Text(tx("Used for new messages. You can change it per message in the chat."), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {

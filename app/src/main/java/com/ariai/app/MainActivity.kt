@@ -87,7 +87,9 @@ fun AppRoot(viewModel: AppViewModel) {
     val chatModes by viewModel.chatModes.collectAsState()
     val messages by viewModel.messages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
+    val isSending by viewModel.isSending.collectAsState()
     val streamingContent by viewModel.streamingContent.collectAsState()
+    val generatedMediaBytes by viewModel.generatedMediaBytes.collectAsState()
     val language by viewModel.language.collectAsState()
     val theme by viewModel.theme.collectAsState()
     val searchKeys by viewModel.searchKeys.collectAsState()
@@ -96,6 +98,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val defaultProviderId by viewModel.defaultProviderId.collectAsState()
     val defaultModelId by viewModel.defaultModelId.collectAsState()
     val reasoningLevel by viewModel.reasoningLevel.collectAsState()
+    val streamResponse by viewModel.streamResponse.collectAsState()
     val searchModeState by viewModel.searchMode.collectAsState()
     val favoriteModels by viewModel.favoriteModels.collectAsState()
     val fontSize by viewModel.fontSize.collectAsState()
@@ -197,6 +200,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         chat = currentChat,
                         messages = messages,
                         isStreaming = isStreaming,
+                        isSending = isSending,
                         currentStreamingContent = streamingContent,
                         selectedModel = modelOverrides[chatId]?.second ?: currentChat?.modelId,
                         providers = providers,
@@ -204,11 +208,16 @@ fun AppRoot(viewModel: AppViewModel) {
                         searchMode = searchModeState,
                         favorites = favoriteModels,
                         localSearchConfigured = searchKeys.values.any { it.isNotBlank() },
-                        onSendMessage = { text, files, level, mode -> viewModel.sendMessage(text, files, level, mode) },
+                        onSendMessage = { text, files, level, mode, onSaved ->
+                            viewModel.sendMessage(text, files, level, mode, onSaved)
+                        },
                         onStopGeneration = { viewModel.stopGeneration() },
                         onBack = { newChat() },
                         onRenameChat = { viewModel.renameChat(chatId, it) },
-                        onBranchMessage = { viewModel.branchMessage(it) },
+                        onBranchMessage = {
+                            val branchId = viewModel.branchMessage(it)
+                            navController.navigate("chat/$branchId") { launchSingleTop = true }
+                        },
                         onRegenerate = { viewModel.regenerateMessage(it) },
                         onCopyMessage = { },
                         onOpenDrawer = { scope.launch { drawerState.open() } },
@@ -298,6 +307,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         fontSize = fontSize,
                         onFontSizeChange = { viewModel.setFontSize(it) },
+                        streamResponse = streamResponse,
+                        onStreamResponseChange = { viewModel.setStreamResponse(it) },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -328,10 +339,11 @@ fun AppRoot(viewModel: AppViewModel) {
                             scope.launch { snackbarHostState.showSnackbar(tx("All chats deleted")) }
                         },
                         onBack = { navController.popBackStack() },
-                        generatedBytes = com.ariai.app.data.local.ImageStore.generatedBytes(),
+                        generatedBytes = generatedMediaBytes,
                         onClearGenerated = {
-                            com.ariai.app.data.local.ImageStore.clearGenerated()
-                            scope.launch { snackbarHostState.showSnackbar(tx("Generated files deleted")) }
+                            viewModel.clearGeneratedMedia {
+                                scope.launch { snackbarHostState.showSnackbar(tx("Generated files deleted")) }
+                            }
                         }
                     )
                 }

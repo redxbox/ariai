@@ -14,7 +14,12 @@ class AriAiApp : Application() {
         super.onCreate()
         com.ariai.app.data.local.ImageStore.init(filesDir)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            try { preferencesManager.migrateSearchKeysToPlain() } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e, "search key migration") }
+            repository.migrateProviderKeysToEncrypted()
+            try {
+                preferencesManager.migrateSearchKeysToEncrypted()
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "search key migration")
+            }
         }
     }
 
@@ -24,7 +29,12 @@ class AriAiApp : Application() {
             AppDatabase::class.java,
             "ariai_db"
         )
-            .addMigrations(com.ariai.app.data.local.MIGRATION_1_2, com.ariai.app.data.local.MIGRATION_2_3, com.ariai.app.data.local.MIGRATION_3_4)
+            .addMigrations(
+                com.ariai.app.data.local.MIGRATION_1_2,
+                com.ariai.app.data.local.MIGRATION_2_3,
+                com.ariai.app.data.local.MIGRATION_3_4,
+                com.ariai.app.data.local.MIGRATION_4_5
+            )
             .build()
     }
 

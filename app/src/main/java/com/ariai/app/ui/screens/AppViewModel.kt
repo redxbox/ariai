@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.models.*
-import kotlinx.coroutines.flow.first
 import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.data.remote.looksLikeVideoModel
 import com.ariai.app.data.repository.ChatRepository
@@ -15,6 +14,8 @@ import kotlinx.coroutines.launch
 
 /** What the next message in a chat produces. */
 enum class ChatMode { TEXT, IMAGE, VIDEO, AUDIO }
+
+private const val MAX_MEDIA_BYTES_PER_REQUEST = 16L * 1024L * 1024L
 
 class AppViewModel(
     private val repository: ChatRepository,
@@ -29,7 +30,6 @@ class AppViewModel(
     val defaultProviderId = prefs.defaultProviderFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val defaultModelId = prefs.defaultModelFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val streamResponse = prefs.streamResponseFlow.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val showReasoning = prefs.showReasoningFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val fontSize = prefs.fontSizeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 15)
     val reasoningLevel = prefs.reasoningLevelFlow.map { ReasoningLevel.fromName(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ReasoningLevel.OFF)
@@ -45,10 +45,6 @@ class AppViewModel(
         viewModelScope.launch { prefs.setStreamResponse(enabled) }
     }
 
-    fun setShowReasoning(enabled: Boolean) {
-        viewModelScope.launch { prefs.setShowReasoning(enabled) }
-    }
-
     fun setFontSize(size: Int) {
         viewModelScope.launch { prefs.setFontSize(size) }
     }
@@ -57,24 +53,6 @@ class AppViewModel(
     val providers = repository.getProviders().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val chats = repository.getChats().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val agents = repository.getAgents().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    init {
-        // One-time upgrade: keys saved before encryption existed are rewritten, so they are stored encrypted.
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                repository.getProviders().first().forEach { repository.saveProvider(it) }
-            } catch (e: Exception) {
-                com.ariai.app.util.AppLog.warn(e, "provider key upgrade")
-            }
-            try {
-                prefs.searchKeysFlow.first().forEach { (name, key) ->
-                    if (key.isNotBlank()) prefs.setSearchApiKey(name, key)
-                }
-            } catch (e: Exception) {
-                com.ariai.app.util.AppLog.warn(e, "search key upgrade")
-            }
-        }
-    }
 
     // Chat state
     private val _currentChatId = MutableStateFlow<String?>(null)
@@ -104,6 +82,7 @@ class AppViewModel(
 
     /** Adds a message unless it is already in the list (the DB flow can deliver it first). */
     private fun appendMessage(message: ChatMessage) {
+        if (_currentChatId.value != message.chatId) return
         if (_messages.value.none { it.id == message.id }) _messages.value = _messages.value + message
     }
 
@@ -121,9 +100,12 @@ class AppViewModel(
     val messages = _messages.asStateFlow()
 
     private val _isStreaming = MutableStateFlow(false)
+    private val _isSending = MutableStateFlow(false)
+    val isSending = _isSending.asStateFlow()
     private var sendPending = false
-    private val RECENT_MESSAGES_FOR_MODEL = 10
+    private val RECENT_MESSAGES_FOR_MODEL = 20
     private var sendJob: kotlinx.coroutines.Job? = null
+    private var messagesCollectionJob: kotlinx.coroutines.Job? = null
 
     /** Stops the reply being generated. The text received so far is kept as the reply. */
     fun stopGeneration() {
@@ -136,6 +118,18 @@ class AppViewModel(
 
     private val _generatedImages = MutableStateFlow<List<GeneratedImage>>(emptyList())
     val generatedImages = _generatedImages.asStateFlow()
+    private val _generatedMediaBytes = MutableStateFlow(0L)
+    val generatedMediaBytes = _generatedMediaBytes.asStateFlow()
+
+    private suspend fun refreshGeneratedMediaBytes() {
+        runCatching { repository.generatedMediaBytes() }
+            .onSuccess { _generatedMediaBytes.value = it }
+            .onFailure { com.ariai.app.util.AppLog.warn(it, "generated media size") }
+    }
+
+    init {
+        viewModelScope.launch { refreshGeneratedMediaBytes() }
+    }
 
     private val _isGeneratingImage = MutableStateFlow(false)
     val isGeneratingImage = _isGeneratingImage.asStateFlow()
@@ -196,29 +190,45 @@ class AppViewModel(
             modelId = modelId ?: defaultModelId.value ?: providers.value.firstOrNull()?.models?.firstOrNull()?.id,
             agentId = agentId
         )
-        viewModelScope.launch {
-            repository.saveChat(chat)
-            _currentChatId.value = id
-            _messages.value = emptyList()
-        }
+        // Set active state synchronously: callers navigate to this id immediately after return.
+        sendJob?.cancel()
+        messagesCollectionJob?.cancel()
+        _currentChatId.value = id
+        _messages.value = emptyList()
+        viewModelScope.launch { repository.saveChat(chat) }
         return id
     }
 
     fun loadChat(chatId: String) {
-        _currentChatId.value = chatId
-        viewModelScope.launch {
+        if (_currentChatId.value != chatId) {
+            sendJob?.cancel()
+            _currentChatId.value = chatId
+            _messages.value = emptyList()
+        }
+        messagesCollectionJob?.cancel()
+        messagesCollectionJob = viewModelScope.launch {
             _messages.value = repository.getMessagesSync(chatId)
-            // Also collect flow for future updates if needed
             repository.getMessages(chatId).collect { msgs ->
-                if (_currentChatId.value == chatId && !_isStreaming.value) {
-                    _messages.value = msgs
-                }
+                if (_currentChatId.value == chatId) _messages.value = msgs
             }
         }
     }
 
     fun deleteChat(id: String) {
-        viewModelScope.launch { repository.deleteChat(id) }
+        viewModelScope.launch {
+            repository.deleteChat(id)
+            runCatching { _generatedMediaBytes.value = repository.generatedMediaBytes() }
+        }
+    }
+
+    fun clearGeneratedMedia(onDone: () -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                repository.clearGeneratedMedia()
+                _generatedMediaBytes.value = repository.generatedMediaBytes()
+            }.onSuccess { onDone() }
+                .onFailure { com.ariai.app.util.AppLog.warn(it, "clear generated media") }
+        }
     }
 
     fun pinChat(chat: Chat) {
@@ -228,12 +238,39 @@ class AppViewModel(
     }
 
     /** Summary of older turns (if any) and the messages that still go to the model. */
-    /** The newest messages sent with each request. Older text is covered by the compressed summary. */
-    private fun recentForModel(history: List<ChatMessage>): List<ChatMessage> {
-        val recent = history.takeLast(RECENT_MESSAGES_FOR_MODEL)
+    /** Keeps the newest turns within a conservative estimate of the selected model's context. */
+    private fun recentForModel(history: List<ChatMessage>, contextWindow: Int): List<ChatMessage> {
+        val tokenBudget = ((contextWindow.takeIf { it > 0 } ?: 8192) * 3L / 4L).coerceAtLeast(1024L)
+        val mediaByteBudget = MAX_MEDIA_BYTES_PER_REQUEST
+        var used = 0L
+        var usedMediaBytes = 0L
+        val newestFirst = mutableListOf<ChatMessage>()
+        for (message in history.takeLast(RECENT_MESSAGES_FOR_MODEL).asReversed()) {
+            val characters = message.content.length + message.attachments.sumOf { it.textContent?.length ?: 0 }
+            val mediaTokens = message.attachments.sumOf { attachment ->
+                when (attachment.type) {
+                    AttachmentType.IMAGE -> 768
+                    AttachmentType.VIDEO -> 2048
+                    else -> 0
+                }
+            }
+            val estimate = maxOf(1L, (characters + 3L) / 4L) + mediaTokens
+            val messageMediaBytes = message.attachments.sumOf { it.estimatedBytes() }
+            if (newestFirst.isNotEmpty() &&
+                (used + estimate > tokenBudget || usedMediaBytes + messageMediaBytes > mediaByteBudget)
+            ) break
+            newestFirst += message
+            used += estimate
+            usedMediaBytes += messageMediaBytes
+        }
         // Most providers expect the conversation to start with a user message.
-        return recent.dropWhile { it.role != MessageRole.USER }
+        return newestFirst.asReversed().dropWhile { it.role != MessageRole.USER }
     }
+
+    private fun Attachment.estimatedBytes(): Long =
+        base64Data?.length?.toLong()?.times(3L)?.div(4L)
+            ?: uri?.let { runCatching { java.io.File(it).length() }.getOrDefault(0L) }
+            ?: 0L
 
     private fun activeContext(all: List<ChatMessage>): Pair<String?, List<ChatMessage>> {
         val idx = all.indexOfLast { it.role == MessageRole.SYSTEM }
@@ -252,11 +289,16 @@ class AppViewModel(
     }
 
     /** The first attached photo, saved as a file so image models can edit it. */
-    private fun List<Attachment>.firstImageFile(): java.io.File? {
-        val image = firstOrNull { it.type == AttachmentType.IMAGE && !it.base64Data.isNullOrBlank() } ?: return null
-        val bytes = android.util.Base64.decode(image.base64Data, android.util.Base64.DEFAULT)
-        return com.ariai.app.data.local.ImageStore.save(bytes)
-    }
+    private suspend fun List<Attachment>.firstImageFile(): java.io.File? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val image = firstOrNull { it.type == AttachmentType.IMAGE } ?: return@withContext null
+            val bytes = runCatching {
+                image.base64Data?.takeIf { it.isNotBlank() }?.let {
+                    android.util.Base64.decode(it, android.util.Base64.DEFAULT)
+                } ?: image.uri?.let { path -> java.io.File(path).takeIf { it.isFile }?.readBytes() }
+            }.getOrNull() ?: return@withContext null
+            com.ariai.app.data.local.ImageStore.createTempImage(bytes, image.mimeType)
+        }
 
     /** Creates an image (or edits [source]) and stores it as its own assistant message. */
     private suspend fun generateImageReply(
@@ -266,6 +308,11 @@ class AppViewModel(
         prompt: String,
         source: java.io.File?
     ) {
+        if (source != null && provider.type == ProviderType.GEMINI) {
+            com.ariai.app.data.local.ImageStore.deleteTemp(source)
+            postAssistantError(chatId, tx("Image editing is not supported for Gemini providers yet."))
+            return
+        }
         _isStreaming.value = true
         try {
             val response = if (source == null) {
@@ -274,7 +321,10 @@ class AppViewModel(
                 repository.editImage(provider, modelId, source, prompt)
             }
             val first = response.images.firstOrNull() ?: throw Exception(tx("No image returned"))
-            val file = com.ariai.app.data.local.ImageStore.save(repository.imageBytes(first))
+            val imageBytes = repository.imageBytes(first)
+            val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.ariai.app.data.local.ImageStore.save(imageBytes)
+            }
             val reply = ChatMessage(
                 chatId = chatId,
                 role = MessageRole.ASSISTANT,
@@ -283,11 +333,18 @@ class AppViewModel(
                 providerId = provider.id,
                 imagePath = file.absolutePath
             )
-            repository.saveMessage(reply)
+            if (!repository.saveMessage(reply)) {
+                com.ariai.app.data.local.ImageStore.deleteOwnedFile(file.absolutePath)
+                throw Exception(tx("Could not save the generated image"))
+            }
             appendMessage(reply)
+            refreshGeneratedMediaBytes()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}")
         } finally {
+            source?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
             _isStreaming.value = false
         }
     }
@@ -297,7 +354,9 @@ class AppViewModel(
         _streamingContent.value = tx("Generating audio…")
         try {
             val bytes = repository.generateAudio(provider, modelId, prompt) { _streamingContent.value = it }
-            val file = com.ariai.app.data.local.ImageStore.saveAudio(bytes)
+            val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.ariai.app.data.local.ImageStore.saveAudio(bytes)
+            }
             val reply = ChatMessage(
                 chatId = chatId,
                 role = MessageRole.ASSISTANT,
@@ -306,8 +365,14 @@ class AppViewModel(
                 providerId = provider.id,
                 imagePath = file.absolutePath
             )
-            repository.saveMessage(reply)
+            if (!repository.saveMessage(reply)) {
+                com.ariai.app.data.local.ImageStore.deleteOwnedFile(file.absolutePath)
+                throw Exception(tx("Could not save the generated audio"))
+            }
             appendMessage(reply)
+            refreshGeneratedMediaBytes()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             postAssistantError(chatId, "❌ Audio error: ${e.message ?: e::class.java.simpleName}")
         } finally {
@@ -322,7 +387,9 @@ class AppViewModel(
         try {
             // The progress line shows in the reply bubble until the video is ready.
             val bytes = repository.generateVideo(provider, modelId, prompt) { _streamingContent.value = it }
-            val file = com.ariai.app.data.local.ImageStore.saveVideo(bytes)
+            val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.ariai.app.data.local.ImageStore.saveVideo(bytes)
+            }
             val reply = ChatMessage(
                 chatId = chatId,
                 role = MessageRole.ASSISTANT,
@@ -331,8 +398,14 @@ class AppViewModel(
                 providerId = provider.id,
                 imagePath = file.absolutePath
             )
-            repository.saveMessage(reply)
+            if (!repository.saveMessage(reply)) {
+                com.ariai.app.data.local.ImageStore.deleteOwnedFile(file.absolutePath)
+                throw Exception(tx("Could not save the generated video"))
+            }
             appendMessage(reply)
+            refreshGeneratedMediaBytes()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             postAssistantError(chatId, "❌ Video error: ${e.message ?: e::class.java.simpleName}")
         } finally {
@@ -346,13 +419,30 @@ class AppViewModel(
         val path = source.imagePath ?: return
         val modelId = source.modelId ?: return
         val chatId = source.chatId
-        if (instruction.isBlank() || _isStreaming.value) return
+        if (instruction.isBlank() || _isStreaming.value || sendPending) return
         val provider = providers.value.firstOrNull { it.id == source.providerId } ?: resolveProvider(chatId) ?: return
-        viewModelScope.launch {
-            val userMessage = ChatMessage(chatId = chatId, role = MessageRole.USER, content = "✏️ $instruction")
-            repository.saveMessage(userMessage)
-            appendMessage(userMessage)
-            generateImageReply(chatId, provider, modelId, instruction, java.io.File(path))
+        sendPending = true
+        _isSending.value = true
+        sendJob = viewModelScope.launch {
+            try {
+                val userMessage = ChatMessage(chatId = chatId, role = MessageRole.USER, content = "✏️ $instruction")
+                if (!repository.saveMessage(userMessage)) {
+                    postAssistantError(chatId, tx("Could not save your message. Check free storage and try again."))
+                    return@launch
+                }
+                appendMessage(userMessage)
+                generateImageReply(chatId, provider, modelId, instruction, java.io.File(path))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "edit image")
+                postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}")
+            }
+        }.also { job ->
+            job.invokeOnCompletion {
+                sendPending = false
+                _isSending.value = false
+            }
         }
     }
 
@@ -370,30 +460,38 @@ class AppViewModel(
         content: String,
         attachments: List<Attachment> = emptyList(),
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
-        searchMode: SearchMode = SearchMode.OFF
-    ) {
-        val chatId = _currentChatId.value ?: return
-        if (content.isBlank() && attachments.isEmpty()) return
-        if (_isStreaming.value || sendPending) return
+        searchMode: SearchMode = SearchMode.OFF,
+        onUserMessageSaved: (Boolean) -> Unit = {}
+    ): Boolean {
+        val chatId = _currentChatId.value ?: return false
+        if (content.isBlank() && attachments.isEmpty()) return false
+        if (_isStreaming.value || sendPending) return false
+        if (attachments.sumOf { it.estimatedBytes() } > MAX_MEDIA_BYTES_PER_REQUEST) {
+            postAssistantError(chatId, tx("Attachments exceed the 16 MB per-request limit. Remove some files and try again."))
+            return false
+        }
 
         val provider = resolveProvider(chatId)
         if (provider == null) {
             postAssistantError(chatId, "⚠️ No provider configured. Add a provider in Settings > AI Providers.")
-            return
+            return false
         }
 
         val localSearchKey = if (searchMode == SearchMode.LOCAL || (searchMode == SearchMode.MODEL && !supportsNativeSearch(provider))) {
-            searchKeys.value.entries.firstOrNull { it.value.isNotBlank() }
+            listOf("tavily", "brave", "exa", "serper").firstNotNullOfOrNull { name ->
+                searchKeys.value[name]?.takeIf { it.isNotBlank() }?.let { name to it }
+            }
         } else {
             null
         }
-        if (searchMode == SearchMode.LOCAL && localSearchKey == null) {
+        if (searchMode == SearchMode.LOCAL && content.isNotBlank() && localSearchKey == null) {
             postAssistantError(chatId, "🔎 Local search needs an API key. Add one in Settings > Search service.")
-            return
+            return false
         }
 
         // Set before launching so a fast second tap cannot start a second send.
         sendPending = true
+        _isSending.value = true
         sendJob = viewModelScope.launch {
             try {
                 val userMessage = ChatMessage(
@@ -403,24 +501,41 @@ class AppViewModel(
                     attachments = attachments
                 )
                 if (!repository.saveMessage(userMessage)) {
+                    onUserMessageSaved(false)
                     postAssistantError(chatId, tx("Could not save your message. Check free storage and try again."))
                     return@launch
                 }
-                appendMessage(userMessage)
+                onUserMessageSaved(true)
+                appendMessage(repository.getMessageById(userMessage.id) ?: userMessage)
 
                 val targetModelId = _modelOverrides.value[chatId]?.second
                     ?: getCurrentChat()?.modelId
                     ?: provider.models.firstOrNull()?.id
                 val current = provider.models.firstOrNull { it.id == targetModelId }
+                if ((_chatModes.value[chatId] ?: ChatMode.TEXT) == ChatMode.TEXT &&
+                    attachments.any { it.type == AttachmentType.IMAGE } && current != null && !current.supportsVision
+                ) {
+                    postAssistantError(chatId, tx("This model is not marked as accepting images. Choose a vision model or enable Vision in its model settings."))
+                    return@launch
+                }
                 when (_chatModes.value[chatId] ?: ChatMode.TEXT) {
                     ChatMode.IMAGE -> {
+                        if (content.isBlank()) {
+                            postAssistantError(chatId, tx("Describe the image you want, or explain how the attached image should change."))
+                            return@launch
+                        }
                         // Only a model flagged for image output generates; nothing else is guessed.
                         val found = findImageModel(provider)
                         if (found == null) {
                             postAssistantError(chatId, tx("No image model found. Add an image model, or fetch the models in provider settings."))
                             return@launch
                         }
-                        generateImageReply(chatId, found.first, found.second.id, content, attachments.firstImageFile())
+                        val source = attachments.firstImageFile()
+                        if (attachments.any { it.type == AttachmentType.IMAGE } && source == null) {
+                            postAssistantError(chatId, tx("The attached image is no longer available. Please attach it again."))
+                            return@launch
+                        }
+                        generateImageReply(chatId, found.first, found.second.id, content, source)
                         return@launch
                     }
                     ChatMode.AUDIO -> {
@@ -459,29 +574,46 @@ class AppViewModel(
                         return@launch
                     } else if (current != null && current.supportsImageGen && !current.outputsText) {
                         // Image-only model: text cannot work, so it generates an image.
-                        generateImageReply(chatId, provider, current.id, content, attachments.firstImageFile())
+                        if (content.isBlank()) {
+                            postAssistantError(chatId, tx("Describe the image you want, or explain how the attached image should change."))
+                            return@launch
+                        }
+                        val source = attachments.firstImageFile()
+                        if (attachments.any { it.type == AttachmentType.IMAGE } && source == null) {
+                            postAssistantError(chatId, tx("The attached image is no longer available. Please attach it again."))
+                            return@launch
+                        }
+                        generateImageReply(chatId, provider, current.id, content, source)
                         return@launch
                     }
                 }
 
                 var searchContext: String? = null
-                if (localSearchKey != null) {
+                if (localSearchKey != null && content.isNotBlank()) {
                     try {
                         val sp = SearchProvider(
-                            name = localSearchKey.key,
-                            type = when (localSearchKey.key) {
+                            name = localSearchKey.first,
+                            type = when (localSearchKey.first) {
                                 "tavily" -> SearchProviderType.TAVILY
                                 "brave" -> SearchProviderType.BRAVE
                                 "exa" -> SearchProviderType.EXA
                                 "serper" -> SearchProviderType.SERPER
                                 else -> SearchProviderType.CUSTOM
                             },
-                            apiKey = localSearchKey.value
+                            apiKey = localSearchKey.second
                         )
                         val result = repository.searchWeb(content, sp)
                         searchContext = repository.formatSearchForLLM(result)
+                        if (result.results.isEmpty()) {
+                            postAssistantError(chatId, tx("Web search returned no results. Check the search service key and try again."))
+                            return@launch
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
-                        // Search failed: answer without results instead of blocking the message.
+                        com.ariai.app.util.AppLog.warn(e, "web search")
+                        postAssistantError(chatId, tx("Web search failed: ${e.message?.take(180) ?: "check the search service settings"}"))
+                        return@launch
                     }
                 }
 
@@ -489,9 +621,12 @@ class AppViewModel(
                 _streamingContent.value = ""
 
                 var fullResponse = ""
+                val requestModelId = targetModelId ?: "openai"
                 try {
                     val (summary, allHistory) = activeContext(_messages.value)
-                    val history = recentForModel(allHistory)
+                    val history = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        recentForModel(allHistory, current?.contextWindow ?: 8192)
+                    }
                     val systemPrompt = listOfNotNull(
                         getCurrentChat()?.systemPrompt ?: getAgentSystemPrompt(),
                         summary?.let { "Summary of the earlier conversation:\n$it" }
@@ -501,11 +636,12 @@ class AppViewModel(
                     repository.streamChat(
                         provider = provider,
                         messages = history,
-                        modelId = _modelOverrides.value[chatId]?.second ?: getCurrentChat()?.modelId ?: provider.models.firstOrNull()?.id ?: "openai",
+                        modelId = requestModelId,
                         systemPrompt = systemPrompt,
                         searchContext = searchContext,
                         reasoning = reasoning,
-                        nativeSearch = searchMode == SearchMode.MODEL && supportsNativeSearch(provider)
+                        nativeSearch = searchMode == SearchMode.MODEL && supportsNativeSearch(provider),
+                        stream = streamResponse.value
                     ).collect { chunk ->
                         fullResponse += chunk
                         // Publish at most ~16 times per second; each publish recomposes and re-renders markdown.
@@ -525,7 +661,7 @@ class AppViewModel(
                         chatId = chatId,
                         role = MessageRole.ASSISTANT,
                         content = fullResponse,
-                        modelId = getCurrentChat()?.modelId,
+                        modelId = requestModelId,
                         providerId = provider.id
                     )
                     if (!repository.saveMessage(assistantMessage)) {
@@ -544,7 +680,7 @@ class AppViewModel(
                             chatId = chatId,
                             role = MessageRole.ASSISTANT,
                             content = fullResponse,
-                            modelId = getCurrentChat()?.modelId,
+                            modelId = requestModelId,
                             providerId = provider.id
                         )
                         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
@@ -575,11 +711,22 @@ class AppViewModel(
                     _isStreaming.value = false
                     _streamingContent.value = ""
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                _isStreaming.value = false
+                _streamingContent.value = ""
+                throw e
             } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "sendMessage")
                 _isStreaming.value = false
                 _streamingContent.value = ""
             }
-        }.also { job -> job.invokeOnCompletion { sendPending = false } }
+        }.also { job ->
+            job.invokeOnCompletion {
+                sendPending = false
+                _isSending.value = false
+            }
+        }
+        return true
     }
 
     /**
@@ -617,7 +764,8 @@ class AppViewModel(
                     provider = provider,
                     messages = history + instruction,
                     modelId = modelId,
-                    systemPrompt = systemPrompt
+                    systemPrompt = systemPrompt,
+                    stream = streamResponse.value
                 ).collect { summary.append(it) }
 
                 val text = summary.toString().trim()
@@ -658,29 +806,41 @@ class AppViewModel(
         }
     }
 
-    fun branchMessage(message: ChatMessage) {
-        // Create new chat from this message
+    fun branchMessage(message: ChatMessage): String {
+        val newChatId = java.util.UUID.randomUUID().toString()
+        val currentMessages = _messages.value
+        val branchIndex = currentMessages.indexOfFirst { it.id == message.id }
+        val sourceMessages = if (branchIndex >= 0) currentMessages.take(branchIndex + 1) else emptyList()
+        val newIds = sourceMessages.associate { it.id to java.util.UUID.randomUUID().toString() }
+        val branchedMessages = sourceMessages.map { source ->
+            source.copy(
+                id = newIds.getValue(source.id),
+                chatId = newChatId,
+                parentId = source.parentId?.let(newIds::get),
+                branchChildren = source.branchChildren.mapNotNull(newIds::get)
+            )
+        }
+
+        sendJob?.cancel()
+        messagesCollectionJob?.cancel()
+        _currentChatId.value = newChatId
+        _messages.value = emptyList()
         viewModelScope.launch {
             val originalChat = repository.getChatById(message.chatId) ?: return@launch
-            val newChatId = java.util.UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
             val newChat = originalChat.copy(
                 id = newChatId,
                 title = "${originalChat.title} (Branch)",
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
+                createdAt = now,
+                updatedAt = now
             )
             repository.saveChat(newChat)
-
-            // Copy messages up to this message
-            val messagesUpToBranch = _messages.value.filter { it.timestamp <= message.timestamp }
-            messagesUpToBranch.forEach { msg ->
-                val newMsg = msg.copy(id = java.util.UUID.randomUUID().toString(), chatId = newChatId)
-                repository.saveMessage(newMsg)
+            branchedMessages.forEach { repository.saveMessage(it) }
+            if (_currentChatId.value == newChatId) {
+                _messages.value = repository.getMessagesSync(newChatId)
             }
-
-            _currentChatId.value = newChatId
-            _messages.value = repository.getMessagesSync(newChatId)
         }
+        return newChatId
     }
 
     fun regenerateMessage(message: ChatMessage) {
@@ -692,7 +852,7 @@ class AppViewModel(
                 if (prevUserMessage.role == MessageRole.USER) {
                     repository.deleteMessage(message.id)
                     _messages.value = _messages.value.filter { it.id != message.id }
-                    sendMessage(prevUserMessage.content)
+                    sendMessage(prevUserMessage.content, prevUserMessage.attachments)
                 }
             }
         }
