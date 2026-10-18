@@ -179,8 +179,12 @@ fun NewChatScreen(
     var showRename by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     if (showRename) {
+        val dialogShape = RoundedCornerShape(26.dp)
         AlertDialog(
             onDismissRequest = { showRename = false },
+            modifier = paperPopupModifier(dialogShape, AriPaper),
+            shape = dialogShape,
+            containerColor = AriCard,
             title = { Text(tx("Rename chat")) },
             text = {
                 OutlinedTextField(
@@ -213,7 +217,6 @@ fun NewChatScreen(
     var showThinking by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
-    val glassOverlayOpen = showModelSheet || showAttachments || showThinking || showSearch
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -438,7 +441,7 @@ fun NewChatScreen(
     Scaffold(
         containerColor = PageBg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        modifier = modifier.then(frostedBackdropModifier(glassOverlayOpen)),
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
@@ -480,12 +483,11 @@ fun NewChatScreen(
                         IconButton(onClick = { showTopMenu = true }) {
                             Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
                         }
+                        val menuShape = RoundedCornerShape(18.dp)
                         DropdownMenu(
                             expanded = showTopMenu,
                             onDismissRequest = { showTopMenu = false },
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .border(0.5.dp, AriLine, RoundedCornerShape(18.dp))
+                            modifier = Modifier.clip(menuShape).then(paperPopupModifier(menuShape, AriPaper, 10.dp))
                         ) {
                             DropdownMenuItem(
                                 text = { Text(tx("Copy conversation")) },
@@ -937,8 +939,12 @@ private fun FullImageDialog(bitmap: ImageBitmap, onDismiss: () -> Unit) {
 @Composable
 private fun EditImageDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
+    val dialogShape = RoundedCornerShape(26.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = paperPopupModifier(dialogShape, AriPaper),
+        shape = dialogShape,
+        containerColor = AriCard,
         title = { Text(tx("Edit image")) },
         text = {
             OutlinedTextField(

@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -98,7 +97,6 @@ fun NewProvidersScreen(
     }
 
     Scaffold(
-        modifier = frostedBackdropModifier(showRecommended),
         containerColor = AriPaper,
         topBar = {
             TopAppBar(
@@ -317,7 +315,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
     val dialogShape = RoundedCornerShape(28.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.border(BorderStroke(1.dp, AriLine), dialogShape),
+        modifier = paperPopupModifier(dialogShape, AriPaper),
         shape = dialogShape,
         containerColor = AriCard,
         tonalElevation = 8.dp,
@@ -363,9 +361,9 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = frostedSheetBorder(sheetShape),
+        modifier = paperPopupModifier(sheetShape, AriCard),
         shape = sheetShape,
-        containerColor = frostedSheetColor(),
+        containerColor = AriPaper,
         tonalElevation = 4.dp
     ) {
         Column(

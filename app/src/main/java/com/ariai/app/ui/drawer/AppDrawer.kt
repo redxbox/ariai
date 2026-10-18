@@ -216,7 +216,12 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
             IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Default.MoreVert, contentDescription = tx("Chat options"), tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
             }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            val menuShape = RoundedCornerShape(16.dp)
+            DropdownMenu(
+                expanded = menu,
+                onDismissRequest = { menu = false },
+                modifier = Modifier.clip(menuShape).then(paperPopupModifier(menuShape, AriPaper, 10.dp))
+            ) {
                 DropdownMenuItem(
                     text = { Text(if (chat.isPinned) tx("Unpin") else tx("Pin")) },
                     leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) },

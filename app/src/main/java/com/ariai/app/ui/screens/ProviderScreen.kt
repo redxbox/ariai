@@ -225,7 +225,12 @@ fun GlassProviderCard(
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
-                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                val menuShape = RoundedCornerShape(16.dp)
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.clip(menuShape).then(paperPopupModifier(menuShape, AriPaper, 10.dp))
+                ) {
                     DropdownMenuItem(text = { Text(tx("Test")) }, onClick = { showMenu = false; onTest() }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) })
                     DropdownMenuItem(text = { Text(tx("Edit")) }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) })
                     DropdownMenuItem(text = { Text(tx("Delete")) }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
@@ -406,8 +411,12 @@ fun AddProviderScreen(
     }
 
     if (confirmDelete && initialProvider != null) {
+        val dialogShape = RoundedCornerShape(26.dp)
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
+            modifier = paperPopupModifier(dialogShape, AriPaper),
+            shape = dialogShape,
+            containerColor = AriCard,
             title = { Text(tx("Delete provider?")) },
             text = { Text("${initialProvider.name} and its models will be removed.") },
             confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete(initialProvider.id) }) { Text(tx("Delete"), color = AriAccent) } },
@@ -870,7 +879,14 @@ private fun AddModelSheet(
     val bodyValid = isValidJsonObject(customBody)
     val isGemini = providerType == ProviderType.GEMINI
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = paperPopupModifier(sheetShape, AriCard),
+        shape = sheetShape,
+        containerColor = AriPaper,
+        tonalElevation = 4.dp
+    ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
             Text(
                 tx("Add model"),

@@ -1,10 +1,6 @@
 package com.ariai.app.ui.theme
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,34 +8,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-
-private const val FROSTED_SHEET_ALPHA = 0.66f
-
-/** Semi-transparent, theme-aware tint for modal sheets. Keep their inner cards opaque. */
-@Composable
-fun frostedSheetColor(): Color = AriPaper.copy(alpha = FROSTED_SHEET_ALPHA)
-
-/** Thin highlight edge that gives a floating sheet definition without a heavy outline. */
-@Composable
-fun frostedSheetBorder(shape: Shape): Modifier =
-    Modifier.border(BorderStroke(1.dp, AriCard.copy(alpha = 0.88f)), shape)
-
-/** Animate the backdrop blur only while a frosted overlay is visible. */
-@Composable
-fun frostedBackdropModifier(enabled: Boolean, radius: Dp = 14.dp): Modifier {
-    val animatedRadius = animateDpAsState(
-        targetValue = if (enabled) radius else 0.dp,
-        animationSpec = tween(durationMillis = 220),
-        label = "frosted backdrop blur"
-    ).value
-    return if (animatedRadius > 0.dp) Modifier.blur(animatedRadius) else Modifier
-}
 
 /**
  * Professional Glassmorphism Theme Utilities
