@@ -136,7 +136,7 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
-                    modifier = Modifier.clip(menuShape).then(paperPopupModifier(menuShape, AriPaper, 10.dp))
+                    modifier = Modifier.clip(menuShape).background(AriCard, menuShape).then(paperPopupModifier(menuShape, 14.dp))
                 ) {
                     DropdownMenuItem(text = { Text(tx("Pin")) }, onClick = { showMenu = false; onPin() }, leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) })
                     DropdownMenuItem(text = { Text(tx("Delete")) }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })

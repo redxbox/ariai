@@ -50,7 +50,7 @@ fun StorageScreen(
     if (confirmGenerated) {
         AlertDialog(
             onDismissRequest = { confirmGenerated = false },
-            modifier = paperPopupModifier(dialogShape, AriPaper),
+            modifier = paperPopupModifier(dialogShape),
             shape = dialogShape,
             containerColor = AriCard,
             title = { Text(tx("Delete generated files?")) },
@@ -65,7 +65,7 @@ fun StorageScreen(
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            modifier = paperPopupModifier(dialogShape, AriPaper),
+            modifier = paperPopupModifier(dialogShape),
             shape = dialogShape,
             containerColor = AriCard,
             title = { Text(tx("Delete all chats?")) },

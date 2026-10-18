@@ -229,7 +229,7 @@ fun GlassProviderCard(
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
-                    modifier = Modifier.clip(menuShape).then(paperPopupModifier(menuShape, AriPaper, 10.dp))
+                    modifier = Modifier.clip(menuShape).background(AriCard, menuShape).then(paperPopupModifier(menuShape, 14.dp))
                 ) {
                     DropdownMenuItem(text = { Text(tx("Test")) }, onClick = { showMenu = false; onTest() }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) })
                     DropdownMenuItem(text = { Text(tx("Edit")) }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) })
@@ -414,7 +414,7 @@ fun AddProviderScreen(
         val dialogShape = RoundedCornerShape(26.dp)
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            modifier = paperPopupModifier(dialogShape, AriPaper),
+            modifier = paperPopupModifier(dialogShape),
             shape = dialogShape,
             containerColor = AriCard,
             title = { Text(tx("Delete provider?")) },
@@ -882,9 +882,9 @@ private fun AddModelSheet(
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape, AriCard),
+        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriPaper,
+        containerColor = AriCard,
         tonalElevation = 4.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {

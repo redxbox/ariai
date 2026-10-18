@@ -48,9 +48,9 @@ fun AttachmentSheet(
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape, AriCard),
+        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriPaper,
+        containerColor = AriCard,
         tonalElevation = 4.dp
     ) {
         Column(
@@ -124,9 +124,9 @@ fun ThinkingDepthSheet(
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape, AriCard),
+        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriPaper,
+        containerColor = AriCard,
         tonalElevation = 4.dp
     ) {
         Column(
@@ -183,9 +183,9 @@ fun SearchSheet(
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape, AriCard),
+        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriPaper,
+        containerColor = AriCard,
         tonalElevation = 4.dp
     ) {
         Column(

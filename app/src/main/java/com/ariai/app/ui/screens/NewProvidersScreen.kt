@@ -315,7 +315,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
     val dialogShape = RoundedCornerShape(28.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(dialogShape, AriPaper),
+        modifier = paperPopupModifier(dialogShape),
         shape = dialogShape,
         containerColor = AriCard,
         tonalElevation = 8.dp,
@@ -361,9 +361,9 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape, AriCard),
+        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriPaper,
+        containerColor = AriCard,
         tonalElevation = 4.dp
     ) {
         Column(
@@ -374,7 +374,7 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
             providerPresets.forEach { preset ->
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = AriCard,
+                    color = AriPaper,
                     tonalElevation = 0.dp,
                     shadowElevation = 1.dp,
                     border = BorderStroke(0.5.dp, AriLine),

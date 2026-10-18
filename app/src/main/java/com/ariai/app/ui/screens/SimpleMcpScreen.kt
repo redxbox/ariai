@@ -136,9 +136,9 @@ private fun AddMcpServerSheet(onSave: (McpServerItem) -> Unit, onDismiss: () -> 
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape, AriCard),
+        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriPaper,
+        containerColor = AriCard,
         tonalElevation = 4.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {

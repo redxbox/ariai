@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
@@ -21,12 +20,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun paperPopupModifier(
     shape: Shape,
-    foldColor: Color,
-    foldSize: Dp = 14.dp
+    foldSize: Dp = 22.dp
 ): Modifier {
-    val borderColor = AriLine
-    val creaseColor = AriInk.copy(alpha = 0.16f)
-    val foldEdgeColor = AriCard.copy(alpha = 0.72f)
+    val borderColor = AriInk.copy(alpha = 0.18f)
+    val creaseColor = AriInk.copy(alpha = 0.28f)
+    val foldColor = AriFold
+    val foldEdgeColor = AriCard.copy(alpha = 0.9f)
 
     return Modifier
         .border(BorderStroke(1.dp, borderColor), shape)

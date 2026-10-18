@@ -220,7 +220,7 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
             DropdownMenu(
                 expanded = menu,
                 onDismissRequest = { menu = false },
-                modifier = Modifier.clip(menuShape).then(paperPopupModifier(menuShape, AriPaper, 10.dp))
+                modifier = Modifier.clip(menuShape).background(AriCard, menuShape).then(paperPopupModifier(menuShape, 14.dp))
             ) {
                 DropdownMenuItem(
                     text = { Text(if (chat.isPinned) tx("Unpin") else tx("Pin")) },

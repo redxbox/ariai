@@ -182,7 +182,7 @@ fun NewChatScreen(
         val dialogShape = RoundedCornerShape(26.dp)
         AlertDialog(
             onDismissRequest = { showRename = false },
-            modifier = paperPopupModifier(dialogShape, AriPaper),
+            modifier = paperPopupModifier(dialogShape),
             shape = dialogShape,
             containerColor = AriCard,
             title = { Text(tx("Rename chat")) },
@@ -487,7 +487,7 @@ fun NewChatScreen(
                         DropdownMenu(
                             expanded = showTopMenu,
                             onDismissRequest = { showTopMenu = false },
-                            modifier = Modifier.clip(menuShape).then(paperPopupModifier(menuShape, AriPaper, 10.dp))
+                            modifier = Modifier.clip(menuShape).background(AriCard, menuShape).then(paperPopupModifier(menuShape, 14.dp))
                         ) {
                             DropdownMenuItem(
                                 text = { Text(tx("Copy conversation")) },
@@ -942,7 +942,7 @@ private fun EditImageDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) 
     val dialogShape = RoundedCornerShape(26.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(dialogShape, AriPaper),
+        modifier = paperPopupModifier(dialogShape),
         shape = dialogShape,
         containerColor = AriCard,
         title = { Text(tx("Edit image")) },
@@ -1012,7 +1012,12 @@ private fun FullScreenMessageEditor(
         onDismissRequest = onCollapse,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = AriCard) {
+        val pageShape = RoundedCornerShape(28.dp)
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(8.dp).then(paperPopupModifier(pageShape)),
+            shape = pageShape,
+            color = AriCard
+        ) {
             Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Icon(
                     Icons.Default.CloseFullscreen,

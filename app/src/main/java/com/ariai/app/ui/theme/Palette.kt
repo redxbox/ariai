@@ -12,7 +12,8 @@ data class AriPalette(
     val ink: Color,
     val muted: Color,
     val line: Color,
-    val tint: Color
+    val tint: Color,
+    val fold: Color
 )
 
 val LightAriPalette = AriPalette(
@@ -21,7 +22,8 @@ val LightAriPalette = AriPalette(
     ink = Color(0xFF111111),
     muted = Color(0x8A111111),
     line = Color(0x14000000),
-    tint = Color(0xFFF3F3F3)
+    tint = Color(0xFFF3F3F3),
+    fold = Color(0xFFE5E5E5)
 )
 
 val DarkAriPalette = AriPalette(
@@ -30,7 +32,8 @@ val DarkAriPalette = AriPalette(
     ink = Color(0xFFF2F2F2),
     muted = Color(0x8AF2F2F2),
     line = Color(0x1FFFFFFF),
-    tint = Color(0xFF242426)
+    tint = Color(0xFF242426),
+    fold = Color(0xFF303034)
 )
 
 val LocalAriPalette = staticCompositionLocalOf { LightAriPalette }
@@ -41,4 +44,5 @@ val AriCard: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.curre
 val AriInk: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.ink
 val AriMuted: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.muted
 val AriLine: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.line
+val AriFold: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.fold
 val AriTint: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.tint
