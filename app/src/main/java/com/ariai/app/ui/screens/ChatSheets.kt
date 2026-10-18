@@ -30,7 +30,6 @@ import kotlin.math.roundToInt
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private val SheetBg: Color @Composable @ReadOnlyComposable get() = AriPaper
 private val Tile: Color @Composable @ReadOnlyComposable get() = AriTint
 /** Actions offered by the "+" button above the chat input. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,7 +45,14 @@ fun AttachmentSheet(
     onAudio: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SheetBg) {
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = frostedSheetBorder(sheetShape),
+        shape = sheetShape,
+        containerColor = frostedSheetColor(),
+        tonalElevation = 4.dp
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -115,7 +121,14 @@ fun ThinkingDepthSheet(
     onDismiss: () -> Unit
 ) {
     val levels = ReasoningLevel.values()
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SheetBg) {
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = frostedSheetBorder(sheetShape),
+        shape = sheetShape,
+        containerColor = frostedSheetColor(),
+        tonalElevation = 4.dp
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -167,7 +180,14 @@ fun SearchSheet(
     onConfigureLocal: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SheetBg) {
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = frostedSheetBorder(sheetShape),
+        shape = sheetShape,
+        containerColor = frostedSheetColor(),
+        tonalElevation = 4.dp
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)

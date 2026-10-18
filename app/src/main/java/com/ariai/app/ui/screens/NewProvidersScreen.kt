@@ -23,7 +23,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -99,7 +98,7 @@ fun NewProvidersScreen(
     }
 
     Scaffold(
-        modifier = if (showRecommended) Modifier.blur(18.dp) else Modifier,
+        modifier = frostedBackdropModifier(showRecommended),
         containerColor = AriPaper,
         topBar = {
             TopAppBar(
@@ -364,9 +363,9 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = Modifier.border(BorderStroke(1.dp, AriCard.copy(alpha = 0.92f)), sheetShape),
+        modifier = frostedSheetBorder(sheetShape),
         shape = sheetShape,
-        containerColor = AriPaper.copy(alpha = 0.78f),
+        containerColor = frostedSheetColor(),
         tonalElevation = 4.dp
     ) {
         Column(

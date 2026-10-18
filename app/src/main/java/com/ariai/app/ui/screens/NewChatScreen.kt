@@ -213,6 +213,7 @@ fun NewChatScreen(
     var showThinking by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
+    val glassOverlayOpen = showModelSheet || showAttachments || showThinking || showSearch
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -437,7 +438,7 @@ fun NewChatScreen(
     Scaffold(
         containerColor = PageBg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        modifier = modifier,
+        modifier = modifier.then(frostedBackdropModifier(glassOverlayOpen)),
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
