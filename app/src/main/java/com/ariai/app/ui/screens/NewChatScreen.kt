@@ -70,6 +70,7 @@ import com.ariai.app.data.models.AttachmentType
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
+import com.ariai.app.data.models.MessageStatus
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.ReasoningLevel
@@ -120,8 +121,16 @@ fun NewChatScreen(
     onAddProvider: () -> Unit = {},
     onCheckProvider: suspend (Provider) -> com.ariai.app.data.remote.ConnectionResult,
     fontSize: Int = 15,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    screenChatId: String? = chat?.id,
+    onChatScreenDisposed: (String) -> Unit = {}
 ) {
+    val onChatDisposedState = rememberUpdatedState(onChatScreenDisposed)
+    DisposableEffect(screenChatId) {
+        val disposedChatId = screenChatId
+        onDispose { disposedChatId?.let(onChatDisposedState.value) }
+    }
+
     var inputText by remember { mutableStateOf("") }
     // Voice input with the device's built-in speech recognizer. Spoken text is added to the input box.
     var listening by remember { mutableStateOf(false) }
@@ -229,6 +238,7 @@ fun NewChatScreen(
     val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
     val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
     val hasStreamingText = currentStreamingContent.isNotBlank()
+    val lastMessageIndex = messages.lastIndex
     val showWaitingStatus = isSending && !hasStreamingText
     val waitingStatus = when {
         chatMode == ChatMode.IMAGE || selectedModelIsImageOnly ->
@@ -655,8 +665,16 @@ fun NewChatScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                items(count = messages.size, key = { i -> "${messages[i].id}_$i" }) { i ->
+                items(count = messages.size, key = { i -> messages[i].id }) { i ->
                     val m = messages[i]
+                    val isError = m.status == MessageStatus.ERROR
+                    val hasLaterTurn = i < lastMessageIndex
+                    val retryUserId = m.parentId ?: messages.getOrNull(i - 1)
+                        ?.takeIf { it.role == MessageRole.USER }
+                        ?.id
+                    val canRetry = isError && !hasLaterTurn && retryUserId?.let { userId ->
+                        messages.any { it.id == userId && it.role == MessageRole.USER }
+                    } == true
                     when (m.role) {
                         MessageRole.SYSTEM -> AppearIn(m.id) { CompressedNotice() }
                         MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }
@@ -665,6 +683,8 @@ fun NewChatScreen(
                                 text = m.content,
                                 fontSize = fontSize,
                                 imagePath = m.imagePath,
+                                isError = isError,
+                                retryable = canRetry && !isStreaming && !isSending,
                                 onCopy = { copyToClipboard(m.content) },
                                 onShare = { shareText(m.content) },
                                 onEdit = { editingImage = m },
@@ -854,6 +874,8 @@ private fun AssistantBlock(
     fontSize: Int,
     streaming: Boolean = false,
     imagePath: String? = null,
+    isError: Boolean = false,
+    retryable: Boolean = false,
     onCopy: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null,
     onBranch: (() -> Unit)? = null,
@@ -889,6 +911,23 @@ private fun AssistantBlock(
                 }
                 TextButton(onClick = { onSave?.invoke() }) {
                     Text(tx("Save"), color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
+                }
+            }
+        } else if (onCopy != null && isError) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ActionIcon(Icons.Default.ContentCopy, tx("Copy"), onCopy)
+                if (retryable && onRetry != null) {
+                    TextButton(
+                        onClick = onRetry,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(tx("Retry"), fontSize = 13.sp)
+                    }
                 }
             }
         } else if (onCopy != null) {

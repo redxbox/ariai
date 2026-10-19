@@ -198,6 +198,7 @@ fun AppRoot(viewModel: AppViewModel) {
                     LaunchedEffect(chatId) { viewModel.loadChat(chatId) }
                     NewChatScreen(
                         chat = currentChat,
+                        screenChatId = chatId,
                         messages = messages,
                         isStreaming = isStreaming,
                         isSending = isSending,
@@ -212,13 +213,14 @@ fun AppRoot(viewModel: AppViewModel) {
                             viewModel.sendMessage(text, files, level, mode, onSaved)
                         },
                         onStopGeneration = { viewModel.stopGeneration() },
+                        onChatScreenDisposed = { viewModel.onChatScreenDisposed(it) },
                         onBack = { newChat() },
                         onRenameChat = { viewModel.renameChat(chatId, it) },
                         onBranchMessage = {
                             val branchId = viewModel.branchMessage(it)
                             navController.navigate("chat/$branchId") { launchSingleTop = true }
                         },
-                        onRegenerate = { viewModel.regenerateMessage(it) },
+                        onRegenerate = { viewModel.regenerateMessage(it, reasoningLevel, searchModeState) },
                         onCopyMessage = { },
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },

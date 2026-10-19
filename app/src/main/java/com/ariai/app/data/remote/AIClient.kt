@@ -7,6 +7,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
@@ -169,6 +170,7 @@ class AIClient {
                         else -> t?.message ?: "Streaming request failed"
                     }
                     response?.close()
+                    eventSource.cancel()
                     producer.close(IOException(message, t))
                 }
             }
@@ -188,35 +190,51 @@ class AIClient {
         searchContext: String?,
         reasoning: ReasoningLevel,
         nativeSearch: Boolean
-    ): String = withContext(Dispatchers.IO) {
+    ): String {
         val request = Request.Builder()
             .url(buildChatUrl(provider, modelId, forceNonStream = true))
             .post(buildRequestBody(provider, messages, modelId, systemPrompt, temperature, searchContext, false, reasoning, nativeSearch))
             .header("Content-Type", "application/json")
             .addProviderHeaders(provider, modelId)
             .build()
-        client.newCall(request).execute().use { response ->
-            val raw = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
-                throw IOException("API Error ${response.code}: ${raw.ifBlank { response.message }.take(500)}")
-            }
-            if (raw.isBlank()) throw IOException("Empty response from API")
-            val json = JSONObject(raw)
-            if (json.has("error")) {
-                val error = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
-                    ?: json.optString("error", "Provider returned an error")
-                throw IOException(error)
-            }
-            if (hasUnexecutedToolCalls(json, provider.type)) {
-                throw IOException("The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search.")
-            }
-            val text = when (provider.type) {
-                ProviderType.GEMINI -> parseGeminiResponse(json)
-                ProviderType.ANTHROPIC -> parseAnthropicResponse(json)
-                else -> parseOpenAINonStreaming(json)
-            }
-            if (text.isBlank()) throw IOException("The provider returned no text response")
-            text
+
+        return suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (continuation.isActive) continuation.resumeWith(Result.failure(e))
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val result = runCatching {
+                        response.use { received ->
+                            val raw = received.body?.string().orEmpty()
+                            if (!received.isSuccessful) {
+                                throw IOException("API Error ${received.code}: ${raw.ifBlank { received.message }.take(500)}")
+                            }
+                            if (raw.isBlank()) throw IOException("Empty response from API")
+                            val json = JSONObject(raw)
+                            if (json.has("error")) {
+                                val error = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                                    ?: json.optString("error", "Provider returned an error")
+                                throw IOException(error)
+                            }
+                            if (hasUnexecutedToolCalls(json, provider.type)) {
+                                throw IOException("The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search.")
+                            }
+                            val text = when (provider.type) {
+                                ProviderType.GEMINI -> parseGeminiResponse(json)
+                                ProviderType.ANTHROPIC -> parseAnthropicResponse(json)
+                                else -> parseOpenAINonStreaming(json)
+                            }
+                            if (text.isBlank()) throw IOException("The provider returned no text response")
+                            text
+                        }
+                    }
+                    if (continuation.isActive) continuation.resumeWith(result)
+                }
+            })
         }
     }
 

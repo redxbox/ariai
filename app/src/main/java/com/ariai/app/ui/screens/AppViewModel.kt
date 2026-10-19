@@ -9,6 +9,8 @@ import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.data.remote.looksLikeVideoModel
 import com.ariai.app.data.repository.ChatRepository
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -85,7 +87,9 @@ class AppViewModel(
     /** Adds a message unless it is already in the list (the DB flow can deliver it first). */
     private fun appendMessage(message: ChatMessage) {
         if (_currentChatId.value != message.chatId) return
-        if (_messages.value.none { it.id == message.id }) _messages.value = _messages.value + message
+        if (_messages.value.none { it.id == message.id }) {
+            _messages.value = (_messages.value + message).sortedBy { it.timestamp }
+        }
     }
 
     /** Finds a model matching [pred]; the chat's own provider is preferred. */
@@ -108,12 +112,62 @@ class AppViewModel(
     val isSending = _isSending.asStateFlow()
     private var sendPending = false
     private val RECENT_MESSAGES_FOR_MODEL = 20
-    private var sendJob: kotlinx.coroutines.Job? = null
-    private var messagesCollectionJob: kotlinx.coroutines.Job? = null
+    private var sendJob: Job? = null
+    private var sendGeneration = 0L
+    private var historyCompressionJob: Job? = null
+    private var historyCompressionGeneration = 0L
+    private var messagesCollectionJob: Job? = null
+
+    private fun launchSendJob(block: suspend (Long) -> Unit) {
+        val generation = ++sendGeneration
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) { block(generation) }
+        sendJob = job
+        job.invokeOnCompletion {
+            if (sendGeneration == generation && sendJob === job) {
+                sendJob = null
+                sendPending = false
+                _isSending.value = false
+            }
+        }
+        job.start()
+    }
+
+    private fun cancelActiveSend() {
+        val job = sendJob ?: return
+        ++sendGeneration
+        sendJob = null
+        sendPending = false
+        _isSending.value = false
+        _isStreaming.value = false
+        _streamingContent.value = ""
+        job.cancel()
+    }
+
+    private fun cancelHistoryCompression() {
+        val job = historyCompressionJob ?: return
+        ++historyCompressionGeneration
+        historyCompressionJob = null
+        _isStreaming.value = false
+        _streamingContent.value = ""
+        job.cancel()
+    }
+
+    private fun cancelActiveChatStreams() {
+        cancelActiveSend()
+        cancelHistoryCompression()
+    }
 
     /** Stops the reply being generated. The text received so far is kept as the reply. */
     fun stopGeneration() {
-        sendJob?.cancel()
+        if (sendJob != null) cancelActiveSend() else cancelHistoryCompression()
+    }
+
+    /** Stop network work and message collection when this chat screen leaves composition. */
+    fun onChatScreenDisposed(chatId: String) {
+        if (_currentChatId.value != chatId) return
+        cancelActiveChatStreams()
+        messagesCollectionJob?.cancel()
+        messagesCollectionJob = null
     }
     val isStreaming = _isStreaming.asStateFlow()
 
@@ -195,8 +249,9 @@ class AppViewModel(
             agentId = agentId
         )
         // Set active state synchronously: callers navigate to this id immediately after return.
-        sendJob?.cancel()
+        cancelActiveChatStreams()
         messagesCollectionJob?.cancel()
+        messagesCollectionJob = null
         _currentChatId.value = id
         _messages.value = emptyList()
         viewModelScope.launch { repository.saveChat(chat) }
@@ -205,7 +260,7 @@ class AppViewModel(
 
     fun loadChat(chatId: String) {
         if (_currentChatId.value != chatId) {
-            sendJob?.cancel()
+            cancelActiveChatStreams()
             _currentChatId.value = chatId
             _messages.value = emptyList()
         }
@@ -310,14 +365,20 @@ class AppViewModel(
         provider: Provider,
         modelId: String,
         prompt: String,
-        source: java.io.File?
+        source: java.io.File?,
+        retryForMessageId: String?,
+        generation: Long
     ) {
         if (source != null && provider.type == ProviderType.GEMINI) {
             com.ariai.app.data.local.ImageStore.deleteTemp(source)
-            postAssistantError(chatId, tx("Image editing is not supported for Gemini providers yet."))
+            postAssistantError(
+                chatId,
+                tx("Image editing is not supported for Gemini providers yet."),
+                retryForMessageId
+            )
             return
         }
-        _isStreaming.value = true
+        setSendStreamingState(generation, streaming = true)
         try {
             val response = if (source == null) {
                 repository.generateImage(provider, ImageGenRequest(prompt = prompt, model = modelId))
@@ -346,18 +407,26 @@ class AppViewModel(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}")
+            postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}", retryForMessageId)
         } finally {
             source?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
-            _isStreaming.value = false
+            setSendStreamingState(generation, streaming = false)
         }
     }
 
-    private suspend fun generateAudioReply(chatId: String, provider: Provider, modelId: String, prompt: String) {
-        _isStreaming.value = true
-        _streamingContent.value = tx("Generating audio…")
+    private suspend fun generateAudioReply(
+        chatId: String,
+        provider: Provider,
+        modelId: String,
+        prompt: String,
+        retryForMessageId: String,
+        generation: Long
+    ) {
+        setSendStreamingState(generation, streaming = true, content = tx("Generating audio…"))
         try {
-            val bytes = repository.generateAudio(provider, modelId, prompt) { _streamingContent.value = it }
+            val bytes = repository.generateAudio(provider, modelId, prompt) { progress ->
+                setSendStreamingContent(generation, progress)
+            }
             val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 com.ariai.app.data.local.ImageStore.saveAudio(bytes)
             }
@@ -378,19 +447,26 @@ class AppViewModel(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            postAssistantError(chatId, "❌ Audio error: ${e.message ?: e::class.java.simpleName}")
+            postAssistantError(chatId, "❌ Audio error: ${e.message ?: e::class.java.simpleName}", retryForMessageId)
         } finally {
-            _streamingContent.value = ""
-            _isStreaming.value = false
+            setSendStreamingState(generation, streaming = false)
         }
     }
 
-    private suspend fun generateVideoReply(chatId: String, provider: Provider, modelId: String, prompt: String) {
-        _isStreaming.value = true
-        _streamingContent.value = tx("Generating video…")
+    private suspend fun generateVideoReply(
+        chatId: String,
+        provider: Provider,
+        modelId: String,
+        prompt: String,
+        retryForMessageId: String,
+        generation: Long
+    ) {
+        setSendStreamingState(generation, streaming = true, content = tx("Generating video…"))
         try {
             // The progress line shows in the reply bubble until the video is ready.
-            val bytes = repository.generateVideo(provider, modelId, prompt) { _streamingContent.value = it }
+            val bytes = repository.generateVideo(provider, modelId, prompt) { progress ->
+                setSendStreamingContent(generation, progress)
+            }
             val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 com.ariai.app.data.local.ImageStore.saveVideo(bytes)
             }
@@ -411,11 +487,20 @@ class AppViewModel(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            postAssistantError(chatId, "❌ Video error: ${e.message ?: e::class.java.simpleName}")
+            postAssistantError(chatId, "❌ Video error: ${e.message ?: e::class.java.simpleName}", retryForMessageId)
         } finally {
-            _streamingContent.value = ""
-            _isStreaming.value = false
+            setSendStreamingState(generation, streaming = false)
         }
+    }
+
+    private fun setSendStreamingState(generation: Long, streaming: Boolean, content: String = "") {
+        if (sendGeneration != generation) return
+        _isStreaming.value = streaming
+        _streamingContent.value = content
+    }
+
+    private fun setSendStreamingContent(generation: Long, content: String) {
+        if (sendGeneration == generation) _streamingContent.value = content
     }
 
     /** Sends an edit request for a generated image; the result is a separate image message. */
@@ -427,36 +512,58 @@ class AppViewModel(
         val provider = providers.value.firstOrNull { it.id == source.providerId } ?: resolveProvider(chatId) ?: return
         sendPending = true
         _isSending.value = true
-        sendJob = viewModelScope.launch {
+        launchSendJob { generation ->
             try {
                 val userMessage = ChatMessage(chatId = chatId, role = MessageRole.USER, content = "✏️ $instruction")
                 if (!repository.saveMessage(userMessage)) {
                     postAssistantError(chatId, tx("Could not save your message. Check free storage and try again."))
-                    return@launch
+                    return@launchSendJob
                 }
-                appendMessage(userMessage)
-                generateImageReply(chatId, provider, modelId, instruction, java.io.File(path))
+                appendMessage(repository.getMessageById(userMessage.id) ?: userMessage)
+                generateImageReply(
+                    chatId,
+                    provider,
+                    modelId,
+                    instruction,
+                    java.io.File(path),
+                    retryForMessageId = null,
+                    generation = generation
+                )
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "edit image")
                 postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}")
             }
-        }.also { job ->
-            job.invokeOnCompletion {
-                sendPending = false
-                _isSending.value = false
-            }
         }
     }
 
-    private fun postAssistantError(chatId: String, text: String) {
+    private fun postAssistantError(
+        chatId: String,
+        text: String,
+        retryForMessageId: String? = null,
+        replaceMessageId: String? = null
+    ) {
         viewModelScope.launch {
-            val message = ChatMessage(chatId = chatId, role = MessageRole.ASSISTANT, content = text, status = MessageStatus.ERROR)
             try {
+                if (replaceMessageId != null) {
+                    repository.deleteMessage(replaceMessageId)
+                    if (_currentChatId.value == chatId) {
+                        _messages.value = _messages.value.filterNot { it.id == replaceMessageId }
+                    }
+                }
+                val message = ChatMessage(
+                    chatId = chatId,
+                    role = MessageRole.ASSISTANT,
+                    content = text,
+                    status = MessageStatus.ERROR,
+                    parentId = retryForMessageId
+                )
                 repository.saveMessage(message)
                 appendMessage(message)
-            } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e)
+            }
         }
     }
 
@@ -466,18 +573,50 @@ class AppViewModel(
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         searchMode: SearchMode = SearchMode.OFF,
         onUserMessageSaved: (Boolean) -> Unit = {}
+    ): Boolean = sendMessageInternal(
+        content = content,
+        attachments = attachments,
+        reasoning = reasoning,
+        searchMode = searchMode,
+        existingUserMessage = null,
+        messageToReplace = null,
+        onUserMessageSaved = onUserMessageSaved
+    )
+
+    /** Reuses a stored user turn when retrying/regenerating; it never inserts a duplicate. */
+    private fun sendMessageInternal(
+        content: String,
+        attachments: List<Attachment>,
+        reasoning: ReasoningLevel,
+        searchMode: SearchMode,
+        existingUserMessage: ChatMessage?,
+        messageToReplace: ChatMessage?,
+        onUserMessageSaved: (Boolean) -> Unit
     ): Boolean {
         val chatId = _currentChatId.value ?: return false
-        if (content.isBlank() && attachments.isEmpty()) return false
+        if (existingUserMessage != null && existingUserMessage.chatId != chatId) return false
+        val requestContent = existingUserMessage?.content ?: content
+        val requestAttachments = existingUserMessage?.attachments ?: attachments
+        if (requestContent.isBlank() && requestAttachments.isEmpty()) return false
         if (_isStreaming.value || sendPending) return false
-        if (attachments.sumOf { it.estimatedBytes() } > MAX_MEDIA_BYTES_PER_REQUEST) {
-            postAssistantError(chatId, tx("Attachments exceed the 16 MB per-request limit. Remove some files and try again."))
+
+        fun postImmediateError(text: String) {
+            postAssistantError(
+                chatId = chatId,
+                text = text,
+                retryForMessageId = existingUserMessage?.id,
+                replaceMessageId = messageToReplace?.id
+            )
+        }
+
+        if (requestAttachments.sumOf { it.estimatedBytes() } > MAX_MEDIA_BYTES_PER_REQUEST) {
+            postImmediateError(tx("Attachments exceed the 16 MB per-request limit. Remove some files and try again."))
             return false
         }
 
         val provider = resolveProvider(chatId)
         if (provider == null) {
-            postAssistantError(chatId, "⚠️ No provider configured. Add a provider in Settings > AI Providers.")
+            postImmediateError("⚠️ No provider configured. Add a provider in Settings > AI Providers.")
             return false
         }
 
@@ -488,112 +627,140 @@ class AppViewModel(
         } else {
             null
         }
-        if (searchMode == SearchMode.LOCAL && content.isNotBlank() && localSearchKey == null) {
-            postAssistantError(chatId, "🔎 Local search needs an API key. Add one in Settings > Search service.")
+        if (searchMode == SearchMode.LOCAL && requestContent.isNotBlank() && localSearchKey == null) {
+            postImmediateError("🔎 Local search needs an API key. Add one in Settings > Search service.")
             return false
         }
 
         // Set before launching so a fast second tap cannot start a second send.
         sendPending = true
         _isSending.value = true
-        sendJob = viewModelScope.launch {
+        launchSendJob { generation ->
             try {
-                val userMessage = ChatMessage(
+                messageToReplace?.let { response ->
+                    repository.deleteMessage(response.id)
+                    if (_currentChatId.value == chatId) {
+                        _messages.value = _messages.value.filterNot { it.id == response.id }
+                    }
+                }
+
+                val storedUserMessage = existingUserMessage?.let { repository.getMessageById(it.id) }
+                if (existingUserMessage != null && storedUserMessage == null) {
+                    postAssistantError(chatId, tx("The original message could not be loaded. Please send it again."))
+                    return@launchSendJob
+                }
+                val userMessage = storedUserMessage ?: ChatMessage(
                     chatId = chatId,
                     role = MessageRole.USER,
-                    content = content,
-                    attachments = attachments
+                    content = requestContent,
+                    attachments = requestAttachments
                 )
-                if (!repository.saveMessage(userMessage)) {
-                    onUserMessageSaved(false)
-                    postAssistantError(chatId, tx("Could not save your message. Check free storage and try again."))
-                    return@launch
+                if (existingUserMessage == null) {
+                    if (!repository.saveMessage(userMessage)) {
+                        onUserMessageSaved(false)
+                        postAssistantError(chatId, tx("Could not save your message. Check free storage and try again."))
+                        return@launchSendJob
+                    }
+                    onUserMessageSaved(true)
+                    appendMessage(repository.getMessageById(userMessage.id) ?: userMessage)
+                } else {
+                    appendMessage(userMessage)
                 }
-                onUserMessageSaved(true)
-                appendMessage(repository.getMessageById(userMessage.id) ?: userMessage)
 
+                val sentContent = userMessage.content
+                val sentAttachments = userMessage.attachments
                 val targetModelId = _modelOverrides.value[chatId]?.second
                     ?: getCurrentChat()?.modelId
                     ?: provider.models.firstOrNull()?.id
                 val current = provider.models.firstOrNull { it.id == targetModelId }
                 if ((_chatModes.value[chatId] ?: ChatMode.TEXT) == ChatMode.TEXT &&
-                    attachments.any { it.type == AttachmentType.IMAGE } && current != null && !current.supportsVision
+                    sentAttachments.any { it.type == AttachmentType.IMAGE } && current != null && !current.supportsVision
                 ) {
-                    postAssistantError(chatId, tx("This model is not marked as accepting images. Choose a vision model or enable Vision in its model settings."))
-                    return@launch
+                    postAssistantError(
+                        chatId,
+                        tx("This model is not marked as accepting images. Choose a vision model or enable Vision in its model settings."),
+                        userMessage.id
+                    )
+                    return@launchSendJob
                 }
                 when (_chatModes.value[chatId] ?: ChatMode.TEXT) {
                     ChatMode.IMAGE -> {
-                        if (content.isBlank()) {
-                            postAssistantError(chatId, tx("Describe the image you want, or explain how the attached image should change."))
-                            return@launch
+                        if (sentContent.isBlank()) {
+                            postAssistantError(chatId, tx("Describe the image you want, or explain how the attached image should change."), userMessage.id)
+                            return@launchSendJob
                         }
                         // Only a model flagged for image output generates; nothing else is guessed.
                         val found = findImageModel(provider)
                         if (found == null) {
-                            postAssistantError(chatId, tx("No image model found. Add an image model, or fetch the models in provider settings."))
-                            return@launch
+                            postAssistantError(chatId, tx("No image model found. Add an image model, or fetch the models in provider settings."), userMessage.id)
+                            return@launchSendJob
                         }
-                        val source = attachments.firstImageFile()
-                        if (attachments.any { it.type == AttachmentType.IMAGE } && source == null) {
-                            postAssistantError(chatId, tx("The attached image is no longer available. Please attach it again."))
-                            return@launch
+                        val source = sentAttachments.firstImageFile()
+                        if (sentAttachments.any { it.type == AttachmentType.IMAGE } && source == null) {
+                            postAssistantError(chatId, tx("The attached image is no longer available. Please attach it again."), userMessage.id)
+                            return@launchSendJob
                         }
-                        generateImageReply(chatId, found.first, found.second.id, content, source)
-                        return@launch
+                        generateImageReply(
+                            chatId, found.first, found.second.id, sentContent, source,
+                            retryForMessageId = userMessage.id, generation = generation
+                        )
+                        return@launchSendJob
                     }
                     ChatMode.AUDIO -> {
-                        if (attachments.isNotEmpty()) {
-                            postAssistantError(chatId, tx("Photos and videos are not used in audio mode. Switch to text mode to send them."))
-                            return@launch
+                        if (sentAttachments.isNotEmpty()) {
+                            postAssistantError(chatId, tx("Photos and videos are not used in audio mode. Switch to text mode to send them."), userMessage.id)
+                            return@launchSendJob
                         }
                         val found = findModel(provider) { it.supportsAudioGen }
                         if (found == null) {
-                            postAssistantError(chatId, tx("No audio model found. Fetch the models of a provider that has one."))
-                            return@launch
+                            postAssistantError(chatId, tx("No audio model found. Fetch the models of a provider that has one."), userMessage.id)
+                            return@launchSendJob
                         }
-                        generateAudioReply(chatId, found.first, found.second.id, content)
-                        return@launch
+                        generateAudioReply(chatId, found.first, found.second.id, sentContent, userMessage.id, generation)
+                        return@launchSendJob
                     }
                     ChatMode.VIDEO -> {
-                        if (attachments.isNotEmpty()) {
-                            postAssistantError(chatId, tx("Photos and videos are not used in video mode yet. Switch to text mode to send them."))
-                            return@launch
+                        if (sentAttachments.isNotEmpty()) {
+                            postAssistantError(chatId, tx("Photos and videos are not used in video mode yet. Switch to text mode to send them."), userMessage.id)
+                            return@launchSendJob
                         }
                         val found = findModel(provider) { it.supportsVideoGen }
                         if (found == null) {
-                            postAssistantError(chatId, "⚠️ No video model found. Fetch the models of a provider that has one.")
-                            return@launch
+                            postAssistantError(chatId, "⚠️ No video model found. Fetch the models of a provider that has one.", userMessage.id)
+                            return@launchSendJob
                         }
-                        generateVideoReply(chatId, found.first, found.second.id, content)
-                        return@launch
+                        generateVideoReply(chatId, found.first, found.second.id, sentContent, userMessage.id, generation)
+                        return@launchSendJob
                     }
                     ChatMode.TEXT -> if (current != null && current.supportsAudioGen && !current.outputsText) {
                         // Audio-only model selected in text mode: generate audio instead of calling chat.
-                        generateAudioReply(chatId, provider, current.id, content)
-                        return@launch
+                        generateAudioReply(chatId, provider, current.id, sentContent, userMessage.id, generation)
+                        return@launchSendJob
                     } else if (current != null && ((current.supportsVideoGen && !current.outputsText) || looksLikeVideoModel(current.id))) {
                         // Video-only model selected in text mode: generate a video instead of calling chat.
-                        generateVideoReply(chatId, provider, current.id, content)
-                        return@launch
+                        generateVideoReply(chatId, provider, current.id, sentContent, userMessage.id, generation)
+                        return@launchSendJob
                     } else if (current != null && current.supportsImageGen && !current.outputsText) {
                         // Image-only model: text cannot work, so it generates an image.
-                        if (content.isBlank()) {
-                            postAssistantError(chatId, tx("Describe the image you want, or explain how the attached image should change."))
-                            return@launch
+                        if (sentContent.isBlank()) {
+                            postAssistantError(chatId, tx("Describe the image you want, or explain how the attached image should change."), userMessage.id)
+                            return@launchSendJob
                         }
-                        val source = attachments.firstImageFile()
-                        if (attachments.any { it.type == AttachmentType.IMAGE } && source == null) {
-                            postAssistantError(chatId, tx("The attached image is no longer available. Please attach it again."))
-                            return@launch
+                        val source = sentAttachments.firstImageFile()
+                        if (sentAttachments.any { it.type == AttachmentType.IMAGE } && source == null) {
+                            postAssistantError(chatId, tx("The attached image is no longer available. Please attach it again."), userMessage.id)
+                            return@launchSendJob
                         }
-                        generateImageReply(chatId, provider, current.id, content, source)
-                        return@launch
+                        generateImageReply(
+                            chatId, provider, current.id, sentContent, source,
+                            retryForMessageId = userMessage.id, generation = generation
+                        )
+                        return@launchSendJob
                     }
                 }
 
                 var searchContext: String? = null
-                if (localSearchKey != null && content.isNotBlank()) {
+                if (localSearchKey != null && sentContent.isNotBlank()) {
                     try {
                         val sp = SearchProvider(
                             name = localSearchKey.first,
@@ -606,24 +773,22 @@ class AppViewModel(
                             },
                             apiKey = localSearchKey.second
                         )
-                        val result = repository.searchWeb(content, sp)
+                        val result = repository.searchWeb(sentContent, sp)
                         searchContext = repository.formatSearchForLLM(result)
                         if (result.results.isEmpty()) {
-                            postAssistantError(chatId, tx("Web search returned no results. Check the search service key and try again."))
-                            return@launch
+                            postAssistantError(chatId, tx("Web search returned no results. Check the search service key and try again."), userMessage.id)
+                            return@launchSendJob
                         }
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         com.ariai.app.util.AppLog.warn(e, "web search")
-                        postAssistantError(chatId, tx("Web search failed: ${e.message?.take(180) ?: "check the search service settings"}"))
-                        return@launch
+                        postAssistantError(chatId, tx("Web search failed: ${e.message?.take(180) ?: "check the search service settings"}"), userMessage.id)
+                        return@launchSendJob
                     }
                 }
 
-                _isStreaming.value = true
-                _streamingContent.value = ""
-
+                setSendStreamingState(generation, streaming = true)
                 var fullResponse = ""
                 val requestModelId = targetModelId ?: "openai"
                 try {
@@ -654,10 +819,10 @@ class AppViewModel(
                         val now = System.currentTimeMillis()
                         if (now - lastPublishMs >= 60) {
                             lastPublishMs = now
-                            _streamingContent.value = fullResponse
+                            setSendStreamingContent(generation, fullResponse)
                         }
                     }
-                    _streamingContent.value = fullResponse
+                    setSendStreamingContent(generation, fullResponse)
 
                     if (fullResponse.isBlank()) {
                         throw Exception(tx("Empty response from API"))
@@ -671,12 +836,12 @@ class AppViewModel(
                         providerId = provider.id
                     )
                     if (!repository.saveMessage(assistantMessage)) {
-                        postAssistantError(chatId, tx("Could not save the reply. Check free storage."))
-                    }
-                    appendMessage(assistantMessage)
-
-                    if (_messages.value.size <= 3) {
-                        updateChatTitle(chatId, content.ifBlank { attachments.first().name }.take(30))
+                        postAssistantError(chatId, tx("Could not save the reply. Check free storage."), userMessage.id)
+                    } else {
+                        appendMessage(assistantMessage)
+                        if (_messages.value.size <= 3) {
+                            updateChatTitle(chatId, sentContent.ifBlank { sentAttachments.first().name }.take(30))
+                        }
                     }
 
                 } catch (e: kotlinx.coroutines.CancellationException) {
@@ -707,29 +872,24 @@ class AppViewModel(
                         chatId = chatId,
                         role = MessageRole.ASSISTANT,
                         content = errorMsg,
-                        status = MessageStatus.ERROR
+                        status = MessageStatus.ERROR,
+                        parentId = userMessage.id
                     )
                     try {
                         repository.saveMessage(errorMessage)
                         appendMessage(errorMessage)
-                    } catch (e2: Exception) {}
+                    } catch (e2: Exception) {
+                        com.ariai.app.util.AppLog.warn(e2, "save chat error")
+                    }
                 } finally {
-                    _isStreaming.value = false
-                    _streamingContent.value = ""
+                    setSendStreamingState(generation, streaming = false)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
-                _isStreaming.value = false
-                _streamingContent.value = ""
+                setSendStreamingState(generation, streaming = false)
                 throw e
             } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "sendMessage")
-                _isStreaming.value = false
-                _streamingContent.value = ""
-            }
-        }.also { job ->
-            job.invokeOnCompletion {
-                sendPending = false
-                _isSending.value = false
+                setSendStreamingState(generation, streaming = false)
             }
         }
         return true
@@ -741,7 +901,7 @@ class AppViewModel(
      */
     fun compressHistory(onDone: (String) -> Unit) {
         val chatId = _currentChatId.value ?: return
-        if (_isStreaming.value) {
+        if (_isStreaming.value || sendPending || historyCompressionJob?.isActive == true) {
             onDone(tx("Wait for the reply to finish first"))
             return
         }
@@ -755,7 +915,10 @@ class AppViewModel(
             onDone(tx("Not enough messages to compress yet"))
             return
         }
-        viewModelScope.launch {
+
+        val generation = ++historyCompressionGeneration
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            if (historyCompressionGeneration != generation || _currentChatId.value != chatId) return@launch
             _isStreaming.value = true
             try {
                 val instruction = ChatMessage(
@@ -772,20 +935,38 @@ class AppViewModel(
                     modelId = modelId,
                     systemPrompt = systemPrompt,
                     stream = streamResponse.value
-                ).collect { summary.append(it) }
+                ).collect { chunk ->
+                    if (historyCompressionGeneration == generation) summary.append(chunk)
+                }
 
                 val text = summary.toString().trim()
                 if (text.isBlank()) throw Exception("empty summary")
-                val marker = ChatMessage(chatId = chatId, role = MessageRole.SYSTEM, content = text)
-                repository.saveMessage(marker)
-                appendMessage(marker)
-                onDone(tx("Older messages compressed"))
+                if (historyCompressionGeneration == generation && _currentChatId.value == chatId) {
+                    val marker = ChatMessage(chatId = chatId, role = MessageRole.SYSTEM, content = text)
+                    repository.saveMessage(marker)
+                    appendMessage(marker)
+                    onDone(tx("Older messages compressed"))
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                onDone("Compression failed: ${e.message?.take(120)}")
+                if (historyCompressionGeneration == generation && _currentChatId.value == chatId) {
+                    onDone("Compression failed: ${e.message?.take(120)}")
+                }
             } finally {
-                _isStreaming.value = false
+                if (historyCompressionGeneration == generation && _currentChatId.value == chatId) {
+                    _isStreaming.value = false
+                    _streamingContent.value = ""
+                }
             }
         }
+        historyCompressionJob = job
+        job.invokeOnCompletion {
+            if (historyCompressionGeneration == generation && historyCompressionJob === job) {
+                historyCompressionJob = null
+            }
+        }
+        job.start()
     }
 
     fun setReasoningLevel(level: ReasoningLevel) {
@@ -827,8 +1008,9 @@ class AppViewModel(
             )
         }
 
-        sendJob?.cancel()
+        cancelActiveChatStreams()
         messagesCollectionJob?.cancel()
+        messagesCollectionJob = null
         _currentChatId.value = newChatId
         _messages.value = emptyList()
         viewModelScope.launch {
@@ -849,19 +1031,38 @@ class AppViewModel(
         return newChatId
     }
 
-    fun regenerateMessage(message: ChatMessage) {
-        // Delete this message and resend previous user message
-        viewModelScope.launch {
-            val idx = _messages.value.indexOf(message)
-            if (idx > 0) {
-                val prevUserMessage = _messages.value[idx - 1]
-                if (prevUserMessage.role == MessageRole.USER) {
-                    repository.deleteMessage(message.id)
-                    _messages.value = _messages.value.filter { it.id != message.id }
-                    sendMessage(prevUserMessage.content, prevUserMessage.attachments)
-                }
-            }
+    fun regenerateMessage(
+        message: ChatMessage,
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        searchMode: SearchMode = SearchMode.OFF
+    ) {
+        val chatId = _currentChatId.value ?: return
+        if (message.chatId != chatId || _isStreaming.value || sendPending) return
+
+        val currentMessages = _messages.value
+        val messageIndex = currentMessages.indexOfFirst { it.id == message.id }
+        if (messageIndex < 0) return
+
+        val userMessage = if (message.status == MessageStatus.ERROR) {
+            message.parentId?.let { parentId ->
+                currentMessages.firstOrNull { it.id == parentId && it.role == MessageRole.USER }
+            } ?: currentMessages.getOrNull(messageIndex - 1)?.takeIf { it.role == MessageRole.USER } ?: return
+        } else {
+            currentMessages.take(messageIndex).lastOrNull { it.role == MessageRole.USER } ?: return
         }
+
+        // An old failed turn is not the active request once a later turn has been added.
+        if (message.status == MessageStatus.ERROR && currentMessages.drop(messageIndex + 1).isNotEmpty()) return
+
+        sendMessageInternal(
+            content = userMessage.content,
+            attachments = userMessage.attachments,
+            reasoning = reasoning,
+            searchMode = searchMode,
+            existingUserMessage = userMessage,
+            messageToReplace = message,
+            onUserMessageSaved = {}
+        )
     }
 
     fun generateImage(prompt: String, model: String, size: String) {

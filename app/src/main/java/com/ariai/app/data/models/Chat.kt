@@ -38,7 +38,7 @@ data class ChatMessage(
     val modelId: String? = null,
     val providerId: String? = null,
     val attachments: List<Attachment> = emptyList(),
-    val parentId: String? = null, // For branching
+    val parentId: String? = null, // Branch parent, or the user turn associated with a retryable error.
     val branchChildren: List<String> = emptyList(),
     val toolCalls: List<ToolCall> = emptyList(),
     /** Absolute path of a generated image stored on this device. */

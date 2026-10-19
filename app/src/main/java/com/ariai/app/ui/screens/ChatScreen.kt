@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
+import com.ariai.app.data.models.MessageStatus
 import com.ariai.app.data.models.Provider
 import com.ariai.app.ui.components.MessageBubble
 import com.ariai.app.util.LocalStrings
@@ -238,7 +239,7 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 if (messages.isEmpty() && currentStreamingContent.isEmpty()) {
-                    item {
+                    item(key = "welcome") {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -264,7 +265,7 @@ fun ChatScreen(
 
                 items(
                     count = messages.size,
-                    key = { index -> "${messages[index].id}_${messages[index].timestamp}_$index" }
+                    key = { index -> messages[index].id }
                 ) { index ->
                     val message = messages[index]
                     MessageItem(
@@ -276,7 +277,7 @@ fun ChatScreen(
                 }
 
                 if (currentStreamingContent.isNotEmpty()) {
-                    item {
+                    item(key = "streaming") {
                         MessageBubble(
                             content = currentStreamingContent,
                             isUser = false,
@@ -354,25 +355,35 @@ fun MessageItem(
                         modifier = Modifier.size(16.dp)
                     )
                 }
-                IconButton(
-                    onClick = onBranch,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = strings.branch,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onRegenerate,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = strings.regenerate,
-                        modifier = Modifier.size(16.dp)
-                    )
+                if (message.status == MessageStatus.ERROR) {
+                    if (message.parentId != null) {
+                        TextButton(onClick = onRegenerate) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(Modifier.width(4.dp))
+                            Text(tx("Retry"))
+                        }
+                    }
+                } else {
+                    IconButton(
+                        onClick = onBranch,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = strings.branch,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onRegenerate,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = strings.regenerate,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
