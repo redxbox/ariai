@@ -6,7 +6,9 @@ import androidx.compose.runtime.ReadOnlyComposable
 
 import com.ariai.app.ui.theme.*
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,7 +47,7 @@ fun AttachmentSheet(
     onAudio: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,
@@ -118,7 +120,7 @@ fun ThinkingDepthSheet(
     onDismiss: () -> Unit
 ) {
     val levels = ReasoningLevel.values()
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,
@@ -174,7 +176,7 @@ fun SearchSheet(
     onConfigureLocal: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,
@@ -184,7 +186,11 @@ fun SearchSheet(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(tx("Web search"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 SearchCard(
                     icon = Icons.Default.AutoAwesome,
                     title = tx("Model search"),
@@ -200,6 +206,10 @@ fun SearchSheet(
                     if (modelSearchAvailable || localSearchConfigured) onModeChange(SearchMode.MODEL) else onConfigureLocal()
                     onDismiss()
                 }
+                VerticalDivider(
+                    modifier = Modifier.fillMaxHeight(),
+                    color = AriInk.copy(alpha = 0.14f)
+                )
                 SearchCard(
                     icon = Icons.Default.Public,
                     title = tx("Local search"),
@@ -233,10 +243,14 @@ private fun SearchCard(
     modifier: Modifier,
     onClick: () -> Unit
 ) {
+    val cardShape = RoundedCornerShape(18.dp)
+    val cardColor = if (selected) Accent.copy(alpha = 0.10f) else AriTint
+    val borderColor = if (selected) Accent.copy(alpha = 0.32f) else AriInk.copy(alpha = 0.12f)
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (selected) Accent.copy(alpha = 0.10f) else AriCard)
+            .clip(cardShape)
+            .background(cardColor, cardShape)
+            .border(BorderStroke(1.dp, borderColor), cardShape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(16.dp)
             .alpha(if (enabled) 1f else 0.5f),

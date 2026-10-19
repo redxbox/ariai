@@ -132,7 +132,7 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.MoreVert, contentDescription = null, tint = AriInk.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                 }
-                val menuShape = RoundedCornerShape(16.dp)
+                val menuShape = paperPopupShape(16.dp)
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },

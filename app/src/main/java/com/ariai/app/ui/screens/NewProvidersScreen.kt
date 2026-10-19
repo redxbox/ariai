@@ -312,7 +312,7 @@ private fun MiniChip(text: String, bg: Color, fg: Color, onClick: (() -> Unit)? 
 private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
     val parsed = remember(text) { if (text.isBlank()) null else providerFromJson(text) }
-    val dialogShape = RoundedCornerShape(28.dp)
+    val dialogShape = paperPopupShape(28.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = paperPopupModifier(dialogShape),
@@ -358,7 +358,7 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
         ProviderType.OLLAMA to tx("Models that run on your own computer"),
         ProviderType.OPENAI_COMPATIBLE to tx("Any OpenAI-compatible API")
     )
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,

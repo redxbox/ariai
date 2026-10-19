@@ -75,7 +75,7 @@ fun ModelPickerSheet(
         .map { p -> p to p.models.filter { matches(p, it) } }
         .filter { it.second.isNotEmpty() }
 
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,

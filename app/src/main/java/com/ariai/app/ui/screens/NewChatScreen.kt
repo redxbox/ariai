@@ -179,7 +179,7 @@ fun NewChatScreen(
     var showRename by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     if (showRename) {
-        val dialogShape = RoundedCornerShape(26.dp)
+        val dialogShape = paperPopupShape(26.dp)
         AlertDialog(
             onDismissRequest = { showRename = false },
             modifier = paperPopupModifier(dialogShape),
@@ -483,7 +483,7 @@ fun NewChatScreen(
                         IconButton(onClick = { showTopMenu = true }) {
                             Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
                         }
-                        val menuShape = RoundedCornerShape(18.dp)
+                        val menuShape = paperPopupShape(18.dp)
                         DropdownMenu(
                             expanded = showTopMenu,
                             onDismissRequest = { showTopMenu = false },
@@ -939,7 +939,7 @@ private fun FullImageDialog(bitmap: ImageBitmap, onDismiss: () -> Unit) {
 @Composable
 private fun EditImageDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
-    val dialogShape = RoundedCornerShape(26.dp)
+    val dialogShape = paperPopupShape(26.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = paperPopupModifier(dialogShape),
@@ -1012,7 +1012,7 @@ private fun FullScreenMessageEditor(
         onDismissRequest = onCollapse,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
-        val pageShape = RoundedCornerShape(28.dp)
+        val pageShape = paperPopupShape(28.dp)
         Surface(
             modifier = Modifier.fillMaxSize().padding(8.dp).then(paperPopupModifier(pageShape)),
             shape = pageShape,

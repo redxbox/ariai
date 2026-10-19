@@ -225,7 +225,7 @@ fun GlassProviderCard(
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
-                val menuShape = RoundedCornerShape(16.dp)
+                val menuShape = paperPopupShape(16.dp)
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
@@ -411,7 +411,7 @@ fun AddProviderScreen(
     }
 
     if (confirmDelete && initialProvider != null) {
-        val dialogShape = RoundedCornerShape(26.dp)
+        val dialogShape = paperPopupShape(26.dp)
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             modifier = paperPopupModifier(dialogShape),
@@ -879,7 +879,7 @@ private fun AddModelSheet(
     val bodyValid = isValidJsonObject(customBody)
     val isGemini = providerType == ProviderType.GEMINI
 
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,

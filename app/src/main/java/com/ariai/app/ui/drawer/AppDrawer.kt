@@ -216,7 +216,7 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
             IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Default.MoreVert, contentDescription = tx("Chat options"), tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
             }
-            val menuShape = RoundedCornerShape(16.dp)
+            val menuShape = paperPopupShape(16.dp)
             DropdownMenu(
                 expanded = menu,
                 onDismissRequest = { menu = false },

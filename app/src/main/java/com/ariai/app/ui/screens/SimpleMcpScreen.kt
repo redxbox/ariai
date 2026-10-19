@@ -133,7 +133,7 @@ private fun AddMcpServerSheet(onSave: (McpServerItem) -> Unit, onDismiss: () -> 
     val urlValid = url.startsWith("http://") || url.startsWith("https://")
     val valid = name.isNotBlank() && urlValid
 
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,
