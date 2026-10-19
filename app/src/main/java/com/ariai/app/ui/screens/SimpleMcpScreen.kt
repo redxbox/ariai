@@ -134,12 +134,9 @@ private fun AddMcpServerSheet(onSave: (McpServerItem) -> Unit, onDismiss: () -> 
     val valid = name.isNotBlank() && urlValid
 
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ModalBottomSheet(
+    PaperBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriCard,
-        tonalElevation = 4.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(tx("Add MCP server"), fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = Ink)

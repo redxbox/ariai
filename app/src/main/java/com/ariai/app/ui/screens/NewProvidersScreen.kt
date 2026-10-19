@@ -359,12 +359,9 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
         ProviderType.OPENAI_COMPATIBLE to tx("Any OpenAI-compatible API")
     )
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ModalBottomSheet(
+    PaperBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriCard,
-        tonalElevation = 4.dp
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),

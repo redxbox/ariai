@@ -76,12 +76,9 @@ fun ModelPickerSheet(
         .filter { it.second.isNotEmpty() }
 
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ModalBottomSheet(
+    PaperBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriCard,
-        tonalElevation = 4.dp
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),

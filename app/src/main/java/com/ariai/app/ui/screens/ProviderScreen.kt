@@ -880,12 +880,9 @@ private fun AddModelSheet(
     val isGemini = providerType == ProviderType.GEMINI
 
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ModalBottomSheet(
+    PaperBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(sheetShape),
         shape = sheetShape,
-        containerColor = AriCard,
-        tonalElevation = 4.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
             Text(
