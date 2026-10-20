@@ -14,4 +14,5 @@ for node in root.iter("node"):
         value = " ".join(value.split())
         if value and value not in texts:
             texts.append(value)
-print(f"::notice title={name}::" + " | ".join(texts)[:1500])
+level = "warning" if name in {"13-photo-picker", "14-document-picker", "15-camera-intent"} else "notice"
+print(f"::{level} title={name}::" + " | ".join(texts)[:1500])
