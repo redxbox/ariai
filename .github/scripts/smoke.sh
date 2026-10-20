@@ -576,7 +576,8 @@ step "Final process and crash check"
 adb logcat -d > "$OUT/logcat.txt"
 if grep -A12 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "$PKG"; then
   grep -A30 "FATAL EXCEPTION" "$OUT/logcat.txt" > "$OUT/crash.txt"
-  echo "::error title=Crash detected::AriAI had a fatal exception during the UI walkthrough."
+  crash_detail="$(tr '\n' ' ' < "$OUT/crash.txt" | cut -c1-1500)"
+  echo "::error title=Crash detected::$crash_detail"
   FAILED=1
 fi
 if ! adb shell pidof "$PKG" >/dev/null; then
