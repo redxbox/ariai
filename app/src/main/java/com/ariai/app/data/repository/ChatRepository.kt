@@ -226,6 +226,46 @@ class ChatRepository(
     }
 
     // AI Operations - with error handling
+    fun agentChat(
+        provider: Provider,
+        messages: List<ChatMessage>,
+        modelId: String,
+        systemPrompt: String?,
+        tools: List<com.ariai.app.data.remote.ChatFunctionTool>,
+        temperature: Float = 0.7f,
+        searchContext: String? = null,
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        nativeSearch: Boolean = false,
+        maxSteps: Int = 6,
+        contextWindow: Int = 8192,
+        allowUrlContext: Boolean = true
+    ): Flow<String> = kotlinx.coroutines.flow.flow {
+        val readyMessages = messages.map { m -> m.copy(attachments = m.attachments.map { it.hydrated() }) }
+        val toolBudget = ((contextWindow.coerceAtLeast(4096).toLong() * 3L) / 2L).coerceAtMost(20_000L).toInt()
+        val loop = com.ariai.app.data.remote.AgentLoop(maxSteps = maxSteps, maxTotalToolChars = toolBudget)
+        val answer = loop.run(readyMessages, tools) { stepMessages, stepTools, recovery ->
+            val stepPrompt = if (recovery) {
+                listOfNotNull(
+                    systemPrompt,
+                    "Do not answer with an acknowledgement or progress-only message. Complete the request now using the available tool results, or clearly ask for the exact missing input. If a tool step limit was reached, summarize only what was actually retrieved."
+                ).joinToString("\n\n")
+            } else systemPrompt
+            aiClient.chatCompletionStep(
+                provider = provider,
+                messages = stepMessages,
+                modelId = modelId,
+                systemPrompt = stepPrompt,
+                tools = stepTools,
+                temperature = temperature,
+                searchContext = searchContext,
+                reasoning = reasoning,
+                nativeSearch = nativeSearch,
+                allowUrlContext = allowUrlContext
+            )
+        }
+        emit(answer)
+    }.flowOn(Dispatchers.IO)
+
     fun streamChat(
         provider: Provider,
         messages: List<ChatMessage>,

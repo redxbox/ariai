@@ -41,6 +41,9 @@ data class ChatMessage(
     val parentId: String? = null, // Branch parent, or the user turn associated with a retryable error.
     val branchChildren: List<String> = emptyList(),
     val toolCalls: List<ToolCall> = emptyList(),
+    /** Ephemeral tool-result linkage used only while an agent turn is running. */
+    val toolCallId: String? = null,
+    val toolName: String? = null,
     /** Absolute path of a generated image stored on this device. */
     val imagePath: String? = null,
     val reasoning: String? = null, // For o1/thinking models

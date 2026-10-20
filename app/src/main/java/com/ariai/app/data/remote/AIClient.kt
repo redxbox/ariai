@@ -238,6 +238,73 @@ class AIClient {
         }
     }
 
+    /** Requests one non-streaming model step with executable function tools attached. */
+    suspend fun chatCompletionStep(
+        provider: Provider,
+        messages: List<ChatMessage>,
+        modelId: String,
+        systemPrompt: String?,
+        tools: List<ChatFunctionTool>,
+        temperature: Float = 0.7f,
+        searchContext: String? = null,
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        nativeSearch: Boolean = false,
+        allowUrlContext: Boolean = true
+    ): AgentStep {
+        val request = Request.Builder()
+            .url(buildChatUrl(provider, modelId, forceNonStream = true))
+            .post(buildRequestBody(
+                provider = provider,
+                messages = messages,
+                modelId = modelId,
+                systemPrompt = systemPrompt,
+                temperature = temperature,
+                searchContext = searchContext,
+                isStream = false,
+                reasoning = reasoning,
+                nativeSearch = nativeSearch,
+                functionTools = tools,
+                allowUrlContext = allowUrlContext
+            ))
+            .header("Content-Type", "application/json")
+            .addProviderHeaders(provider, modelId)
+            .build()
+
+        return suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (continuation.isActive) continuation.resumeWith(Result.failure(e))
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val result = runCatching {
+                        response.use { received ->
+                            val raw = received.body?.string().orEmpty()
+                            if (!received.isSuccessful) {
+                                throw IOException("API Error ${received.code}: ${raw.ifBlank { received.message }.take(500)}")
+                            }
+                            if (raw.isBlank()) throw IOException("Empty response from API")
+                            val json = JSONObject(raw)
+                            if (json.has("error")) {
+                                val error = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                                    ?: json.optString("error", "Provider returned an error")
+                                throw IOException(error)
+                            }
+                            val step = parseAgentStep(json, provider.type)
+                            if (step.text.isBlank() && step.toolCalls.isEmpty()) {
+                                throw IOException("The provider returned neither a reply nor a tool call")
+                            }
+                            step
+                        }
+                    }
+                    if (continuation.isActive) continuation.resumeWith(result)
+                }
+            })
+        }
+    }
+
     suspend fun generateImage(
         provider: Provider,
         request: ImageGenRequest
@@ -609,7 +676,9 @@ class AIClient {
         searchContext: String?,
         isStream: Boolean = true,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
-        nativeSearch: Boolean = false
+        nativeSearch: Boolean = false,
+        functionTools: List<ChatFunctionTool> = emptyList(),
+        allowUrlContext: Boolean = true
     ): RequestBody {
         val json = JSONObject()
         val lastMessage = messages.lastOrNull()
@@ -620,20 +689,36 @@ class AIClient {
                 messages.forEach { msg ->
                     if (msg.role == MessageRole.SYSTEM) return@forEach
                     val parts = JSONArray()
-                    var text = msg.promptText(gemini = true)
-                    if (searchContext != null && msg == lastMessage) {
-                        text = "Web search results:\n$searchContext\n\nUser question: $text\n\nAnswer using the search results when relevant."
-                    }
-                    if (text.isNotBlank()) parts.put(JSONObject().put("text", text))
-                    msg.imageParts().forEach { img ->
-                        parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", img.mimeType).put("data", img.base64Data)))
-                    }
-                    msg.videoParts().forEach { vid ->
-                        parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", vid.mimeType).put("data", vid.base64Data)))
+                    if (msg.role == MessageRole.TOOL) {
+                        val response = JSONObject().put("result", msg.content)
+                        val functionResponse = JSONObject()
+                            .put("name", msg.toolName.orEmpty())
+                            .put("response", response)
+                        msg.toolCallId?.takeIf { it.isNotBlank() }?.let { functionResponse.put("id", it) }
+                        parts.put(JSONObject().put("functionResponse", functionResponse))
+                    } else {
+                        var text = msg.promptText(gemini = true)
+                        if (searchContext != null && msg == lastMessage && msg.role == MessageRole.USER) {
+                            text = "Web search results:\n$searchContext\n\nUser question: $text\n\nAnswer using the search results when relevant."
+                        }
+                        if (text.isNotBlank()) parts.put(JSONObject().put("text", text))
+                        msg.imageParts().forEach { img ->
+                            parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", img.mimeType).put("data", img.base64Data)))
+                        }
+                        msg.videoParts().forEach { vid ->
+                            parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", vid.mimeType).put("data", vid.base64Data)))
+                        }
+                        msg.toolCalls.forEach { call ->
+                            val functionCall = JSONObject()
+                                .put("name", call.name)
+                                .put("args", call.arguments.asJsonObject())
+                            if (call.id.isNotBlank()) functionCall.put("id", call.id)
+                            parts.put(JSONObject().put("functionCall", functionCall))
+                        }
                     }
                     if (parts.length() == 0) return@forEach
                     contents.put(JSONObject().apply {
-                        put("role", if (msg.role == MessageRole.USER) "user" else "model")
+                        put("role", if (msg.role == MessageRole.USER || msg.role == MessageRole.TOOL) "user" else "model")
                         put("parts", parts)
                     })
                 }
@@ -645,11 +730,24 @@ class AIClient {
                     put("temperature", temperature.toDouble())
                     reasoning.geminiBudget?.takeIf { it > 0 }?.let { put("thinkingConfig", JSONObject().put("thinkingBudget", it)) }
                 })
-                val tools = modelTools(provider, modelId)
-                if (nativeSearch && !tools.contains("google_search")) tools.add("google_search")
-                if (tools.isNotEmpty()) {
-                    json.put("tools", JSONArray().apply { tools.forEach { put(JSONObject().put(it, JSONObject())) } })
+                val nativeTools = modelTools(provider, modelId)
+                    .filterNot { it == "url_context" && !allowUrlContext }
+                    .toMutableList()
+                if (nativeSearch && !nativeTools.contains("google_search")) nativeTools.add("google_search")
+                val toolsJson = JSONArray().apply {
+                    nativeTools.forEach { put(JSONObject().put(it, JSONObject())) }
+                    if (functionTools.isNotEmpty()) {
+                        put(JSONObject().put("functionDeclarations", JSONArray().apply {
+                            functionTools.forEach { tool ->
+                                put(JSONObject()
+                                    .put("name", tool.name)
+                                    .put("description", tool.description)
+                                    .put("parameters", tool.parameters.toGeminiSchema()))
+                            }
+                        }))
+                    }
                 }
+                if (toolsJson.length() > 0) json.put("tools", toolsJson)
             }
             ProviderType.ANTHROPIC -> {
                 val budget = reasoning.budgetTokens
@@ -657,9 +755,17 @@ class AIClient {
                 val thinking = budget != null && budget > 0
                 json.put("max_tokens", if (thinking) budget!! + 4096 else 4096)
                 json.put("stream", isStream)
+                val anthropicTools = JSONArray()
                 if (nativeSearch) {
-                    json.put("tools", JSONArray().put(JSONObject().put("type", "web_search_20250305").put("name", "web_search")))
+                    anthropicTools.put(JSONObject().put("type", "web_search_20250305").put("name", "web_search"))
                 }
+                functionTools.forEach { tool ->
+                    anthropicTools.put(JSONObject()
+                        .put("name", tool.name)
+                        .put("description", tool.description)
+                        .put("input_schema", tool.parameters))
+                }
+                if (anthropicTools.length() > 0) json.put("tools", anthropicTools)
                 if (thinking) {
                     // Extended thinking requires temperature 1 (the API default), so it is omitted here.
                     json.put("thinking", JSONObject().put("type", "enabled").put("budget_tokens", budget))
@@ -672,7 +778,21 @@ class AIClient {
                 ).joinToString("\n\n")
                 if (systemText.isNotBlank()) json.put("system", systemText)
                 val msgs = JSONArray()
+                var pendingToolResults = JSONArray()
+                fun flushToolResults() {
+                    if (pendingToolResults.length() == 0) return
+                    msgs.put(JSONObject().put("role", "user").put("content", pendingToolResults))
+                    pendingToolResults = JSONArray()
+                }
                 messages.filter { it.role != MessageRole.SYSTEM }.forEach { m ->
+                    if (m.role == MessageRole.TOOL) {
+                        pendingToolResults.put(JSONObject()
+                            .put("type", "tool_result")
+                            .put("tool_use_id", m.toolCallId.orEmpty())
+                            .put("content", m.content))
+                        return@forEach
+                    }
+                    flushToolResults()
                     val content = JSONArray()
                     m.imageParts().forEach { img ->
                         content.put(JSONObject().put("type", "image").put("source", JSONObject()
@@ -680,12 +800,20 @@ class AIClient {
                     }
                     val text = m.promptText()
                     if (text.isNotBlank()) content.put(JSONObject().put("type", "text").put("text", text))
+                    m.toolCalls.forEach { call ->
+                        content.put(JSONObject()
+                            .put("type", "tool_use")
+                            .put("id", call.id)
+                            .put("name", call.name)
+                            .put("input", call.arguments.asJsonObject()))
+                    }
                     if (content.length() == 0) return@forEach
                     msgs.put(JSONObject().apply {
                         put("role", if (m.role == MessageRole.USER) "user" else "assistant")
                         put("content", content)
                     })
                 }
+                flushToolResults()
                 json.put("messages", msgs)
             }
             else -> {
@@ -697,6 +825,19 @@ class AIClient {
                 reasoning.effort?.let { json.put("reasoning_effort", it) }
                 if (nativeSearch && provider.baseUrl.contains("openrouter.ai")) {
                     json.put("plugins", JSONArray().put(JSONObject().put("id", "web")))
+                }
+                if (functionTools.isNotEmpty()) {
+                    json.put("tools", JSONArray().apply {
+                        functionTools.forEach { tool ->
+                            put(JSONObject()
+                                .put("type", "function")
+                                .put("function", JSONObject()
+                                    .put("name", tool.name)
+                                    .put("description", tool.description)
+                                    .put("parameters", tool.parameters)))
+                        }
+                    })
+                    json.put("tool_choice", "auto")
                 }
 
                 val msgs = JSONArray()
@@ -714,9 +855,18 @@ class AIClient {
                 }
                 messages.forEach { m ->
                     if (m.role == MessageRole.SYSTEM && systemPrompt != null) return@forEach
+                    if (m.role == MessageRole.TOOL) {
+                        msgs.put(JSONObject().apply {
+                            put("role", "tool")
+                            put("tool_call_id", m.toolCallId.orEmpty())
+                            m.toolName?.takeIf { it.isNotBlank() }?.let { put("name", it) }
+                            put("content", m.content)
+                        })
+                        return@forEach
+                    }
                     val text = m.promptText()
                     val images = m.imageParts()
-                    if (text.isBlank() && images.isEmpty()) return@forEach
+                    if (text.isBlank() && images.isEmpty() && m.toolCalls.isEmpty()) return@forEach
                     val content: Any = if (m.role == MessageRole.USER && images.isNotEmpty()) {
                         JSONArray().apply {
                             put(JSONObject().put("type", "text").put("text", text))
@@ -725,18 +875,31 @@ class AIClient {
                                     JSONObject().put("url", "data:${img.mimeType};base64,${img.base64Data}")))
                             }
                         }
+                    } else if (m.role == MessageRole.ASSISTANT && text.isBlank() && m.toolCalls.isNotEmpty()) {
+                        JSONObject.NULL
                     } else {
                         text
                     }
-                    msgs.put(JSONObject().apply {
-                        put("role", when (m.role) {
-                            MessageRole.USER -> "user"
-                            MessageRole.ASSISTANT -> "assistant"
-                            MessageRole.SYSTEM -> "system"
-                            MessageRole.TOOL -> "tool"
+                    val role = when (m.role) {
+                        MessageRole.USER -> "user"
+                        MessageRole.ASSISTANT -> "assistant"
+                        MessageRole.SYSTEM -> "system"
+                        MessageRole.TOOL -> "tool"
+                    }
+                    val message = JSONObject().put("role", role).put("content", content)
+                    if (m.toolCalls.isNotEmpty()) {
+                        message.put("tool_calls", JSONArray().apply {
+                            m.toolCalls.forEach { call ->
+                                put(JSONObject()
+                                    .put("id", call.id)
+                                    .put("type", "function")
+                                    .put("function", JSONObject()
+                                        .put("name", call.name)
+                                        .put("arguments", call.arguments)))
+                            }
                         })
-                        put("content", content)
-                    })
+                    }
+                    msgs.put(message)
                 }
                 json.put("messages", msgs)
             }
@@ -747,7 +910,7 @@ class AIClient {
             try {
                 val customJson = JSONObject(custom)
                 customJson.keys().forEach { key ->
-                    if (key != "model" && key != "messages" && key != "stream") {
+                    if (key != "model" && key != "messages" && key != "stream" && !(key == "tools" && functionTools.isNotEmpty())) {
                         json.put(key, customJson.get(key))
                     }
                 }
@@ -827,6 +990,103 @@ class AIClient {
             }
         }
     }
+
+    private fun parseAgentStep(json: JSONObject, providerType: ProviderType): AgentStep {
+        return when (providerType) {
+        ProviderType.GEMINI -> {
+            val candidate = json.optJSONArray("candidates")?.optJSONObject(0)
+            val parts = candidate?.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
+            val text = StringBuilder()
+            val calls = mutableListOf<ToolCall>()
+            for (index in 0 until parts.length()) {
+                val part = parts.optJSONObject(index) ?: continue
+                if (!part.optBoolean("thought", false)) text.append(part.optString("text", ""))
+                val function = part.optJSONObject("functionCall") ?: part.optJSONObject("function_call") ?: continue
+                val name = function.optString("name").takeIf { it.isNotBlank() } ?: continue
+                calls += ToolCall(
+                    id = function.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
+                    name = name,
+                    arguments = function.optJSONObject("args")?.toString()
+                        ?: function.optJSONObject("arguments")?.toString()
+                        ?: "{}"
+                )
+            }
+            AgentStep(text.toString(), calls)
+        }
+        ProviderType.ANTHROPIC -> {
+            val blocks = json.optJSONArray("content") ?: JSONArray()
+            val text = StringBuilder()
+            val calls = mutableListOf<ToolCall>()
+            for (index in 0 until blocks.length()) {
+                val block = blocks.optJSONObject(index) ?: continue
+                when (block.optString("type")) {
+                    "text" -> text.append(block.optString("text", ""))
+                    "tool_use" -> {
+                        val name = block.optString("name").takeIf { it.isNotBlank() } ?: continue
+                        calls += ToolCall(
+                            id = block.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
+                            name = name,
+                            arguments = block.optJSONObject("input")?.toString() ?: "{}"
+                        )
+                    }
+                }
+            }
+            AgentStep(text.toString(), calls)
+        }
+        else -> {
+            val message = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
+                ?: return AgentStep("", emptyList())
+            val text = responseText(message.opt("content"))
+            val calls = mutableListOf<ToolCall>()
+            val toolCalls = message.optJSONArray("tool_calls") ?: JSONArray()
+            for (index in 0 until toolCalls.length()) {
+                val item = toolCalls.optJSONObject(index) ?: continue
+                val function = item.optJSONObject("function") ?: continue
+                val name = function.optString("name").takeIf { it.isNotBlank() } ?: continue
+                calls += ToolCall(
+                    id = item.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
+                    name = name,
+                    arguments = function.optString("arguments", "{}").ifBlank { "{}" }
+                )
+            }
+            val legacyCall = message.optJSONObject("function_call")
+            if (calls.isEmpty() && legacyCall != null) {
+                val name = legacyCall.optString("name")
+                if (name.isNotBlank()) calls += ToolCall(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = name,
+                    arguments = legacyCall.optString("arguments", "{}").ifBlank { "{}" }
+                )
+            }
+            AgentStep(text, calls)
+        }
+        }
+    }
+
+    private fun JSONObject.toGeminiSchema(): JSONObject {
+        val output = JSONObject()
+        val keys = keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key == "additionalProperties") continue
+            val value = get(key)
+            val converted = when {
+                key == "type" && value is String -> value.uppercase()
+                value is JSONObject -> value.toGeminiSchema()
+                value is JSONArray -> JSONArray().apply {
+                    for (index in 0 until value.length()) {
+                        val item = value.get(index)
+                        put(if (item is JSONObject) item.toGeminiSchema() else item)
+                    }
+                }
+                else -> value
+            }
+            output.put(key, converted)
+        }
+        return output
+    }
+
+    private fun String.asJsonObject(): JSONObject = runCatching { JSONObject(this) }.getOrElse { JSONObject() }
 
     private fun responseText(value: Any?): String = when (value) {
         is String -> value
