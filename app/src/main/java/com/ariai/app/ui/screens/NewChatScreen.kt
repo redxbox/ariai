@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import android.content.ClipboardManager
@@ -400,6 +401,14 @@ fun NewChatScreen(
         }
     }
 
+    fun launchPickerAfterSheetCloses(launch: () -> Unit) {
+        // Let the modal finish dismissing before handing control to an external Android activity.
+        scope.launch {
+            delay(350)
+            launch()
+        }
+    }
+
     if (showModelSheet) {
         ModelPickerSheet(
             providers = providers,
@@ -414,9 +423,17 @@ fun NewChatScreen(
     }
     if (showAttachments) {
         AttachmentSheet(
-            onPhoto = { mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
-            onCamera = { cameraPicker.launch(null) },
-            onFile = { filePicker.launch(arrayOf("text/*", "application/json", "image/*")) },
+            onPhoto = {
+                launchPickerAfterSheetCloses {
+                    mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                }
+            },
+            onCamera = { launchPickerAfterSheetCloses { cameraPicker.launch(null) } },
+            onFile = {
+                launchPickerAfterSheetCloses {
+                    filePicker.launch(arrayOf("text/*", "application/json", "image/*"))
+                }
+            },
             onCompress = { onCompressHistory { showNote(it) } },
             onExtensions = onOpenExtensions,
             onImage = {
