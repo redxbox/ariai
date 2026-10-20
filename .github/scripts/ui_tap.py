@@ -31,8 +31,29 @@ def node_values(node: ET.Element) -> tuple[str, str]:
     return node.get("text", "").strip(), node.get("content-desc", "").strip()
 
 
+def node_bounds(node: ET.Element) -> tuple[int, int, int, int] | None:
+    bounds = node.get("bounds", "")
+    match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds)
+    if not match:
+        return None
+    return tuple(map(int, match.groups()))
+
+
+def visible_bounds(node: ET.Element, width: int, height: int) -> tuple[int, int, int, int] | None:
+    if node.get("visible-to-user", "true").casefold() == "false":
+        return None
+    bounds = node_bounds(node)
+    if bounds is None:
+        return None
+    left, top, right, bottom = bounds
+    left, top = max(0, left), max(0, top)
+    right, bottom = min(width, right), min(height, bottom)
+    return (left, top, right, bottom) if right > left and bottom > top else None
+
+
 def locate(xml: str, label: str) -> tuple[int, int] | None:
     root = ET.fromstring(xml)
+    width, height = screen_size()
     needle = label.casefold()
     exact: list[ET.Element] = []
     partial: list[ET.Element] = []
@@ -44,21 +65,21 @@ def locate(xml: str, label: str) -> tuple[int, int] | None:
             partial.append(node)
 
     for node in exact + partial:
-        bounds = node.get("bounds", "")
-        match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds)
-        if match:
-            left, top, right, bottom = map(int, match.groups())
-            if right > left and bottom > top:
-                return (left + right) // 2, (top + bottom) // 2
+        bounds = visible_bounds(node, width, height)
+        if bounds is not None:
+            left, top, right, bottom = bounds
+            return (left + right) // 2, (top + bottom) // 2
     return None
 
 
 def is_visible(xml: str, label: str) -> bool:
     root = ET.fromstring(xml)
+    width, height = screen_size()
     needle = label.casefold()
     return any(
         needle in value.casefold()
         for node in root.iter("node")
+        if visible_bounds(node, width, height) is not None
         for value in node_values(node)
     )
 
@@ -70,19 +91,27 @@ def is_scrollable(xml: str) -> bool:
 
 def visible_labels(xml: str, limit: int = 80) -> str:
     root = ET.fromstring(xml)
+    width, height = screen_size()
     labels = dict.fromkeys(
         value
         for node in root.iter("node")
+        if visible_bounds(node, width, height) is not None
         for value in node_values(node)
         if value
     )
     return " | ".join(list(labels)[:limit])
 
 
+_SCREEN_SIZE: tuple[int, int] | None = None
+
+
 def screen_size() -> tuple[int, int]:
-    output = run_adb("shell", "wm", "size")
-    match = re.search(r"(\d+)x(\d+)", output)
-    return (int(match.group(1)), int(match.group(2))) if match else (1080, 2400)
+    global _SCREEN_SIZE
+    if _SCREEN_SIZE is None:
+        output = run_adb("shell", "wm", "size")
+        match = re.search(r"(\d+)x(\d+)", output)
+        _SCREEN_SIZE = (int(match.group(1)), int(match.group(2))) if match else (1080, 2400)
+    return _SCREEN_SIZE
 
 
 def scroll_page(up: bool = False) -> None:
