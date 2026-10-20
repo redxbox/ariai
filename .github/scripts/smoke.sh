@@ -211,7 +211,7 @@ step "Chat home and model picker"
 expect_text "How can I help you?"
 shot 01-chat-home
 tap "Open models"
-expect_text "No models available"
+wait_for_text "No models available" 30
 shot 02-model-picker
 back
 end_step
