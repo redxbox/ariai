@@ -82,6 +82,17 @@ back() {
   sleep 1
 }
 
+dismiss_external_picker() {
+  local label
+  for label in Cancel Close; do
+    if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1; then
+      tap "$label"
+      return 0
+    fi
+  done
+  back
+}
+
 hide_keyboard() {
   adb shell input keyevent KEYCODE_BACK >/dev/null
   sleep 0.5
@@ -233,13 +244,13 @@ shot 12-attachment-sheet
 tap_scroll_up "Photo"
 sleep 2
 shot 13-photo-picker
-back
+dismiss_external_picker
 wait_for_text "Message AriAI" 20
 tap "Add to message"
 tap "Text file"
 sleep 2
 shot 14-document-picker
-back
+dismiss_external_picker
 wait_for_text "Message AriAI" 20
 tap "Add to message"
 tap "Camera"
