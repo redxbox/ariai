@@ -325,11 +325,12 @@ end_step
 step "MCP extension screen and add/remove flow"
 tap "Add to message"
 tap_scroll "Extensions"
-expect_text "Model Context Protocol"
+wait_for_text "Model Context Protocol" 20
 expect_text "No MCP servers yet"
 shot 19-mcp-empty
 
-tap "Add server"
+wait_for_text "Add server" 10
+tap_exact "Add server"
 expect_text "Add MCP server"
 shot 20-mcp-add-form
 tap "Name"
