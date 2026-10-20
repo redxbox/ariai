@@ -558,9 +558,10 @@ else
 fi
 
 back
-tap_scroll "About AriAI"
+expect_text "About AriAI"
+tap_exact "About AriAI"
+wait_for_text "AriAI v1.0 - Personal AI" 8
 shot 54-settings-about
-expect_text "AriAI v1.0 - Personal AI"
 back
 expect_text "Message AriAI"
 
