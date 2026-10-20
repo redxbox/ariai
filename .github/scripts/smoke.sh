@@ -1,54 +1,436 @@
 #!/usr/bin/env bash
-# Launches AriAI on the emulator, walks through the main screens, takes screenshots,
-# and fails if the app crashes. Output goes to smoke-out/ (uploaded as an artifact).
-set -u
+# Walks every user-reachable screen and the major chat/settings/provider sheets on an Android emulator.
+# External provider calls are intentionally avoided: this uses no API keys and only adds/removes an
+# in-memory MCP test server. Screenshots, UI text dumps and logcat are uploaded as smoke-output.
+set -uo pipefail
 PKG=com.ariai.app
 APK=app/build/outputs/apk/debug/app-debug.apk
 OUT=smoke-out
 mkdir -p "$OUT"
 FAILED=0
-shot() {
-  adb exec-out screencap -p > "$OUT/$1.png"
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  adb pull /sdcard/ui.xml "$OUT/$1.xml" >/dev/null 2>&1
-  # Put the visible texts in the run log as annotations, so results can be read without downloading artifacts.
-  python3 .github/scripts/screen_texts.py "$OUT/$1.xml" "$1"
+STEP_NO=0
+
+step() {
+  STEP_NO=$((STEP_NO + 1))
+  echo "::group::[$STEP_NO] $1"
+  echo "== $1"
 }
-step() { echo "== $1"; }
+end_step() { echo "::endgroup::"; }
+
+expect_text() {
+  local label="$1"
+  if ! python3 .github/scripts/ui_tap.py --assert --scroll "$label"; then
+    echo "::error title=UI assertion failed::$label"
+    FAILED=1
+    return 1
+  fi
+}
+
+tap() {
+  local label="$1"
+  if ! python3 .github/scripts/ui_tap.py "$label"; then
+    echo "::error title=UI target missing::$label"
+    FAILED=1
+    return 1
+  fi
+  sleep 0.8
+}
+
+tap_scroll() {
+  local label="$1"
+  if ! python3 .github/scripts/ui_tap.py --scroll "$label"; then
+    echo "::error title=UI target missing::$label"
+    FAILED=1
+    return 1
+  fi
+  sleep 0.8
+}
+
+back() {
+  adb shell input keyevent KEYCODE_BACK >/dev/null
+  sleep 1
+}
+
+hide_keyboard() {
+  adb shell input keyevent KEYCODE_BACK >/dev/null
+  sleep 0.5
+}
+
+type_text() {
+  adb shell input text "$1"
+  sleep 0.4
+}
+
+shot() {
+  local name="$1"
+  adb exec-out screencap -p > "$OUT/$name.png"
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || true
+  adb pull /sdcard/ui.xml "$OUT/$name.xml" >/dev/null 2>&1 || true
+  if [ -f "$OUT/$name.xml" ]; then
+    python3 .github/scripts/screen_texts.py "$OUT/$name.xml" "$name"
+  else
+    echo "::warning title=$name::UI hierarchy could not be captured"
+  fi
+}
 
 adb wait-for-device
-adb shell input keyevent 82 || true
+adb shell pm uninstall "$PKG" >/dev/null 2>&1 || true
 adb logcat -c
 adb install -r "$APK" | tee "$OUT/install.txt"
 grep -q Success "$OUT/install.txt" || { echo "install failed"; exit 1; }
+adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
+sleep 9
 
-step "launch"
-adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null
-sleep 10
-shot 01-launch
+step "Chat home and model picker"
+expect_text "How can I help you?"
+shot 01-chat-home
+tap "Open models"
+expect_text "No models available"
+shot 02-model-picker
+back
+end_step
 
-step "open attachment menu"
-python3 .github/scripts/ui_tap.py "Add to message" || FAILED=1
-sleep 2; shot 02-attachments
-adb shell input keyevent 4; sleep 1
+step "Thinking controls and rename dialog"
+tap "Off"
+expect_text "Thinking depth"
+expect_text "Not every model supports this"
+shot 03-thinking-sheet
+back
+tap "Rename chat"
+expect_text "Chat title"
+shot 04-rename-dialog
+tap "Cancel"
+end_step
 
-step "open web search sheet"
-python3 .github/scripts/ui_tap.py "Web search" || FAILED=1
-sleep 2; shot 03-search
-adb shell input keyevent 4; sleep 1
+step "Chat overflow actions"
+tap "More"
+expect_text "Copy conversation"
+expect_text "Image chat"
+expect_text "Compress history"
+shot 05-chat-overflow
+tap "Copy conversation"
+shot 06-copy-conversation
+tap "More"
+tap "Image chat"
+shot 07-image-chat-without-provider
+# This chat is empty, so compression should report that there is nothing to summarize.
+tap "More"
+tap "Compress history"
+shot 08-compress-empty-chat
+end_step
 
-step "open side menu"
-python3 .github/scripts/ui_tap.py "Open menu" || FAILED=1
-sleep 2; shot 04-menu
-adb shell input keyevent 4; sleep 1
+step "Web search chooser and missing-key path"
+tap "Web search"
+expect_text "Model search"
+expect_text "Local search"
+expect_text "Turn off search"
+shot 09-web-search-sheet
+tap "Local search"
+expect_text "Search service"
+shot 10-search-service-from-local-search
+back
+tap "Web search"
+tap "Model search"
+expect_text "Search service"
+shot 11-search-service-from-model-search
+back
+end_step
 
-step "crash check"
-adb logcat -d > "$OUT/logcat.txt"
-if grep -q "FATAL EXCEPTION" "$OUT/logcat.txt"; then
-  grep -A30 "FATAL EXCEPTION" "$OUT/logcat.txt" > "$OUT/crash.txt"
-  echo "CRASH FOUND"; FAILED=1
+step "Attachment picker and generation modes"
+tap "Add to message"
+expect_text "Photo"
+expect_text "Camera"
+expect_text "Text file"
+expect_text "Image"
+expect_text "Video"
+expect_text "Audio"
+expect_text "Compress history"
+expect_text "Extensions"
+shot 12-attachment-sheet
+
+# Exercise the Android photo picker, document picker and camera intent, then cancel each one.
+tap "Photo"
+sleep 2
+shot 13-photo-picker
+back
+expect_text "Message AriAI"
+tap "Text file"
+sleep 2
+shot 14-document-picker
+back
+expect_text "Message AriAI"
+tap "Camera"
+sleep 3
+shot 15-camera-intent
+back
+expect_text "Message AriAI"
+
+# With no configured provider, these modes should fail safely with an explanatory notice.
+for mode in Image Video Audio; do
+  tap "Add to message"
+  tap "$mode"
+  sleep 1
+  shot "16-generate-$mode-lacking-provider"
+done
+end_step
+
+step "MCP extension screen and add/remove flow"
+tap "Add to message"
+tap "Extensions"
+expect_text "Model Context Protocol"
+expect_text "No MCP servers yet"
+shot 19-mcp-empty
+
+tap "Add server"
+expect_text "Add MCP server"
+shot 20-mcp-add-form
+tap "Name"
+type_text "ArenaSmokeServer"
+hide_keyboard
+tap "Server URL"
+type_text "https://example.org/mcp"
+hide_keyboard
+tap "SSE"
+shot 21-mcp-sse-selected
+tap "Save"
+expect_text "ArenaSmokeServer"
+expect_text "not connected"
+shot 22-mcp-server-added
+tap "Remove server"
+expect_text "No MCP servers yet"
+shot 23-mcp-server-removed
+back
+expect_text "Message AriAI"
+end_step
+
+step "Voice input permission surface"
+tap "Voice input"
+sleep 2
+shot 24-voice-input
+# Dismiss a possible Android permission/recognizer surface without granting microphone access.
+back
+expect_text "Message AriAI"
+end_step
+
+step "Navigation drawer and provider screens"
+tap "Open menu"
+expect_text "Search conversations"
+expect_text "Providers"
+expect_text "MCP"
+expect_text "Settings"
+expect_text "About"
+shot 25-navigation-drawer
+tap "About"
+expect_text "AriAI v1.0 - Personal AI"
+shot 25-drawer-about
+
+tap "Open menu"
+tap "Search conversations"
+type_text "no-match-arena-smoke"
+hide_keyboard
+expect_text "No matches"
+shot 25-drawer-search-no-matches
+tap "MCP"
+expect_text "Model Context Protocol"
+shot 25-mcp-from-drawer
+back
+tap "Open menu"
+tap "Providers"
+expect_text "No providers yet"
+expect_text "Tap the star icon for recommended providers"
+shot 26-providers-empty
+
+tap "Import provider"
+expect_text "Import provider"
+expect_text "Paste a provider as JSON"
+shot 27-import-provider-dialog
+tap "Cancel"
+
+tap "Recommended providers"
+expect_text "Recommended providers"
+expect_text "OpenAI"
+shot 28-recommended-providers
+tap_scroll "Gemini"
+expect_text "Add provider"
+expect_text "Connection"
+shot 29-add-gemini-provider
+
+# Exercise connection presets without saving a provider or transmitting credentials.
+for provider in OpenAI Anthropic Ollama Custom Gemini; do
+  tap "$provider"
+done
+expect_text "Base URL"
+expect_text "API key"
+shot 30-provider-presets
+
+tap "Models"
+expect_text "No models yet"
+shot 31-provider-models-empty
+tap_scroll "Add model"
+expect_text "Model ID"
+expect_text "Built-in Tools"
+shot 32-add-model-basic
+tap "Model ID"
+type_text "smoke-model"
+hide_keyboard
+tap "Built-in Tools"
+expect_text "Google Search grounding"
+expect_text "URL context"
+shot 33-add-model-built-in-tools
+tap "Search"
+tap "URL context"
+tap "Advanced"
+expect_text "Extra headers for this model only"
+shot 34-add-model-advanced
+tap "Basic"
+tap "Add"
+expect_text "smoke-model"
+shot 35-unsaved-model-added
+
+tap "Connection"
+tap_scroll "Advanced"
+tap "Advanced"
+expect_text "Custom headers"
+shot 36-provider-advanced
+# Add a blank header row to check that editor, without saving the provider.
+tap_scroll "Add header"
+expect_text "Header"
+expect_text "Value"
+shot 37-provider-header-editor
+expect_text "Custom body (JSON)"
+back
+expect_text "No providers yet"
+# Also verify the direct + route to the provider editor.
+tap "Add provider"
+expect_text "Add provider"
+shot 38-add-provider-direct
+back
+back
+expect_text "Message AriAI"
+end_step
+
+step "Search-service settings for every provider"
+tap "Open menu"
+tap "Search"
+expect_text "Search service"
+expect_text "Tavily"
+shot 39-search-service
+for service in "Tavily" "Brave Search" "Exa" "Serper"; do
+  tap_scroll "$service"
+  expect_text "API key"
+  shot "40-search-$service"
+done
+# Reveal/hide is safe with an empty key and does not persist a credential.
+tap_scroll "Show key"
+shot 41-search-key-visibility
+back
+expect_text "Message AriAI"
+end_step
+
+step "Settings, appearance, preferences, and default model"
+tap "Open menu"
+tap "Settings"
+expect_text "General"
+shot 42-settings
+
+tap_scroll "Dark"
+shot 43-settings-dark-theme
+tap_scroll "System"
+shot 44-settings-system-theme
+
+tap_scroll "Preferences"
+expect_text "Stream replies"
+expect_text "Default thinking depth"
+shot 47-preferences
+# Verify preference chips respond, then restore the defaults for this test run.
+tap_scroll "High"
+shot 48-preferences-high-reasoning
+tap_scroll "Off"
+tap_scroll "Large"
+shot 49-preferences-large-text
+tap "Medium"
+expect_text "Preview: the quick brown fox"
+back
+
+expect_text "Language"
+tap "Language"
+expect_text "زبان"
+shot 45-settings-persian-rtl
+# Toggle back to English so the remaining test selectors are stable.
+tap "زبان"
+expect_text "Settings"
+shot 46-settings-english
+
+tap_scroll "Default model"
+expect_text "New chats start with this model"
+expect_text "No models yet"
+shot 50-default-model-empty
+back
+
+tap_scroll "Search service"
+tap "Search service"
+expect_text "Tavily"
+shot 51-search-service-from-settings
+back
+
+tap_scroll "MCP servers"
+tap "MCP servers"
+expect_text "Model Context Protocol"
+shot 52-mcp-from-settings
+back
+end_step
+
+step "Storage, export chooser, guarded delete dialog, and About"
+tap_scroll "Data & storage"
+expect_text "Stored locally on this device"
+shot 53-storage
+
+tap_scroll "Export chat list"
+sleep 2
+shot 54-export-share-sheet
+back
+# Open the destructive confirmation, capture it, and cancel; no chat data is deleted.
+if tap_scroll "Delete all chats"; then
+  if python3 .github/scripts/ui_tap.py --assert "Delete all chats?"; then
+    shot 53-delete-chats-confirmation
+    tap "Cancel"
+  else
+    echo "::notice title=Storage test::Delete confirmation was unavailable (there were no chats to delete)."
+  fi
 fi
-adb shell pidof $PKG >/dev/null || { echo "app is not running at the end"; FAILED=1; }
 
-echo "result failed=$FAILED"
-exit $FAILED
+back
+tap_scroll "About AriAI"
+shot 54-settings-about
+expect_text "AriAI v1.0 - Personal AI"
+back
+expect_text "Message AriAI"
+
+# Exercise the send path without credentials; it must report the missing provider, not pretend to answer.
+tap "Message AriAI"
+type_text "EmulatorSmokeTestWithoutProvider"
+hide_keyboard
+tap "Send"
+expect_text "No provider configured"
+shot 55-send-without-provider
+
+# Start a clean conversation after the intentional missing-provider error.
+tap "Open menu"
+tap "New chat"
+expect_text "How can I help you?"
+shot 56-new-chat-from-drawer
+end_step
+
+step "Final process and crash check"
+adb logcat -d > "$OUT/logcat.txt"
+if grep -A12 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "$PKG"; then
+  grep -A30 "FATAL EXCEPTION" "$OUT/logcat.txt" > "$OUT/crash.txt"
+  echo "::error title=Crash detected::AriAI had a fatal exception during the UI walkthrough."
+  FAILED=1
+fi
+if ! adb shell pidof "$PKG" >/dev/null; then
+  echo "::error title=App stopped::AriAI is not running at the end of the walkthrough."
+  FAILED=1
+fi
+printf 'result failed=%s steps=%s\n' "$FAILED" "$STEP_NO"
+if [ "$FAILED" -ne 0 ]; then exit 1; fi
