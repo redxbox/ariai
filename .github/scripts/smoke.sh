@@ -447,7 +447,6 @@ shot 35-unsaved-model-added
 
 tap_exact "Connection"
 tap_scroll "Advanced"
-tap "Advanced"
 expect_text "Custom headers"
 shot 36-provider-advanced
 # Add a blank header row to check that editor, without saving the provider.
@@ -526,13 +525,11 @@ shot 50-default-model-empty
 back
 
 tap_scroll "Search service"
-tap "Search service"
 expect_text "Tavily"
 shot 51-search-service-from-settings
 back
 
 tap_scroll "MCP servers"
-tap "MCP servers"
 expect_text "Model Context Protocol"
 shot 52-mcp-from-settings
 back
