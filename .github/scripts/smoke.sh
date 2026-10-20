@@ -55,6 +55,17 @@ tap() {
   sleep 0.8
 }
 
+tap_exact() {
+  local label="$1"
+  if ! python3 .github/scripts/ui_tap.py --exact "$label"; then
+    echo "::error title=Exact UI target missing::$label"
+    FAILED=1
+    capture_failure "$label"
+    return 1
+  fi
+  sleep 0.8
+}
+
 tap_scroll() {
   local label="$1"
   if ! python3 .github/scripts/ui_tap.py --scroll "$label"; then
@@ -252,9 +263,12 @@ tap "Text file"
 sleep 2
 shot 14-document-picker
 tap "ui.xml"
-expect_text "Open"
-shot 14-document-selected
-tap "Open"
+if python3 .github/scripts/ui_tap.py --assert --exact "Open" >/dev/null 2>&1; then
+  shot 14-document-selected
+  tap_exact "Open"
+else
+  shot 14-document-selected
+fi
 wait_for_text "Message AriAI" 20
 expect_text "ui.xml"
 tap "Remove attachment"

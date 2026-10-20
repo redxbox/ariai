@@ -51,7 +51,7 @@ def visible_bounds(node: ET.Element, width: int, height: int) -> tuple[int, int,
     return (left, top, right, bottom) if right > left and bottom > top else None
 
 
-def locate(xml: str, label: str) -> tuple[int, int] | None:
+def locate(xml: str, label: str, exact_only: bool = False) -> tuple[int, int] | None:
     root = ET.fromstring(xml)
     width, height = screen_size()
     needle = label.casefold()
@@ -61,7 +61,7 @@ def locate(xml: str, label: str) -> tuple[int, int] | None:
         values = node_values(node)
         if any(value.casefold() == needle for value in values):
             exact.append(node)
-        elif any(needle in value.casefold() for value in values):
+        elif not exact_only and any(needle in value.casefold() for value in values):
             partial.append(node)
 
     for node in exact + partial:
@@ -72,12 +72,12 @@ def locate(xml: str, label: str) -> tuple[int, int] | None:
     return None
 
 
-def is_visible(xml: str, label: str) -> bool:
+def is_visible(xml: str, label: str, exact_only: bool = False) -> bool:
     root = ET.fromstring(xml)
     width, height = screen_size()
     needle = label.casefold()
     return any(
-        needle in value.casefold()
+        (value.casefold() == needle if exact_only else needle in value.casefold())
         for node in root.iter("node")
         if visible_bounds(node, width, height) is not None
         for value in node_values(node)
@@ -131,6 +131,7 @@ def main() -> int:
     scroll.add_argument("--scroll", action="store_true", help="scroll down until the label is visible")
     scroll.add_argument("--scroll-up", action="store_true", help="scroll up until the label is visible")
     parser.add_argument("--assert", dest="assert_only", action="store_true", help="check visibility without tapping")
+    parser.add_argument("--exact", action="store_true", help="require an exact label match instead of a substring")
     parser.add_argument("label", nargs="+", help="visible text or content description")
     args = parser.parse_args()
     label = " ".join(args.label)
@@ -143,11 +144,11 @@ def main() -> int:
             xml = dump_xml()
             last_xml = xml
             if args.assert_only:
-                if is_visible(xml, label):
+                if is_visible(xml, label, exact_only=args.exact):
                     print(f"VISIBLE: {label}")
                     return 0
             else:
-                position = locate(xml, label)
+                position = locate(xml, label, exact_only=args.exact)
                 if position is not None:
                     run_adb("shell", "input", "tap", str(position[0]), str(position[1]))
                     print(f"tapped {label!r} at {position}")
