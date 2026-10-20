@@ -110,9 +110,11 @@ capture_failure() {
   safe="$(printf '%s' "$label" | tr -cs '[:alnum:]_-' '_')"
   shot "failure-${STEP_NO}-${safe:0:40}"
   adb logcat -d -t 500 > "$OUT/failure-${STEP_NO}-logcat.txt" || true
-  local relevant
-  relevant="$(grep -E 'FATAL EXCEPTION|ANR in|isn.t responding|com\.ariai\.app' "$OUT/failure-${STEP_NO}-logcat.txt" | tail -25 | tr '\n' ' ' | cut -c1-1500 || true)"
-  if [[ -n "$relevant" ]]; then echo "::notice title=Failure logcat::$relevant"; fi
+  local relevant activity
+  relevant="$(grep -E 'FATAL EXCEPTION|ANR in|isn.t responding|com\.ariai\.app' "$OUT/failure-${STEP_NO}-logcat.txt" | tail -25 | tr '\n' ' ' | cut -c1-1200 || true)"
+  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' | cut -c1-500 || true)"
+  if [[ -n "$relevant" ]]; then echo "::error title=Failure logcat::$relevant"; fi
+  if [[ -n "$activity" ]]; then echo "::error title=Foreground activity after failure::$activity"; fi
 }
 
 wait_for_text() {
