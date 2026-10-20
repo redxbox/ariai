@@ -2,9 +2,16 @@ name: Emulator smoke test
 
 on:
   push:
+    branches:
+      - arena/5f5dd5fd-ariai
     paths:
       - ".github/workflows/emulator-smoke.yml"
       - ".github/scripts/**"
+      - "app/**"
+      - "gradle/**"
+      - "gradlew"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
   workflow_dispatch:
 
 jobs:
