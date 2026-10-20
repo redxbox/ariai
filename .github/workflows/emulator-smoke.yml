@@ -50,7 +50,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            timeout --signal=TERM --kill-after=15s 35m bash .github/scripts/smoke.sh
+            timeout --signal=TERM --kill-after=15s 20m bash .github/scripts/smoke.sh
 
       - name: Upload screenshots and logs
         if: always()

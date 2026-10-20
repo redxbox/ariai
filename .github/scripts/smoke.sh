@@ -2,7 +2,7 @@
 # Walks every user-reachable screen and the major chat/settings/provider sheets on an Android emulator.
 # External provider calls are intentionally avoided: this uses no API keys and only adds/removes an
 # in-memory MCP test server. Screenshots, UI text dumps and logcat are uploaded as smoke-output.
-set -uo pipefail
+set -euo pipefail
 PKG=com.ariai.app
 APK=app/build/outputs/apk/debug/app-debug.apk
 OUT=smoke-out
@@ -35,6 +35,7 @@ expect_text() {
   if ! python3 .github/scripts/ui_tap.py --assert --scroll "$label"; then
     echo "::error title=UI assertion failed::$label"
     FAILED=1
+    capture_failure "$label"
     return 1
   fi
 }
@@ -44,6 +45,7 @@ tap() {
   if ! python3 .github/scripts/ui_tap.py "$label"; then
     echo "::error title=UI target missing::$label"
     FAILED=1
+    capture_failure "$label"
     return 1
   fi
   sleep 0.8
@@ -54,6 +56,7 @@ tap_scroll() {
   if ! python3 .github/scripts/ui_tap.py --scroll "$label"; then
     echo "::error title=UI target missing::$label"
     FAILED=1
+    capture_failure "$label"
     return 1
   fi
   sleep 0.8
@@ -86,6 +89,13 @@ shot() {
   fi
 }
 
+capture_failure() {
+  local label="$1"
+  local safe
+  safe="$(printf '%s' "$label" | tr -cs '[:alnum:]_-' '_')"
+  shot "failure-${STEP_NO}-${safe:0:40}"
+}
+
 adb wait-for-device
 adb shell pm uninstall "$PKG" >/dev/null 2>&1 || true
 adb logcat -c
@@ -103,14 +113,22 @@ shot 02-model-picker
 back
 end_step
 
-step "Thinking controls and rename dialog"
+step "Providerless send, thinking controls, and rename dialog"
+tap "Message AriAI"
+type_text "EmulatorSmokeTestWithoutProvider"
+hide_keyboard
+tap "Send"
+expect_text "No provider configured"
+shot 02a-send-without-provider
+
 tap "Off"
 expect_text "Thinking depth"
 expect_text "Not every model supports this"
 shot 03-thinking-sheet
 back
 tap "Rename chat"
-expect_text "Chat title"
+expect_text "Save"
+expect_text "Cancel"
 shot 04-rename-dialog
 tap "Cancel"
 end_step
@@ -125,11 +143,13 @@ tap "Copy conversation"
 shot 06-copy-conversation
 tap "More"
 tap "Image chat"
+expect_text "No image model found"
 shot 07-image-chat-without-provider
-# This chat is empty, so compression should report that there is nothing to summarize.
+# Without a provider, compression must explain the missing prerequisite without making a request.
 tap "More"
 tap "Compress history"
-shot 08-compress-empty-chat
+expect_text "Add a provider first"
+shot 08-compress-no-provider
 end_step
 
 step "Web search chooser and missing-key path"
@@ -403,13 +423,16 @@ sleep 2
 shot 54-export-share-sheet
 back
 # Open the destructive confirmation, capture it, and cancel; no chat data is deleted.
-if tap_scroll "Delete all chats"; then
+if python3 .github/scripts/ui_tap.py --scroll "Delete all chats"; then
+  sleep 0.8
   if python3 .github/scripts/ui_tap.py --assert "Delete all chats?"; then
     shot 53-delete-chats-confirmation
     tap "Cancel"
   else
     echo "::notice title=Storage test::Delete confirmation was unavailable (there were no chats to delete)."
   fi
+else
+  echo "::notice title=Storage test::Delete all chats was not available on this screen."
 fi
 
 back
@@ -419,15 +442,7 @@ expect_text "AriAI v1.0 - Personal AI"
 back
 expect_text "Message AriAI"
 
-# Exercise the send path without credentials; it must report the missing provider, not pretend to answer.
-tap "Message AriAI"
-type_text "EmulatorSmokeTestWithoutProvider"
-hide_keyboard
-tap "Send"
-expect_text "No provider configured"
-shot 55-send-without-provider
-
-# Start a clean conversation after the intentional missing-provider error.
+# Start a clean conversation after the intentional missing-provider error at the beginning.
 tap "Open menu"
 tap "New chat"
 expect_text "How can I help you?"

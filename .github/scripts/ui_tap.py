@@ -63,6 +63,22 @@ def is_visible(xml: str, label: str) -> bool:
     )
 
 
+def is_scrollable(xml: str) -> bool:
+    root = ET.fromstring(xml)
+    return any(node.get("scrollable", "false").casefold() == "true" for node in root.iter("node"))
+
+
+def visible_labels(xml: str, limit: int = 80) -> str:
+    root = ET.fromstring(xml)
+    labels = dict.fromkeys(
+        value
+        for node in root.iter("node")
+        for value in node_values(node)
+        if value
+    )
+    return " | ".join(list(labels)[:limit])
+
+
 def screen_size() -> tuple[int, int]:
     output = run_adb("shell", "wm", "size")
     match = re.search(r"(\d+)x(\d+)", output)
@@ -88,9 +104,11 @@ def main() -> int:
     label = " ".join(args.label)
     attempts = 7 if args.scroll else 1
 
+    last_xml = ""
     for attempt in range(attempts):
         try:
             xml = dump_xml()
+            last_xml = xml
             if args.assert_only:
                 if is_visible(xml, label):
                     print(f"VISIBLE: {label}")
@@ -105,11 +123,17 @@ def main() -> int:
             print(f"UI automation error for {label!r}: {error}", file=sys.stderr)
             return 2
 
-        if attempt + 1 < attempts:
+        # Never swipe a static screen/dialog: on Android that can trigger the system Home gesture.
+        # Only keep searching when the current accessibility tree exposes a real scroll container.
+        if attempt + 1 < attempts and args.scroll and is_scrollable(last_xml):
             scroll_page()
+        else:
+            break
 
     action = "not visible" if args.assert_only else "not found"
     print(f"{action}: {label}", file=sys.stderr)
+    if last_xml:
+        print(f"visible UI labels: {visible_labels(last_xml)}", file=sys.stderr)
     return 1
 
 
