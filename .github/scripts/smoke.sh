@@ -94,6 +94,32 @@ capture_failure() {
   local safe
   safe="$(printf '%s' "$label" | tr -cs '[:alnum:]_-' '_')"
   shot "failure-${STEP_NO}-${safe:0:40}"
+  adb logcat -d -t 500 > "$OUT/failure-${STEP_NO}-logcat.txt" || true
+  local relevant
+  relevant="$(grep -E 'FATAL EXCEPTION|ANR in|isn.t responding|com\.ariai\.app' "$OUT/failure-${STEP_NO}-logcat.txt" | tail -25 | tr '\n' ' ' | cut -c1-1500 || true)"
+  if [[ -n "$relevant" ]]; then echo "::notice title=Failure logcat::$relevant"; fi
+}
+
+wait_for_text() {
+  local label="$1"
+  local timeout_seconds="${2:-90}"
+  local deadline=$((SECONDS + timeout_seconds))
+  while (( SECONDS < deadline )); do
+    if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1; then
+      echo "VISIBLE after startup wait: $label"
+      return 0
+    fi
+    if python3 .github/scripts/ui_tap.py --assert "Pixel Launcher isn't responding" >/dev/null 2>&1; then
+      echo "::warning title=Emulator startup::Pixel Launcher stalled; asking Android to wait."
+      python3 .github/scripts/ui_tap.py "Wait" >/dev/null 2>&1 || true
+      sleep 5
+    else
+      sleep 2
+    fi
+  done
+  echo "::error title=UI startup timeout::$label was not visible within ${timeout_seconds}s"
+  capture_failure "$label"
+  return 1
 }
 
 adb wait-for-device
@@ -101,8 +127,10 @@ adb shell pm uninstall "$PKG" >/dev/null 2>&1 || true
 adb logcat -c
 adb install -r "$APK" | tee "$OUT/install.txt"
 grep -q Success "$OUT/install.txt" || { echo "install failed"; exit 1; }
-adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
-sleep 9
+adb shell am force-stop "$PKG"
+adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/launch.txt"
+wait_for_text "How can I help you?" 90
+shot 00-app-home
 
 step "Chat home and model picker"
 expect_text "How can I help you?"
