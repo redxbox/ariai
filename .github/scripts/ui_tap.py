@@ -85,24 +85,28 @@ def screen_size() -> tuple[int, int]:
     return (int(match.group(1)), int(match.group(2))) if match else (1080, 2400)
 
 
-def scroll_page() -> None:
+def scroll_page(up: bool = False) -> None:
     width, height = screen_size()
     x = width // 2
+    start_y, end_y = (0.32, 0.82) if up else (0.82, 0.32)
     run_adb(
-        "shell", "input", "swipe", str(x), str(int(height * 0.82)),
-        str(x), str(int(height * 0.32)), "350"
+        "shell", "input", "swipe", str(x), str(int(height * start_y)),
+        str(x), str(int(height * end_y)), "350"
     )
     time.sleep(0.35)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scroll", action="store_true", help="scroll down until the label is visible")
+    scroll = parser.add_mutually_exclusive_group()
+    scroll.add_argument("--scroll", action="store_true", help="scroll down until the label is visible")
+    scroll.add_argument("--scroll-up", action="store_true", help="scroll up until the label is visible")
     parser.add_argument("--assert", dest="assert_only", action="store_true", help="check visibility without tapping")
     parser.add_argument("label", nargs="+", help="visible text or content description")
     args = parser.parse_args()
     label = " ".join(args.label)
-    attempts = 7 if args.scroll else 1
+    should_scroll = args.scroll or args.scroll_up
+    attempts = 7 if should_scroll else 1
 
     last_xml = ""
     for attempt in range(attempts):
@@ -125,8 +129,8 @@ def main() -> int:
 
         # Never swipe a static screen/dialog: on Android that can trigger the system Home gesture.
         # Only keep searching when the current accessibility tree exposes a real scroll container.
-        if attempt + 1 < attempts and args.scroll and is_scrollable(last_xml):
-            scroll_page()
+        if attempt + 1 < attempts and should_scroll and is_scrollable(last_xml):
+            scroll_page(up=args.scroll_up)
         else:
             break
 

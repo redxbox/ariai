@@ -62,6 +62,17 @@ tap_scroll() {
   sleep 0.8
 }
 
+tap_scroll_up() {
+  local label="$1"
+  if ! python3 .github/scripts/ui_tap.py --scroll-up "$label"; then
+    echo "::error title=UI target missing::$label"
+    FAILED=1
+    capture_failure "$label"
+    return 1
+  fi
+  sleep 0.8
+}
+
 back() {
   adb shell input keyevent KEYCODE_BACK >/dev/null
   sleep 1
@@ -209,16 +220,19 @@ expect_text "Extensions"
 shot 12-attachment-sheet
 
 # Exercise the Android photo picker, document picker and camera intent, then cancel each one.
-tap "Photo"
+# The preceding checks leave the long attachment sheet scrolled near its bottom.
+tap_scroll_up "Photo"
 sleep 2
 shot 13-photo-picker
 back
 expect_text "Message AriAI"
+tap "Add to message"
 tap "Text file"
 sleep 2
 shot 14-document-picker
 back
 expect_text "Message AriAI"
+tap "Add to message"
 tap "Camera"
 sleep 3
 shot 15-camera-intent
@@ -228,7 +242,7 @@ expect_text "Message AriAI"
 # With no configured provider, these modes should fail safely with an explanatory notice.
 for mode in Image Video Audio; do
   tap "Add to message"
-  tap "$mode"
+  tap_scroll "$mode"
   sleep 1
   shot "16-generate-$mode-lacking-provider"
 done
@@ -236,7 +250,7 @@ end_step
 
 step "MCP extension screen and add/remove flow"
 tap "Add to message"
-tap "Extensions"
+tap_scroll "Extensions"
 expect_text "Model Context Protocol"
 expect_text "No MCP servers yet"
 shot 19-mcp-empty
