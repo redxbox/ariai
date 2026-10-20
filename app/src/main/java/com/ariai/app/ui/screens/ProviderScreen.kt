@@ -885,7 +885,10 @@ private fun AddModelSheet(
         shape = sheetShape,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 760.dp).navigationBarsPadding()
+            modifier = Modifier.fillMaxWidth()
+                .heightIn(max = 760.dp)
+                .fillMaxHeight(0.92f)
+                .navigationBarsPadding()
         ) {
             Text(
                 tx("Add model"),
@@ -896,7 +899,7 @@ private fun AddModelSheet(
             )
             // Scrollable body: long forms scroll, the footer below stays put.
             Column(
-                modifier = Modifier.weight(1f, fill = false).fillMaxWidth()
+                modifier = Modifier.weight(1f).fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)

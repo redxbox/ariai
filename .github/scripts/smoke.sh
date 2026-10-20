@@ -61,12 +61,16 @@ tap() {
 
 tap_exact() {
   local label="$1"
-  if ! python3 .github/scripts/ui_tap.py --exact "$label"; then
-    echo "::error title=Exact UI target missing::$label"
+  local output
+  if ! output="$(python3 .github/scripts/ui_tap.py --exact "$label" 2>&1)"; then
+    echo "$output"
+    local detail="${output//$'\n'/ | }"
+    echo "::error title=Exact UI target missing::${label}; ${detail:0:1200}"
     FAILED=1
     capture_failure "$label"
     return 1
   fi
+  echo "$output"
   sleep 0.8
 }
 
