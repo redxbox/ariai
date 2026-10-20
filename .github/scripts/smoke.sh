@@ -32,12 +32,16 @@ end_step() { echo "::endgroup::"; }
 
 expect_text() {
   local label="$1"
-  if ! python3 .github/scripts/ui_tap.py --assert --scroll "$label"; then
-    echo "::error title=UI assertion failed::$label"
+  local output
+  if ! output="$(python3 .github/scripts/ui_tap.py --assert --scroll "$label" 2>&1)"; then
+    echo "$output"
+    local detail="${output//$'\n'/ | }"
+    echo "::error title=UI assertion failed::${label}; ${detail:0:1200}"
     FAILED=1
     capture_failure "$label"
     return 1
   fi
+  echo "$output"
 }
 
 tap() {
@@ -128,7 +132,10 @@ wait_for_text() {
       sleep 2
     fi
   done
-  echo "::error title=UI startup timeout::$label was not visible within ${timeout_seconds}s"
+  local detail
+  detail="$(python3 .github/scripts/ui_tap.py --assert "$label" 2>&1 || true)"
+  detail="${detail//$'\n'/ | }"
+  echo "::error title=UI startup timeout::${label} was not visible within ${timeout_seconds}s; ${detail:0:1200}"
   capture_failure "$label"
   return 1
 }
@@ -225,19 +232,19 @@ tap_scroll_up "Photo"
 sleep 2
 shot 13-photo-picker
 back
-expect_text "Message AriAI"
+wait_for_text "Message AriAI" 20
 tap "Add to message"
 tap "Text file"
 sleep 2
 shot 14-document-picker
 back
-expect_text "Message AriAI"
+wait_for_text "Message AriAI" 20
 tap "Add to message"
 tap "Camera"
 sleep 3
 shot 15-camera-intent
 back
-expect_text "Message AriAI"
+wait_for_text "Message AriAI" 20
 
 # With no configured provider, these modes should fail safely with an explanatory notice.
 for mode in Image Video Audio; do
