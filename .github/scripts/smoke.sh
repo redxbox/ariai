@@ -7,8 +7,21 @@ PKG=com.ariai.app
 APK=app/build/outputs/apk/debug/app-debug.apk
 OUT=smoke-out
 mkdir -p "$OUT"
+exec > >(tee -a "$OUT/walkthrough.log") 2>&1
 FAILED=0
 STEP_NO=0
+
+# Keep ADB failures bounded so a wedged emulator command cannot stall the workflow indefinitely.
+adb() {
+  local seconds=90
+  if [[ "${1:-}" == "wait-for-device" ]]; then seconds=120; fi
+  local status=0
+  timeout --signal=TERM --kill-after=10s "${seconds}s" adb "$@" || status=$?
+  if [[ "$status" -ne 0 ]]; then
+    echo "::error title=ADB command failed::adb $* exited with status $status"
+  fi
+  return "$status"
+}
 
 step() {
   STEP_NO=$((STEP_NO + 1))
