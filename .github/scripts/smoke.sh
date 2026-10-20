@@ -436,11 +436,11 @@ tap "Advanced"
 expect_text "Extra headers for this model only"
 shot 34-add-model-advanced
 tap "Basic"
-tap "Add"
+tap_exact "Add"
+wait_for_text "Connection" 20
 expect_text "smoke-model"
 shot 35-unsaved-model-added
 
-wait_for_text "Connection" 20
 tap_exact "Connection"
 tap_scroll "Advanced"
 tap "Advanced"

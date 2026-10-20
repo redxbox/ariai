@@ -884,7 +884,9 @@ private fun AddModelSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 760.dp).navigationBarsPadding()
+        ) {
             Text(
                 tx("Add model"),
                 fontWeight = FontWeight.SemiBold,
