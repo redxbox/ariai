@@ -104,6 +104,31 @@ dismiss_external_picker() {
   back
 }
 
+return_to_chat_after_external() {
+  local origin="$1"
+  local activity
+  if python3 .github/scripts/ui_tap.py --assert "Message AriAI" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
+  if [[ "$activity" != *NexusLauncherActivity* ]]; then
+    dismiss_external_picker
+  fi
+  if python3 .github/scripts/ui_tap.py --assert "Message AriAI" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
+  if [[ "$activity" == *NexusLauncherActivity* ]]; then
+    echo "::warning title=External intent return::$origin did not return directly to AriAI; reopening the app to continue the walkthrough. Foreground: ${activity:0:400}"
+    adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/relaunch-after-${origin}.txt"
+    wait_for_text "Message AriAI" 30
+  else
+    wait_for_text "Message AriAI" 20
+  fi
+}
+
 hide_keyboard() {
   adb shell input keyevent KEYCODE_BACK >/dev/null
   sleep 0.5
@@ -272,12 +297,21 @@ fi
 wait_for_text "Message AriAI" 20
 expect_text "ui.xml"
 tap "Remove attachment"
-tap "Add to message"
-tap "Camera"
-sleep 3
-shot 15-camera-intent
-back
-wait_for_text "Message AriAI" 20
+camera_handler="$(adb shell cmd package resolve-activity --brief -a android.media.action.IMAGE_CAPTURE 2>&1 | tail -n1 || true)"
+if [[ -z "$camera_handler" || "$camera_handler" == *"No activity found"* ]]; then
+  echo "::warning title=Camera intent unavailable::No IMAGE_CAPTURE activity is installed in this emulator; checking the Camera tile only. Resolver: ${camera_handler:0:400}"
+  tap "Add to message"
+  expect_text "Camera"
+  shot 15-camera-unavailable
+  back
+  wait_for_text "Message AriAI" 20
+else
+  tap "Add to message"
+  tap "Camera"
+  sleep 3
+  shot 15-camera-intent
+  return_to_chat_after_external "Camera"
+fi
 
 # With no configured provider, these modes should fail safely with an explanatory notice.
 for mode in Image Video Audio; do
