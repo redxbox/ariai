@@ -53,7 +53,12 @@ fun SimpleMcpScreen(
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
-                title = { Text(tx("MCP servers"), fontWeight = FontWeight.SemiBold, color = Ink) }
+                title = { Text(tx("MCP servers"), fontWeight = FontWeight.SemiBold, color = Ink) },
+                actions = {
+                    IconButton(onClick = { showAdd = true }) {
+                        Icon(Icons.Default.Add, contentDescription = tx("Add server"), tint = Ink)
+                    }
+                }
             )
         },
         floatingActionButton = {
