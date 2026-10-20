@@ -239,7 +239,8 @@ expect_text "Compress history"
 expect_text "Extensions"
 shot 12-attachment-sheet
 
-# Exercise the Android photo picker, document picker and camera intent, then cancel each one.
+# Exercise the Android photo picker, document picker and camera intent; the document picker uses
+# the UI hierarchy file created by this smoke run, so no user data is accessed.
 # The preceding checks leave the long attachment sheet scrolled near its bottom.
 tap_scroll_up "Photo"
 sleep 2
@@ -250,8 +251,13 @@ tap "Add to message"
 tap "Text file"
 sleep 2
 shot 14-document-picker
-dismiss_external_picker
+tap "ui.xml"
+expect_text "Open"
+shot 14-document-selected
+tap "Open"
 wait_for_text "Message AriAI" 20
+expect_text "ui.xml"
+tap "Remove attachment"
 tap "Add to message"
 tap "Camera"
 sleep 3
