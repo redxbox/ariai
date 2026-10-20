@@ -879,6 +879,29 @@ private fun AddModelSheet(
     val bodyValid = isValidJsonObject(customBody)
     val isGemini = providerType == ProviderType.GEMINI
 
+    fun submitModel() {
+        val id = modelId.trim()
+        onAdd(
+            AIModel(
+                id = id,
+                displayName = displayName.trim().ifBlank { id },
+                providerId = providerId,
+                supportsVision = vision,
+                supportsFunctionCalling = tools,
+                supportsImageGen = isImage,
+                contextWindow = 8192,
+                isCustom = true,
+                outputsText = !isImage,
+                builtInTools = listOfNotNull(
+                    "google_search".takeIf { search && isGemini },
+                    "url_context".takeIf { urlContext && isGemini }
+                ),
+                headers = headers.filter { it.first.isNotBlank() }.toMap(),
+                customBody = customBody.trim().ifBlank { null }
+            )
+        )
+    }
+
     val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
@@ -890,14 +913,26 @@ private fun AddModelSheet(
                 .fillMaxHeight(0.92f)
                 .navigationBarsPadding()
         ) {
-            Text(
-                tx("Add model"),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                color = AriInk,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp)
-            )
-            // Scrollable body: long forms scroll, the footer below stays put.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    tx("Add model"),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    color = AriInk,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = { submitModel() },
+                    enabled = modelId.isNotBlank() && bodyValid,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AriInk),
+                    modifier = Modifier.height(44.dp)
+                ) { Text(tx("Add"), fontWeight = FontWeight.SemiBold) }
+            }
+            // Scrollable body: the add action stays reachable in the sheet header.
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth()
                     .verticalScroll(rememberScrollState())
@@ -965,37 +1000,6 @@ private fun AddModelSheet(
                 Spacer(Modifier.height(4.dp))
             }
 
-            // Fixed footer: always visible above the navigation bar.
-            Box(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                Button(
-                    onClick = {
-                        val id = modelId.trim()
-                        onAdd(
-                            AIModel(
-                                id = id,
-                                displayName = displayName.trim().ifBlank { id },
-                                providerId = providerId,
-                                supportsVision = vision,
-                                supportsFunctionCalling = tools,
-                                supportsImageGen = isImage,
-                                contextWindow = 8192,
-                                isCustom = true,
-                                outputsText = !isImage,
-                                builtInTools = listOfNotNull(
-                                    "google_search".takeIf { search && isGemini },
-                                    "url_context".takeIf { urlContext && isGemini }
-                                ),
-                                headers = headers.filter { it.first.isNotBlank() }.toMap(),
-                                customBody = customBody.trim().ifBlank { null }
-                            )
-                        )
-                    },
-                    enabled = modelId.isNotBlank() && bodyValid,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriInk),
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) { Text(tx("Add"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-            }
         }
     }
 }
