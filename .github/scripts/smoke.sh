@@ -46,12 +46,16 @@ expect_text() {
 
 tap() {
   local label="$1"
-  if ! python3 .github/scripts/ui_tap.py "$label"; then
-    echo "::error title=UI target missing::$label"
+  local output
+  if ! output="$(python3 .github/scripts/ui_tap.py "$label" 2>&1)"; then
+    echo "$output"
+    local detail="${output//$'\n'/ | }"
+    echo "::error title=UI target missing::${label}; ${detail:0:1200}"
     FAILED=1
     capture_failure "$label"
     return 1
   fi
+  echo "$output"
   sleep 0.8
 }
 
@@ -436,7 +440,8 @@ tap "Add"
 expect_text "smoke-model"
 shot 35-unsaved-model-added
 
-tap "Connection"
+wait_for_text "Connection" 20
+tap_exact "Connection"
 tap_scroll "Advanced"
 tap "Advanced"
 expect_text "Custom headers"
