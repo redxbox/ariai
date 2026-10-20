@@ -18,12 +18,14 @@ import java.net.URI
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
-private val PUBLIC_ADDRESS_DNS = Dns { hostname ->
-    val addresses = InetAddress.getAllByName(hostname).toList()
-    if (addresses.isEmpty() || addresses.any { !isPublicInternetAddress(it) }) {
-        throw UnknownHostException("URL host resolved to a non-public IP address")
+private val PUBLIC_ADDRESS_DNS = object : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        val addresses = InetAddress.getAllByName(hostname).toList()
+        if (addresses.isEmpty() || addresses.any { !isPublicInternetAddress(it) }) {
+            throw UnknownHostException("URL host resolved to a non-public IP address")
+        }
+        return addresses
     }
-    addresses
 }
 
 private fun isPublicInternetAddress(address: InetAddress): Boolean {
