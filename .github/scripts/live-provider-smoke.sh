@@ -401,8 +401,17 @@ live_wait_for_text "Providers" 45
 live_wait_for_text "Custom" 45
 adb_quiet shell input keyevent KEYCODE_BACK
 live_wait_for_text "How can I help you?" 45
-review_prompt='Review only the branch named by the URL below. First call github_list_files. Then read GitHubRepositoryClient.kt, DefaultAgentTools.kt, MainActivity.kt and ChatRepository.kt from the returned tree with github_read_file. You may try AppViewModel.kt once, but if it exceeds the reader limit, skip it and do not guess. In Persian, provide at most three high-impact concrete findings, under 350 words total. For each, cite an exact path and symbol or one short code line, explain impact, give a minimal fix and a regression test. State the exact ref and at least one successfully read path. If a tool fails, say so. Do not infer beyond returned source. Repository URL: https://github.com/redxbox/ariai?ref=arena%2F5f5dd5fd-ariai'
 review_repo_url='https://github.com/redxbox/ariai?ref=arena%2F5f5dd5fd-ariai'
+review_prompt="You are performing a source-based review now. Do not acknowledge the request, ask a question, or ask me to provide files or a URL; the GitHub tools and repository URL are available. Immediately call github_list_files for the URL below, then use github_read_file on GitHubRepositoryClient.kt, DefaultAgentTools.kt, MainActivity.kt, and ChatRepository.kt from that tree. Try AppViewModel.kt only once; if it exceeds the reader limit, skip it and do not guess. In Persian, report at most three high-impact concrete findings, under 350 words total. Each finding must cite an exact path and symbol or short code line, explain impact, propose a minimal fix, and name a regression test. Start by stating the exact ref and at least one path actually read. If a tool fails, say so. Do not infer beyond returned source. URL: $review_repo_url"
+review_retry_prompt="Your previous reply omitted the required exact ref and/or a source path. Complete the review now; do not ask for clarification or for files or URL. Call github_list_files on this exact URL and use github_read_file to inspect GitHubRepositoryClient.kt and ChatRepository.kt; read any other requested file only if budget permits. In Persian, return at most three high-impact findings with path/symbol, impact, minimal fix, and regression test. State the exact ref, at least one path actually read, and any tool failure. Do not guess. URL: $review_repo_url"
+review_has_source_evidence() {
+  local response="$1"
+  [[ "$response" == *"arena/5f5dd5fd-ariai"* && \
+     ( "$response" == *"GitHubRepositoryClient.kt"* ||
+       "$response" == *"DefaultAgentTools.kt"* ||
+       "$response" == *"ChatRepository.kt"* ||
+       "$response" == *"MainActivity.kt"* ) ]]
+}
 mkdir -p smoke-out
 completed_review_count=0
 verified_review_count=0
@@ -420,37 +429,54 @@ for model_index in 0 1; do
 
   printf 'Starting independent review %d with selected model ID: %s\n' "$review_number" "$model_id"
   select_review_model "$model_id"
-  live_tap "Message AriAI"
-  enter_text "$review_prompt" "branch review prompt"
-  if ! live_assert "$review_repo_url"; then
-    echo "::error title=Live GitHub research::The complete feature-branch URL was not visible in the composed request; nothing was sent."
-    exit 1
-  fi
-  adb_quiet shell input keyevent KEYCODE_BACK
-  request_started_at="$(date +%s%3N)"
-  live_tap "Send"
-
-  # Scope extraction to messages created after this turn starts so a prior model's answer cannot pass.
-  research_deadline=$((SECONDS + 600))
   research_response=""
-  while (( SECONDS < research_deadline )); do
-    if ! live_assert "Stop"; then
-      candidate="$(extract_latest_assistant "$request_started_at" 2>/dev/null || true)"
-      if [[ -n "$candidate" ]]; then
-        research_response="$candidate"
-        break
-      fi
+  model_deadline=$((SECONDS + 720))
+  for attempt in 1 2; do
+    if (( attempt == 1 )); then
+      turn_prompt="$review_prompt"
+    else
+      echo "::warning title=Review retry $review_number::The first reply omitted the required ref/source evidence; asking this model once to complete the review."
+      turn_prompt="$review_retry_prompt"
     fi
-    sleep 3
+
+    live_tap "Message AriAI"
+    enter_text "$turn_prompt" "branch review prompt, attempt $attempt"
+    if ! live_assert "$review_repo_url"; then
+      echo "::error title=Live GitHub research::The complete feature-branch URL was not visible in the composed request; nothing was sent."
+      exit 1
+    fi
+    adb_quiet shell input keyevent KEYCODE_BACK
+    request_started_at="$(date +%s%3N)"
+    live_tap "Send"
+
+    # Scope extraction to messages created after this turn starts so a prior model's answer cannot pass.
+    research_response=""
+    while (( SECONDS < model_deadline )); do
+      if ! live_assert "Stop"; then
+        candidate="$(extract_latest_assistant "$request_started_at" 2>/dev/null || true)"
+        if [[ -n "$candidate" ]]; then
+          research_response="$candidate"
+          break
+        fi
+      fi
+      sleep 3
+    done
+    if [[ -z "$research_response" ]]; then
+      echo "::error title=Live provider test::No completed review reply was saved within the 12-minute per-model window."
+      exit 1
+    fi
+    research_response="$(extract_latest_assistant "$request_started_at" 2>/dev/null)" || {
+      echo "::error title=Live provider test::The completed review reply could not be read from the temporary messages-only snapshot."
+      exit 1
+    }
+    printf '%s\n' "$research_response" > "smoke-out/live-research-review-${review_number}-attempt-${attempt}.txt"
+    if review_has_source_evidence "$research_response"; then
+      break
+    fi
+    if (( attempt == 2 )); then
+      echo "::warning title=Review source evidence $review_number::The model's final response did not prove it reviewed the requested feature-branch ref."
+    fi
   done
-  if [[ -z "$research_response" ]]; then
-    echo "::error title=Live provider test::No completed review reply was saved within 10 minutes."
-    exit 1
-  fi
-  research_response="$(extract_latest_assistant "$request_started_at" 2>/dev/null)" || {
-    echo "::error title=Live provider test::The completed review reply could not be read from the temporary messages-only snapshot."
-    exit 1
-  }
 
   review_file="smoke-out/live-research-review-${review_number}.txt"
   printf '%s\n' "$research_response" > "$review_file"
@@ -470,11 +496,7 @@ for model_index in 0 1; do
   done
   unset annotation_parts
 
-  if [[ "$research_response" == *"arena/5f5dd5fd-ariai"* && \
-        ( "$research_response" == *"GitHubRepositoryClient.kt"* ||
-          "$research_response" == *"DefaultAgentTools.kt"* ||
-          "$research_response" == *"ChatRepository.kt"* ||
-          "$research_response" == *"MainActivity.kt"* ) ]]; then
+  if review_has_source_evidence "$research_response"; then
     verified_review_count=$((verified_review_count + 1))
     echo "::notice title=Review source evidence $review_number::The response states the requested ref and cites a source file."
   else
@@ -482,15 +504,21 @@ for model_index in 0 1; do
   fi
 done
 
-printf '%s\n' "$completed_review_count/$expected_review_count" > smoke-out/live-review-count.txt
+printf 'completed=%s/%s\nsource_evidence=%s/%s\n' \\
+  "$completed_review_count" "$expected_review_count" \\
+  "$verified_review_count" "$expected_review_count" > smoke-out/live-review-count.txt
 if (( completed_review_count != expected_review_count )); then
   echo "::error title=Live GitHub research::Completed $completed_review_count of $expected_review_count independent model reviews."
   exit 1
 fi
-echo "::notice title=Live GitHub research::Completed $completed_review_count independent model reviews; $verified_review_count cited the target ref and a source file."
+if (( verified_review_count != expected_review_count )); then
+  echo "::error title=Live GitHub research::Only $verified_review_count of $expected_review_count reviews cited both the exact target ref and a requested source file."
+  exit 1
+fi
+echo "::notice title=Live GitHub research::Completed $completed_review_count independent model reviews; every response cited the target ref and a source file."
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-  printf '\n**Independent reviews completed:** %d/%d. **Responses with target-ref/source evidence:** %d.\n' \\
-    "$completed_review_count" "$expected_review_count" "$verified_review_count" >> "$GITHUB_STEP_SUMMARY"
+  printf '\n**Independent reviews completed:** %d/%d. **Responses with target-ref/source evidence:** %d/%d.\n' \\
+    "$completed_review_count" "$expected_review_count" "$verified_review_count" "$expected_review_count" >> "$GITHUB_STEP_SUMMARY"
 fi
 
 # Clear the temporary provider/key before the main smoke script's final process check.

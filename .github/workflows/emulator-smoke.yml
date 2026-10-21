@@ -18,7 +18,7 @@ jobs:
   smoke:
     name: Run app walkthrough or isolated live provider test
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 
@@ -41,7 +41,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run app on emulator
-        timeout-minutes: 30
+        timeout-minutes: 33
         uses: reactivecircus/android-emulator-runner@v2
         env:
           # Only expose the API key when a push commit message contains [live-api-test]; ordinary runs get no key.
@@ -56,7 +56,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            timeout --signal=TERM --kill-after=15s 25m bash .github/scripts/smoke.sh
+            timeout --signal=TERM --kill-after=15s 28m bash .github/scripts/smoke.sh
 
       - name: Upload screenshots and logs
         if: always()
