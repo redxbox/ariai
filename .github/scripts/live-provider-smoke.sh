@@ -452,7 +452,15 @@ for model_index in 0 1; do
     exit 1
   }
 
-  printf '%s\n' "$research_response" > "smoke-out/live-research-review-${review_number}.txt"
+  review_file="smoke-out/live-research-review-${review_number}.txt"
+  printf '%s\n' "$research_response" > "$review_file"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    {
+      printf '\n## Independent review %d — %s\n\n' "$review_number" "$safe_model_id"
+      cat "$review_file"
+      printf '\n\n'
+    } >> "$GITHUB_STEP_SUMMARY"
+  fi
   completed_review_count=$((completed_review_count + 1))
   annotation_parts=()
   mapfile -t annotation_parts < <(printf '%s' "$research_response" | python3 -c 'import sys; text=sys.stdin.read().replace("\t", " "); chunks=[text[i:i+1000] for i in range(0, len(text), 1000)] or ["(empty reply)"]; print("\n".join(chunk.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A") for chunk in chunks))')
@@ -480,6 +488,10 @@ if (( completed_review_count != expected_review_count )); then
   exit 1
 fi
 echo "::notice title=Live GitHub research::Completed $completed_review_count independent model reviews; $verified_review_count cited the target ref and a source file."
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  printf '\n**Independent reviews completed:** %d/%d. **Responses with target-ref/source evidence:** %d.\n' \\
+    "$completed_review_count" "$expected_review_count" "$verified_review_count" >> "$GITHUB_STEP_SUMMARY"
+fi
 
 # Clear the temporary provider/key before the main smoke script's final process check.
 if ! cleanup_live_test; then
