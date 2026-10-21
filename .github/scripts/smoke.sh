@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Walks every user-reachable screen and the major chat/settings/provider sheets on an Android emulator.
-# External provider calls are intentionally avoided: this uses no API keys and only adds/removes an
-# in-memory MCP test server. Screenshots, UI text dumps and logcat are uploaded as smoke-output.
+# External provider calls are skipped by default. A one-shot commit-message gate can opt into a live
+# RadoxAI-compatible model-list/chat test; its key is never written to screenshots, UI dumps or logs.
 set -euo pipefail
+# Keep the Actions secret out of every ordinary adb/logging subprocess; pass it only to the
+# isolated live-test helper after the providerless walkthrough has completed.
+LIVE_API_KEY="${ARIAI_TEST_API_KEY:-}"
+unset ARIAI_TEST_API_KEY
 PKG=com.ariai.app
 APK=app/build/outputs/apk/debug/app-debug.apk
 OUT=smoke-out
@@ -571,6 +575,18 @@ tap "New chat"
 expect_text "How can I help you?"
 shot 56-new-chat-from-drawer
 end_step
+
+if [[ "${ARIAI_LIVE_API_TEST:-false}" == "true" ]]; then
+  step "One-shot RadoxAI-compatible live provider test"
+  live_status=0
+  ARIAI_TEST_API_KEY="$LIVE_API_KEY" bash .github/scripts/live-provider-smoke.sh || live_status=$?
+  unset LIVE_API_KEY
+  if (( live_status != 0 )); then exit "$live_status"; fi
+  end_step
+else
+  unset LIVE_API_KEY
+  echo "Live provider test skipped (no one-shot commit-message opt-in)."
+fi
 
 step "Final process and crash check"
 adb logcat -d > "$OUT/logcat.txt"
