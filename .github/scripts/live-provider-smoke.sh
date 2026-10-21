@@ -278,17 +278,13 @@ review_models_raw="$(discover_review_models)" || {
 }
 REVIEW_MODELS=()
 mapfile -t REVIEW_MODELS <<<"$review_models_raw"
-if ((${#REVIEW_MODELS[@]} == 0)); then
+if ((${#REVIEW_MODELS[@]} < 2)); then
   unset API_KEY
-  echo "::error title=Live provider test::The provider returned no selectable text models."
+  echo "::error title=Live provider test::At least two selectable text models are required for independent reviews."
   exit 1
 fi
 safe_selected_models="$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9._/-]+", "_", sys.stdin.read()).strip("_"))' <<<"${REVIEW_MODELS[*]}")"
-if ((${#REVIEW_MODELS[@]} < 2)); then
-  echo "::warning title=RadoxAI model selection::Only one text model was available: $safe_selected_models"
-else
-  echo "::notice title=RadoxAI model selection::Selected two highest-ranked available text models: $safe_selected_models"
-fi
+echo "::notice title=RadoxAI model selection::Selected two highest-ranked available text models: $safe_selected_models"
 unset review_models_raw
 
 # Read only the latest assistant message from the disposable debug app database. Database snapshots
@@ -407,10 +403,14 @@ live_wait_for_text "How can I help you?" 45
 review_prompt='Review only the branch named by the URL below. First call github_list_files. Then read GitHubRepositoryClient.kt, DefaultAgentTools.kt, MainActivity.kt and ChatRepository.kt from the returned tree with github_read_file. You may try AppViewModel.kt once, but if it exceeds the reader limit, skip it and do not guess. In Persian, provide at most three high-impact concrete findings, under 350 words total. For each, cite an exact path and symbol or one short code line, explain impact, give a minimal fix and a regression test. State the exact ref and at least one successfully read path. If a tool fails, say so. Do not infer beyond returned source. Repository URL: https://github.com/redxbox/ariai?ref=arena%2F5f5dd5fd-ariai'
 review_repo_url='https://github.com/redxbox/ariai?ref=arena%2F5f5dd5fd-ariai'
 mkdir -p smoke-out
+completed_review_count=0
+verified_review_count=0
 
 for model_index in "${!REVIEW_MODELS[@]}"; do
   model_id="${REVIEW_MODELS[$model_index]}"
   review_number=$((model_index + 1))
+  safe_model_id="$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9._/-]+", "_", sys.stdin.read()).strip("_"))' <<<"$model_id" | cut -c1-60)"
+  echo "::notice title=Review loop::Starting independent review $review_number/${#REVIEW_MODELS[@]} with model $safe_model_id"
   if (( model_index > 0 )); then
     live_tap "Open menu"
     live_tap "New chat"
@@ -452,7 +452,7 @@ for model_index in "${!REVIEW_MODELS[@]}"; do
   }
 
   printf '%s\n' "$research_response" > "smoke-out/live-research-review-${review_number}.txt"
-  safe_model_id="$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9._/-]+", "_", sys.stdin.read()).strip("_"))' <<<"$model_id" | cut -c1-60)"
+  completed_review_count=$((completed_review_count + 1))
   annotation_parts=()
   mapfile -t annotation_parts < <(printf '%s' "$research_response" | python3 -c 'import sys; text=sys.stdin.read().replace("\t", " "); chunks=[text[i:i+1000] for i in range(0, len(text), 1000)] or ["(empty reply)"]; print("\n".join(chunk.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A") for chunk in chunks))')
   for part_index in "${!annotation_parts[@]}"; do
@@ -462,14 +462,22 @@ for model_index in "${!REVIEW_MODELS[@]}"; do
   unset annotation_parts
 
   if [[ "$research_response" == *"arena/5f5dd5fd-ariai"* && \
-        ( "$research_response" == *"app/src/main/java/com/ariai/app/data/remote/GitHubRepositoryClient.kt"* ||
-          "$research_response" == *"app/src/main/java/com/ariai/app/data/repository/ChatRepository.kt"* ||
-          "$research_response" == *"app/src/main/java/com/ariai/app/MainActivity.kt"* ) ]]; then
-    echo "::notice title=Review source evidence $review_number::The response states the requested ref and cites concrete source paths."
+        ( "$research_response" == *"GitHubRepositoryClient.kt"* ||
+          "$research_response" == *"DefaultAgentTools.kt"* ||
+          "$research_response" == *"ChatRepository.kt"* ||
+          "$research_response" == *"MainActivity.kt"* ) ]]; then
+    verified_review_count=$((verified_review_count + 1))
+    echo "::notice title=Review source evidence $review_number::The response states the requested ref and cites a source file."
   else
     echo "::warning title=Review source evidence $review_number::The response did not prove it reviewed the requested feature-branch ref; inspect it before applying its findings."
   fi
 done
+
+if (( completed_review_count != ${#REVIEW_MODELS[@]} )); then
+  echo "::error title=Live GitHub research::Completed $completed_review_count of ${#REVIEW_MODELS[@]} independent model reviews."
+  exit 1
+fi
+echo "::notice title=Live GitHub research::Completed $completed_review_count independent model reviews; $verified_review_count cited the target ref and a source file."
 
 # Clear the temporary provider/key before the main smoke script's final process check.
 if ! cleanup_live_test; then
