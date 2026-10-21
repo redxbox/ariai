@@ -10,6 +10,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URI
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
@@ -24,12 +25,14 @@ class GitHubRepositoryClient {
         .build()
     private val branchCache = ConcurrentHashMap<String, String>()
 
-    data class Repository(val owner: String, val name: String) {
+    data class Repository(val owner: String, val name: String, val ref: String? = null) {
         init {
             require(isRepositoryComponent(owner) && isRepositoryComponent(name)) { "Invalid GitHub repository identity" }
+            require(ref == null || isSafeRef(ref)) { "Invalid GitHub reference" }
         }
 
         val key: String get() = "$owner/$name"
+        val cacheKey: String get() = "$key@${ref.orEmpty()}"
 
         companion object {
             fun fromUserText(text: String): Repository? {
@@ -43,21 +46,39 @@ class GitHubRepositoryClient {
                 val owner = parts[0]
                 val name = parts[1].removeSuffix(".git")
                 if (!isRepositoryComponent(owner) || !isRepositoryComponent(name)) return null
-                return Repository(owner, name)
+
+                val refParams = uri.rawQuery.orEmpty().split('&').mapNotNull { parameter ->
+                    val key = decodeQueryComponent(parameter.substringBefore('=')) ?: return@mapNotNull null
+                    if (!key.equals("ref", ignoreCase = true)) return@mapNotNull null
+                    decodeQueryComponent(parameter.substringAfter('=', missingDelimiterValue = ""))
+                }
+                if (uri.rawQuery.orEmpty().split('&').any { parameter ->
+                        (decodeQueryComponent(parameter.substringBefore('=')) ?: "").equals("ref", ignoreCase = true)
+                    } && (refParams.size != 1 || !isSafeRef(refParams.single()))) return null
+                val pathRef = parts.getOrNull(3).takeIf { parts.size >= 4 && parts[2].equals("tree", ignoreCase = true) }
+                val ref = refParams.singleOrNull() ?: pathRef
+                if (ref != null && !isSafeRef(ref)) return null
+                return Repository(owner, name, ref)
             }
 
             private val OWNER_OR_REPO = Regex("^[A-Za-z0-9_.-]{1,100}$")
+            private val SAFE_REF_CHARS = Regex("^[A-Za-z0-9._/-]{1,200}$")
 
             private fun isRepositoryComponent(value: String): Boolean =
                 OWNER_OR_REPO.matches(value) && value != "." && value != ".."
+
+            private fun isSafeRef(value: String): Boolean =
+                SAFE_REF_CHARS.matches(value) && !value.startsWith('/') && !value.endsWith('/') && !value.endsWith('.') &&
+                    !value.contains("..") && !value.contains("//") &&
+                    value.split('/').none { it.isBlank() || it == "." || it == ".." || it.endsWith(".lock") }
+
+            private fun decodeQueryComponent(value: String): String? =
+                runCatching { URLDecoder.decode(value, Charsets.UTF_8.name()) }.getOrNull()
         }
     }
 
     suspend fun listFiles(repository: Repository, rawPathPrefix: String? = null): String {
-        val repoJson = getJson("https://api.github.com/repos/${repository.owner}/${repository.name}")
-        val branch = repoJson.optString("default_branch").takeIf { it.isNotBlank() }
-            ?: throw IOException("GitHub did not report a default branch")
-        branchCache[repository.key] = branch
+        val branch = resolveReference(repository)
         val encodedBranch = encodePathSegment(branch)
         val treeJson = getJson("https://api.github.com/repos/${repository.owner}/${repository.name}/git/trees/$encodedBranch?recursive=1")
         val tree = treeJson.optJSONArray("tree") ?: JSONArray()
@@ -76,7 +97,7 @@ class GitHubRepositoryClient {
         val cap = 200
         return buildString {
             appendLine("Public repository: ${repository.key}")
-            appendLine("Default branch: $branch")
+            appendLine(if (repository.ref == null) "Default branch: $branch" else "Requested ref: $branch")
             appendLine("Files in tree: ${paths.size}${if (treeJson.optBoolean("truncated")) " (GitHub truncated the tree)" else ""}")
             var displayed = 0
             for (path in paths.take(cap)) {
@@ -105,9 +126,7 @@ class GitHubRepositoryClient {
         }
         if (containsSensitivePath) throw IOException("Sensitive files are not available through the repository reader")
 
-        val branch = branchCache[repository.key] ?: getJson("https://api.github.com/repos/${repository.owner}/${repository.name}")
-            .optString("default_branch").also { if (it.isNotBlank()) branchCache[repository.key] = it }
-        if (branch.isBlank()) throw IOException("GitHub did not report a default branch")
+        val branch = resolveReference(repository)
         val encodedPath = path.split('/').joinToString("/") { encodePathSegment(it) }
         val encodedRef = URLEncoder.encode(branch, Charsets.UTF_8.name()).replace("+", "%20")
         val content = getJson("https://api.github.com/repos/${repository.owner}/${repository.name}/contents/$encodedPath?ref=$encodedRef")
@@ -129,6 +148,19 @@ class GitHubRepositoryClient {
             append(text.take(MAX_FILE_CHARS))
             if (text.length > MAX_FILE_CHARS) append("\n[File truncated at $MAX_FILE_CHARS characters]")
         }
+    }
+
+    private suspend fun resolveReference(repository: Repository): String {
+        repository.ref?.let { requested ->
+            branchCache[repository.cacheKey] = requested
+            return requested
+        }
+        branchCache[repository.cacheKey]?.takeIf { it.isNotBlank() }?.let { return it }
+        val defaultBranch = getJson("https://api.github.com/repos/${repository.owner}/${repository.name}")
+            .optString("default_branch").takeIf { it.isNotBlank() }
+            ?: throw IOException("GitHub did not report a default branch")
+        branchCache[repository.cacheKey] = defaultBranch
+        return defaultBranch
     }
 
     private suspend fun getJson(url: String): JSONObject {

@@ -107,10 +107,190 @@ enter_secret() {
   sleep 0.4
 }
 
+select_review_model() {
+  local model_id="$1"
+  live_tap "Open models"
+  live_wait_for_text "Search models" 30
+  live_tap "Search models"
+  # The picker may retain a previous query within a chat; clear it before typing this exact model ID.
+  adb_quiet shell input keyevent 113 29 67 || true
+  enter_text "$model_id"
+  adb_quiet shell input keyevent KEYCODE_BACK
+  if ! python3 - "$model_id" <<'PY'
+import re
+import subprocess
+import sys
+import time
+import xml.etree.ElementTree as ET
+
+wanted = sys.argv[1].casefold()
+for _ in range(20):
+    try:
+        subprocess.run(
+            ["adb", "shell", "uiautomator", "dump", "/sdcard/live-provider.xml"],
+            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=25
+        )
+        xml = subprocess.run(
+            ["adb", "shell", "cat", "/sdcard/live-provider.xml"],
+            check=True, capture_output=True, text=True, timeout=25
+        ).stdout
+        candidates = []
+        for node in ET.fromstring(xml).iter("node"):
+            label = node.get("text", "").strip()
+            class_name = node.get("class", "").lower()
+            if not label or "edittext" in class_name or "autocompletetextview" in class_name:
+                continue
+            if node.get("visible-to-user", "true").casefold() == "false":
+                continue
+            if wanted in label.casefold():
+                match = re.search(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
+                if match:
+                    x1, y1, x2, y2 = map(int, match.groups())
+                    if x2 > x1 and y2 > y1:
+                        candidates.append((node.get("clickable") == "true", x1, y1, x2, y2))
+        if candidates:
+            candidates.sort(reverse=True)
+            _, x1, y1, x2, y2 = candidates[0]
+            subprocess.run(
+                ["adb", "shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2)],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20
+            )
+            sys.exit(0)
+    except Exception:
+        pass
+    time.sleep(1)
+sys.exit(1)
+PY
+  then
+    echo "::error title=Live provider test::The selected model ID did not appear as a selectable row; UI details were suppressed."
+    return 1
+  fi
+  live_wait_for_text "Message AriAI" 30
+}
+
+# Discover only public model IDs; the credential is passed through the child environment and never printed.
+discover_review_models() {
+  ARIAI_REVIEW_API_KEY="$API_KEY" python3 - "$BASE_URL" <<'PY'
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+
+base = sys.argv[1].rstrip("/")
+key = os.environ.get("ARIAI_REVIEW_API_KEY", "")
+if not base or not key:
+    raise SystemExit(1)
+request = urllib.request.Request(
+    base + "/models",
+    headers={
+        "Accept": "application/json",
+        "Authorization": "Bearer " + key,
+        "User-Agent": "AriAI-Android",
+    },
+)
+try:
+    with urllib.request.urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read())
+except urllib.error.HTTPError as error:
+    print(f"Model catalog request returned HTTP {error.code}; credential details suppressed.", file=sys.stderr)
+    raise SystemExit(1)
+except Exception:
+    print("Could not read the model catalog; response details suppressed.", file=sys.stderr)
+    raise SystemExit(1)
+if not isinstance(payload, dict):
+    print("The model catalog had an unexpected response shape.", file=sys.stderr)
+    raise SystemExit(1)
+
+items = payload.get("data") or payload.get("models") or []
+if not isinstance(items, list):
+    raise SystemExit(1)
+ranked = []
+positive = {
+    "opus": 140, "gpt-5": 130, "gpt5": 130, "gemini-3-pro": 130,
+    "gemini-2.5-pro": 120, "deepseek-r1": 115, "qwen3-235b": 115,
+    "claude-4": 110, "gpt-4.1": 100, "gpt-4.5": 100, "deepseek-v3": 95,
+    "gemini-2.0-pro": 90, "gpt-4o": 85, "claude-3.7": 85,
+    "claude-3-7": 85, "claude-3.5": 70, "claude-3-5": 70,
+    "qwen2.5-72b": 80, "llama-3.3-70b": 75, "mistral-large": 75,
+    "405b": 105, "235b": 100, "reasoner": 100, "reasoning": 90,
+    "o3-pro": 105, "o3": 95, "o4": 95, "gemini-pro": 90,
+    "sonnet": 75, "max": 65, "70b": 65, "72b": 65, "pro": 50, "large": 35,
+}
+negative = {
+    "embedding": 100, "embed": 100, "moderation": 100, "whisper": 90,
+    "tts": 90, "audio": 80, "image": 80, "video": 80,
+    "mini": 45, "flash": 45, "haiku": 40, "lite": 40, "nano": 50,
+    "small": 35, "instant": 30, "fast": 25, "8b": 15, "7b": 20,
+}
+for position, item in enumerate(items):
+    if isinstance(item, str):
+        model_id = item
+        metadata = {}
+    elif isinstance(item, dict):
+        model_id = str(item.get("id", ""))
+        metadata = item
+    else:
+        continue
+    model_id = model_id.strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,200}", model_id):
+        continue
+    low = model_id.lower()
+    modalities = metadata.get("output_modalities") or metadata.get("modalities")
+    if isinstance(modalities, list) and modalities and not any(str(value).lower() == "text" for value in modalities):
+        continue
+    score = sum(points for token, points in positive.items() if token in low)
+    score -= sum(points for token, points in negative.items() if token in low)
+    context = metadata.get("context_length") or metadata.get("context_window") or metadata.get("max_input_tokens") or 0
+    try:
+        score += min(30, int(context) // 32_000)
+    except (TypeError, ValueError):
+        pass
+    ranked.append((score, -position, model_id))
+
+ranked.sort(reverse=True)
+selected = []
+seen = set()
+for _, _, model_id in ranked:
+    if model_id not in seen:
+        selected.append(model_id)
+        seen.add(model_id)
+    if len(selected) == 2:
+        break
+if not selected:
+    print("No text-capable models were listed by the provider.", file=sys.stderr)
+    raise SystemExit(1)
+for model_id in selected:
+    print(model_id)
+PY
+}
+
+review_models_raw="$(discover_review_models)" || {
+  unset API_KEY
+  echo "::error title=Live provider test::Could not discover selectable text models; response and credential details were suppressed."
+  exit 1
+}
+REVIEW_MODELS=()
+mapfile -t REVIEW_MODELS <<<"$review_models_raw"
+if ((${#REVIEW_MODELS[@]} == 0)); then
+  unset API_KEY
+  echo "::error title=Live provider test::The provider returned no selectable text models."
+  exit 1
+fi
+safe_selected_models="$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9._/-]+", "_", sys.stdin.read()).strip("_"))' <<<"${REVIEW_MODELS[*]}")"
+if ((${#REVIEW_MODELS[@]} < 2)); then
+  echo "::warning title=RadoxAI model selection::Only one text model was available: $safe_selected_models"
+else
+  echo "::notice title=RadoxAI model selection::Selected two highest-ranked available text models: $safe_selected_models"
+fi
+unset review_models_raw
+
 # Read only the latest assistant message from the disposable debug app database. Database snapshots
 # stay under /tmp, are deleted immediately, and never include provider rows in logs or artifacts.
 extract_latest_assistant() (
   set -euo pipefail
+  local cutoff="${1:-0}"
   local snapshot
   snapshot="$(mktemp -d /tmp/ariai-research-db.XXXXXX)"
   trap 'rm -rf "$snapshot"' EXIT
@@ -120,7 +300,7 @@ extract_latest_assistant() (
       rm -f "$snapshot/ariai_db$suffix"
     fi
   done
-  python3 - "$snapshot/ariai_db" <<'PY'
+  python3 - "$snapshot/ariai_db" "$cutoff" <<'PY'
 import sqlite3
 import sys
 
@@ -128,7 +308,8 @@ try:
     connection = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True, timeout=5)
     row = connection.execute(
         "SELECT content FROM messages WHERE role = 'ASSISTANT' "
-        "AND TRIM(content) <> '' ORDER BY timestamp DESC LIMIT 1"
+        "AND TRIM(content) <> '' AND timestamp > ? ORDER BY timestamp DESC, rowid DESC LIMIT 1",
+        (int(sys.argv[2]),),
     ).fetchone()
     connection.close()
     if not row or not row[0].strip():
@@ -218,93 +399,65 @@ live_wait_for_text "Providers" 45
 live_wait_for_text "Custom" 45
 adb_quiet shell input keyevent KEYCODE_BACK
 live_wait_for_text "How can I help you?" 45
-live_tap "Open models"
-live_wait_for_text "Search models" 30
-
-# The compatible /models endpoint populates displayName with the model ID. The first model is
-# already visible in the provider section; read only its public label, never the credential field.
-model_label="$(python3 - <<'PY'
-import subprocess
-import sys
-import xml.etree.ElementTree as ET
-
-try:
-    subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/live-provider.xml"],
-                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
-    xml = subprocess.run(["adb", "shell", "cat", "/sdcard/live-provider.xml"],
-                         check=True, capture_output=True, text=True, timeout=30).stdout
-    labels = [node.get("text", "").strip() for node in ET.fromstring(xml).iter("node")]
-    start = next(i for i, label in enumerate(labels) if label == "Custom")
-    ignored = {"All", "Custom", "Search models", "Collapse", "Expand", "Vision", "Tools", "Image"}
-    for label in labels[start + 1:]:
-        if label and label not in ignored and not label.isdigit():
-            print(label)
-            sys.exit(0)
-except Exception:
-    pass
-sys.exit(1)
-PY
-)" || {
-  echo "::error title=Live provider test::Models were discovered, but no selectable model label was available."
-  exit 1
-}
-if [[ -z "$model_label" ]]; then
-  echo "::error title=Live provider test::Models were discovered, but no selectable model label was available."
-  exit 1
-fi
-printf 'Discovered model ID: %s\n' "$model_label"
-live_tap "$model_label"
-live_wait_for_text "Message AriAI" 30
-# The app was cleared before setup, so this chat is already fresh; keep the selected model on it.
-live_tap "Message AriAI"
-research_prompt='Call github_list_files first for the public repository default branch, then use github_read_file on app/src/main/java/com/ariai/app/MainActivity.kt and app/build.gradle.kts. In Persian, explain what the app currently does, give two concrete risks with exact paths and code evidence, and one practical recommendation. Quote exactly the Persian UI string assigned in MainActivity.onCreate. If a tool cannot read the files, say so and do not guess. Repository URL: https://github.com/redxbox/ariai'
-enter_text "$research_prompt"
-if ! live_assert "https://github.com/redxbox/ariai"; then
-  echo "::error title=Live GitHub research::The complete repository URL was not visible in the composed request; nothing was sent to the model."
-  exit 1
-fi
-adb_quiet shell input keyevent KEYCODE_BACK
-live_tap "Send"
-
-# Wait for the final assistant message. The app writes completed (or error) replies to Room only
-# after the agent/tool loop ends; no provider row is selected or printed from the snapshot.
-research_deadline=$((SECONDS + 600))
-research_response=""
-while (( SECONDS < research_deadline )); do
-  if ! live_assert "Stop"; then
-    candidate="$(extract_latest_assistant 2>/dev/null || true)"
-    if [[ -n "$candidate" ]]; then
-      research_response="$candidate"
-      break
-    fi
-  fi
-  sleep 3
-done
-if [[ -z "$research_response" ]]; then
-  echo "::error title=Live provider test::No completed research reply was saved within 10 minutes."
-  exit 1
-fi
-
-# Stop the disposable app, take one final messages-only snapshot, and publish just the model's
-# repository review (never the provider table or API key) for the user to inspect in Actions.
-adb_quiet shell am force-stop "$PKG"
-research_response="$(extract_latest_assistant 2>/dev/null)" || {
-  echo "::error title=Live provider test::The completed research reply could not be read from the disposable app database."
-  exit 1
-}
-research_response="$(python3 -c 'import sys; text=sys.stdin.read(); print(text[:6000])' <<<"$research_response")"
+review_prompt='Use GitHub tools to review the exact branch ref in the repository URL. First call github_list_files; then read app/src/main/java/com/ariai/app/ui/screens/AppViewModel.kt and other relevant listed files with github_read_file. Review the Android app on ref arena/5f5dd5fd-ariai, not default main. In Persian, rank up to four concrete high-impact issues; for each cite the exact path and code/symbol evidence, explain impact, give a minimal fix and a regression test. State the ref you actually reviewed. If listing or reading fails, say so and do not guess. Do not claim files or behavior absent from returned source. Repository URL: https://github.com/redxbox/ariai?ref=arena/5f5dd5fd-ariai'
+review_repo_url='https://github.com/redxbox/ariai?ref=arena/5f5dd5fd-ariai'
 mkdir -p smoke-out
-printf '%s\n' "$research_response" > smoke-out/live-research-response.txt
-escaped_response="$(python3 -c 'import sys; text=sys.stdin.read(); print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))' <<<"$research_response")"
-printf '::notice title=RadoxAI GitHub review::%s\n' "$escaped_response"
 
-if [[ "$research_response" == *"app/src/main/java/com/ariai/app/MainActivity.kt"* && \
-      "$research_response" == *"app/build.gradle.kts"* && \
-      "$research_response" == *"سلام! اپلیکیشن خالص AriAi با موفقیت اجرا شد! 🎉"* ]]; then
-  echo "Repository-specific evidence confirmed: source paths and the exact UI string were returned."
-else
-  echo "::warning title=Live GitHub research::The model replied, but did not include every requested repository fingerprint; inspect the attached response before treating its findings as verified."
-fi
+for model_index in "${!REVIEW_MODELS[@]}"; do
+  model_id="${REVIEW_MODELS[$model_index]}"
+  review_number=$((model_index + 1))
+  if (( model_index > 0 )); then
+    live_tap "Open menu"
+    live_tap "New chat"
+    live_wait_for_text "How can I help you?" 30
+  fi
+
+  printf 'Starting independent review %d with selected model ID: %s\n' "$review_number" "$model_id"
+  select_review_model "$model_id"
+  live_tap "Message AriAI"
+  enter_text "$review_prompt"
+  if ! live_assert "$review_repo_url"; then
+    echo "::error title=Live GitHub research::The complete feature-branch URL was not visible in the composed request; nothing was sent."
+    exit 1
+  fi
+  adb_quiet shell input keyevent KEYCODE_BACK
+  request_started_at="$(date +%s%3N)"
+  live_tap "Send"
+
+  # Scope extraction to messages created after this turn starts so a prior model's answer cannot pass.
+  research_deadline=$((SECONDS + 600))
+  research_response=""
+  while (( SECONDS < research_deadline )); do
+    if ! live_assert "Stop"; then
+      candidate="$(extract_latest_assistant "$request_started_at" 2>/dev/null || true)"
+      if [[ -n "$candidate" ]]; then
+        research_response="$candidate"
+        break
+      fi
+    fi
+    sleep 3
+  done
+  if [[ -z "$research_response" ]]; then
+    echo "::error title=Live provider test::No completed review reply was saved within 10 minutes."
+    exit 1
+  fi
+  research_response="$(extract_latest_assistant "$request_started_at" 2>/dev/null)" || {
+    echo "::error title=Live provider test::The completed review reply could not be read from the temporary messages-only snapshot."
+    exit 1
+  }
+
+  printf '%s\n' "$research_response" > "smoke-out/live-research-review-${review_number}.txt"
+  safe_model_id="$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9._/-]+", "_", sys.stdin.read()).strip("_"))' <<<"$model_id" | cut -c1-60)"
+  annotation_response="$(python3 -c 'import sys; text=sys.stdin.read(); text=text[:6000] + ("\n[Annotation truncated; full reply is in the workflow artifact.]" if len(text) > 6000 else ""); print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))' <<<"$research_response")"
+  printf '::notice title=RadoxAI review %d %s::%s\n' "$review_number" "$safe_model_id" "$annotation_response"
+
+  if [[ "$research_response" == *"arena/5f5dd5fd-ariai"* && \
+        "$research_response" == *"app/src/main/java/com/ariai/app/ui/screens/AppViewModel.kt"* ]]; then
+    echo "::notice title=Review source evidence $review_number::The response names the requested ref and a file unique to the feature branch."
+  else
+    echo "::warning title=Review source evidence $review_number::The response did not prove it reviewed the requested feature-branch ref; inspect it before applying its findings."
+  fi
+done
 
 # Clear the temporary provider/key before the main smoke script's final process check.
 if ! cleanup_live_test; then

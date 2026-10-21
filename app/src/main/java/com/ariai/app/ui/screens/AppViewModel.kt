@@ -804,6 +804,8 @@ class AppViewModel(
                     for (url in extractUserUrls(sentContent)) {
                         if (publicUrlFetcher.isSafePublicUrl(url)) userProvidedUrls += url
                     }
+                    val githubRepository = GitHubRepositoryClient.Repository.fromUserText(sentContent)
+                    val webUrls = userProvidedUrls.filterNot { GitHubRepositoryClient.Repository.fromUserText(it) != null }
                     val functionTools: List<ChatFunctionTool> = if (current?.supportsFunctionCalling != false) {
                         buildList {
                             add(DefaultAgentTools.calculator())
@@ -825,8 +827,8 @@ class AppViewModel(
                                     else repository.formatSearchForLLM(results)
                                 })
                             }
-                            DefaultAgentTools.openUserUrl(userProvidedUrls, publicUrlFetcher)?.let(::add)
-                            GitHubRepositoryClient.Repository.fromUserText(sentContent)?.let { repo ->
+                            DefaultAgentTools.openUserUrl(webUrls, publicUrlFetcher)?.let(::add)
+                            githubRepository?.let { repo ->
                                 addAll(DefaultAgentTools.githubRepository(repo, githubRepositoryClient))
                             }
                         }
