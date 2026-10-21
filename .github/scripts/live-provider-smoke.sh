@@ -348,7 +348,7 @@ printf 'Testing model discovery at %s (credential value hidden).\n' "$BASE_URL"
 adb_quiet shell am force-stop "$PKG"
 adb_quiet shell pm clear "$PKG"
 adb_quiet shell am start -W -n "$PKG/.MainActivity"
-live_wait_for_text "How can I help you?" 60
+live_wait_for_text "Message AriAI" 120
 
 live_tap "Open menu"
 live_tap "Providers"
