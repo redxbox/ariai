@@ -18,7 +18,7 @@ jobs:
   smoke:
     name: Exercise all reachable app sections on emulator
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
 
@@ -55,7 +55,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            timeout --signal=TERM --kill-after=15s 20m bash .github/scripts/smoke.sh
+            timeout --signal=TERM --kill-after=15s 25m bash .github/scripts/smoke.sh
 
       - name: Upload screenshots and logs
         if: always()

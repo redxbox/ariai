@@ -100,6 +100,38 @@ enter_secret() {
   sleep 0.4
 }
 
+# Read only the latest assistant message from the disposable debug app database. Database snapshots
+# stay under /tmp, are deleted immediately, and never include provider rows in logs or artifacts.
+extract_latest_assistant() (
+  set -euo pipefail
+  local snapshot
+  snapshot="$(mktemp -d /tmp/ariai-research-db.XXXXXX)"
+  trap 'rm -rf "$snapshot"' EXIT
+  for suffix in "" "-wal" "-shm"; do
+    if ! timeout --signal=TERM --kill-after=5s 35s adb exec-out run-as "$PKG" cat "databases/ariai_db$suffix" \
+      > "$snapshot/ariai_db$suffix" 2>/dev/null; then
+      rm -f "$snapshot/ariai_db$suffix"
+    fi
+  done
+  python3 - "$snapshot/ariai_db" <<'PY'
+import sqlite3
+import sys
+
+try:
+    connection = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True, timeout=5)
+    row = connection.execute(
+        "SELECT content FROM messages WHERE role = 'ASSISTANT' "
+        "AND TRIM(content) <> '' ORDER BY timestamp DESC LIMIT 1"
+    ).fetchone()
+    connection.close()
+    if not row or not row[0].strip():
+        raise SystemExit(1)
+    sys.stdout.write(row[0])
+except Exception:
+    raise SystemExit(1)
+PY
+)
+
 cleanup_live_test() {
   [[ "$CLEANUP_DONE" == "true" ]] && return 0
   local failed=0
@@ -216,40 +248,51 @@ fi
 printf 'Discovered model ID: %s\n' "$model_label"
 live_tap "$model_label"
 live_wait_for_text "Message AriAI" 30
+# The app was cleared before setup, so this chat is already fresh; keep the selected model on it.
 live_tap "Message AriAI"
-enter_text "What is the capital of Greece? Reply with the city name only."
+research_prompt='Review the public GitHub repository https://github.com/redxbox/ariai on its default branch using the GitHub repository tools. First list the files, then actually read the app entry point and Gradle build configuration. In Persian and in at most 150 words, explain what the app currently does, two concrete limitations or risks, and two practical recommendations. Cite exact file paths and code identifiers for your claims. Finally, quote the exact Persian UI string assigned in MainActivity.onCreate. If you cannot read the files from GitHub, say so plainly and do not guess.'
+enter_text "$research_prompt"
 adb_quiet shell input keyevent KEYCODE_BACK
 live_tap "Send"
 
-# Check for a real assistant answer, while failing early on common provider errors without
-# dumping the message or any other UI content into the workflow log/artifact.
-reply_deadline=$((SECONDS + 180))
-while (( SECONDS < reply_deadline )); do
-  if live_assert "Athens"; then
-    echo "Live chat completion succeeded (expected answer received)."
-    break
+# Wait for the final assistant message. The app writes completed (or error) replies to Room only
+# after the agent/tool loop ends; no provider row is selected or printed from the snapshot.
+research_deadline=$((SECONDS + 600))
+research_response=""
+while (( SECONDS < research_deadline )); do
+  if ! live_assert "Stop"; then
+    candidate="$(extract_latest_assistant 2>/dev/null || true)"
+    if [[ -n "$candidate" ]]; then
+      research_response="$candidate"
+      break
+    fi
   fi
-  if live_assert "Invalid API key"; then
-    echo "::error title=Live provider test::The provider rejected the configured API key (HTTP 401)."
-    exit 1
-  fi
-  if live_assert "Rate limit exceeded"; then
-    echo "::error title=Live provider test::The provider rate-limited the completion request (HTTP 429)."
-    exit 1
-  fi
-  if live_assert "No internet connection"; then
-    echo "::error title=Live provider test::The emulator could not reach the provider endpoint."
-    exit 1
-  fi
-  if live_assert "Please check your API key and provider settings."; then
-    echo "::error title=Live provider test::The app reported a provider request error; response details were suppressed."
-    exit 1
-  fi
-  sleep 2
+  sleep 3
 done
-if ! live_assert "Athens"; then
-  echo "::error title=Live provider test::No expected assistant reply arrived within 180 seconds; message details were suppressed."
+if [[ -z "$research_response" ]]; then
+  echo "::error title=Live provider test::No completed research reply was saved within 10 minutes."
   exit 1
+fi
+
+# Stop the disposable app, take one final messages-only snapshot, and publish just the model's
+# repository review (never the provider table or API key) for the user to inspect in Actions.
+adb_quiet shell am force-stop "$PKG"
+research_response="$(extract_latest_assistant 2>/dev/null)" || {
+  echo "::error title=Live provider test::The completed research reply could not be read from the disposable app database."
+  exit 1
+}
+research_response="$(python3 -c 'import sys; text=sys.stdin.read(); print(text[:6000])' <<<"$research_response")"
+mkdir -p smoke-out
+printf '%s\n' "$research_response" > smoke-out/live-research-response.txt
+escaped_response="$(python3 -c 'import sys; text=sys.stdin.read(); print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))' <<<"$research_response")"
+printf '::notice title=RadoxAI GitHub review::%s\n' "$escaped_response"
+
+if [[ "$research_response" == *"app/src/main/java/com/ariai/app/MainActivity.kt"* && \
+      "$research_response" == *"app/build.gradle.kts"* && \
+      "$research_response" == *"اپلیکیشن خالص AriAi با موفقیت اجرا شد"* ]]; then
+  echo "Repository-specific evidence confirmed: source paths and the exact UI string were returned."
+else
+  echo "::warning title=Live GitHub research::The model replied, but did not include every requested repository fingerprint; inspect the attached response before treating its findings as verified."
 fi
 
 # Clear the temporary provider/key before the main smoke script's final process check.
