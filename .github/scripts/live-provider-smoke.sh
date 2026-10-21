@@ -81,7 +81,7 @@ enter_text() {
   local text="$1"
   local purpose="${2:-non-secret test value}"
   local chunk escaped quoted
-  echo "::notice title=Live provider input::Entering $purpose; value suppressed."
+  printf 'Entering %s; value suppressed.\n' "$purpose"
   # Long prompts can overflow a single Android `input text` event; send exact ASCII chunks in order.
   # Quote each remote shell argument so punctuation in prompts is typed, not interpreted by /system/bin/sh.
   while [[ -n "$text" ]]; do
@@ -402,8 +402,8 @@ live_wait_for_text "Custom" 45
 adb_quiet shell input keyevent KEYCODE_BACK
 live_wait_for_text "How can I help you?" 45
 review_repo_url='https://github.com/redxbox/ariai?ref=arena%2F5f5dd5fd-ariai'
-review_prompt="You are performing a source-based review now. Do not acknowledge the request, ask a question, or ask me to provide files or a URL; the GitHub tools and repository URL are available. Immediately call github_list_files for the URL below, then use github_read_file on GitHubRepositoryClient.kt, DefaultAgentTools.kt, MainActivity.kt, and ChatRepository.kt from that tree. Try AppViewModel.kt only once; if it exceeds the reader limit, skip it and do not guess. In Persian, report at most three high-impact concrete findings, under 350 words total. Each finding must cite an exact path and symbol or short code line, explain impact, propose a minimal fix, and name a regression test. Start by stating the exact ref and at least one path actually read. If a tool fails, say so. Do not infer beyond returned source. URL: $review_repo_url"
-review_retry_prompt="Your previous reply omitted the required exact ref and/or a source path. Complete the review now; do not ask for clarification or for files or URL. Call github_list_files on this exact URL and use github_read_file to inspect GitHubRepositoryClient.kt and ChatRepository.kt; read any other requested file only if budget permits. In Persian, return at most three high-impact findings with path/symbol, impact, minimal fix, and regression test. State the exact ref, at least one path actually read, and any tool failure. Do not guess. URL: $review_repo_url"
+review_prompt="You are performing a source-based review now. Do not acknowledge the request, ask a question, or ask me to provide files or a URL; the GitHub tools and repository URL are available. Immediately call github_list_files for the URL below, then use github_read_file on GitHubRepositoryClient.kt, DefaultAgentTools.kt, MainActivity.kt, and ChatRepository.kt from that tree. Try AppViewModel.kt only once; if it exceeds the reader limit, skip it and do not guess. In Persian, report at most two high-impact concrete findings, under 200 words total. Each finding must cite an exact path and symbol, explain impact, propose a minimal fix, and name a regression test. Start by stating the exact ref and at least one path actually read. If a tool fails, say so. Do not infer beyond returned source. URL: $review_repo_url"
+review_retry_prompt="Your previous reply omitted the required exact ref and/or a source path. Complete the review now; do not ask for clarification or for files or URL. Call github_list_files on this exact URL and use github_read_file to inspect GitHubRepositoryClient.kt and ChatRepository.kt; read any other requested file only if budget permits. In Persian, return at most two high-impact findings in 200 words with path/symbol, impact, minimal fix, and regression test. State the exact ref, at least one path actually read, and any tool failure. Do not guess. URL: $review_repo_url"
 review_has_source_evidence() {
   local response="$1"
   [[ "$response" == *"arena/5f5dd5fd-ariai"* && \
@@ -488,13 +488,10 @@ for model_index in 0 1; do
     } >> "$GITHUB_STEP_SUMMARY"
   fi
   completed_review_count=$((completed_review_count + 1))
-  annotation_parts=()
-  mapfile -t annotation_parts < <(printf '%s' "$research_response" | python3 -c 'import sys; text=sys.stdin.read().replace("\t", " "); chunks=[text[i:i+1000] for i in range(0, len(text), 1000)] or ["(empty reply)"]; print("\n".join(chunk.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A") for chunk in chunks))')
-  for part_index in "${!annotation_parts[@]}"; do
-    printf '::notice title=RadoxAI review %d %s part %d/%d::%s\n' \
-      "$review_number" "$safe_model_id" "$((part_index + 1))" "${#annotation_parts[@]}" "${annotation_parts[$part_index]}"
-  done
-  unset annotation_parts
+  annotation_excerpt="$(printf '%s' "$research_response" | python3 -c 'import sys; text=sys.stdin.read().replace("\t", " ").replace("\r", " ").replace("\n", " ").strip(); limit=1000; excerpt=text[:limit] + (" … [full response in artifact]" if len(text) > limit else ""); print(excerpt.replace("%", "%25"), end="")')"
+  printf '::notice title=RadoxAI review %d %s::%s\n' \
+    "$review_number" "$safe_model_id" "$annotation_excerpt"
+  unset annotation_excerpt
 
   if review_has_source_evidence "$research_response"; then
     verified_review_count=$((verified_review_count + 1))
