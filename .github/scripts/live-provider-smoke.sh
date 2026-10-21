@@ -79,14 +79,18 @@ live_wait_for_text() {
 
 enter_text() {
   local text="$1"
-  local chunk escaped
+  local purpose="${2:-non-secret test value}"
+  local chunk escaped quoted
+  echo "::notice title=Live provider input::Entering $purpose; value suppressed."
   # Long prompts can overflow a single Android `input text` event; send exact ASCII chunks in order.
+  # Quote each remote shell argument so punctuation in prompts is typed, not interpreted by /system/bin/sh.
   while [[ -n "$text" ]]; do
     chunk="${text:0:48}"
     text="${text:${#chunk}}"
     escaped="${chunk// /%s}"
-    if ! adb_quiet shell input text "$escaped"; then
-      echo "::error title=Live provider test::Could not enter a non-secret test value."
+    quoted="$(printf '%s' "$escaped" | python3 -c 'import shlex,sys; print(shlex.quote(sys.stdin.read()), end="")')"
+    if ! adb_quiet shell "input text $quoted"; then
+      echo "::error title=Live provider test::Could not enter $purpose; value suppressed."
       return 1
     fi
     sleep 0.15
@@ -97,13 +101,14 @@ enter_text() {
 enter_secret() {
   local secret="$1"
   local escaped="${secret// /%s}"
-  # Do not use the main smoke script's logging adb wrapper and never print this command or its args.
-  if ! timeout --signal=TERM --kill-after=5s 35s adb shell input text "$escaped" >/dev/null 2>&1; then
-    unset secret escaped
+  local quoted="$(printf '%s' "$escaped" | python3 -c 'import shlex,sys; print(shlex.quote(sys.stdin.read()), end="")')"
+  # Never print the command or its args; the API key remains out of logs, artifacts and shell traces.
+  if ! timeout --signal=TERM --kill-after=5s 35s adb shell "input text $quoted" >/dev/null 2>&1; then
+    unset secret escaped quoted
     echo "::error title=Live provider test::Could not enter the Actions API key; its value was suppressed."
     return 1
   fi
-  unset secret escaped
+  unset secret escaped quoted
   sleep 0.4
 }
 
@@ -114,7 +119,7 @@ select_review_model() {
   live_tap "Search models"
   # The picker may retain a previous query within a chat; clear it before typing this exact model ID.
   adb_quiet shell input keyevent 113 29 67 || true
-  enter_text "$model_id"
+  enter_text "$model_id" "selected model ID"
   adb_quiet shell input keyevent KEYCODE_BACK
   if ! python3 - "$model_id" <<'PY'
 import re
@@ -355,7 +360,7 @@ live_tap "Add provider"
 live_wait_for_text "Add provider" 30
 live_tap "Custom"
 live_tap "Base URL"
-enter_text "$BASE_URL"
+enter_text "$BASE_URL" "provider base URL"
 adb_quiet shell input keyevent KEYCODE_BACK
 live_tap "API key"
 enter_secret "$API_KEY"
@@ -399,7 +404,7 @@ live_wait_for_text "Providers" 45
 live_wait_for_text "Custom" 45
 adb_quiet shell input keyevent KEYCODE_BACK
 live_wait_for_text "How can I help you?" 45
-review_prompt='Use GitHub tools to review the exact branch ref in the repository URL. First call github_list_files; then read app/src/main/java/com/ariai/app/ui/screens/AppViewModel.kt and other relevant listed files with github_read_file. Review the Android app on ref arena/5f5dd5fd-ariai, not default main. In Persian, rank up to four concrete high-impact issues; for each cite the exact path and code/symbol evidence, explain impact, give a minimal fix and a regression test. State the ref you actually reviewed. If listing or reading fails, say so and do not guess. Do not claim files or behavior absent from returned source. Repository URL: https://github.com/redxbox/ariai?ref=arena/5f5dd5fd-ariai'
+review_prompt='Use GitHub tools to review the exact branch ref in the repository URL. First call github_list_files, then read app/src/main/java/com/ariai/app/ui/screens/AppViewModel.kt and other relevant listed files with github_read_file. Review the Android app on ref arena/5f5dd5fd-ariai, not default main. In Persian, rank up to four concrete high-impact issues. For each, cite the exact path and code or symbol evidence, explain the impact, give a minimal fix and a regression test. State the ref you actually reviewed. If listing or reading fails, say so and do not guess. Do not claim files or behavior absent from returned source. Repository URL: https://github.com/redxbox/ariai?ref=arena/5f5dd5fd-ariai'
 review_repo_url='https://github.com/redxbox/ariai?ref=arena/5f5dd5fd-ariai'
 mkdir -p smoke-out
 
@@ -415,7 +420,7 @@ for model_index in "${!REVIEW_MODELS[@]}"; do
   printf 'Starting independent review %d with selected model ID: %s\n' "$review_number" "$model_id"
   select_review_model "$model_id"
   live_tap "Message AriAI"
-  enter_text "$review_prompt"
+  enter_text "$review_prompt" "branch review prompt"
   if ! live_assert "$review_repo_url"; then
     echo "::error title=Live GitHub research::The complete feature-branch URL was not visible in the composed request; nothing was sent."
     exit 1
