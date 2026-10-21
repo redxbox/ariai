@@ -9,6 +9,9 @@ APK=app/build/outputs/apk/debug/app-debug.apk
 BASE_URL="${ARIAI_TEST_BASE_URL:-https://radoxai.com/v1}"
 API_KEY="${ARIAI_TEST_API_KEY:-}"
 unset ARIAI_TEST_API_KEY
+# Match the app's apiKey.trim(): tolerate accidental whitespace only around the pasted token.
+API_KEY="${API_KEY#"${API_KEY%%[![:space:]]*}"}"
+API_KEY="${API_KEY%"${API_KEY##*[![:space:]]}"}"
 CLEANUP_DONE=false
 
 if [[ -z "$API_KEY" ]]; then
