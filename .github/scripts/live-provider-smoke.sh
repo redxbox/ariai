@@ -404,8 +404,8 @@ live_wait_for_text "Providers" 45
 live_wait_for_text "Custom" 45
 adb_quiet shell input keyevent KEYCODE_BACK
 live_wait_for_text "How can I help you?" 45
-review_prompt='Use GitHub tools to review the exact branch ref in the repository URL. First call github_list_files, then read app/src/main/java/com/ariai/app/ui/screens/AppViewModel.kt and other relevant listed files with github_read_file. Review the Android app on ref arena/5f5dd5fd-ariai, not default main. In Persian, rank up to four concrete high-impact issues. For each, cite the exact path and code or symbol evidence, explain the impact, give a minimal fix and a regression test. State the ref you actually reviewed. If listing or reading fails, say so and do not guess. Do not claim files or behavior absent from returned source. Repository URL: https://github.com/redxbox/ariai?ref=arena/5f5dd5fd-ariai'
-review_repo_url='https://github.com/redxbox/ariai?ref=arena/5f5dd5fd-ariai'
+review_prompt='Review only the branch named by the URL below. First call github_list_files. Then read GitHubRepositoryClient.kt, DefaultAgentTools.kt, MainActivity.kt and ChatRepository.kt from the returned tree with github_read_file. You may try AppViewModel.kt once, but if it exceeds the reader limit, skip it and do not guess. In Persian, provide at most three high-impact concrete findings, under 350 words total. For each, cite an exact path and symbol or one short code line, explain impact, give a minimal fix and a regression test. State the exact ref and at least one successfully read path. If a tool fails, say so. Do not infer beyond returned source. Repository URL: https://github.com/redxbox/ariai?ref=arena%2F5f5dd5fd-ariai'
+review_repo_url='https://github.com/redxbox/ariai?ref=arena%2F5f5dd5fd-ariai'
 mkdir -p smoke-out
 
 for model_index in "${!REVIEW_MODELS[@]}"; do
@@ -453,12 +453,19 @@ for model_index in "${!REVIEW_MODELS[@]}"; do
 
   printf '%s\n' "$research_response" > "smoke-out/live-research-review-${review_number}.txt"
   safe_model_id="$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9._/-]+", "_", sys.stdin.read()).strip("_"))' <<<"$model_id" | cut -c1-60)"
-  annotation_response="$(python3 -c 'import sys; text=sys.stdin.read(); text=text[:6000] + ("\n[Annotation truncated; full reply is in the workflow artifact.]" if len(text) > 6000 else ""); print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))' <<<"$research_response")"
-  printf '::notice title=RadoxAI review %d %s::%s\n' "$review_number" "$safe_model_id" "$annotation_response"
+  annotation_parts=()
+  mapfile -t annotation_parts < <(printf '%s' "$research_response" | python3 -c 'import sys; text=sys.stdin.read().replace("\t", " "); chunks=[text[i:i+1000] for i in range(0, len(text), 1000)] or ["(empty reply)"]; print("\n".join(chunk.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A") for chunk in chunks))')
+  for part_index in "${!annotation_parts[@]}"; do
+    printf '::notice title=RadoxAI review %d %s part %d/%d::%s\n' \
+      "$review_number" "$safe_model_id" "$((part_index + 1))" "${#annotation_parts[@]}" "${annotation_parts[$part_index]}"
+  done
+  unset annotation_parts
 
   if [[ "$research_response" == *"arena/5f5dd5fd-ariai"* && \
-        "$research_response" == *"app/src/main/java/com/ariai/app/ui/screens/AppViewModel.kt"* ]]; then
-    echo "::notice title=Review source evidence $review_number::The response names the requested ref and a file unique to the feature branch."
+        ( "$research_response" == *"app/src/main/java/com/ariai/app/data/remote/GitHubRepositoryClient.kt"* ||
+          "$research_response" == *"app/src/main/java/com/ariai/app/data/repository/ChatRepository.kt"* ||
+          "$research_response" == *"app/src/main/java/com/ariai/app/MainActivity.kt"* ) ]]; then
+    echo "::notice title=Review source evidence $review_number::The response states the requested ref and cites concrete source paths."
   else
     echo "::warning title=Review source evidence $review_number::The response did not prove it reviewed the requested feature-branch ref; inspect it before applying its findings."
   fi
@@ -469,6 +476,8 @@ if ! cleanup_live_test; then
   exit 1
 fi
 trap - EXIT
+# Clear emulator logs from the authenticated flow before smoke.sh captures its final diagnostics.
+adb_quiet logcat -c
 adb_quiet shell am start -W -n "$PKG/.MainActivity"
 live_wait_for_text "How can I help you?" 45
 printf 'Live provider smoke passed; emulator provider data was cleared.\n'
