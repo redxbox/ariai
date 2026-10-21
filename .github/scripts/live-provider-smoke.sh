@@ -79,12 +79,19 @@ live_wait_for_text() {
 
 enter_text() {
   local text="$1"
-  local escaped="${text// /%s}"
-  if ! adb_quiet shell input text "$escaped"; then
-    echo "::error title=Live provider test::Could not enter a non-secret test value."
-    return 1
-  fi
-  sleep 0.4
+  local chunk escaped
+  # Long prompts can overflow a single Android `input text` event; send exact ASCII chunks in order.
+  while [[ -n "$text" ]]; do
+    chunk="${text:0:48}"
+    text="${text:${#chunk}}"
+    escaped="${chunk// /%s}"
+    if ! adb_quiet shell input text "$escaped"; then
+      echo "::error title=Live provider test::Could not enter a non-secret test value."
+      return 1
+    fi
+    sleep 0.15
+  done
+  sleep 0.25
 }
 
 enter_secret() {
@@ -250,8 +257,12 @@ live_tap "$model_label"
 live_wait_for_text "Message AriAI" 30
 # The app was cleared before setup, so this chat is already fresh; keep the selected model on it.
 live_tap "Message AriAI"
-research_prompt='Review the public GitHub repository https://github.com/redxbox/ariai on its default branch using the GitHub repository tools. First list the files, then actually read the app entry point and Gradle build configuration. In Persian and in at most 150 words, explain what the app currently does, two concrete limitations or risks, and two practical recommendations. Cite exact file paths and code identifiers for your claims. Finally, quote the exact Persian UI string assigned in MainActivity.onCreate. If you cannot read the files from GitHub, say so plainly and do not guess.'
+research_prompt='Call github_list_files first for the public repository default branch, then use github_read_file on app/src/main/java/com/ariai/app/MainActivity.kt and app/build.gradle.kts. In Persian, explain what the app currently does, give two concrete risks with exact paths and code evidence, and one practical recommendation. Quote exactly the Persian UI string assigned in MainActivity.onCreate. If a tool cannot read the files, say so and do not guess. Repository URL: https://github.com/redxbox/ariai'
 enter_text "$research_prompt"
+if ! live_assert "https://github.com/redxbox/ariai"; then
+  echo "::error title=Live GitHub research::The complete repository URL was not visible in the composed request; nothing was sent to the model."
+  exit 1
+fi
 adb_quiet shell input keyevent KEYCODE_BACK
 live_tap "Send"
 
@@ -289,7 +300,7 @@ printf '::notice title=RadoxAI GitHub review::%s\n' "$escaped_response"
 
 if [[ "$research_response" == *"app/src/main/java/com/ariai/app/MainActivity.kt"* && \
       "$research_response" == *"app/build.gradle.kts"* && \
-      "$research_response" == *"اپلیکیشن خالص AriAi با موفقیت اجرا شد"* ]]; then
+      "$research_response" == *"سلام! اپلیکیشن خالص AriAi با موفقیت اجرا شد! 🎉"* ]]; then
   echo "Repository-specific evidence confirmed: source paths and the exact UI string were returned."
 else
   echo "::warning title=Live GitHub research::The model replied, but did not include every requested repository fingerprint; inspect the attached response before treating its findings as verified."
