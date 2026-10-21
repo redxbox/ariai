@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Walks every user-reachable screen and the major chat/settings/provider sheets on an Android emulator.
-# External provider calls are skipped by default. A one-shot commit-message gate can opt into a live
-# RadoxAI-compatible model-list/chat test; its key is never written to screenshots, UI dumps or logs.
+# External provider calls are skipped by default. A one-shot commit-message gate opts into an isolated
+# RadoxAI-compatible model-list/repository-review test; its key is never written to screenshots, UI dumps or logs.
 set -euo pipefail
-# Keep the Actions secret out of every ordinary adb/logging subprocess; pass it only to the
-# isolated live-test helper after the providerless walkthrough has completed.
+# Keep the Actions secret out of ordinary adb/logging subprocesses; pass it only to the
+# isolated live-test helper when the one-shot commit-message gate is enabled.
 LIVE_API_KEY="${ARIAI_TEST_API_KEY:-}"
 unset ARIAI_TEST_API_KEY
 PKG=com.ariai.app
@@ -201,12 +201,44 @@ wait_for_text() {
   return 1
 }
 
+final_process_check() {
+  step "Final process and crash check"
+  adb logcat -d > "$OUT/logcat.txt"
+  if grep -A12 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "$PKG"; then
+    grep -A30 "FATAL EXCEPTION" "$OUT/logcat.txt" > "$OUT/crash.txt"
+    crash_detail="$(tr '\n' ' ' < "$OUT/crash.txt" | cut -c1-1500)"
+    echo "::error title=Crash detected::$crash_detail"
+    FAILED=1
+  fi
+  if ! adb shell pidof "$PKG" >/dev/null; then
+    echo "::error title=App stopped::AriAI is not running at the end of the walkthrough."
+    FAILED=1
+  fi
+  printf 'result failed=%s steps=%s\n' "$FAILED" "$STEP_NO"
+  end_step
+  [[ "$FAILED" -eq 0 ]]
+}
+
 adb wait-for-device
 adb shell pm uninstall "$PKG" >/dev/null 2>&1 || true
 adb logcat -c
 adb install -r "$APK" | tee "$OUT/install.txt"
 grep -q Success "$OUT/install.txt" || { echo "install failed"; exit 1; }
 adb shell am force-stop "$PKG"
+
+# Keep the one-shot API credential test isolated from the long, providerless UI walkthrough.
+# The normal CI path still exercises every UI section; this branch exists only on the explicit marker.
+if [[ "${ARIAI_LIVE_API_TEST:-false}" == "true" ]]; then
+  step "One-shot RadoxAI GitHub research test"
+  live_status=0
+  ARIAI_TEST_API_KEY="$LIVE_API_KEY" bash .github/scripts/live-provider-smoke.sh || live_status=$?
+  unset LIVE_API_KEY
+  end_step
+  if (( live_status != 0 )); then exit "$live_status"; fi
+  final_process_check
+  exit 0
+fi
+
 adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/launch.txt"
 wait_for_text "How can I help you?" 90
 shot 00-app-home
@@ -576,29 +608,6 @@ expect_text "How can I help you?"
 shot 56-new-chat-from-drawer
 end_step
 
-if [[ "${ARIAI_LIVE_API_TEST:-false}" == "true" ]]; then
-  step "One-shot RadoxAI-compatible live provider test"
-  live_status=0
-  ARIAI_TEST_API_KEY="$LIVE_API_KEY" bash .github/scripts/live-provider-smoke.sh || live_status=$?
-  unset LIVE_API_KEY
-  if (( live_status != 0 )); then exit "$live_status"; fi
-  end_step
-else
-  unset LIVE_API_KEY
-  echo "Live provider test skipped (no one-shot commit-message opt-in)."
-fi
-
-step "Final process and crash check"
-adb logcat -d > "$OUT/logcat.txt"
-if grep -A12 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "$PKG"; then
-  grep -A30 "FATAL EXCEPTION" "$OUT/logcat.txt" > "$OUT/crash.txt"
-  crash_detail="$(tr '\n' ' ' < "$OUT/crash.txt" | cut -c1-1500)"
-  echo "::error title=Crash detected::$crash_detail"
-  FAILED=1
-fi
-if ! adb shell pidof "$PKG" >/dev/null; then
-  echo "::error title=App stopped::AriAI is not running at the end of the walkthrough."
-  FAILED=1
-fi
-printf 'result failed=%s steps=%s\n' "$FAILED" "$STEP_NO"
-if [ "$FAILED" -ne 0 ]; then exit 1; fi
+unset LIVE_API_KEY
+echo "Live provider test skipped (no one-shot commit-message opt-in)."
+final_process_check

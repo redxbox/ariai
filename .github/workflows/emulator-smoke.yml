@@ -1,4 +1,4 @@
-name: Full app emulator walkthrough
+name: Android emulator walkthrough and provider test
 
 on:
   push:
@@ -16,7 +16,7 @@ on:
 
 jobs:
   smoke:
-    name: Exercise all reachable app sections on emulator
+    name: Run app walkthrough or isolated live provider test
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
