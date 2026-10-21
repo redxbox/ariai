@@ -14,6 +14,11 @@ mkdir -p "$OUT"
 exec > >(tee -a "$OUT/walkthrough.log") 2>&1
 FAILED=0
 STEP_NO=0
+if [[ "${ARIAI_LIVE_API_TEST:-false}" == "true" ]]; then
+  echo "::notice title=Smoke bootstrap::Isolated live-research path selected; the normal UI walkthrough remains covered by ordinary emulator runs."
+else
+  echo "::notice title=Smoke bootstrap::Full providerless UI walkthrough selected."
+fi
 
 # Keep ADB failures bounded so a wedged emulator command cannot stall the workflow indefinitely.
 adb() {
@@ -219,11 +224,13 @@ final_process_check() {
   [[ "$FAILED" -eq 0 ]]
 }
 
+echo "::notice title=Smoke bootstrap::Waiting for emulator and installing the debug APK."
 adb wait-for-device
 adb shell pm uninstall "$PKG" >/dev/null 2>&1 || true
 adb logcat -c
 adb install -r "$APK" | tee "$OUT/install.txt"
 grep -q Success "$OUT/install.txt" || { echo "install failed"; exit 1; }
+echo "::notice title=Smoke bootstrap::Debug APK installed; proceeding with the selected test path."
 adb shell am force-stop "$PKG"
 
 # Keep the one-shot API credential test isolated from the long, providerless UI walkthrough.
