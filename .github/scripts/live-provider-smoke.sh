@@ -278,7 +278,8 @@ review_models_raw="$(discover_review_models)" || {
 }
 REVIEW_MODELS=()
 mapfile -t REVIEW_MODELS <<<"$review_models_raw"
-if ((${#REVIEW_MODELS[@]} < 2)); then
+expected_review_count=${#REVIEW_MODELS[@]}
+if ((expected_review_count < 2)); then
   unset API_KEY
   echo "::error title=Live provider test::At least two selectable text models are required for independent reviews."
   exit 1
@@ -406,11 +407,11 @@ mkdir -p smoke-out
 completed_review_count=0
 verified_review_count=0
 
-for model_index in "${!REVIEW_MODELS[@]}"; do
+for model_index in 0 1; do
   model_id="${REVIEW_MODELS[$model_index]}"
   review_number=$((model_index + 1))
   safe_model_id="$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9._/-]+", "_", sys.stdin.read()).strip("_"))' <<<"$model_id" | cut -c1-60)"
-  echo "::notice title=Review loop::Starting independent review $review_number/${#REVIEW_MODELS[@]} with model $safe_model_id"
+  echo "::notice title=Review loop::Starting independent review $review_number/$expected_review_count with model $safe_model_id"
   if (( model_index > 0 )); then
     live_tap "Open menu"
     live_tap "New chat"
@@ -473,8 +474,9 @@ for model_index in "${!REVIEW_MODELS[@]}"; do
   fi
 done
 
-if (( completed_review_count != ${#REVIEW_MODELS[@]} )); then
-  echo "::error title=Live GitHub research::Completed $completed_review_count of ${#REVIEW_MODELS[@]} independent model reviews."
+printf '%s\n' "$completed_review_count/$expected_review_count" > smoke-out/live-review-count.txt
+if (( completed_review_count != expected_review_count )); then
+  echo "::error title=Live GitHub research::Completed $completed_review_count of $expected_review_count independent model reviews."
   exit 1
 fi
 echo "::notice title=Live GitHub research::Completed $completed_review_count independent model reviews; $verified_review_count cited the target ref and a source file."
