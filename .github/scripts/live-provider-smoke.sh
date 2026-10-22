@@ -62,6 +62,31 @@ live_assert() {
   python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1
 }
 
+live_wait_for_composer() {
+  local timeout_seconds="${1:-30}"
+  local deadline=$((SECONDS + timeout_seconds))
+  while (( SECONDS < deadline )); do
+    if live_assert "Message AriAI" || live_assert "How can I help you?"; then
+      echo "Reached live-test chat composer."
+      return 0
+    fi
+    sleep 2
+  done
+  echo "::error title=Live provider test::Timed out waiting for the chat composer; screen contents were not logged."
+  return 1
+}
+
+live_tap_composer() {
+  if live_assert "Message AriAI"; then
+    live_tap "Message AriAI"
+  elif live_assert "How can I help you?"; then
+    live_tap "How can I help you?"
+  else
+    echo "::error title=Live provider test::Chat composer was not available; UI details were suppressed."
+    return 1
+  fi
+}
+
 live_wait_for_text() {
   local label="$1"
   local timeout_seconds="${2:-60}"
@@ -178,7 +203,11 @@ PY
     echo "::error title=Live provider test::The selected model ID did not appear as a selectable row; UI details were suppressed."
     return 1
   fi
-  live_wait_for_text "Message AriAI" 30
+  if ! live_wait_for_composer 15; then
+    # A model tap can leave the picker open if its row consumed the click; dismiss it and verify once more.
+    adb_quiet shell input keyevent KEYCODE_BACK || true
+    live_wait_for_composer 15
+  fi
 }
 
 # Discover only public model IDs; the credential is passed through the child environment and never printed.
@@ -447,7 +476,7 @@ for model_index in 0 1; do
       turn_prompt="$review_retry_prompt"
     fi
 
-    live_tap "Message AriAI"
+    live_tap_composer
     enter_text "$turn_prompt" "branch review prompt, attempt $attempt"
     if ! live_assert "$review_repo_url"; then
       echo "::error title=Live GitHub research::The complete feature-branch URL was not visible in the composed request; nothing was sent."
