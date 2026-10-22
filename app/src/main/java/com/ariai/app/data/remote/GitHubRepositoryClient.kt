@@ -16,6 +16,10 @@ import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
+/** Reject a successful but malformed tree response rather than reporting an empty repository. */
+internal fun requireGitHubTreeArray(response: JSONObject): JSONArray =
+    response.optJSONArray("tree") ?: throw IOException("GitHub returned an invalid repository tree response")
+
 /** Read-only access to public repositories, bound to a GitHub URL explicitly supplied by the user. */
 class GitHubRepositoryClient {
     private val client = OkHttpClient.Builder()
@@ -55,7 +59,18 @@ class GitHubRepositoryClient {
                 if (uri.rawQuery.orEmpty().split('&').any { parameter ->
                         (decodeQueryComponent(parameter.substringBefore('=')) ?: "").equals("ref", ignoreCase = true)
                     } && (refParams.size != 1 || !isSafeRef(refParams.single()))) return null
-                val pathRef = parts.getOrNull(3).takeIf { parts.size >= 4 && parts[2].equals("tree", ignoreCase = true) }
+                // Parse only the explicit ref segment from GitHub tree/blob/commit URLs. A slash in
+                // a branch name must be percent-encoded here (or supplied as ?ref=...), since an
+                // unescaped slash is indistinguishable from a repository subpath.
+                val rawParts = uri.rawPath.orEmpty().trim('/').split('/').filter { it.isNotBlank() }
+                val refKind = rawParts.getOrNull(2)
+                val isRefPath = refKind?.let { kind ->
+                    kind.equals("tree", ignoreCase = true) ||
+                        kind.equals("blob", ignoreCase = true) ||
+                        kind.equals("commit", ignoreCase = true)
+                } == true
+                val rawPathRef = rawParts.getOrNull(3).takeIf { rawParts.size >= 4 && isRefPath }
+                val pathRef = rawPathRef?.let(::decodePathSegment)
                 val ref = refParams.singleOrNull() ?: pathRef
                 if (ref != null && !isSafeRef(ref)) return null
                 return Repository(owner, name, ref)
@@ -74,6 +89,9 @@ class GitHubRepositoryClient {
 
             private fun decodeQueryComponent(value: String): String? =
                 runCatching { URLDecoder.decode(value, Charsets.UTF_8.name()) }.getOrNull()
+
+            private fun decodePathSegment(value: String): String? =
+                runCatching { URLDecoder.decode(value.replace("+", "%2B"), Charsets.UTF_8.name()) }.getOrNull()
         }
     }
 
@@ -81,7 +99,7 @@ class GitHubRepositoryClient {
         val branch = resolveReference(repository)
         val encodedBranch = encodePathSegment(branch)
         val treeJson = getJson("https://api.github.com/repos/${repository.owner}/${repository.name}/git/trees/$encodedBranch?recursive=1")
-        val tree = treeJson.optJSONArray("tree") ?: JSONArray()
+        val tree = requireGitHubTreeArray(treeJson)
         val pathPrefix = rawPathPrefix?.trim()?.trim('/')?.takeIf { it.isNotBlank() }
         if (pathPrefix != null && (pathPrefix.length > 500 || pathPrefix.split('/').any { it == ".." || it.isBlank() })) {
             throw IOException("Invalid repository folder path")

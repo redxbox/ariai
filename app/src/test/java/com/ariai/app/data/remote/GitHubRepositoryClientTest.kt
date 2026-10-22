@@ -1,7 +1,10 @@
 package com.ariai.app.data.remote
 
+import java.io.IOException
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class GitHubRepositoryClientTest {
@@ -22,6 +25,19 @@ class GitHubRepositoryClientTest {
     }
 
     @Test
+    fun `parses percent-encoded slash refs from tree and blob URLs without consuming the subpath`() {
+        val treeRef = GitHubRepositoryClient.Repository.fromUserText(
+            "https://github.com/example/project/tree/feature%2Fapi/app/src"
+        )
+        assertEquals("feature/api", treeRef?.ref)
+
+        val blobRef = GitHubRepositoryClient.Repository.fromUserText(
+            "https://github.com/example/project/blob/release%2F1/README.md"
+        )
+        assertEquals("release/1", blobRef?.ref)
+    }
+
+    @Test
     fun `rejects unsafe or ambiguous branch refs`() {
         assertNull(GitHubRepositoryClient.Repository.fromUserText(
             "https://github.com/redxbox/ariai?ref=arena%2F..%2Fmain"
@@ -29,6 +45,14 @@ class GitHubRepositoryClientTest {
         assertNull(GitHubRepositoryClient.Repository.fromUserText(
             "https://github.com/redxbox/ariai?ref=main&ref=other"
         ))
+    }
+
+    @Test
+    fun `invalid tree response is not reported as an empty repository`() {
+        assertThrows(IOException::class.java) {
+            requireGitHubTreeArray(JSONObject("{}"))
+        }
+        assertEquals(0, requireGitHubTreeArray(JSONObject("""{"tree":[]}""")).length())
     }
 
     @Test

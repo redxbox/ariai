@@ -69,7 +69,7 @@ object DefaultAgentTools {
     fun githubRepository(repository: GitHubRepositoryClient.Repository, client: GitHubRepositoryClient): List<ChatFunctionTool> = listOf(
         ChatFunctionTool(
             name = "github_list_files",
-            description = "List files from the public GitHub repository and branch/ref explicitly supplied by the user (the default branch when no ref is present). Use this before choosing source files to read. Pass path_prefix to focus on a folder when the tree is large.",
+            description = "List files from the public GitHub repository and branch/ref explicitly supplied by the user (the default branch when no ref is present). Use this before choosing source files to read. For branch names containing '/', use an explicit ?ref= query (or a percent-encoded ref segment), because unescaped path segments are ambiguous. Pass path_prefix to focus on a folder when the tree is large.",
             parameters = objectSchema(
                 properties = JSONObject().put("path_prefix", stringProperty("Optional repository folder prefix, such as app/src/main")),
                 required = emptyList()
