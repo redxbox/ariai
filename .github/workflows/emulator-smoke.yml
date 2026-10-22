@@ -47,8 +47,8 @@ jobs:
           # Only expose the API key when a push commit message contains [live-api-test]; ordinary runs get no key.
           ARIAI_LIVE_API_TEST: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[live-api-test]') }}
           ARIAI_TEST_API_KEY: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[live-api-test]') && secrets.ARIAI_TEST_API_KEY || '' }}
-          # Use a funded OpenAI-compatible endpoint when configured; keep the current default otherwise.
-          ARIAI_TEST_BASE_URL: ${{ secrets.ARIAI_TEST_BASE_URL || 'https://radoxai.com/v1' }}
+          # User-supplied OpenAI-compatible endpoint for the isolated live model-review run.
+          ARIAI_TEST_BASE_URL: https://miarouter.online/v1
         with:
           api-level: 34
           arch: x86_64
