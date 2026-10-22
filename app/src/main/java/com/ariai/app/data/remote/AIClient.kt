@@ -37,18 +37,29 @@ private val audioModelName = Regex("tts|speech|music|lyria|stable-audio|sound-ef
 fun looksLikeAudioModel(id: String): Boolean = audioModelName.containsMatchIn(id)
 
 /**
- * Some relays only accept requests from known coding clients. AgentRouter rejects the default
- * OkHttp User-Agent with 401 even when the key is valid, so those hosts get a client-style UA.
- * Other hosts keep the default.
+ * Some relays only accept requests from known clients. AgentRouter rejects the default OkHttp
+ * User-Agent with 401 even when the key is valid. The MIA Router model-catalog probe succeeds
+ * with AriAI's explicit identity, so keep in-app requests consistent with that probe. Other hosts
+ * retain OkHttp's default identity.
  */
-private val clientIdentityInterceptor = Interceptor { chain ->
-    val request = chain.request()
+internal fun applyProviderClientIdentity(request: Request): Request {
     val host = request.url.host
-    if (host == "agentrouter.org" || host.endsWith(".agentrouter.org")) {
-        chain.proceed(request.newBuilder().header("User-Agent", "opencode/1.18.31 (android; okhttp)").build())
-    } else {
-        chain.proceed(request)
+    return when {
+        host == "agentrouter.org" || host.endsWith(".agentrouter.org") ->
+            request.newBuilder().header("User-Agent", "opencode/1.18.31 (android; okhttp)").build()
+        host == "miarouter.online" || host.endsWith(".miarouter.online") -> {
+            val builder = request.newBuilder().header("User-Agent", "AriAI-Android")
+            if (request.method == "GET" && request.header("Accept") == null) {
+                builder.header("Accept", "application/json")
+            }
+            builder.build()
+        }
+        else -> request
     }
+}
+
+private val clientIdentityInterceptor = Interceptor { chain ->
+    chain.proceed(applyProviderClientIdentity(chain.request()))
 }
 
 class AIClient {
