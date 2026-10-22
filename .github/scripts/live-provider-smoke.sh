@@ -100,15 +100,23 @@ enter_text() {
 
 enter_secret() {
   local secret="$1"
-  local escaped="${secret// /%s}"
-  local quoted="$(printf '%s' "$escaped" | python3 -c 'import shlex,sys; print(shlex.quote(sys.stdin.read()), end="")')"
-  # Never print the command or its args; the API key remains out of logs, artifacts and shell traces.
-  if ! timeout --signal=TERM --kill-after=5s 35s adb shell "input text $quoted" >/dev/null 2>&1; then
-    unset secret escaped quoted
-    echo "::error title=Live provider test::Could not enter the Actions API key; its value was suppressed."
-    return 1
-  fi
-  unset secret escaped quoted
+  local chunk escaped quoted
+  # Long API keys can be truncated by one Android input event; send bounded chunks without logging them.
+  while [[ -n "$secret" ]]; do
+    chunk="${secret:0:48}"
+    secret="${secret:${#chunk}}"
+    escaped="${chunk// /%s}"
+    quoted="$(printf '%s' "$escaped" | python3 -c 'import shlex,sys; print(shlex.quote(sys.stdin.read()), end="")')"
+    # Never print the command or its args; the API key remains out of logs, artifacts and shell traces.
+    if ! timeout --signal=TERM --kill-after=5s 35s adb shell "input text $quoted" >/dev/null 2>&1; then
+      unset secret chunk escaped quoted
+      echo "::error title=Live provider test::Could not enter the Actions API key; its value was suppressed."
+      return 1
+    fi
+    unset chunk escaped quoted
+    sleep 0.15
+  done
+  unset secret
   sleep 0.4
 }
 
