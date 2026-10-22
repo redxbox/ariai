@@ -128,7 +128,7 @@ enter_secret() {
   local chunk escaped quoted
   # Long API keys can be truncated by one Android input event; send bounded chunks without logging them.
   while [[ -n "$secret" ]]; do
-    chunk="${secret:0:48}"
+    chunk="${secret:0:24}"
     secret="${secret:${#chunk}}"
     escaped="${chunk// /%s}"
     quoted="$(printf '%s' "$escaped" | python3 -c 'import shlex,sys; print(shlex.quote(sys.stdin.read()), end="")')"
@@ -139,10 +139,10 @@ enter_secret() {
       return 1
     fi
     unset chunk escaped quoted
-    sleep 0.15
+    sleep 0.5
   done
   unset secret
-  sleep 0.4
+  sleep 1
 }
 
 select_review_model() {
