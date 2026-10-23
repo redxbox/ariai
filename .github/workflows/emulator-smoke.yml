@@ -57,13 +57,30 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            ./gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace
+            bash -o pipefail -c './gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace 2>&1 | tee instrumentation.log'
             timeout --signal=TERM --kill-after=15s 28m bash .github/scripts/smoke.sh
+
+      - name: Report emulator test failures as annotations
+        if: failure()
+        run: |
+          set +e
+          for log in instrumentation.log smoke-out/walkthrough.log; do
+            if [ -f "$log" ]; then
+              (grep -E "FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|FATAL EXCEPTION|ANR in|not visible:|not found:|::error" "$log" || true) | tail -40 | while IFS= read -r line; do
+                safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
+                echo "::error title=Emulator test failure::$safe"
+              done
+            fi
+          done
 
       - name: Upload screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: smoke-output
-          path: smoke-out/
+          path: |
+            smoke-out/
+            instrumentation.log
+            app/build/reports/androidTests/connected/
+          if-no-files-found: ignore
           retention-days: 7

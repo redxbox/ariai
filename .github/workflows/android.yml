@@ -35,7 +35,9 @@ jobs:
       continue-on-error: true
     
     - name: Unit tests
-      run: ./gradlew :app:testDebugUnitTest --stacktrace
+      run: |
+        set -o pipefail
+        ./gradlew :app:testDebugUnitTest --stacktrace 2>&1 | tee build.log
 
     - name: Build release APK (checks R8 and resource shrinking)
       run: ./gradlew :app:assembleRelease --stacktrace
@@ -49,7 +51,7 @@ jobs:
       if: failure()
       run: |
         # Surface Kotlin/aapt errors as GitHub annotations so they can be read without raw log access.
-        grep -E "^e: |error:|What went wrong|Execution failed" build.log | head -40 | while IFS= read -r line; do
+        (grep -E "^e: |error:|What went wrong|Execution failed|FAILED|AssertionError|expected:|but was:|Tests run:|There were failing tests|Caused by:" build.log || true) | tail -40 | while IFS= read -r line; do
           safe=$(echo "$line" | tr -d '\r' | cut -c1-900)
           echo "::error title=Build error::$safe"
         done
