@@ -39,14 +39,11 @@ class ChatRepository(
         null
     }
 
-    suspend fun saveProvider(provider: Provider) {
-        try {
-            val entity = withContext(Dispatchers.IO) { provider.toEntity() }
-            db.providerDao().insertProvider(entity)
-        } catch (e: Exception) {
-            com.ariai.app.util.AppLog.warn(e, "saveProvider")
-        }
-    }
+    suspend fun saveProvider(provider: Provider): Boolean = persistWithResult(
+        prepare = { withContext(Dispatchers.IO) { provider.toEntity() } },
+        persist = { entity -> db.providerDao().insertProvider(entity) },
+        onFailure = { com.ariai.app.util.AppLog.warn(it, "saveProvider") }
+    )
 
     /** Safely upgrades legacy plain-text provider keys without decrypting or replacing ciphertext. */
     suspend fun migrateProviderKeysToEncrypted() {
@@ -142,10 +139,10 @@ class ChatRepository(
                 })
             }
             db.withTransaction {
+                val chat = db.chatDao().getChatById(message.chatId)
+                    ?: throw IllegalStateException("Cannot save a message to a deleted chat")
                 db.messageDao().insertMessage(stored.toEntity())
-                db.chatDao().getChatById(message.chatId)?.let { chat ->
-                    db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
-                }
+                db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
             }
             true
         } catch (e: Exception) {
@@ -275,7 +272,8 @@ class ChatRepository(
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false,
-        stream: Boolean = true
+        stream: Boolean = true,
+        allowUrlContext: Boolean = true
     ): Flow<String> = kotlinx.coroutines.flow.flow {
         // Load stored attachment bytes here, off the main thread, right before the request.
         val ready = messages.map { m -> m.copy(attachments = m.attachments.map { it.hydrated() }) }
@@ -288,7 +286,8 @@ class ChatRepository(
             searchContext = searchContext,
             reasoning = reasoning,
             nativeSearch = nativeSearch,
-            stream = stream
+            stream = stream,
+            allowUrlContext = allowUrlContext
         ))
     }
         // Network work must not run on the main thread.

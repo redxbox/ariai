@@ -29,6 +29,20 @@ class ReplyFormatTest {
     }
 
     @Test
+    fun literalAsterisksArePreservedOutsideMarkdownEmphasis() {
+        assertEquals("Multiply 2 * 3 = 6; use * as a wildcard.", formatReply("Multiply 2 * 3 = 6; use * as a wildcard.").text)
+        assertEquals("2*3*4", formatReply("2*3*4").text)
+        assertEquals("foo_bar_baz", formatReply("foo_bar_baz").text)
+        assertEquals("The symbol is *.", formatReply("The symbol is `*`.").text)
+        assertEquals("Keep ** as code.", formatReply("Keep `**` as code.").text)
+    }
+
+    @Test
+    fun singleAsteriskEmphasisRemainsStyledWithoutLeakingMarkers() {
+        assertEquals("italic", formatReply("*italic*").text)
+    }
+
+    @Test
     fun headingsAreStyledAndSeparatedFromParagraphs() {
         val formatted = formatReply("## Summary\nA short answer.\n\n### Details\nMore context.", 15f)
         assertEquals("Summary\nA short answer.\n\nDetails\nMore context.", formatted.text)

@@ -57,6 +57,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
+            ./gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace
             timeout --signal=TERM --kill-after=15s 28m bash .github/scripts/smoke.sh
 
       - name: Upload screenshots and logs

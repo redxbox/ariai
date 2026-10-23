@@ -26,6 +26,9 @@ jobs:
       uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: 8.6
+
+    - name: Check Persian translation coverage
+      run: python3 .github/scripts/check_translations.py
     
     - name: Clean
       run: ./gradlew clean --stacktrace

@@ -154,7 +154,7 @@ class SearchClient {
                 }
                 val result = runCatching {
                     response.use { received ->
-                        val body = received.body?.string().orEmpty()
+                        val body = received.body?.readUtf8AtMost(HttpBodyLimits.SEARCH_BYTES).orEmpty()
                         if (!received.isSuccessful) {
                             throw IOException("$service search failed: HTTP ${received.code}: ${body.take(300)}")
                         }

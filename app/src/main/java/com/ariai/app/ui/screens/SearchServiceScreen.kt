@@ -29,13 +29,15 @@ import androidx.compose.ui.unit.sp
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private data class SearchService(val key: String, val name: String, val description: String)
+private data class SearchService(val key: String, val name: String, val descriptionKey: String) {
+    val description: String get() = tx(descriptionKey)
+}
 
 private val searchServices = listOf(
-    SearchService("tavily", "Tavily", tx("Research-focused search API")),
-    SearchService("brave", "Brave Search", tx("Independent web index")),
-    SearchService("exa", "Exa", tx("Semantic neural search")),
-    SearchService("serper", "Serper", tx("Google results via API"))
+    SearchService("tavily", "Tavily", "Research-focused search API"),
+    SearchService("brave", "Brave Search", "Independent web index"),
+    SearchService("exa", "Exa", "Semantic neural search"),
+    SearchService("serper", "Serper", "Google results via API")
 )
 
 /**
@@ -75,7 +77,7 @@ fun SearchServiceScreen(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            itemsIndexed(searchServices, key = { i, s -> "${s.key}_$i" }) { index, service ->
+            itemsIndexed(searchServices, key = { _, service -> "search-service:${service.key}" }) { index, service ->
                 val brand = listOf(
                     com.ariai.app.ui.theme.AriGemini,
                     com.ariai.app.ui.theme.AriOpenAI,

@@ -76,9 +76,11 @@ import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.ReasoningLevel
 import com.ariai.app.data.models.SearchMode
+import com.ariai.app.data.remote.PublicUrlFetcher
 import com.ariai.app.util.ReadResult
 import com.ariai.app.util.bitmapAttachment
 import com.ariai.app.util.readAttachment
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -86,6 +88,9 @@ private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Muted: Color @Composable @ReadOnlyComposable get() = AriMuted
 private val PageBg: Color @Composable @ReadOnlyComposable get() = AriPaper
+private val remoteImageFetcher by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { PublicUrlFetcher() }
+private const val MAX_REMOTE_IMAGE_SIDE = 2_048
+private const val MAX_REMOTE_IMAGE_PIXELS = 100_000_000L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewChatScreen(
@@ -95,6 +100,7 @@ fun NewChatScreen(
     isSending: Boolean = false,
     currentStreamingContent: String,
     selectedModel: String?,
+    selectedProviderId: String? = chat?.providerId,
     providers: List<Provider> = emptyList(),
     reasoning: ReasoningLevel = ReasoningLevel.AUTO,
     searchMode: SearchMode = SearchMode.OFF,
@@ -232,14 +238,14 @@ fun NewChatScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val currentProvider = providers.find { it.id == chat?.providerId } ?: providers.firstOrNull()
+    val currentProvider = providers.firstOrNull { it.id == selectedProviderId && it.enabled }
+        ?: providers.firstOrNull { it.enabled }
     val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
     val selectedModelCapabilities = currentProvider?.models?.firstOrNull { it.id == selectedModel }
     val selectedModelIsImageOnly = selectedModelCapabilities?.let { it.supportsImageGen && !it.outputsText } == true
     val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
     val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
     val hasStreamingText = currentStreamingContent.isNotBlank()
-    val lastMessageIndex = messages.lastIndex
     val showWaitingStatus = isSending && !hasStreamingText
     val waitingStatus = when {
         chatMode == ChatMode.IMAGE || selectedModelIsImageOnly ->
@@ -412,6 +418,7 @@ fun NewChatScreen(
     if (showModelSheet) {
         ModelPickerSheet(
             providers = providers,
+            selectedProviderId = selectedProviderId,
             selectedModelId = selectedModel,
             favorites = favorites,
             onToggleFavorite = onToggleFavorite,
@@ -685,11 +692,11 @@ fun NewChatScreen(
                 items(count = messages.size, key = { i -> messages[i].id }) { i ->
                     val m = messages[i]
                     val isError = m.status == MessageStatus.ERROR
-                    val hasLaterTurn = i < lastMessageIndex
-                    val retryUserId = m.parentId ?: messages.getOrNull(i - 1)
-                        ?.takeIf { it.role == MessageRole.USER }
+                    val retryUserId = if (isError) m.parentId else null
+                    val associatedUserId = retryUserId ?: messages.take(i)
+                        .lastOrNull { it.role == MessageRole.USER }
                         ?.id
-                    val canRetry = isError && !hasLaterTurn && retryUserId?.let { userId ->
+                    val canRetry = m.role == MessageRole.ASSISTANT && associatedUserId?.let { userId ->
                         messages.any { it.id == userId && it.role == MessageRole.USER }
                     } == true
                     when (m.role) {
@@ -952,7 +959,7 @@ private fun AssistantBlock(
                 ActionIcon(Icons.Default.ContentCopy, tx("Copy"), onCopy)
                 ActionIcon(Icons.Default.Share, tx("Share"), onShare ?: {})
                 ActionIcon(Icons.Default.CallSplit, tx("Branch"), onBranch ?: {})
-                ActionIcon(Icons.Default.Refresh, tx("Retry"), onRetry ?: {})
+                if (retryable && onRetry != null) ActionIcon(Icons.Default.Refresh, tx("Retry"), onRetry)
             }
         }
     }
@@ -1251,14 +1258,33 @@ private fun extractImageUrls(text: String): List<String> =
 
 private fun stripImageUrls(text: String): String = ImageLinkRegex.replace(text, "").trim()
 
-/** Downloads an image link off the main thread and shows it at full width. */
+private fun decodeRemoteImage(bytes: ByteArray): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    val width = bounds.outWidth
+    val height = bounds.outHeight
+    if (width <= 0 || height <= 0 || width.toLong() * height.toLong() > MAX_REMOTE_IMAGE_PIXELS) return null
+
+    var sampleSize = 1
+    while (width / sampleSize > MAX_REMOTE_IMAGE_SIDE || height / sampleSize > MAX_REMOTE_IMAGE_SIDE) {
+        sampleSize *= 2
+    }
+    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+}
+
+/** Safely downloads a bounded public image off the main thread and shows a downsampled preview. */
 @Composable
 private fun RemoteImage(url: String) {
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = url) {
         value = withContext(Dispatchers.IO) {
-            runCatching {
-                java.net.URL(url).openStream().use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-            }.getOrNull()
+            try {
+                decodeRemoteImage(remoteImageFetcher.fetchImageBytes(url))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
         }
     }
     val shape = RoundedCornerShape(16.dp)

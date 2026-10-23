@@ -140,6 +140,7 @@ fun PreferencesScreen(
 @Composable
 fun DefaultModelScreen(
     providers: List<Provider>,
+    defaultProviderId: String?,
     defaultModelId: String?,
     onSelect: (providerId: String, modelId: String) -> Unit,
     onAddProvider: () -> Unit,
@@ -191,8 +192,8 @@ fun DefaultModelScreen(
                 item(key = "h_${provider.id}") {
                     Text(provider.name, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Ink.copy(alpha = 0.5f), modifier = Modifier.padding(top = 10.dp, start = 6.dp))
                 }
-                itemsIndexed(models, key = { i, m -> "${provider.id}_${m.id}_$i" }) { _, model ->
-                    val selected = model.id == defaultModelId
+                itemsIndexed(models, key = { _, m -> "model:${provider.id}:${m.id}" }) { _, model ->
+                    val selected = isSelectedModel(provider.id, model.id, defaultProviderId, defaultModelId)
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = if (selected) Accent.copy(alpha = 0.10f) else AriCard,

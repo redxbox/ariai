@@ -2,14 +2,10 @@ package com.ariai.app.data.remote
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import okhttp3.Callback
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
@@ -85,6 +81,41 @@ class PublicUrlFetcher {
         }
     }
 
+    suspend fun fetchImageBytes(rawUrl: String, maxBytes: Int = MAX_IMAGE_BYTES): ByteArray {
+        require(maxBytes in 1..MAX_IMAGE_BYTES) { "Requested image limit is out of range" }
+        var current = parseAndValidate(rawUrl)
+        repeat(MAX_REDIRECTS + 1) { redirectCount ->
+            val request = Request.Builder()
+                .url(current.toASCIIString())
+                .header("User-Agent", "AriAI/1.0 (image preview)")
+                .header("Accept", "image/png,image/jpeg,image/webp,image/gif")
+                .get()
+                .build()
+            var redirectedTo: URI? = null
+            val bytes = executeCancellable(request).use { response ->
+                if (response.code in REDIRECT_CODES) {
+                    val location = response.header("Location") ?: throw IOException("Redirect did not include a Location header")
+                    redirectedTo = current.resolve(location)
+                    return@use null
+                }
+                if (!response.isSuccessful) throw IOException("Image fetch failed: HTTP ${response.code}")
+                val body = response.body ?: throw IOException("Image URL returned an empty body")
+                val mediaType = body.contentType()?.let { "${it.type}/${it.subtype}" }?.lowercase()
+                    ?: throw IOException("Image URL did not declare a content type")
+                if (mediaType !in IMAGE_TYPES) throw IOException("Unsupported image content type: $mediaType")
+                if (body.contentLength() > maxBytes) throw IOException("Image exceeds the ${maxBytes / 1024} KB limit")
+                readLimited(body.byteStream(), maxBytes)
+            }
+            if (redirectedTo != null) {
+                if (redirectCount == MAX_REDIRECTS) throw IOException("Too many redirects")
+                current = parseAndValidate(redirectedTo.toString())
+            } else {
+                return bytes ?: throw IOException("Image URL returned no image data")
+            }
+        }
+        throw IOException("Too many redirects")
+    }
+
     suspend fun fetch(rawUrl: String, maxChars: Int = 12_000): String {
         require(maxChars in 1..50_000) { "Requested text limit is out of range" }
         var current = parseAndValidate(rawUrl)
@@ -133,20 +164,6 @@ class PublicUrlFetcher {
         throw IOException("Too many redirects")
     }
 
-    private suspend fun executeCancellable(request: Request): Response = suspendCancellableCoroutine { continuation ->
-        val call = client.newCall(request)
-        continuation.invokeOnCancellation { call.cancel() }
-        call.enqueue(object : Callback {
-            override fun onFailure(call: okhttp3.Call, e: IOException) {
-                if (continuation.isActive) continuation.resumeWith(Result.failure(e))
-            }
-
-            override fun onResponse(call: okhttp3.Call, response: Response) {
-                if (continuation.isActive) continuation.resumeWith(Result.success(response)) else response.close()
-            }
-        })
-    }
-
     private fun parseAndValidate(rawUrl: String): URI {
         if (rawUrl.length > 2_048) throw IOException("URL is too long")
         val uri = try { URI(rawUrl.trim()) } catch (e: Exception) { throw IOException("Invalid URL", e) }
@@ -165,20 +182,6 @@ class PublicUrlFetcher {
             throw IOException("Private and local IP addresses are not allowed")
         }
         return uri
-    }
-
-    private fun readLimited(input: java.io.InputStream, maxBytes: Int): ByteArray {
-        input.use { stream ->
-            val out = ByteArrayOutputStream()
-            val buffer = ByteArray(8_192)
-            while (out.size() <= maxBytes) {
-                val count = stream.read(buffer, 0, minOf(buffer.size, maxBytes + 1 - out.size()))
-                if (count < 0) break
-                out.write(buffer, 0, count)
-            }
-            if (out.size() > maxBytes) throw IOException("URL response exceeds the ${maxBytes / 1024} KB limit")
-            return out.toByteArray()
-        }
     }
 
     private fun htmlToText(html: String): String = html
@@ -200,9 +203,11 @@ class PublicUrlFetcher {
 
     private companion object {
         const val MAX_BYTES = 512 * 1024
+        const val MAX_IMAGE_BYTES = 20 * 1024 * 1024
         const val MAX_REDIRECTS = 4
         val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
         val TEXT_TYPES = setOf("text/html", "text/plain", "application/json", "application/xml", "text/xml", "text/markdown")
+        val IMAGE_TYPES = setOf("image/png", "image/jpeg", "image/webp", "image/gif")
         val TITLE_REGEX = Regex("<title[^>]*>(.*?)</title>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         val SCRIPT_REGEX = Regex("<(script|noscript)[^>]*>.*?</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         val STYLE_REGEX = Regex("<style[^>]*>.*?</style>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))

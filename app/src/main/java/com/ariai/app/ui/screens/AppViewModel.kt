@@ -10,6 +10,8 @@ import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.data.remote.looksLikeVideoModel
 import com.ariai.app.data.remote.ChatFunctionTool
 import com.ariai.app.data.remote.DefaultAgentTools
+import com.ariai.app.data.remote.shouldOfferCalculatorTool
+import com.ariai.app.data.remote.shouldStreamToolFreeChat
 import com.ariai.app.data.remote.GitHubRepositoryClient
 import com.ariai.app.data.remote.PublicUrlFetcher
 import com.ariai.app.data.repository.ChatRepository
@@ -235,13 +237,26 @@ class AppViewModel(
 
     suspend fun fetchModels(provider: Provider): List<AIModel> = repository.fetchModels(provider)
 
-    fun saveProvider(provider: Provider) {
+    fun saveProvider(provider: Provider, onSaved: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val models = if (provider.models.isEmpty()) {
-                runCatching { repository.fetchModels(provider) }.getOrNull()?.takeIf { it.isNotEmpty() }
-                    ?: getDefaultModelsForType(provider.type, provider.id)
+                val fetched = try {
+                    repository.fetchModels(provider)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    com.ariai.app.util.AppLog.warn(e, "fetch models before provider save")
+                    onSaved(false)
+                    return@launch
+                }
+                if (fetched.isEmpty()) {
+                    onSaved(false)
+                    return@launch
+                }
+                fetched
             } else provider.models
-            repository.saveProvider(provider.copy(models = models))
+            val saved = repository.saveProvider(provider.copy(models = models))
+            onSaved(saved)
         }
     }
 
@@ -266,11 +281,20 @@ class AppViewModel(
 
     fun createNewChat(providerId: String? = null, modelId: String? = null, agentId: String? = null): String {
         val id = java.util.UUID.randomUUID().toString()
+        val availableProviders = providers.value.filter { it.enabled }
+        val selectedProvider = providerId?.let { requested ->
+            availableProviders.firstOrNull { it.id == requested }
+        } ?: defaultProviderId.value?.let { requested ->
+            availableProviders.firstOrNull { it.id == requested }
+        } ?: availableProviders.firstOrNull()
+        val selectedModel = modelId?.takeIf { requested -> selectedProvider?.models?.any { it.id == requested } == true }
+            ?: defaultModelId.value?.takeIf { requested -> selectedProvider?.models?.any { it.id == requested } == true }
+            ?: selectedProvider?.models?.firstOrNull()?.id
         val chat = Chat(
             id = id,
             title = "New Chat",
-            providerId = providerId ?: defaultProviderId.value ?: providers.value.firstOrNull()?.id,
-            modelId = modelId ?: defaultModelId.value ?: providers.value.firstOrNull()?.models?.firstOrNull()?.id,
+            providerId = selectedProvider?.id,
+            modelId = selectedModel,
             agentId = agentId
         )
         // Set active state synchronously: callers navigate to this id immediately after return.
@@ -298,10 +322,21 @@ class AppViewModel(
         }
     }
 
-    fun deleteChat(id: String) {
+    fun deleteChat(id: String, onDone: () -> Unit = {}) = deleteChats(listOf(id), onDone)
+
+    fun deleteChats(ids: List<String>, onDone: () -> Unit = {}) {
+        val uniqueIds = ids.toSet()
+        if (_currentChatId.value?.let { it in uniqueIds } == true) {
+            cancelActiveChatStreams()
+            messagesCollectionJob?.cancel()
+            messagesCollectionJob = null
+            _currentChatId.value = null
+            _messages.value = emptyList()
+        }
         viewModelScope.launch {
-            repository.deleteChat(id)
+            uniqueIds.forEach { repository.deleteChat(it) }
             runCatching { _generatedMediaBytes.value = repository.generatedMediaBytes() }
+            onDone()
         }
     }
 
@@ -367,7 +402,7 @@ class AppViewModel(
 
     private fun resolveProvider(chatId: String? = null): Provider? = try {
         val providerId = (chatId?.let { _modelOverrides.value[it]?.first }) ?: getCurrentChat()?.providerId
-        providers.value.find { it.id == providerId } ?: providers.value.firstOrNull()
+        resolveEnabledProvider(providers.value, providerId)
     } catch (e: Exception) {
         null
     }
@@ -808,7 +843,7 @@ class AppViewModel(
                     val webUrls = userProvidedUrls.filterNot { GitHubRepositoryClient.Repository.fromUserText(it) != null }
                     val functionTools: List<ChatFunctionTool> = if (current?.supportsFunctionCalling != false) {
                         buildList {
-                            add(DefaultAgentTools.calculator())
+                            if (shouldOfferCalculatorTool(sentContent)) add(DefaultAgentTools.calculator())
                             if (localSearchKey != null) {
                                 val searchProvider = SearchProvider(
                                     name = localSearchKey.first,
@@ -862,19 +897,37 @@ class AppViewModel(
                         CHAT_CAPABILITY_POLICY
                     ).joinToString("\n\n").ifBlank { null }
 
+                    val streamEnabled = shouldStreamToolFreeChat(streamResponse.value, functionTools.isNotEmpty())
+                    val responseFlow = if (functionTools.isEmpty()) {
+                        repository.streamChat(
+                            provider = provider,
+                            messages = history,
+                            modelId = requestModelId,
+                            systemPrompt = systemPrompt,
+                            searchContext = searchContext,
+                            reasoning = reasoning,
+                            nativeSearch = nativeSearch,
+                            stream = streamEnabled,
+                            allowUrlContext = hasUrlContext
+                        )
+                    } else {
+                        // Tool-routing steps remain non-streaming until the provider can safely
+                        // stream structured tool-call deltas; ordinary tool-free replies honor the preference.
+                        repository.agentChat(
+                            provider = provider,
+                            messages = history,
+                            modelId = requestModelId,
+                            systemPrompt = systemPrompt,
+                            tools = functionTools,
+                            searchContext = searchContext,
+                            reasoning = reasoning,
+                            nativeSearch = nativeSearch,
+                            contextWindow = modelContextWindow,
+                            allowUrlContext = userProvidedUrls.isNotEmpty()
+                        )
+                    }
                     var lastPublishMs = 0L
-                    repository.agentChat(
-                        provider = provider,
-                        messages = history,
-                        modelId = requestModelId,
-                        systemPrompt = systemPrompt,
-                        tools = functionTools,
-                        searchContext = searchContext,
-                        reasoning = reasoning,
-                        nativeSearch = nativeSearch,
-                        contextWindow = modelContextWindow,
-                        allowUrlContext = userProvidedUrls.isNotEmpty()
-                    ).collect { chunk ->
+                    responseFlow.collect { chunk ->
                         fullResponse += chunk
                         // Publish at most ~16 times per second; each publish recomposes and re-renders markdown.
                         val now = System.currentTimeMillis()
@@ -1098,24 +1151,26 @@ class AppViewModel(
         message: ChatMessage,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         searchMode: SearchMode = SearchMode.OFF
-    ) {
-        val chatId = _currentChatId.value ?: return
-        if (message.chatId != chatId || _isStreaming.value || sendPending) return
+    ): String? {
+        val chatId = _currentChatId.value ?: return null
+        if (message.chatId != chatId || _isStreaming.value || sendPending) return null
 
         val currentMessages = _messages.value
         val messageIndex = currentMessages.indexOfFirst { it.id == message.id }
-        if (messageIndex < 0) return
+        if (messageIndex < 0 || message.role != MessageRole.ASSISTANT) return null
 
         val userMessage = if (message.status == MessageStatus.ERROR) {
             message.parentId?.let { parentId ->
                 currentMessages.firstOrNull { it.id == parentId && it.role == MessageRole.USER }
-            } ?: currentMessages.getOrNull(messageIndex - 1)?.takeIf { it.role == MessageRole.USER } ?: return
+            } ?: currentMessages.take(messageIndex).lastOrNull { it.role == MessageRole.USER } ?: return null
         } else {
-            currentMessages.take(messageIndex).lastOrNull { it.role == MessageRole.USER } ?: return
+            currentMessages.take(messageIndex).lastOrNull { it.role == MessageRole.USER } ?: return null
         }
+        val laterConversationExists = currentMessages.drop(messageIndex + 1).any { it.role != MessageRole.SYSTEM }
 
-        // An old failed turn is not the active request once a later turn has been added.
-        if (message.status == MessageStatus.ERROR && currentMessages.drop(messageIndex + 1).isNotEmpty()) return
+        if (laterConversationExists) {
+            return branchAndRetry(userMessage, currentMessages, reasoning, searchMode)
+        }
 
         sendMessageInternal(
             content = userMessage.content,
@@ -1126,6 +1181,64 @@ class AppViewModel(
             messageToReplace = message,
             onUserMessageSaved = {}
         )
+        return chatId
+    }
+
+    /** Preserve later turns in the original chat while retrying the selected request in a branch. */
+    private fun branchAndRetry(
+        userMessage: ChatMessage,
+        history: List<ChatMessage>,
+        reasoning: ReasoningLevel,
+        searchMode: SearchMode
+    ): String? {
+        val originalChat = getCurrentChat() ?: return null
+        val sourceMessages = messagesThroughUserTurn(history, userMessage.id)
+        if (sourceMessages.isEmpty()) return null
+        val newChatId = java.util.UUID.randomUUID().toString()
+        val newIds = sourceMessages.associate { it.id to java.util.UUID.randomUUID().toString() }
+        val branchMessages = sourceMessages.map { source ->
+            source.copy(
+                id = newIds.getValue(source.id),
+                chatId = newChatId,
+                parentId = source.parentId?.let(newIds::get),
+                branchChildren = source.branchChildren.mapNotNull(newIds::get)
+            )
+        }
+        val branchUser = branchMessages.firstOrNull { it.id == newIds[userMessage.id] } ?: return null
+        val now = System.currentTimeMillis()
+        val branchChat = originalChat.copy(
+            id = newChatId,
+            title = "${originalChat.title} (Retry)",
+            createdAt = now,
+            updatedAt = now
+        )
+
+        cancelActiveChatStreams()
+        messagesCollectionJob?.cancel()
+        messagesCollectionJob = null
+        _currentChatId.value = newChatId
+        _messages.value = emptyList()
+        viewModelScope.launch {
+            repository.saveChat(branchChat)
+            for (branchMessage in branchMessages) {
+                if (!repository.saveMessage(branchMessage)) {
+                    com.ariai.app.util.AppLog.warn(IllegalStateException("Could not prepare retry branch"), "retry branch")
+                    return@launch
+                }
+            }
+            if (_currentChatId.value != newChatId) return@launch
+            _messages.value = repository.getMessagesSync(newChatId)
+            sendMessageInternal(
+                content = branchUser.content,
+                attachments = branchUser.attachments,
+                reasoning = reasoning,
+                searchMode = searchMode,
+                existingUserMessage = branchUser,
+                messageToReplace = null,
+                onUserMessageSaved = {}
+            )
+        }
+        return newChatId
     }
 
     fun generateImage(prompt: String, model: String, size: String) {

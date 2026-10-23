@@ -81,7 +81,7 @@ fun SimpleSettingsScreen(
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Preferences"), subtitle = tx("Chat options, text size, theme"), onClick = onPreferencesClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Language, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Language"), subtitle = if (currentLanguage == "en") tx("English") else currentLanguage, onClick = {
+                        SimpleRow(icon = Icons.Default.Language, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Language"), subtitle = if (currentLanguage == "en") tx("English") else tx("Persian"), onClick = {
                             val newLang = if (currentLanguage == "en") "fa" else "en"
                             onLanguageChange(newLang)
                         })
@@ -95,7 +95,6 @@ fun SimpleSettingsScreen(
                         SimpleRow(icon = Icons.Default.Storage, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Providers"), subtitle = tx("OpenAI, Gemini, Claude and more"), onClick = onProvidersClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Search, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Search service"), subtitle = tx("Web search for answers"), onClick = onSearchServiceClick)
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriAccent, title = tx("MCP servers"), subtitle = tx("Preview only; tools are not connected yet"), onClick = onMcpClick)
                     }

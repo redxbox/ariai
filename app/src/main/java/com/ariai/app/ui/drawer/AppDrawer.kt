@@ -1,5 +1,6 @@
 package com.ariai.app.ui.drawer
 
+import com.ariai.app.util.UiLang
 import com.ariai.app.util.tx
 
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +38,11 @@ import java.util.Calendar
 
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private enum class DayBucket(val label: String) { PINNED(tx("Pinned")), TODAY(tx("Today")), YESTERDAY(tx("Yesterday")), EARLIER(tx("Earlier")) }
+private enum class DayBucket(val labelKey: String) {
+    PINNED("Pinned"), TODAY("Today"), YESTERDAY("Yesterday"), EARLIER("Earlier");
+
+    val label: String get() = tx(labelKey)
+}
 
 private fun bucketOf(timestamp: Long, now: Long = System.currentTimeMillis()): DayBucket {
     val nowCal = Calendar.getInstance().apply { timeInMillis = now }
@@ -52,7 +57,7 @@ private fun bucketOf(timestamp: Long, now: Long = System.currentTimeMillis()): D
 }
 
 private sealed interface DrawerRow {
-    data class Header(val label: String) : DrawerRow
+    data class Header(val id: String, val label: String) : DrawerRow
     data class ChatRow(val chat: Chat) : DrawerRow
 }
 
@@ -75,19 +80,19 @@ fun ColumnScope.AppDrawerContent(
 ) {
     var query by remember { mutableStateOf("") }
 
-    val rows: List<DrawerRow> = remember(chats, query) {
+    val rows: List<DrawerRow> = remember(chats, query, UiLang.code) {
         val filtered = if (query.isBlank()) chats else chats.filter { it.title.contains(query, ignoreCase = true) }
         val out = mutableListOf<DrawerRow>()
         val pinned = filtered.filter { it.isPinned }
         if (pinned.isNotEmpty()) {
-            out += DrawerRow.Header(DayBucket.PINNED.label)
+            out += DrawerRow.Header("header:pinned", DayBucket.PINNED.label)
             pinned.forEach { out += DrawerRow.ChatRow(it) }
         }
         val rest = filtered.filterNot { it.isPinned }.sortedByDescending { it.updatedAt }
         DayBucket.values().filter { it != DayBucket.PINNED }.forEach { bucket ->
             val group = rest.filter { bucketOf(it.updatedAt) == bucket }
             if (group.isNotEmpty()) {
-                out += DrawerRow.Header(bucket.label)
+                out += DrawerRow.Header("header:${bucket.name.lowercase()}", bucket.label)
                 group.forEach { out += DrawerRow.ChatRow(it) }
             }
         }
@@ -132,7 +137,7 @@ fun ColumnScope.AppDrawerContent(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         if (rows.isEmpty()) {
-            item {
+            item(key = "drawer:empty") {
                 Text(
                     if (query.isBlank()) tx("No conversations yet") else tx("No matches"),
                     color = Ink.copy(alpha = 0.45f),
@@ -141,10 +146,10 @@ fun ColumnScope.AppDrawerContent(
                 )
             }
         }
-        itemsIndexed(rows, key = { index, row ->
+        itemsIndexed(rows, key = { _, row ->
             when (row) {
-                is DrawerRow.Header -> "h_${row.label}_$index"
-                is DrawerRow.ChatRow -> "c_${row.chat.id}_$index"
+                is DrawerRow.Header -> row.id
+                is DrawerRow.ChatRow -> "chat:${row.chat.id}"
             }
         }) { _, row ->
             when (row) {
@@ -170,7 +175,7 @@ fun ColumnScope.AppDrawerContent(
 
     // Footer: quick access to the main areas. Each button opens a real screen.
     Column(
-        modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }

@@ -4,7 +4,6 @@ import com.ariai.app.util.tx
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import com.ariai.app.ui.components.GlassCard
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.BorderStroke
@@ -22,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -184,14 +184,14 @@ fun NewProvidersScreen(
             val onList = visible.filter { it.enabled }
             val offList = visible.filter { !it.enabled }
             if (onList.isNotEmpty()) {
-                item { SectionTitle(tx("Active")) }
-                itemsIndexed(onList, key = { i, p -> "on_${p.id}_$i" }) { _, provider ->
+                item(key = "providers:active") { SectionTitle(tx("Active")) }
+                itemsIndexed(onList, key = { _, p -> "provider:${p.id}" }) { _, provider ->
                     ProviderCard(provider = provider, onClick = { onEditProvider(provider) }, onToggle = { onToggleProvider(provider) })
                 }
             }
             if (offList.isNotEmpty()) {
-                item { SectionTitle(tx("Turned off")) }
-                itemsIndexed(offList, key = { i, p -> "off_${p.id}_$i" }) { _, provider ->
+                item(key = "providers:turned-off") { SectionTitle(tx("Turned off")) }
+                itemsIndexed(offList, key = { _, p -> "provider:${p.id}" }) { _, provider ->
                     ProviderCard(provider = provider, onClick = { onEditProvider(provider) }, onToggle = { onToggleProvider(provider) })
                 }
             }
@@ -282,6 +282,7 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
                 }
             }
             Switch(
+                modifier = Modifier.testTag("provider-toggle-${provider.id}"),
                 checked = provider.enabled,
                 onCheckedChange = { onToggle() },
                 colors = SwitchDefaults.colors(

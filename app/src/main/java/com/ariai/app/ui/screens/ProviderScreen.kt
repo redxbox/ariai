@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.*
 import com.ariai.app.util.LocalStrings
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -123,7 +124,7 @@ fun ProviderListScreen(
                 }
             }
 
-            items(count = providers.size, key = { index -> "${providers[index].id}_${providers[index].createdAt}_$index" }) { index ->
+            items(count = providers.size, key = { index -> "provider:${providers[index].id}" }) { index ->
                 val provider = providers[index]
                 GlassProviderCard(
                     provider = provider,
@@ -272,14 +273,16 @@ fun PopularProviderRow(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-internal data class ProviderPreset(val label: String, val type: ProviderType, val baseUrl: String, val color: Color)
+internal data class ProviderPreset(val labelKey: String, val type: ProviderType, val baseUrl: String, val color: Color) {
+    val label: String get() = tx(labelKey)
+}
 
 internal val providerPresets = listOf(
     ProviderPreset("OpenAI", ProviderType.OPENAI, "https://api.openai.com/v1", AriOpenAI),
     ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", AriGemini),
     ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", AriAnthropic),
     ProviderPreset("Ollama", ProviderType.OLLAMA, "http://localhost:11434/v1", AriOllama),
-    ProviderPreset(tx("Custom"), ProviderType.OPENAI_COMPATIBLE, "", AriCustom)
+    ProviderPreset("Custom", ProviderType.OPENAI_COMPATIBLE, "", AriCustom)
 )
 
 /**
@@ -349,7 +352,7 @@ fun AddProviderScreen(
         createdAt = initialProvider?.createdAt ?: System.currentTimeMillis()
     )
     fun fetchAndMerge(
-        onDone: (List<AIModel>?) -> Unit,
+        onDone: (List<AIModel>) -> Unit,
         showModelsWhenFetched: Boolean = false
     ) {
         val requestedSourceKey = sourceKey()
@@ -357,26 +360,37 @@ fun AddProviderScreen(
         fetching = true
         fetchError = null
         scope.launch {
-            val result = runCatching { fetchModels(requestProvider) }
+            val outcome = try {
+                refreshProviderModels(
+                    fetch = { fetchModels(requestProvider) },
+                    sourceIsCurrent = { sourceKey() == requestedSourceKey }
+                ) { fetched ->
+                    // When the endpoint/key/type changed, only retain explicitly custom models from the old source.
+                    val mergeBase = if (requestedSourceKey == fetchedKey) models else models.filter { it.isCustom }
+                    val merged = mergeFetched(mergeBase, fetched)
+                    models = merged
+                    fetchedKey = requestedSourceKey
+                    if (showModelsWhenFetched) {
+                        modelFilter = ""
+                        modelsExpanded = false
+                        tab = 1
+                    }
+                    onDone(merged)
+                }
+            } catch (cancelled: CancellationException) {
+                fetching = false
+                throw cancelled
+            }
             fetching = false
-            result.onSuccess { fetched ->
-                if (sourceKey() != requestedSourceKey) {
+            when (outcome) {
+                ProviderRefreshOutcome.Updated -> Unit
+                ProviderRefreshOutcome.SourceChanged -> {
                     fetchError = tx("Connection changed while fetching. Fetch again.")
-                    onDone(null)
-                    return@onSuccess
                 }
-                val merged = mergeFetched(models, fetched)
-                models = merged
-                fetchedKey = requestedSourceKey
-                if (showModelsWhenFetched) {
-                    modelFilter = ""
-                    modelsExpanded = false
-                    tab = 1
+                is ProviderRefreshOutcome.Failed -> {
+                    val error = outcome.error
+                    fetchError = "${tx("Could not load models")}: ${error.message ?: error::class.java.simpleName}"
                 }
-                onDone(merged)
-            }.onFailure {
-                fetchError = "Could not load models: ${it.message ?: it::class.java.simpleName}"
-                onDone(null)
             }
         }
     }
@@ -389,7 +403,7 @@ fun AddProviderScreen(
     fun saveProviderDraft() {
         if (sourceKey() != fetchedKey) {
             // URL, key or type changed: refresh the models before saving.
-            fetchAndMerge(onDone = { list -> onSave(draftProvider(list ?: models)) })
+            fetchAndMerge(onDone = { list -> onSave(draftProvider(list)) })
         } else {
             onSave(draftProvider(models))
         }

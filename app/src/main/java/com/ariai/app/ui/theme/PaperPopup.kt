@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -15,25 +16,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 
-/** A popup silhouette with a squared logical-end corner for the folded flap. */
-fun paperPopupShape(cornerRadius: Dp) = RoundedCornerShape(
-    topStart = cornerRadius,
-    topEnd = 0.dp,
-    bottomEnd = cornerRadius,
-    bottomStart = cornerRadius
+/** A popup silhouette with a squared physical top-left corner for the folded flap. */
+fun paperPopupShape(cornerRadius: Dp) = AbsoluteRoundedCornerShape(
+    topLeft = 0.dp,
+    topRight = cornerRadius,
+    bottomRight = cornerRadius,
+    bottomLeft = cornerRadius
 )
 
-/** Bottom sheets keep their square bottom edge and fold the logical-end top corner. */
-fun paperSheetShape(cornerRadius: Dp) = RoundedCornerShape(
-    topStart = cornerRadius,
-    topEnd = 0.dp
+/** Bottom sheets keep their square bottom edge and fold the physical top-left corner. */
+fun paperSheetShape(cornerRadius: Dp) = AbsoluteRoundedCornerShape(
+    topLeft = 0.dp,
+    topRight = cornerRadius,
+    bottomRight = 0.dp,
+    bottomLeft = 0.dp
 )
 
 /** Adds a visible, theme-aware dog-ear to a popup, with an outline for dialog/menu surfaces. */
@@ -63,11 +67,16 @@ fun PaperBottomSheet(
         Column(
             modifier = Modifier.fillMaxWidth().then(paperFoldModifier(18.dp))
         ) {
+            val physicalLeftAlignment = if (LocalLayoutDirection.current == LayoutDirection.Ltr) {
+                Alignment.CenterStart
+            } else {
+                Alignment.CenterEnd
+            }
             Box(
                 modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                contentAlignment = physicalLeftAlignment
             ) {
-                BottomSheetDefaults.DragHandle()
+                BottomSheetDefaults.DragHandle(modifier = Modifier.absolutePadding(left = 12.dp))
             }
             content()
         }
@@ -78,17 +87,16 @@ fun PaperBottomSheet(
 private fun paperFoldModifier(foldSize: Dp): Modifier {
     val foldColor = AriFold
     val creaseColor = AriInk.copy(alpha = 0.34f)
-    val foldEdgeColor = AriCard.copy(alpha = 0.9f)
+    val foldEdgeColor = AriCard
 
     return Modifier.drawWithContent {
         drawContent()
 
-        // The flap reaches the actual corner; the opposite half stays backed by opaque paper.
+        // The top-left flap is fully opaque, so it cannot reveal the window underneath.
         val fold = foldSize.toPx()
-        val isRtl = layoutDirection == LayoutDirection.Rtl
-        val start = if (isRtl) Offset(fold * 2f, 0f) else Offset(size.width - fold * 2f, 0f)
-        val tip = if (isRtl) Offset(0f, fold * 2f) else Offset(size.width, fold * 2f)
-        val inner = if (isRtl) Offset(fold * 2f, fold * 2f) else Offset(size.width - fold * 2f, fold * 2f)
+        val start = Offset(fold * 2f, 0f)
+        val tip = Offset(0f, fold * 2f)
+        val inner = Offset(fold * 2f, fold * 2f)
         val flap = Path().apply {
             moveTo(start.x, start.y)
             lineTo(tip.x, tip.y)

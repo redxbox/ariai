@@ -4,6 +4,7 @@ import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.util.tx
+import kotlinx.coroutines.CancellationException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLException
@@ -39,6 +40,8 @@ suspend fun checkConnection(provider: Provider, fetch: suspend (Provider) -> Lis
         } else {
             ConnectionResult.Ok(models.size)
         }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
     } catch (e: Exception) {
         classify(e)
     }

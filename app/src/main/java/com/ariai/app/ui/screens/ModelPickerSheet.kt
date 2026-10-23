@@ -46,6 +46,7 @@ private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 @Composable
 fun ModelPickerSheet(
     providers: List<Provider>,
+    selectedProviderId: String?,
     selectedModelId: String?,
     favorites: Set<String>,
     onToggleFavorite: (providerId: String, modelId: String) -> Unit,
@@ -122,7 +123,7 @@ fun ModelPickerSheet(
                         items(favoriteEntries, key = { (p, m) -> "fav_${p.id}_${m.id}" }) { (p, m) ->
                             ModelRow(
                                 model = m,
-                                selected = m.id == selectedModelId,
+                                selected = isSelectedModel(p.id, m.id, selectedProviderId, selectedModelId),
                                 favorite = true,
                                 onSelect = { onSelect(p.id, m.id); onDismiss() },
                                 onToggleFavorite = { onToggleFavorite(p.id, m.id) }
@@ -150,7 +151,7 @@ fun ModelPickerSheet(
                                 if (first != null) {
                                     ModelRow(
                                         model = first,
-                                        selected = first.id == selectedModelId,
+                                        selected = isSelectedModel(provider.id, first.id, selectedProviderId, selectedModelId),
                                         favorite = favorites.contains(favoriteKey(provider.id, first.id)),
                                         onSelect = { onSelect(provider.id, first.id); onDismiss() },
                                         onToggleFavorite = { onToggleFavorite(provider.id, first.id) }
@@ -161,7 +162,7 @@ fun ModelPickerSheet(
                         items(shown.drop(1), key = { m -> "${provider.id}_${m.id}" }) { model ->
                             ModelRow(
                                 model = model,
-                                selected = model.id == selectedModelId,
+                                selected = isSelectedModel(provider.id, model.id, selectedProviderId, selectedModelId),
                                 favorite = favorites.contains(favoriteKey(provider.id, model.id)),
                                 onSelect = { onSelect(provider.id, model.id); onDismiss() },
                                 onToggleFavorite = { onToggleFavorite(provider.id, model.id) }

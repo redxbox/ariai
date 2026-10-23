@@ -6,6 +6,7 @@ import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
@@ -25,7 +26,9 @@ private data class ReplyLine(
 )
 
 private val boldRegex = Regex("""\*\*(.+?)\*\*|__(.+?)__""")
+private val italicRegex = Regex("""(?<![\p{L}\p{N}])\*(?=\S)(.+?)(?<=\S)\*(?![\p{L}\p{N}*])|(?<![\p{L}\p{N}_])_(?=\S)(.+?)(?<=\S)_(?![\p{L}\p{N}_])""")
 private val codeRegex = Regex("""`([^`]+)`""")
+private val codePlaceholder = Regex("\\uE000(\\d+)\\uE001")
 private val linkOrUrl = Regex("""\[([^\]]+)\]\((https?://[^)\s]+)\)|(https?://[^\s)\]]+)""")
 private val tableSeparator = Regex("""^\|?[\s:|-]+\|?$""")
 private val ruleLine = Regex("""^(-{3,}|\*{3,}|_{3,})$""")
@@ -143,31 +146,58 @@ fun formatReply(raw: String, baseFontSizeSp: Float = 15f): AnnotatedString {
 }
 
 private fun AnnotatedString.Builder.appendInline(line: String) {
-    val cleaned = line.replace(codeRegex) { it.groupValues[1] }
+    val inlineCode = mutableListOf<String>()
+    val cleaned = codeRegex.replace(line) { match ->
+        val index = inlineCode.size
+        inlineCode += match.groupValues[1]
+        "\uE000${index}\uE001"
+    }
     var last = 0
     for (m in linkOrUrl.findAll(cleaned)) {
-        appendBold(cleaned.substring(last, m.range.first))
+        appendBold(cleaned.substring(last, m.range.first), inlineCode)
         val url = m.groupValues[2].ifEmpty { m.groupValues[3] }
         val label = m.groupValues[1].ifEmpty { url }
         // The whole "label (address)" is tappable and shows the full address, as requested.
         pushStringAnnotation(tag = "URL", annotation = url)
         withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-            appendBold(label)
+            appendBold(label, inlineCode)
             if (label != url) append(" ($url)")
         }
         pop()
         last = m.range.last + 1
     }
-    appendBold(cleaned.substring(last))
+    appendBold(cleaned.substring(last), inlineCode)
 }
 
-private fun AnnotatedString.Builder.appendBold(segment: String) {
+private fun AnnotatedString.Builder.appendBold(segment: String, inlineCode: List<String>) {
     var last = 0
     for (m in boldRegex.findAll(segment)) {
-        append(segment.substring(last, m.range.first).replace("*", ""))
+        appendItalic(segment.substring(last, m.range.first), inlineCode)
         val inner = m.groupValues[1].ifEmpty { m.groupValues[2] }
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(inner.replace("*", "")) }
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { appendItalic(inner, inlineCode) }
         last = m.range.last + 1
     }
-    append(segment.substring(last).replace("*", ""))
+    appendItalic(segment.substring(last), inlineCode)
+}
+
+private fun AnnotatedString.Builder.appendItalic(segment: String, inlineCode: List<String>) {
+    var last = 0
+    for (code in codePlaceholder.findAll(segment)) {
+        appendItalicText(segment.substring(last, code.range.first))
+        val index = code.groupValues[1].toInt()
+        append(inlineCode[index])
+        last = code.range.last + 1
+    }
+    appendItalicText(segment.substring(last))
+}
+
+private fun AnnotatedString.Builder.appendItalicText(segment: String) {
+    var last = 0
+    for (m in italicRegex.findAll(segment)) {
+        append(segment.substring(last, m.range.first))
+        val inner = m.groupValues[1].ifEmpty { m.groupValues[2] }
+        withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(inner) }
+        last = m.range.last + 1
+    }
+    append(segment.substring(last))
 }

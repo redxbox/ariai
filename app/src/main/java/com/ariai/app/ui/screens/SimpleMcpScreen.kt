@@ -101,7 +101,7 @@ fun SimpleMcpScreen(
                 }
             }
 
-            itemsIndexed(servers, key = { i, s -> "${s.id}_$i" }) { _, server ->
+            itemsIndexed(servers, key = { _, server -> "server:${server.id}" }) { _, server ->
                 Surface(shape = RoundedCornerShape(18.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(modifier = Modifier.weight(1f)) {

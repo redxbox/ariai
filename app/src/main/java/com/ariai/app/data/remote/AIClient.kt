@@ -1,6 +1,7 @@
 package com.ariai.app.data.remote
 
 import com.ariai.app.data.models.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.awaitClose
@@ -99,7 +100,8 @@ class AIClient {
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false,
-        stream: Boolean = true
+        stream: Boolean = true,
+        allowUrlContext: Boolean = true
     ): Flow<String> = if (stream) callbackFlow {
         val producer = this
         val url = buildChatUrl(provider, modelId)
@@ -112,7 +114,8 @@ class AIClient {
             searchContext = searchContext,
             isStream = true,
             reasoning = reasoning,
-            nativeSearch = nativeSearch
+            nativeSearch = nativeSearch,
+            allowUrlContext = allowUrlContext
         )
         val request = Request.Builder()
             .url(url)
@@ -173,7 +176,7 @@ class AIClient {
 
                 override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                     val responseError = runCatching {
-                        response?.body?.string()?.take(500).orEmpty()
+                        response?.body?.readUtf8AtMost(HttpBodyLimits.ERROR_BYTES)?.take(500).orEmpty()
                     }.getOrDefault("")
                     val message = when {
                         response != null && !response.isSuccessful -> "API Error ${response.code}: ${responseError.ifBlank { response.message }}"
@@ -189,7 +192,7 @@ class AIClient {
 
         awaitClose { eventSource.cancel() }
     } else flow {
-        emit(requestNonStreaming(provider, messages, modelId, systemPrompt, temperature, searchContext, reasoning, nativeSearch))
+        emit(requestNonStreaming(provider, messages, modelId, systemPrompt, temperature, searchContext, reasoning, nativeSearch, allowUrlContext))
     }
 
     private suspend fun requestNonStreaming(
@@ -200,11 +203,23 @@ class AIClient {
         temperature: Float,
         searchContext: String?,
         reasoning: ReasoningLevel,
-        nativeSearch: Boolean
+        nativeSearch: Boolean,
+        allowUrlContext: Boolean
     ): String {
         val request = Request.Builder()
             .url(buildChatUrl(provider, modelId, forceNonStream = true))
-            .post(buildRequestBody(provider, messages, modelId, systemPrompt, temperature, searchContext, false, reasoning, nativeSearch))
+            .post(buildRequestBody(
+                provider = provider,
+                messages = messages,
+                modelId = modelId,
+                systemPrompt = systemPrompt,
+                temperature = temperature,
+                searchContext = searchContext,
+                isStream = false,
+                reasoning = reasoning,
+                nativeSearch = nativeSearch,
+                allowUrlContext = allowUrlContext
+            ))
             .header("Content-Type", "application/json")
             .addProviderHeaders(provider, modelId)
             .build()
@@ -220,7 +235,7 @@ class AIClient {
                 override fun onResponse(call: Call, response: Response) {
                     val result = runCatching {
                         response.use { received ->
-                            val raw = received.body?.string().orEmpty()
+                            val raw = received.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES).orEmpty()
                             if (!received.isSuccessful) {
                                 throw IOException("API Error ${received.code}: ${raw.ifBlank { received.message }.take(500)}")
                             }
@@ -292,7 +307,7 @@ class AIClient {
                 override fun onResponse(call: Call, response: Response) {
                     val result = runCatching {
                         response.use { received ->
-                            val raw = received.body?.string().orEmpty()
+                            val raw = received.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES).orEmpty()
                             if (!received.isSuccessful) {
                                 throw IOException("API Error ${received.code}: ${raw.ifBlank { received.message }.take(500)}")
                             }
@@ -339,8 +354,8 @@ class AIClient {
             .addProviderHeaders(provider, request.model)
             .build()
 
-        client.newCall(httpRequest).execute().use { response ->
-            val raw = response.body?.string().orEmpty()
+        client.executeCancellable(httpRequest).use { response ->
+            val raw = response.body?.readUtf8AtMost(HttpBodyLimits.IMAGE_JSON_BYTES).orEmpty()
             if (!response.isSuccessful) {
                 // Some OpenAI-compatible gateways return image output through chat completions.
                 if (response.code in listOf(400, 404, 405, 422) && provider.type != ProviderType.ANTHROPIC) {
@@ -383,8 +398,8 @@ class AIClient {
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .addProviderHeaders(provider, request.model)
             .build()
-        return client.newCall(httpRequest).execute().use { response ->
-            val raw = response.body?.string().orEmpty()
+        return client.executeCancellable(httpRequest).use { response ->
+            val raw = response.body?.readUtf8AtMost(HttpBodyLimits.IMAGE_JSON_BYTES).orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("Imagen request failed: HTTP ${response.code}: ${raw.take(500)}")
             }
@@ -430,8 +445,8 @@ class AIClient {
             .post(body)
             .addProviderHeaders(provider, model)
             .build()
-        client.newCall(request).execute().use { response ->
-            val text = response.body?.string().orEmpty()
+        client.executeCancellable(request).use { response ->
+            val text = response.body?.readUtf8AtMost(HttpBodyLimits.IMAGE_JSON_BYTES).orEmpty()
             if (!response.isSuccessful) throw Exception("Image edit failed: HTTP ${response.code}")
             val data = JSONObject(text).optJSONArray("data") ?: JSONArray()
             val images = (0 until data.length()).map { i ->
@@ -446,7 +461,7 @@ class AIClient {
         }
     }
 
-    private fun generateImageViaChat(provider: Provider, request: ImageGenRequest): ImageGenResponse {
+    private suspend fun generateImageViaChat(provider: Provider, request: ImageGenRequest): ImageGenResponse {
         val url = "${provider.baseUrl.trimEnd('/')}/chat/completions"
         val body = JSONObject().apply {
             put("model", request.model)
@@ -458,8 +473,8 @@ class AIClient {
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .addProviderHeaders(provider, request.model)
             .build()
-        return client.newCall(httpRequest).execute().use { response ->
-            val text = response.body?.string().orEmpty()
+        return client.executeCancellable(httpRequest).use { response ->
+            val text = response.body?.readUtf8AtMost(HttpBodyLimits.IMAGE_JSON_BYTES).orEmpty()
             if (!response.isSuccessful) throw Exception("Image gen failed: ${response.code}")
             val message = JSONObject(text).optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
             val images = message?.optJSONArray("images") ?: JSONArray()
@@ -483,9 +498,9 @@ class AIClient {
             return@withContext android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
         }
         val url = image.url ?: throw Exception("No image data returned")
-        client.newCall(Request.Builder().url(url).build()).execute().use { r ->
+        client.executeCancellable(Request.Builder().url(url).build()).use { r ->
             if (!r.isSuccessful) throw Exception("Image download failed: HTTP ${r.code}")
-            r.body?.bytes() ?: throw Exception("Empty image response")
+            r.body?.readBytesAtMost(HttpBodyLimits.IMAGE_BYTES) ?: throw Exception("Empty image response")
         }
     }
 
@@ -509,10 +524,10 @@ class AIClient {
             .addProviderHeaders(provider)
             .build()
 
-        val response = client.newCall(request).execute()
+        val response = client.executeCancellable(request)
         response.use { r ->
             if (!r.isSuccessful) throw IllegalStateException("HTTP ${r.code} from ${url.substringBefore('?')}")
-            val json = JSONObject(r.body?.string() ?: throw IllegalStateException("Empty response"))
+            val json = JSONObject(r.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES) ?: throw IllegalStateException("Empty response"))
             val models = mutableListOf<AIModel>()
 
             if (provider.type == ProviderType.GEMINI) {
@@ -589,16 +604,16 @@ class AIClient {
      * Models from an extra catalog endpoint (OpenRouter /videos/models, Pollinations /video/models).
      * Type comes from output_modalities; [fixedOutputs] is used when the endpoint only lists one type.
      */
-    private fun catalogModels(provider: Provider, url: String, fixedOutputs: List<String>? = null): List<AIModel> {
+    private suspend fun catalogModels(provider: Provider, url: String, fixedOutputs: List<String>? = null): List<AIModel> {
         return try {
             val request = Request.Builder()
                 .url(url)
                 .get()
                 .addProviderHeaders(provider)
                 .build()
-            client.newCall(request).execute().use { r ->
+            client.executeCancellable(request).use { r ->
                 if (!r.isSuccessful) return emptyList()
-                val text = r.body?.string() ?: return emptyList()
+                val text = r.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES) ?: return emptyList()
                 val arr = if (text.trimStart().startsWith("[")) JSONArray(text)
                     else JSONObject(text).optJSONArray("data") ?: return emptyList()
                 (0 until arr.length()).mapNotNull { i ->
@@ -620,6 +635,8 @@ class AIClient {
                     )
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             emptyList()
         }
@@ -1158,9 +1175,9 @@ class AIClient {
             Request.Builder().url("$base/audio/speech").post(body)
         }
         request.addProviderHeaders(provider, modelId)
-        longClient.newCall(request.build()).execute().use { r ->
-            if (!r.isSuccessful) throw IllegalStateException("API Error ${r.code}: ${r.body?.string()?.take(200)}")
-            r.body?.bytes() ?: throw IllegalStateException("Empty audio response")
+        longClient.executeCancellable(request.build()).use { r ->
+            if (!r.isSuccessful) throw IllegalStateException("API Error ${r.code}: ${r.body?.readUtf8AtMost(HttpBodyLimits.ERROR_BYTES)?.take(200)}")
+            r.body?.readBytesAtMost(HttpBodyLimits.AUDIO_BYTES) ?: throw IllegalStateException("Empty audio response")
         }
     }
 
@@ -1172,8 +1189,8 @@ class AIClient {
         val body = JSONObject()
             .put("instances", JSONArray().put(JSONObject().put("prompt", prompt)))
             .toString().toRequestBody("application/json".toMediaType())
-        val opName = client.newCall(keyed(Request.Builder().url("$base/models/$modelId:predictLongRunning").post(body)).build()).execute().use { r ->
-            val text = r.body?.string().orEmpty()
+        val opName = client.executeCancellable(keyed(Request.Builder().url("$base/models/$modelId:predictLongRunning").post(body)).build()).use { r ->
+            val text = r.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES).orEmpty()
             if (!r.isSuccessful) throw IllegalStateException("Video submit failed: ${r.code} ${text.take(160)}")
             JSONObject(text).optString("name").ifBlank { throw IllegalStateException("No operation returned") }
         }
@@ -1188,9 +1205,9 @@ class AIClient {
             if (now - started > timeoutMs) throw IllegalStateException("Video timed out")
             if (now - lastPoll >= 5_000) {
                 lastPoll = now
-                val op = client.newCall(keyed(Request.Builder().url("$base/$opName").get()).build()).execute().use { r ->
+                val op = client.executeCancellable(keyed(Request.Builder().url("$base/$opName").get()).build()).use { r ->
                     if (!r.isSuccessful) throw IllegalStateException("Video status failed: ${r.code}")
-                    JSONObject(r.body?.string().orEmpty())
+                    JSONObject(r.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES).orEmpty())
                 }
                 op.optJSONObject("error")?.let { err ->
                     throw IllegalStateException(err.optString("message").ifBlank { "Video generation failed" })
@@ -1201,9 +1218,15 @@ class AIClient {
                         ?: response?.optJSONArray("generatedVideos"))?.optJSONObject(0)
                     val uri = first?.optJSONObject("video")?.optString("uri").orEmpty()
                     if (uri.isBlank()) throw IllegalStateException("No video in the response. It may have been blocked by the safety filter.")
-                    bytes = client.newCall(keyed(Request.Builder().url(uri).get()).build()).execute().use { r ->
+                    val downloadUrl = parseSecureHttpsUrl(uri)
+                    val downloadRequest = Request.Builder().url(downloadUrl).get().apply {
+                        // Veo may return a signed URL on a separate storage host. Never forward provider
+                        // API keys or custom headers across origins.
+                        if (shouldSendVeoCredentials(base, downloadUrl)) addProviderHeaders(provider, modelId)
+                    }.build()
+                    bytes = client.executeCancellable(downloadRequest).use { r ->
                         if (!r.isSuccessful) throw IllegalStateException("Video download failed: ${r.code}")
-                        r.body?.bytes() ?: throw IllegalStateException("Empty video")
+                        r.body?.readBytesAtMost(HttpBodyLimits.VIDEO_BYTES) ?: throw IllegalStateException("Empty video")
                     }
                 }
             }
@@ -1237,9 +1260,9 @@ class AIClient {
                 .callTimeout(15, java.util.concurrent.TimeUnit.MINUTES)
                 .build()
             val request = auth(Request.Builder().url("$origin/video/$encodedPrompt?model=$encodedModel").get()).build()
-            longClient.newCall(request).execute().use { r ->
-                if (!r.isSuccessful) throw IllegalStateException("API Error ${r.code}: ${r.body?.string()?.take(200)}")
-                return@withContext r.body?.bytes() ?: throw IllegalStateException("Empty video response")
+            longClient.executeCancellable(request).use { r ->
+                if (!r.isSuccessful) throw IllegalStateException("API Error ${r.code}: ${r.body?.readUtf8AtMost(HttpBodyLimits.ERROR_BYTES)?.take(200)}")
+                return@withContext r.body?.readBytesAtMost(HttpBodyLimits.VIDEO_BYTES) ?: throw IllegalStateException("Empty video response")
             }
         }
         if (provider.type == ProviderType.GEMINI) {
@@ -1248,8 +1271,8 @@ class AIClient {
         onProgress("Sending request")
         val submitBody = JSONObject().put("model", modelId).put("prompt", prompt)
             .toString().toRequestBody("application/json".toMediaType())
-        val jobId = client.newCall(auth(Request.Builder().url("$base/videos").post(submitBody)).build()).execute().use { r ->
-            val text = r.body?.string().orEmpty()
+        val jobId = client.executeCancellable(auth(Request.Builder().url("$base/videos").post(submitBody)).build()).use { r ->
+            val text = r.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES).orEmpty()
             if (!r.isSuccessful) throw IllegalStateException("Video submit failed: ${r.code} ${text.take(160)}")
             JSONObject(text).optString("id").ifBlank { throw IllegalStateException("No job id returned") }
         }
@@ -1265,9 +1288,9 @@ class AIClient {
             // Poll the job every 5 seconds; the elapsed timer still ticks every second.
             if (now - lastPoll >= 5_000) {
                 lastPoll = now
-                val status = client.newCall(auth(Request.Builder().url("$base/videos/$jobId").get()).build()).execute().use { r ->
+                val status = client.executeCancellable(auth(Request.Builder().url("$base/videos/$jobId").get()).build()).use { r ->
                     if (!r.isSuccessful) throw IllegalStateException("Video status failed: ${r.code}")
-                    JSONObject(r.body?.string().orEmpty())
+                    JSONObject(r.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES).orEmpty())
                 }
                 state = status.optString("status", state)
                 if (state == "completed") break
@@ -1283,9 +1306,9 @@ class AIClient {
             val secs = ((now - started) / 1000).toInt()
             onProgress("Generating video · $label · %02d:%02d".format(secs / 60, secs % 60))
         }
-        client.newCall(auth(Request.Builder().url("$base/videos/$jobId/content?index=0").get()).build()).execute().use { r ->
+        client.executeCancellable(auth(Request.Builder().url("$base/videos/$jobId/content?index=0").get()).build()).use { r ->
             if (!r.isSuccessful) throw IllegalStateException("Video download failed: ${r.code}")
-            r.body?.bytes() ?: throw IllegalStateException("Empty video")
+            r.body?.readBytesAtMost(HttpBodyLimits.VIDEO_BYTES) ?: throw IllegalStateException("Empty video")
         }
     }
 }

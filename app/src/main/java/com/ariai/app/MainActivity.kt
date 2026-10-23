@@ -123,6 +123,18 @@ fun AppRoot(viewModel: AppViewModel) {
         navController.navigate("chat/$id") { launchSingleTop = true }
     }
 
+    fun deleteChatFromUi(chatId: String) {
+        val deletingActiveChat = currentChatId == chatId
+        viewModel.deleteChat(chatId)
+        if (deletingActiveChat) {
+            scope.launch { drawerState.close() }
+            navController.navigate("chats") {
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
     fun newImageChat() {
         scope.launch { drawerState.close() }
         val (providerId, modelId) = viewModel.firstImageModel() ?: (null to null)
@@ -147,7 +159,7 @@ fun AppRoot(viewModel: AppViewModel) {
                     onNewChat = { newChat() },
                     onChatClick = { openChat(it.id) },
                     onPinChat = { viewModel.pinChat(it) },
-                    onDeleteChat = { viewModel.deleteChat(it.id) },
+                    onDeleteChat = { deleteChatFromUi(it.id) },
                     onNavigate = { go(it) },
                     onAbout = {
                         scope.launch {
@@ -184,7 +196,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         chats = chats,
                         onChatClick = { openChat(it.id) },
                         onNewChat = { newChat() },
-                        onDeleteChat = { viewModel.deleteChat(it.id) },
+                        onDeleteChat = { deleteChatFromUi(it.id) },
                         onPinChat = { viewModel.pinChat(it) }
                     )
                 }
@@ -204,6 +216,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         isSending = isSending,
                         currentStreamingContent = streamingContent,
                         selectedModel = modelOverrides[chatId]?.second ?: currentChat?.modelId,
+                        selectedProviderId = modelOverrides[chatId]?.first ?: currentChat?.providerId,
                         providers = providers,
                         reasoning = reasoningLevel,
                         searchMode = searchModeState,
@@ -220,7 +233,12 @@ fun AppRoot(viewModel: AppViewModel) {
                             val branchId = viewModel.branchMessage(it)
                             navController.navigate("chat/$branchId") { launchSingleTop = true }
                         },
-                        onRegenerate = { viewModel.regenerateMessage(it, reasoningLevel, searchModeState) },
+                        onRegenerate = { message ->
+                            val retryChatId = viewModel.regenerateMessage(message, reasoningLevel, searchModeState)
+                            if (retryChatId != null && retryChatId != chatId) {
+                                navController.navigate("chat/$retryChatId") { launchSingleTop = true }
+                            }
+                        },
                         onCopyMessage = { },
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },
@@ -245,10 +263,18 @@ fun AppRoot(viewModel: AppViewModel) {
                         providers = providers,
                         onAddProvider = { navController.navigate("add_provider") },
                         onAddPreset = { navController.navigate("add_provider?preset=${it.name}") },
-                        onImportProvider = { viewModel.saveProvider(it) },
+                        onImportProvider = { provider ->
+                            viewModel.saveProvider(provider) { saved ->
+                                if (!saved) scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                            }
+                        },
                         onEditProvider = { navController.navigate("edit_provider/${it.id}") },
                         onBack = { navController.popBackStack() },
-                        onToggleProvider = { viewModel.saveProvider(it.copy(enabled = !it.enabled)) }
+                        onToggleProvider = { provider ->
+                            viewModel.saveProvider(provider.copy(enabled = !provider.enabled)) { saved ->
+                                if (!saved) scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                            }
+                        }
                     )
                 }
 
@@ -260,7 +286,12 @@ fun AppRoot(viewModel: AppViewModel) {
                         presetType = entry.arguments?.getString("preset")
                             ?.let { runCatching { com.ariai.app.data.models.ProviderType.valueOf(it) }.getOrNull() },
                         fetchModels = { viewModel.fetchModels(it) },
-                        onSave = { viewModel.saveProvider(it); navController.popBackStack() },
+                        onSave = { provider ->
+                            viewModel.saveProvider(provider) { saved ->
+                                if (saved) navController.popBackStack()
+                                else scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                            }
+                        },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -273,7 +304,12 @@ fun AppRoot(viewModel: AppViewModel) {
                     AddProviderScreen(
                         initialProvider = providers.find { it.id == providerId },
                         fetchModels = { viewModel.fetchModels(it) },
-                        onSave = { viewModel.saveProvider(it); navController.popBackStack() },
+                        onSave = { provider ->
+                            viewModel.saveProvider(provider) { saved ->
+                                if (saved) navController.popBackStack()
+                                else scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                            }
+                        },
                         onBack = { navController.popBackStack() },
                         onDelete = { id -> viewModel.deleteProvider(id); navController.popBackStack() }
                     )
@@ -318,6 +354,7 @@ fun AppRoot(viewModel: AppViewModel) {
                 composable("default_model") {
                     DefaultModelScreen(
                         providers = providers,
+                        defaultProviderId = defaultProviderId,
                         defaultModelId = defaultModelId,
                         onSelect = { pid, mid -> viewModel.setDefaultSelection(pid, mid) },
                         onAddProvider = { navController.navigate("add_provider") },
@@ -337,8 +374,17 @@ fun AppRoot(viewModel: AppViewModel) {
                     StorageScreen(
                         chats = chats,
                         onClearAll = {
-                            chats.forEach { viewModel.deleteChat(it.id) }
-                            scope.launch { snackbarHostState.showSnackbar(tx("All chats deleted")) }
+                            val ids = chats.map { it.id }
+                            val deletingActiveChat = currentChatId != null && currentChatId in ids
+                            viewModel.deleteChats(ids) {
+                                if (deletingActiveChat) {
+                                    navController.navigate("chats") {
+                                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+                                scope.launch { snackbarHostState.showSnackbar(tx("All chats deleted")) }
+                            }
                         },
                         onBack = { navController.popBackStack() },
                         generatedBytes = generatedMediaBytes,

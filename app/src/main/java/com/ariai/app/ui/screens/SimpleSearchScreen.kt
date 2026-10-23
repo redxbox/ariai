@@ -8,17 +8,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+
+private data class RecentSearch(val id: String, val text: String, val isLocalizationKey: Boolean = false)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,7 +36,13 @@ fun SimpleSearchScreen(
     var query by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val recentSearches = remember { mutableStateListOf(tx("AI news today"), tx("Python best practices"), tx("Quantum computing")) }
+    val recentSearches = remember {
+        mutableStateListOf(
+            RecentSearch("sample:ai-news", "AI news today", isLocalizationKey = true),
+            RecentSearch("sample:python", "Python best practices", isLocalizationKey = true),
+            RecentSearch("sample:quantum", "Quantum computing", isLocalizationKey = true)
+        )
+    }
 
     Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
         Scaffold(
@@ -62,7 +74,7 @@ fun SimpleSearchScreen(
                         trailingIcon = {
                             if (query.isNotBlank()) {
                                 IconButton(onClick = {
-                                    recentSearches.add(0, query)
+                                    recentSearches.add(0, RecentSearch(java.util.UUID.randomUUID().toString(), query))
                                     onSearch(query)
                                 }) {
                                     Icon(Icons.Default.ArrowForward, contentDescription = tx("Search"), tint = AriInk)
@@ -85,18 +97,18 @@ fun SimpleSearchScreen(
                     item {
                         Text(tx("Recent searches"), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(top = 8.dp))
                     }
-                    items(count = recentSearches.size, key = { i -> recentSearches[i] }) { i ->
-                        val item = recentSearches[i]
+                    items(recentSearches, key = { it.id }) { item ->
+                        val label = if (item.isLocalizationKey) tx(item.text) else item.text
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = AriCard),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                            modifier = Modifier.fillMaxWidth().clickable { onSearch(item) }
+                            modifier = Modifier.fillMaxWidth().clickable { onSearch(label) }
                         ) {
                             Row(modifier = Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Icon(Icons.Default.Search, contentDescription = null, tint = AriInk.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
-                                    Text(item, fontSize = 14.sp, color = AriInk)
+                                    Text(label, fontSize = 14.sp, color = AriInk)
                                 }
                                 Icon(Icons.Default.ArrowForward, contentDescription = null, tint = AriInk.copy(alpha = 0.2f), modifier = Modifier.size(16.dp))
                             }
