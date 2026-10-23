@@ -23,6 +23,7 @@ import com.ariai.app.ui.screens.NewChatScreen
 import com.ariai.app.ui.screens.NewProvidersScreen
 import com.ariai.app.ui.theme.AriAiTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,8 +119,11 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
-        compose.onNodeWithTag("chat-thinking-chip").assertIsDisplayed()
-        compose.onNodeWithText(errorText).assertIsDisplayed()
+        val chip = compose.onNodeWithTag("chat-thinking-chip", useUnmergedTree = true)
+            .assertIsDisplayed().fetchSemanticsNode()
+        val firstMessage = compose.onNodeWithText(errorText, useUnmergedTree = true)
+            .assertIsDisplayed().fetchSemanticsNode()
+        assertTrue("reasoning chip must leave space before the first message", chip.boundsInRoot.bottom < firstMessage.boundsInRoot.top)
 
         compose.onNodeWithTag("chat-composer").performClick().performTextInput("سلام")
         compose.onNodeWithTag("chat-composer").assertTextEquals("سلام")
