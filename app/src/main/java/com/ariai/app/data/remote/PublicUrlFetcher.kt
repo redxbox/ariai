@@ -92,7 +92,7 @@ class PublicUrlFetcher {
                 .get()
                 .build()
             var redirectedTo: URI? = null
-            val bytes = executeCancellable(request).use { response ->
+            val bytes = client.executeCancellable(request).use { response ->
                 if (response.code in REDIRECT_CODES) {
                     val location = response.header("Location") ?: throw IOException("Redirect did not include a Location header")
                     redirectedTo = current.resolve(location)
@@ -127,7 +127,7 @@ class PublicUrlFetcher {
                 .get()
                 .build()
             var redirectedTo: URI? = null
-            val text = executeCancellable(request).use { response ->
+            val text = client.executeCancellable(request).use { response ->
                 if (response.code in REDIRECT_CODES) {
                     val location = response.header("Location") ?: throw IOException("Redirect did not include a Location header")
                     redirectedTo = current.resolve(location)

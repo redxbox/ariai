@@ -12,20 +12,30 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
-import kotlin.coroutines.resume
+import java.util.concurrent.atomic.AtomicReference
 
 /** Execute an OkHttp request without blocking a coroutine thread; cancellation cancels the call. */
 internal suspend fun OkHttpClient.executeCancellable(request: Request): Response =
     suspendCancellableCoroutine { continuation ->
         val call = newCall(request)
-        continuation.invokeOnCancellation { call.cancel() }
+        val pendingResponse = AtomicReference<Response?>(null)
+        continuation.invokeOnCancellation {
+            call.cancel()
+            pendingResponse.getAndSet(null)?.close()
+        }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                if (continuation.isActive) continuation.resumeWithException(e)
+                if (continuation.isActive) continuation.resumeWith(Result.failure(e))
             }
 
             override fun onResponse(call: Call, response: Response) {
-                continuation.resume(response) { _, undeliveredResponse, _ -> undeliveredResponse.close() }
+                pendingResponse.set(response)
+                if (continuation.isActive) {
+                    continuation.resumeWith(Result.success(response))
+                    pendingResponse.compareAndSet(response, null)
+                } else {
+                    pendingResponse.getAndSet(null)?.close()
+                }
             }
         })
     }

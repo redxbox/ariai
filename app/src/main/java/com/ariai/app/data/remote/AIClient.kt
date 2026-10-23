@@ -377,7 +377,7 @@ class AIClient {
     }
 
     /** Imagen uses Google's predict endpoint, not the OpenAI /images/generations protocol. */
-    private fun generateGeminiImage(provider: Provider, request: ImageGenRequest): ImageGenResponse {
+    private suspend fun generateGeminiImage(provider: Provider, request: ImageGenRequest): ImageGenResponse {
         val widthHeight = request.size.lowercase().split('x').mapNotNull { it.toIntOrNull() }
         val ratio = if (widthHeight.size == 2 && widthHeight[1] != 0) {
             val value = widthHeight[0].toDouble() / widthHeight[1]
