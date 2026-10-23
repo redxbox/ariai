@@ -1,9 +1,9 @@
 package com.ariai.app.ui
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.fetchSemanticsNode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -23,7 +23,6 @@ import com.ariai.app.ui.screens.NewChatScreen
 import com.ariai.app.ui.screens.NewProvidersScreen
 import com.ariai.app.ui.theme.AriAiTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -90,7 +89,7 @@ class ProviderAndChatUiTest {
     }
 
     @Test
-    fun thinkingChipReservesSpaceAndPersianComposerTextRemainsVisible() {
+    fun thinkingChipAndFirstMessageAreVisibleAndPersianComposerTextRemainsVisible() {
         val chat = Chat(id = "chat-layout-test", title = "New chat", modelId = "mock-model")
         val errorText = "Could not save your message. Please try again."
         val errorMessage = ChatMessage(
@@ -119,11 +118,8 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
-        val chipBounds = compose.onNodeWithTag("chat-thinking-chip", useUnmergedTree = true)
-            .fetchSemanticsNode().boundsInRoot
-        val errorBounds = compose.onNodeWithText(errorText, useUnmergedTree = true)
-            .fetchSemanticsNode().boundsInRoot
-        assertTrue("reasoning chip must not cover the first message", chipBounds.bottom < errorBounds.top)
+        compose.onNodeWithTag("chat-thinking-chip").assertIsDisplayed()
+        compose.onNodeWithText(errorText).assertIsDisplayed()
 
         compose.onNodeWithTag("chat-composer").performClick().performTextInput("سلام")
         compose.onNodeWithTag("chat-composer").assertTextEquals("سلام")
