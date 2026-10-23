@@ -85,11 +85,12 @@ class ChatRepository(
         null
     }
 
-    suspend fun saveChat(chat: Chat) {
-        try {
-            db.chatDao().insertChat(chat.toEntity())
-        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
-    }
+    /** Returns whether the chat row was persisted; failures are logged for device diagnostics. */
+    suspend fun saveChat(chat: Chat): Boolean = persistWithResult(
+        prepare = { chat.toEntity() },
+        persist = { entity -> db.chatDao().insertChat(entity) },
+        onFailure = { com.ariai.app.util.AppLog.warn(it, "saveChat") }
+    )
 
     suspend fun deleteChat(id: String) {
         try {
@@ -140,7 +141,7 @@ class ChatRepository(
             }
             db.withTransaction {
                 val chat = db.chatDao().getChatById(message.chatId)
-                    ?: throw IllegalStateException("Cannot save a message to a deleted chat")
+                    ?: throw IllegalStateException("Cannot save a message because the chat row does not exist")
                 db.messageDao().insertMessage(stored.toEntity())
                 db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
             }

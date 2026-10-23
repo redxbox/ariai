@@ -144,6 +144,7 @@ class AppViewModel(
     private var historyCompressionJob: Job? = null
     private var historyCompressionGeneration = 0L
     private var messagesCollectionJob: Job? = null
+    private val chatPersistenceGate = ChatPersistenceGate()
 
     private fun launchSendJob(block: suspend (Long) -> Unit) {
         val generation = ++sendGeneration
@@ -303,7 +304,18 @@ class AppViewModel(
         messagesCollectionJob = null
         _currentChatId.value = id
         _messages.value = emptyList()
-        viewModelScope.launch { repository.saveChat(chat) }
+        val saveTicket = chatPersistenceGate.begin(id)
+        viewModelScope.launch {
+            try {
+                chatPersistenceGate.complete(id, saveTicket, repository.saveChat(chat))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                chatPersistenceGate.complete(id, saveTicket, saved = false)
+                throw cancelled
+            } catch (error: Exception) {
+                com.ariai.app.util.AppLog.warn(error, "create chat")
+                chatPersistenceGate.complete(id, saveTicket, saved = false)
+            }
+        }
         return id
     }
 
@@ -334,7 +346,13 @@ class AppViewModel(
             _messages.value = emptyList()
         }
         viewModelScope.launch {
-            uniqueIds.forEach { repository.deleteChat(it) }
+            uniqueIds.forEach { id ->
+                // A first chat save may still be in flight. Delete only after it completes so the
+                // insert cannot race behind the delete and resurrect the chat.
+                chatPersistenceGate.await(id)
+                chatPersistenceGate.forget(id)
+                repository.deleteChat(id)
+            }
             runCatching { _generatedMediaBytes.value = repository.generatedMediaBytes() }
             onDone()
         }
@@ -574,9 +592,13 @@ class AppViewModel(
         _isSending.value = true
         launchSendJob { generation ->
             try {
+                if (!chatPersistenceGate.await(chatId)) {
+                    postAssistantError(chatId, tx("Could not save your message. Please try again."))
+                    return@launchSendJob
+                }
                 val userMessage = ChatMessage(chatId = chatId, role = MessageRole.USER, content = "✏️ $instruction")
                 if (!repository.saveMessage(userMessage)) {
-                    postAssistantError(chatId, tx("Could not save your message. Check free storage and try again."))
+                    postAssistantError(chatId, tx("Could not save your message. Please try again."))
                     return@launchSendJob
                 }
                 appendMessage(repository.getMessageById(userMessage.id) ?: userMessage)
@@ -612,6 +634,14 @@ class AppViewModel(
                         _messages.value = _messages.value.filterNot { it.id == replaceMessageId }
                     }
                 }
+                val visibleMessages = if (_currentChatId.value == chatId) {
+                    _messages.value
+                } else {
+                    repository.getMessagesSync(chatId)
+                }
+                if (repeatsLatestAssistantError(visibleMessages, text, retryForMessageId)) {
+                    return@launch
+                }
                 val message = ChatMessage(
                     chatId = chatId,
                     role = MessageRole.ASSISTANT,
@@ -619,8 +649,10 @@ class AppViewModel(
                     status = MessageStatus.ERROR,
                     parentId = retryForMessageId
                 )
-                repository.saveMessage(message)
+                if (chatPersistenceGate.await(chatId)) repository.saveMessage(message)
                 appendMessage(message)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e)
             }
@@ -697,6 +729,11 @@ class AppViewModel(
         _isSending.value = true
         launchSendJob { generation ->
             try {
+                if (!chatPersistenceGate.await(chatId)) {
+                    onUserMessageSaved(false)
+                    postAssistantError(chatId, tx("Could not save your message. Please try again."))
+                    return@launchSendJob
+                }
                 messageToReplace?.let { response ->
                     repository.deleteMessage(response.id)
                     if (_currentChatId.value == chatId) {
@@ -718,7 +755,7 @@ class AppViewModel(
                 if (existingUserMessage == null) {
                     if (!repository.saveMessage(userMessage)) {
                         onUserMessageSaved(false)
-                        postAssistantError(chatId, tx("Could not save your message. Check free storage and try again."))
+                        postAssistantError(chatId, tx("Could not save your message. Please try again."))
                         return@launchSendJob
                     }
                     onUserMessageSaved(true)
@@ -950,7 +987,7 @@ class AppViewModel(
                         providerId = provider.id
                     )
                     if (!repository.saveMessage(assistantMessage)) {
-                        postAssistantError(chatId, tx("Could not save the reply. Check free storage."), userMessage.id)
+                        postAssistantError(chatId, tx("Could not save the reply. Please try again."), userMessage.id)
                     } else {
                         appendMessage(assistantMessage)
                         if (_messages.value.size <= 3) {

@@ -62,7 +62,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -598,11 +601,17 @@ fun NewChatScreen(
                                 ModeChip(mode = chatMode, onClose = { onChatModeChange(ChatMode.TEXT) }, modifier = Modifier)
                             }
                         }
+                        // Resolve paragraph direction from the input itself so Persian remains RTL
+                        // even when the app's interface language is English.
                         TextField(
                             value = inputText,
                             onValueChange = { inputText = it },
                             placeholder = { Text(tx("Message AriAI"), color = Muted) },
-                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(
+                                textAlign = TextAlign.Start,
+                                textDirection = TextDirection.ContentOrLtr
+                            ),
+                            modifier = Modifier.fillMaxWidth().testTag("chat-composer"),
                             maxLines = 12,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -682,57 +691,62 @@ fun NewChatScreen(
                 }
             }
         } else {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                items(count = messages.size, key = { i -> messages[i].id }) { i ->
-                    val m = messages[i]
-                    val isError = m.status == MessageStatus.ERROR
-                    val retryUserId = if (isError) m.parentId else null
-                    val associatedUserId = retryUserId ?: messages.take(i)
-                        .lastOrNull { it.role == MessageRole.USER }
-                        ?.id
-                    val canRetry = m.role == MessageRole.ASSISTANT && associatedUserId?.let { userId ->
-                        messages.any { it.id == userId && it.role == MessageRole.USER }
-                    } == true
-                    when (m.role) {
-                        MessageRole.SYSTEM -> AppearIn(m.id) { CompressedNotice() }
-                        MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }
-                        else -> AppearIn(m.id) {
-                            AssistantBlock(
-                                text = m.content,
-                                fontSize = fontSize,
-                                imagePath = m.imagePath,
-                                isError = isError,
-                                retryable = canRetry && !isStreaming && !isSending,
-                                onCopy = { copyToClipboard(m.content) },
-                                onShare = { shareText(m.content) },
-                                onEdit = { editingImage = m },
-                                onSave = { m.imagePath?.let { saveImage(it) } },
-                                onBranch = { onBranchMessage(m) },
-                                onRetry = { onRegenerate(m) }
-                            )
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                // Keep this control in normal layout flow so it reserves room above the first
+                // message instead of obscuring the message text beneath it.
+                ThinkingChip(
+                    level = reasoning,
+                    onClick = { showThinking = true },
+                    modifier = Modifier
+                        .padding(start = 12.dp, top = 6.dp, bottom = 4.dp)
+                        .testTag("chat-thinking-chip")
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    items(count = messages.size, key = { i -> messages[i].id }) { i ->
+                        val m = messages[i]
+                        val isError = m.status == MessageStatus.ERROR
+                        val retryUserId = if (isError) m.parentId else null
+                        val associatedUserId = retryUserId ?: messages.take(i)
+                            .lastOrNull { it.role == MessageRole.USER }
+                            ?.id
+                        val canRetry = m.role == MessageRole.ASSISTANT && associatedUserId?.let { userId ->
+                            messages.any { it.id == userId && it.role == MessageRole.USER }
+                        } == true
+                        when (m.role) {
+                            MessageRole.SYSTEM -> AppearIn(m.id) { CompressedNotice() }
+                            MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }
+                            else -> AppearIn(m.id) {
+                                AssistantBlock(
+                                    text = m.content,
+                                    fontSize = fontSize,
+                                    imagePath = m.imagePath,
+                                    isError = isError,
+                                    retryable = canRetry && !isStreaming && !isSending,
+                                    onCopy = { copyToClipboard(m.content) },
+                                    onShare = { shareText(m.content) },
+                                    onEdit = { editingImage = m },
+                                    onSave = { m.imagePath?.let { saveImage(it) } },
+                                    onBranch = { onBranchMessage(m) },
+                                    onRetry = { onRegenerate(m) }
+                                )
+                            }
                         }
                     }
-                }
-                if (hasStreamingText) {
-                    item(key = "streaming") {
-                        AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
+                    if (hasStreamingText) {
+                        item(key = "streaming") {
+                            AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
+                        }
+                    } else if (showWaitingStatus) {
+                        item(key = "waiting-status") { WaitingStatus(waitingStatus) }
                     }
-                } else if (showWaitingStatus) {
-                    item(key = "waiting-status") { WaitingStatus(waitingStatus) }
                 }
             }
-            ThinkingChip(
-                level = reasoning,
-                onClick = { showThinking = true },
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 6.dp)
-            )
-            }
+
         }
     }
 }
