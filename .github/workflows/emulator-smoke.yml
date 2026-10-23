@@ -66,7 +66,7 @@ jobs:
           set +e
           for log in instrumentation.log smoke-out/walkthrough.log; do
             if [ -f "$log" ]; then
-              (grep -E "FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|FATAL EXCEPTION|ANR in|not visible:|not found:|::error" "$log" || true) | tail -40 | while IFS= read -r line; do
+              (grep -E "^e: |^w: |error:|FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|FATAL EXCEPTION|ANR in|not visible:|not found:|::error" "$log" || true) | tail -40 | while IFS= read -r line; do
                 safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
                 echo "::error title=Emulator test failure::$safe"
               done

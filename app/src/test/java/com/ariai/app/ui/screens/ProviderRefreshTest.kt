@@ -29,7 +29,7 @@ class ProviderRefreshTest {
         var saveCalled = false
         val failure = IOException("offline")
 
-        val result = refreshProviderModels(
+        val result = refreshProviderModels<String>(
             fetch = { throw failure },
             sourceIsCurrent = { true },
             onSuccess = { saveCalled = true }
@@ -61,7 +61,7 @@ class ProviderRefreshTest {
 
         val thrown = org.junit.Assert.assertThrows(CancellationException::class.java) {
             runBlocking {
-                refreshProviderModels(
+                refreshProviderModels<String>(
                     fetch = { throw cancellation },
                     sourceIsCurrent = { true },
                     onSuccess = { saveCalled = true }
