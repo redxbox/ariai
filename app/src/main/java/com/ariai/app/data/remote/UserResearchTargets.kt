@@ -15,9 +15,9 @@ private val USER_URL_REGEX = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE
  * messages that are also part of the model's current conversation context. Assistant-invented URLs
  * are never treated as permission to browse.
  */
-internal fun userResearchTargets(
+internal suspend fun userResearchTargets(
     conversationContext: List<ChatMessage>,
-    isSafePublicUrl: (String) -> Boolean
+    isSafePublicUrl: suspend (String) -> Boolean
 ): UserResearchTargets {
     val recentUserMessages = conversationContext
         .asSequence()
@@ -25,13 +25,23 @@ internal fun userResearchTargets(
         .toList()
         .takeLast(MAX_USER_MESSAGES_WITH_LINKS)
 
-    val urls = recentUserMessages.asSequence()
+    val candidateUrls = recentUserMessages.asSequence()
         .flatMap { message -> USER_URL_REGEX.findAll(message.content).map { it.value } }
         .map { it.trimEnd('.', ',', ';', ')', ']', '،', '؛') }
         .distinct()
-        .filter { url -> runCatching { isSafePublicUrl(url) }.getOrDefault(false) }
-        .take(MAX_PUBLIC_URLS_PER_TURN)
         .toList()
+    val urls = mutableListOf<String>()
+    for (url in candidateUrls) {
+        val isSafe = try {
+            isSafePublicUrl(url)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
+        if (isSafe) urls += url
+        if (urls.size == MAX_PUBLIC_URLS_PER_TURN) break
+    }
 
     val repository = recentUserMessages.asReversed()
         .firstNotNullOfOrNull { GitHubRepositoryClient.Repository.fromUserText(it.content) }

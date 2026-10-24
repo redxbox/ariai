@@ -2,6 +2,7 @@ package com.ariai.app.data.remote
 
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -17,7 +18,7 @@ class ChatRoutingTest {
     }
 
     @Test
-    fun `recent user supplied GitHub links stay available for follow-up requests`() {
+    fun `recent user supplied GitHub links stay available for follow-up requests`() = runBlocking {
         val history = listOf(
             ChatMessage(
                 chatId = "chat",
