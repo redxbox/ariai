@@ -30,3 +30,19 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_chatId_timestamp ON messages(chatId, timestamp)")
     }
 }
+
+/** Repairs legacy chats with an empty ID before the drawer can navigate to `chat/`. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        val invalidIds = buildList {
+            db.query("SELECT id FROM chats WHERE id IS NULL OR TRIM(id) = ''").use { cursor ->
+                while (cursor.moveToNext()) add(cursor.getString(0).orEmpty())
+            }
+        }
+        invalidIds.forEach { oldId ->
+            val repairedId = java.util.UUID.randomUUID().toString()
+            db.execSQL("UPDATE chats SET id = ? WHERE id = ?", arrayOf(repairedId, oldId))
+            db.execSQL("UPDATE messages SET chatId = ? WHERE chatId = ?", arrayOf(repairedId, oldId))
+        }
+    }
+}

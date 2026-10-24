@@ -81,7 +81,9 @@ fun ColumnScope.AppDrawerContent(
     var query by remember { mutableStateOf("") }
 
     val rows: List<DrawerRow> = remember(chats, query, UiLang.code) {
-        val filtered = if (query.isBlank()) chats else chats.filter { it.title.contains(query, ignoreCase = true) }
+        // Older databases may contain malformed chat rows. They must never produce a `chat/` route.
+        val validChats = chats.filter { it.id.isNotBlank() }
+        val filtered = if (query.isBlank()) validChats else validChats.filter { it.title.contains(query, ignoreCase = true) }
         val out = mutableListOf<DrawerRow>()
         val pinned = filtered.filter { it.isPinned }
         if (pinned.isNotEmpty()) {

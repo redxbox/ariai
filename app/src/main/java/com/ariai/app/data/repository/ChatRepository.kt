@@ -71,11 +71,19 @@ class ChatRepository(
     // Chats
     fun getChats(): Flow<List<Chat>> = db.chatDao().getAllChats()
         .map { list ->
-            try {
-                list.map { it.toModel() }.sortedByDescending { it.updatedAt }
-            } catch (e: Exception) {
-                emptyList()
-            }
+            list.mapNotNull { entity ->
+                if (entity.id.isBlank()) {
+                    com.ariai.app.util.AppLog.warn(
+                        IllegalStateException("Ignoring chat row with a blank ID"),
+                        "getChats"
+                    )
+                    null
+                } else {
+                    runCatching { entity.toModel() }
+                        .onFailure { com.ariai.app.util.AppLog.warn(it, "map chat") }
+                        .getOrNull()
+                }
+            }.sortedByDescending { it.updatedAt }
         }
         .catch { emit(emptyList()) }
 
@@ -86,11 +94,17 @@ class ChatRepository(
     }
 
     /** Returns whether the chat row was persisted; failures are logged for device diagnostics. */
-    suspend fun saveChat(chat: Chat): Boolean = persistWithResult(
-        prepare = { chat.toEntity() },
-        persist = { entity -> db.chatDao().insertChat(entity) },
-        onFailure = { com.ariai.app.util.AppLog.warn(it, "saveChat") }
-    )
+    suspend fun saveChat(chat: Chat): Boolean {
+        if (chat.id.isBlank()) {
+            com.ariai.app.util.AppLog.warn(IllegalArgumentException("Cannot save a chat with a blank ID"), "saveChat")
+            return false
+        }
+        return persistWithResult(
+            prepare = { chat.toEntity() },
+            persist = { entity -> db.chatDao().insertChat(entity) },
+            onFailure = { com.ariai.app.util.AppLog.warn(it, "saveChat") }
+        )
+    }
 
     suspend fun deleteChat(id: String) {
         try {

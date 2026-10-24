@@ -112,6 +112,17 @@ fun AppRoot(viewModel: AppViewModel) {
     }
 
     fun openChat(chatId: String) {
+        if (chatId.isBlank()) {
+            com.ariai.app.util.AppLog.warn(
+                IllegalArgumentException("Refusing to navigate to a chat with a blank ID"),
+                "open chat"
+            )
+            scope.launch {
+                drawerState.close()
+                snackbarHostState.showSnackbar(tx("This saved chat cannot be opened because its ID is missing."))
+            }
+            return
+        }
         scope.launch { drawerState.close() }
         viewModel.loadChat(chatId)
         navController.navigate("chat/$chatId") { launchSingleTop = true }

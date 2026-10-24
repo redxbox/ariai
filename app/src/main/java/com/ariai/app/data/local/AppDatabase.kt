@@ -184,7 +184,7 @@ interface AgentDao {
 
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

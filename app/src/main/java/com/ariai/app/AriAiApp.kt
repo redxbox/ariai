@@ -33,7 +33,8 @@ class AriAiApp : Application() {
                 com.ariai.app.data.local.MIGRATION_1_2,
                 com.ariai.app.data.local.MIGRATION_2_3,
                 com.ariai.app.data.local.MIGRATION_3_4,
-                com.ariai.app.data.local.MIGRATION_4_5
+                com.ariai.app.data.local.MIGRATION_4_5,
+                com.ariai.app.data.local.MIGRATION_5_6
             )
             .build()
     }
