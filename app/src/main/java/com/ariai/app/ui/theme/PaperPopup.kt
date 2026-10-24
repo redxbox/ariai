@@ -120,12 +120,12 @@ private class PaperDogEarShape(
         val path = Path().apply {
             moveTo(cut, 0f)
             lineTo(size.width - radius, 0f)
-            quadraticTo(size.width, 0f, size.width, radius)
+            quadraticBezierTo(size.width, 0f, size.width, radius)
             if (roundBottom) {
                 lineTo(size.width, size.height - radius)
-                quadraticTo(size.width, size.height, size.width - radius, size.height)
+                quadraticBezierTo(size.width, size.height, size.width - radius, size.height)
                 lineTo(radius, size.height)
-                quadraticTo(0f, size.height, 0f, size.height - radius)
+                quadraticBezierTo(0f, size.height, 0f, size.height - radius)
             } else {
                 lineTo(size.width, size.height)
                 lineTo(0f, size.height)
