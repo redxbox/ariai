@@ -46,18 +46,30 @@ object KeyVault {
         }
     }
 
-    fun decrypt(stored: String): String {
+    /**
+     * Returns null when encrypted data cannot be opened. Unlike encrypt(), decrypt must not create a
+     * replacement Keystore key: doing so would silently turn a lost key into an empty API key and a
+     * misleading HTTP 401.
+     */
+    fun decryptOrNull(stored: String): String? {
         if (!stored.startsWith(PREFIX)) return stored
         return try {
             val raw = Base64.decode(stored.removePrefix(PREFIX), Base64.NO_WRAP)
+            require(raw.size > IV_BYTES) { "Encrypted value is truncated" }
             val iv = raw.copyOfRange(0, IV_BYTES)
             val data = raw.copyOfRange(IV_BYTES, raw.size)
+            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            val key = (keyStore.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+                ?: throw IllegalStateException("Android Keystore key is missing")
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(128, iv))
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
             String(cipher.doFinal(data), Charsets.UTF_8)
         } catch (e: Exception) {
             AppLog.warn(e, "KeyVault.decrypt")
-            ""
+            null
         }
     }
+
+    /** Backward-compatible best-effort accessor for preferences that can be re-entered separately. */
+    fun decrypt(stored: String): String = decryptOrNull(stored).orEmpty()
 }

@@ -27,6 +27,12 @@ suspend fun checkConnection(provider: Provider, fetch: suspend (Provider) -> Lis
             tx("It must start with https:// and point to the API root, for example https://api.openai.com/v1")
         )
     }
+    if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
+        return ConnectionResult.Failed(
+            tx("The saved API key could not be unlocked."),
+            tx("Re-enter it in AI Providers and save.")
+        )
+    }
     if (provider.type != ProviderType.OLLAMA && provider.apiKey.isBlank()) {
         return ConnectionResult.Failed(tx("No API key entered"), tx("Paste the key from the provider's dashboard."))
     }

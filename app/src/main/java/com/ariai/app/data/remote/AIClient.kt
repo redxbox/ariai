@@ -74,6 +74,9 @@ class AIClient {
 
     /** Applies provider auth, then custom headers so explicitly configured headers can override defaults. */
     private fun Request.Builder.addProviderHeaders(provider: Provider, modelId: String? = null): Request.Builder {
+        if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
+            throw IOException("${tx("The saved API key could not be unlocked.")} ${tx("Re-enter it in AI Providers and save.")}")
+        }
         val key = provider.apiKey.trim()
         when (provider.type) {
             ProviderType.GEMINI -> if (key.isNotBlank()) header("x-goog-api-key", key)

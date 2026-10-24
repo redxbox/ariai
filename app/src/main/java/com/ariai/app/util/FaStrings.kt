@@ -12,6 +12,8 @@ internal val faStrings: Map<String, String> = mapOf(
         "Check that the Base URL is the API root, such as https://api.openai.com/v1" to "بررسی کنید آدرس پایه ریشه‌ی API باشد، مثلاً https://api.openai.com/v1",
         "The API key was rejected" to "کلید API رد شد",
         "Check the key. It must belong to this provider and the Base URL must match it." to "کلید را بررسی کنید. باید متعلق به همین ارائه‌دهنده باشد و آدرس پایه هم با آن مطابقت داشته باشد.",
+        "The saved API key could not be unlocked." to "کلید API ذخیره‌شده بازگشایی نشد.",
+        "Re-enter it in AI Providers and save." to "آن را در بخش ارائه‌دهندگان هوش مصنوعی دوباره وارد و ذخیره کنید.",
         "The account has no credit" to "حساب اعتبار ندارد",
         "Add credit on the provider's billing page." to "از صفحه‌ی پرداخت ارائه‌دهنده اعتبار اضافه کنید.",
         "The address was not found" to "آدرس پیدا نشد",

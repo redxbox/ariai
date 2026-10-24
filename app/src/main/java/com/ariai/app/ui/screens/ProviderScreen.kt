@@ -349,7 +349,8 @@ fun AddProviderScreen(
         enabled = enabled,
         customHeaders = headers.filter { it.first.isNotBlank() }.toMap(),
         customBody = customBody.trim().ifBlank { null },
-        createdAt = initialProvider?.createdAt ?: System.currentTimeMillis()
+        createdAt = initialProvider?.createdAt ?: System.currentTimeMillis(),
+        apiKeyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
     )
     fun fetchAndMerge(
         onDone: (List<AIModel>) -> Unit,
@@ -394,7 +395,8 @@ fun AddProviderScreen(
             }
         }
     }
-    val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody)
+    val keyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
+    val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody) && !keyNeedsReentry
     val visibleModels = models.filter {
         modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
     }
@@ -564,9 +566,16 @@ fun AddProviderScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
+                        if (keyNeedsReentry) {
+                            Text(
+                                "${tx("The saved API key could not be unlocked.")} ${tx("Re-enter it in AI Providers and save.")}",
+                                fontSize = 12.sp,
+                                color = AriAccent
+                            )
+                        }
                         FetchModelsRow(
                             fetching = fetching,
-                            canFetch = baseUrl.isNotBlank(),
+                            canFetch = baseUrl.isNotBlank() && !keyNeedsReentry,
                             status = fetchError ?: if (models.isEmpty()) null else "${models.size} ${tx("models")}",
                             isError = fetchError != null,
                             onFetch = { fetchAndMerge({}, showModelsWhenFetched = true) }

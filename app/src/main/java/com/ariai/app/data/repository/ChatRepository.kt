@@ -40,7 +40,18 @@ class ChatRepository(
     }
 
     suspend fun saveProvider(provider: Provider): Boolean = persistWithResult(
-        prepare = { withContext(Dispatchers.IO) { provider.toEntity() } },
+        prepare = {
+            withContext(Dispatchers.IO) {
+                val entity = provider.toEntity()
+                if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank()) {
+                    // Preserve ciphertext if a non-key setting (for example enabled state) is saved.
+                    val storedKey = db.providerDao().getProviderById(provider.id)?.apiKey
+                    if (storedKey != null) entity.copy(apiKey = storedKey) else entity
+                } else {
+                    entity
+                }
+            }
+        },
         persist = { entity -> db.providerDao().insertProvider(entity) },
         onFailure = { com.ariai.app.util.AppLog.warn(it, "saveProvider") }
     )
@@ -371,24 +382,36 @@ class ChatRepository(
     }
 
     // Mappers with safety
-    private fun ProviderEntity.toModel() = try {
-        Provider(
-            id = id,
-            name = name,
-            type = try { ProviderType.valueOf(type) } catch (e: Exception) { ProviderType.OPENAI_COMPATIBLE },
-            baseUrl = baseUrl,
-            apiKey = com.ariai.app.util.KeyVault.decrypt(apiKey),
-            enabled = enabled,
-            customHeaders = try { Converters().toStringMap(customHeaders) } catch (e: Exception) { emptyMap() },
-            customBody = customBody,
-            createdAt = createdAt,
-            models = com.ariai.app.data.models.modelsFromJson(modelsJson).ifEmpty {
-                // Providers saved before model storage existed start with the defaults.
-                if (modelsJson == "[]") com.ariai.app.data.models.getDefaultModelsForType(runCatching { ProviderType.valueOf(type) }.getOrDefault(ProviderType.OPENAI_COMPATIBLE), id) else emptyList()
-            }
-        )
-    } catch (e: Exception) {
-        Provider(id = id, name = name.ifBlank { "Unknown" }, type = ProviderType.OPENAI_COMPATIBLE, baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" }, apiKey = com.ariai.app.util.KeyVault.decrypt(apiKey))
+    private fun ProviderEntity.toModel(): Provider {
+        val decryptedKey = com.ariai.app.util.KeyVault.decryptOrNull(apiKey)
+        val apiKeyNeedsReentry = apiKey.startsWith("enc1:") && decryptedKey == null
+        return try {
+            Provider(
+                id = id,
+                name = name,
+                type = try { ProviderType.valueOf(type) } catch (e: Exception) { ProviderType.OPENAI_COMPATIBLE },
+                baseUrl = baseUrl,
+                apiKey = decryptedKey.orEmpty(),
+                enabled = enabled,
+                customHeaders = try { Converters().toStringMap(customHeaders) } catch (e: Exception) { emptyMap() },
+                customBody = customBody,
+                createdAt = createdAt,
+                apiKeyNeedsReentry = apiKeyNeedsReentry,
+                models = com.ariai.app.data.models.modelsFromJson(modelsJson).ifEmpty {
+                    // Providers saved before model storage existed start with the defaults.
+                    if (modelsJson == "[]") com.ariai.app.data.models.getDefaultModelsForType(runCatching { ProviderType.valueOf(type) }.getOrDefault(ProviderType.OPENAI_COMPATIBLE), id) else emptyList()
+                }
+            )
+        } catch (e: Exception) {
+            Provider(
+                id = id,
+                name = name.ifBlank { "Unknown" },
+                type = ProviderType.OPENAI_COMPATIBLE,
+                baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" },
+                apiKey = decryptedKey.orEmpty(),
+                apiKeyNeedsReentry = apiKeyNeedsReentry
+            )
+        }
     }
 
     private fun Provider.toEntity() = ProviderEntity(

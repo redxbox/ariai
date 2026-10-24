@@ -773,6 +773,14 @@ class AppViewModel(
 
                 val sentContent = userMessage.content
                 val sentAttachments = userMessage.attachments
+                if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
+                    postAssistantError(
+                        chatId,
+                        "${tx("The saved API key could not be unlocked.")} ${tx("Re-enter it in AI Providers and save.")} (${provider.name})",
+                        userMessage.id
+                    )
+                    return@launchSendJob
+                }
                 val current = provider.models.firstOrNull { it.id == targetModelId }
                 if ((_chatModes.value[chatId] ?: ChatMode.TEXT) == ChatMode.TEXT &&
                     sentAttachments.any { it.type == AttachmentType.IMAGE } && current != null && !current.supportsVision
