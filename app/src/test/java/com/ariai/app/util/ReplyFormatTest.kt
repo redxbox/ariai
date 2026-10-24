@@ -17,6 +17,15 @@ class ReplyFormatTest {
     }
 
     @Test
+    fun blankLinesSplitParagraphBlocksButKeepListLinesTogether() {
+        val parts = splitReply("First paragraph.\ncontinued.\n\n- one\n- two\n\nFinal paragraph.")
+        assertEquals(3, parts.size)
+        assertEquals("First paragraph.\ncontinued.\n", (parts[0] as ReplyPart.Text).raw)
+        assertEquals("- one\n- two\n", (parts[1] as ReplyPart.Text).raw)
+        assertEquals("Final paragraph.\n", (parts[2] as ReplyPart.Text).raw)
+    }
+
+    @Test
     fun unclosedFenceKeepsRestAsCode() {
         val parts = splitReply("```python\nprint(1)\nprint(2)")
         assertEquals(1, parts.size)

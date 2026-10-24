@@ -33,7 +33,7 @@ import com.ariai.app.util.tx
 fun ReplyContent(text: String, fontSizeSp: Float, color: Color) {
     val parts = remember(text) { splitReply(text) }
     val uriHandler = LocalUriHandler.current
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         parts.forEach { part ->
             when (part) {
                 is ReplyPart.Text -> {

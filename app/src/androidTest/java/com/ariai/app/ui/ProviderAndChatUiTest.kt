@@ -20,6 +20,7 @@ import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.remote.ConnectionResult
 import com.ariai.app.ui.screens.ChatListScreen
 import com.ariai.app.ui.screens.NewChatScreen
+import com.ariai.app.ui.screens.ModelPickerSheet
 import com.ariai.app.ui.screens.NewProvidersScreen
 import com.ariai.app.ui.theme.AriAiTheme
 import org.junit.Assert.assertEquals
@@ -127,5 +128,41 @@ class ProviderAndChatUiTest {
 
         compose.onNodeWithTag("chat-composer").performClick().performTextInput("سلام")
         compose.onNodeWithTag("chat-composer").assertTextEquals("سلام")
+    }
+
+    @Test
+    fun modelPickerKeepsAddAndManageProviderActionsAfterAProviderExists() {
+        val provider = Provider(
+            id = "provider-model-picker-test",
+            name = "Saved provider",
+            type = ProviderType.OPENAI_COMPATIBLE,
+            baseUrl = "https://api.example.test/v1",
+            apiKey = "test-key",
+            models = listOf(AIModel("saved-model", "Saved model", "provider-model-picker-test"))
+        )
+        var addCalls = 0
+        var manageCalls = 0
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                ModelPickerSheet(
+                    providers = listOf(provider),
+                    selectedProviderId = provider.id,
+                    selectedModelId = "saved-model",
+                    favorites = emptySet(),
+                    onToggleFavorite = { _, _ -> },
+                    onSelect = { _, _ -> },
+                    onAddProvider = { addCalls++ },
+                    onManageProviders = { manageCalls++ },
+                    onCheckProvider = { ConnectionResult.Ok(0) },
+                    onDismiss = {}
+                )
+            }
+        }
+
+        compose.onNodeWithText("Add provider").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Manage providers").assertIsDisplayed().performClick()
+        assertEquals(1, addCalls)
+        assertEquals(1, manageCalls)
     }
 }

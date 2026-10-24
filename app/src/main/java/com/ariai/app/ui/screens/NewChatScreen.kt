@@ -129,6 +129,7 @@ fun NewChatScreen(
     onOpenExtensions: () -> Unit = {},
     onOpenSearchSettings: () -> Unit = {},
     onAddProvider: () -> Unit = {},
+    onManageProviders: () -> Unit = {},
     onCheckProvider: suspend (Provider) -> com.ariai.app.data.remote.ConnectionResult,
     fontSize: Int = 15,
     modifier: Modifier = Modifier,
@@ -427,6 +428,7 @@ fun NewChatScreen(
             onToggleFavorite = onToggleFavorite,
             onSelect = onSelectModel,
             onAddProvider = { showModelSheet = false; onAddProvider() },
+            onManageProviders = { showModelSheet = false; onManageProviders() },
             onCheckProvider = onCheckProvider,
             onDismiss = { showModelSheet = false }
         )
@@ -520,11 +522,11 @@ fun NewChatScreen(
                         IconButton(onClick = { showTopMenu = true }) {
                             Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
                         }
-                        val menuShape = paperPopupShape(18.dp)
+                        val menuShape = paperPopupShape(18.dp, 12.dp)
                         DropdownMenu(
                             expanded = showTopMenu,
                             onDismissRequest = { showTopMenu = false },
-                            modifier = Modifier.clip(menuShape).background(AriCard, menuShape).then(paperPopupModifier(menuShape, 14.dp))
+                            modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
                         ) {
                             DropdownMenuItem(
                                 text = { Text(tx("Copy conversation")) },

@@ -226,11 +226,11 @@ fun GlassProviderCard(
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
-                val menuShape = paperPopupShape(16.dp)
+                val menuShape = paperPopupShape(16.dp, 12.dp)
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
-                    modifier = Modifier.clip(menuShape).background(AriCard, menuShape).then(paperPopupModifier(menuShape, 14.dp))
+                    modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
                 ) {
                     DropdownMenuItem(text = { Text(tx("Test")) }, onClick = { showMenu = false; onTest() }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) })
                     DropdownMenuItem(text = { Text(tx("Edit")) }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) })
@@ -298,18 +298,25 @@ fun AddProviderScreen(
     onSave: (Provider) -> Unit,
     onBack: () -> Unit,
     onDelete: (String) -> Unit = {},
+    existingProviderNames: Set<String> = emptySet(),
     modifier: Modifier = Modifier
 ) {
     val isEdit = initialProvider != null
-    var name by remember(initialProvider?.id, presetType) {
-        mutableStateOf(initialProvider?.name ?: providerPresets.firstOrNull { it.type == presetType }?.label.orEmpty())
+    fun defaultNameFor(type: ProviderType?): String {
+        val preset = providerPresets.firstOrNull { it.type == type } ?: return ""
+        val label = tx(preset.label)
+        return if (preset.type == ProviderType.OPENAI_COMPATIBLE) {
+            nextUniqueProviderName(label, existingProviderNames)
+        } else {
+            label
+        }
+    }
+    var name by remember(initialProvider?.id, presetType, existingProviderNames) {
+        mutableStateOf(initialProvider?.name ?: defaultNameFor(presetType))
     }
     // Preset names follow the selected provider until the user supplies a custom name.
     var nameManuallyEdited by remember(initialProvider?.id, presetType) {
-        mutableStateOf(
-            initialProvider != null &&
-                initialProvider.name != providerPresets.firstOrNull { it.type == initialProvider.type }?.label
-        )
+        mutableStateOf(initialProvider != null && initialProvider.name != defaultNameFor(initialProvider.type))
     }
     var baseUrl by remember(initialProvider?.id, presetType) {
         mutableStateOf(initialProvider?.baseUrl ?: providerPresets.firstOrNull { it.type == presetType }?.baseUrl ?: "https://api.openai.com/v1")
@@ -501,7 +508,7 @@ fun AddProviderScreen(
                                     selectedType = preset.type
                                     baseUrl = preset.baseUrl
                                     if (!nameManuallyEdited || name.isBlank()) {
-                                        name = preset.label
+                                        name = defaultNameFor(preset.type)
                                         nameManuallyEdited = false
                                     }
                                 }

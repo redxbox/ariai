@@ -6,12 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Favorite
@@ -52,6 +54,7 @@ fun ModelPickerSheet(
     onToggleFavorite: (providerId: String, modelId: String) -> Unit,
     onSelect: (providerId: String, modelId: String) -> Unit,
     onAddProvider: () -> Unit,
+    onManageProviders: () -> Unit,
     onCheckProvider: suspend (Provider) -> ConnectionResult,
     onDismiss: () -> Unit
 ) {
@@ -109,9 +112,6 @@ fun ModelPickerSheet(
                 ) {
                     Text(tx("No models available"), fontWeight = FontWeight.SemiBold, color = Ink)
                     Text(tx("Add a provider with at least one model."), color = Ink.copy(alpha = 0.5f), fontSize = 13.sp)
-                    Button(onClick = onAddProvider, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent)) {
-                        Text(tx("Add provider"))
-                    }
                 }
             } else {
                 LazyColumn(
@@ -183,6 +183,31 @@ fun ModelPickerSheet(
                             label = { Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         )
                     }
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedButton(
+                    onClick = onManageProviders,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, AriInk.copy(alpha = 0.16f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink)
+                ) {
+                    Text(tx("Manage providers"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Button(
+                    onClick = onAddProvider,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(tx("Add provider"), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

@@ -265,6 +265,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         onOpenSearchSettings = { navController.navigate("search_service") },
                         fontSize = fontSize,
                         onAddProvider = { navController.navigate("add_provider") },
+                        onManageProviders = { navController.navigate("providers") },
                         onCheckProvider = { provider -> com.ariai.app.data.remote.checkConnection(provider) { viewModel.fetchModels(it) } }
                     )
                 }
@@ -296,6 +297,7 @@ fun AppRoot(viewModel: AppViewModel) {
                     AddProviderScreen(
                         presetType = entry.arguments?.getString("preset")
                             ?.let { runCatching { com.ariai.app.data.models.ProviderType.valueOf(it) }.getOrNull() },
+                        existingProviderNames = providers.map { it.name }.toSet(),
                         fetchModels = { viewModel.fetchModels(it) },
                         onSave = { provider ->
                             viewModel.saveProvider(provider) { saved ->
@@ -314,6 +316,7 @@ fun AppRoot(viewModel: AppViewModel) {
                     val providerId = entry.arguments?.getString("providerId") ?: ""
                     AddProviderScreen(
                         initialProvider = providers.find { it.id == providerId },
+                        existingProviderNames = providers.map { it.name }.toSet(),
                         fetchModels = { viewModel.fetchModels(it) },
                         onSave = { provider ->
                             viewModel.saveProvider(provider) { saved ->

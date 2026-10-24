@@ -74,6 +74,7 @@ internal val faStrings: Map<String, String> = mapOf(
         "Add header" to "افزودن هدر",
         "Add model" to "افزودن مدل",
         "Add provider" to "افزودن ارائه‌دهنده",
+        "Manage providers" to "مدیریت ارائه‌دهنده‌ها",
         "Add server" to "افزودن سرور",
         "Add to favorites" to "افزودن به علاقه‌مندی‌ها",
         "Add to message" to "افزودن به پیام",

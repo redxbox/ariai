@@ -62,6 +62,10 @@ fun splitReply(raw: String): List<ReplyPart> {
             }
         } else if (inCode) {
             code.append(line).append('\n')
+        } else if (trimmed.isEmpty()) {
+            // Render blank-line-separated paragraphs as separate compact blocks. Keeping blank
+            // lines inside one Text adds a full line-height of vertical whitespace on phones.
+            flushText()
         } else {
             text.append(line).append('\n')
         }
