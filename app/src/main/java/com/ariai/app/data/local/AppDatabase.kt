@@ -135,6 +135,10 @@ interface ChatDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChat(chat: ChatEntity)
 
+    /** Inserts a recovery row only if no other operation has already created this chat. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertChatIfAbsent(chat: ChatEntity): Long
+
     @Delete
     suspend fun deleteChat(chat: ChatEntity)
 

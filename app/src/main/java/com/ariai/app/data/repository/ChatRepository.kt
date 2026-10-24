@@ -140,8 +140,38 @@ class ChatRepository(
                 })
             }
             db.withTransaction {
-                val chat = db.chatDao().getChatById(message.chatId)
-                    ?: throw IllegalStateException("Cannot save a message because the chat row does not exist")
+                val chat = db.chatDao().getChatById(message.chatId) ?: run {
+                    if (message.role != MessageRole.USER) {
+                        throw IllegalStateException(
+                            "Cannot save ${message.role} message because chat row ${message.chatId} does not exist"
+                        )
+                    }
+                    // A first user send must not be lost just because the screen's chat row was
+                    // not present when this transaction began. Recreate only for user messages,
+                    // so a late assistant error cannot resurrect a chat that was intentionally deleted.
+                    // IGNORE avoids overwriting a row inserted concurrently by createNewChat.
+                    db.chatDao().insertChatIfAbsent(
+                        ChatEntity(
+                            id = message.chatId,
+                            title = "New Chat",
+                            createdAt = message.timestamp,
+                            updatedAt = message.timestamp,
+                            providerId = message.providerId,
+                            modelId = message.modelId,
+                            agentId = null,
+                            systemPrompt = null,
+                            isPinned = false,
+                            isArchived = false,
+                            memoryEnabled = false
+                        )
+                    )
+                    com.ariai.app.util.AppLog.warn(
+                        IllegalStateException("Recovered missing chat row for chatId=${message.chatId}"),
+                        "saveMessage"
+                    )
+                    db.chatDao().getChatById(message.chatId)
+                        ?: throw IllegalStateException("Could not recreate chat row for chatId=${message.chatId}")
+                }
                 db.messageDao().insertMessage(stored.toEntity())
                 db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
             }

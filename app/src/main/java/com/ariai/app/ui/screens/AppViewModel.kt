@@ -307,7 +307,15 @@ class AppViewModel(
         val saveTicket = chatPersistenceGate.begin(id)
         viewModelScope.launch {
             try {
-                chatPersistenceGate.complete(id, saveTicket, repository.saveChat(chat))
+                val saved = repository.saveChat(chat)
+                val persisted = saved && repository.getChatById(id) != null
+                if (saved && !persisted) {
+                    com.ariai.app.util.AppLog.warn(
+                        IllegalStateException("New chat row was not readable after save: chatId=$id"),
+                        "create chat"
+                    )
+                }
+                chatPersistenceGate.complete(id, saveTicket, persisted)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 chatPersistenceGate.complete(id, saveTicket, saved = false)
                 throw cancelled
@@ -746,10 +754,15 @@ class AppViewModel(
                     postAssistantError(chatId, tx("The original message could not be loaded. Please send it again."))
                     return@launchSendJob
                 }
+                val targetModelId = _modelOverrides.value[chatId]?.second
+                    ?: getCurrentChat()?.modelId
+                    ?: provider.models.firstOrNull()?.id
                 val userMessage = storedUserMessage ?: ChatMessage(
                     chatId = chatId,
                     role = MessageRole.USER,
                     content = requestContent,
+                    modelId = targetModelId,
+                    providerId = provider.id,
                     attachments = requestAttachments
                 )
                 if (existingUserMessage == null) {
@@ -766,9 +779,6 @@ class AppViewModel(
 
                 val sentContent = userMessage.content
                 val sentAttachments = userMessage.attachments
-                val targetModelId = _modelOverrides.value[chatId]?.second
-                    ?: getCurrentChat()?.modelId
-                    ?: provider.models.firstOrNull()?.id
                 val current = provider.models.firstOrNull { it.id == targetModelId }
                 if ((_chatModes.value[chatId] ?: ChatMode.TEXT) == ChatMode.TEXT &&
                     sentAttachments.any { it.type == AttachmentType.IMAGE } && current != null && !current.supportsVision
