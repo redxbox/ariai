@@ -21,13 +21,15 @@ data class AgentStep(
 /** A bounded, sequential tool loop: model -> tools -> model, returning only the final text. */
 class AgentLoop(
     private val maxSteps: Int = 6,
-    private val maxCallsPerStep: Int = 4,
+    private val maxCallsPerStep: Int = 16,
+    private val maxTotalToolCalls: Int = 24,
     private val maxCharsPerToolResult: Int = 8_000,
     private val maxTotalToolChars: Int = 20_000
 ) {
     init {
         require(maxSteps > 0)
         require(maxCallsPerStep > 0)
+        require(maxTotalToolCalls > 0)
         require(maxCharsPerToolResult > 0)
         require(maxTotalToolChars >= 0)
     }
@@ -44,6 +46,7 @@ class AgentLoop(
         val acknowledgementWasRequested = isAcknowledgementRequest(originalUserText)
         var acknowledgementRecoveryUsed = false
         var totalToolChars = 0
+        var totalToolCalls = 0
 
         repeat(maxSteps) {
             val step = requestStep(history, tools, acknowledgementRecoveryUsed)
@@ -56,9 +59,6 @@ class AgentLoop(
                 return@repeat
             }
 
-            require(step.toolCalls.size <= maxCallsPerStep) {
-                "The model requested too many tools in one step (${step.toolCalls.size})."
-            }
             val lastUser = history.lastOrNull { it.role == com.ariai.app.data.models.MessageRole.USER }
                 ?: error("Cannot execute tools without a user message")
             history += com.ariai.app.data.models.ChatMessage(
@@ -67,23 +67,29 @@ class AgentLoop(
                 content = step.text,
                 toolCalls = step.toolCalls
             )
+            var callsThisStep = 0
             for (call in step.toolCalls) {
                 val remainingChars = (maxTotalToolChars - totalToolChars).coerceAtLeast(0)
                 val allowedChars = minOf(maxCharsPerToolResult, remainingChars)
                 val tool = tools.firstOrNull { it.name == call.name }
-                val output = if (allowedChars == 0) {
-                    "Tool '${call.name}' was not run because the response context budget was reached."
-                } else if (tool == null) {
-                    "Tool '${call.name}' is not available in this request."
-                } else {
-                    try {
-                        require(call.arguments.length <= MAX_TOOL_ARGUMENT_CHARS) { "Tool arguments are too large" }
-                        val args = call.arguments.takeIf { it.isNotBlank() }?.let { JSONObject(it) } ?: JSONObject()
-                        tool.execute(args)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        "Tool '${call.name}' failed: ${error.message?.take(500) ?: error.javaClass.simpleName}"
+                val withinStepBudget = callsThisStep++ < maxCallsPerStep
+                val withinTurnBudget = totalToolCalls < maxTotalToolCalls
+                val output = when {
+                    !withinStepBudget -> "Tool '${call.name}' was not run because the per-step tool execution limit was reached."
+                    !withinTurnBudget -> "Tool '${call.name}' was not run because the total tool execution limit was reached."
+                    allowedChars == 0 -> "Tool '${call.name}' was not run because the response context budget was reached."
+                    tool == null -> "Tool '${call.name}' is not available in this request."
+                    else -> {
+                        totalToolCalls++
+                        try {
+                            require(call.arguments.length <= MAX_TOOL_ARGUMENT_CHARS) { "Tool arguments are too large" }
+                            val args = call.arguments.takeIf { it.isNotBlank() }?.let { JSONObject(it) } ?: JSONObject()
+                            tool.execute(args)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            "Tool '${call.name}' failed: ${error.message?.take(500) ?: error.javaClass.simpleName}"
+                        }
                     }
                 }
                 val truncationNotice = "\n[Tool output truncated to fit the response context budget.]"
