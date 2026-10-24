@@ -55,7 +55,8 @@ suspend fun checkConnection(provider: Provider, fetch: suspend (Provider) -> Lis
 
 private fun classify(e: Exception): ConnectionResult {
     val msg = e.message.orEmpty()
-    val code = Regex("HTTP (\\d{3})").find(msg)?.groupValues?.get(1)
+    val code = Regex("(?:HTTP\\s+|API Error\\s+)(\\d{3})", RegexOption.IGNORE_CASE)
+        .find(msg)?.groupValues?.get(1)
     val status = code?.toIntOrNull()
     return when {
         status == 401 || status == 403 -> ConnectionResult.Failed(
