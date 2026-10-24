@@ -47,7 +47,7 @@ object DefaultAgentTools {
         val hosts = allowed.mapNotNull { runCatching { URI(it).host?.lowercase() }.getOrNull() }.toSet()
         return ChatFunctionTool(
             name = "open_user_url",
-            description = "Fetch and read a public web page explicitly linked by the user in this request. Use only the user's supplied URL(s); do not claim to have read a page until this tool returns its content.",
+            description = "Fetch and read a public web page explicitly linked by the user in the recent conversation context sent with this turn. Use only those exact user-supplied URLs; do not claim to have read a page until this tool returns its content.",
             parameters = objectSchema(
                 properties = JSONObject().put("url", stringProperty("One of the exact URLs supplied by the user")),
                 required = listOf("url")
@@ -60,7 +60,7 @@ object DefaultAgentTools {
             require(uri.normalize() == uri && host != null && host in hosts &&
                 (scheme == "http" || scheme == "https") && uri.toASCIIString() in allowed
             ) {
-                "Only exact URLs supplied by the user in this turn may be opened."
+                "Only exact URLs supplied by the user in the recent conversation context may be opened."
             }
             fetcher.fetch(uri.toASCIIString())
         }
@@ -69,7 +69,7 @@ object DefaultAgentTools {
     fun githubRepository(repository: GitHubRepositoryClient.Repository, client: GitHubRepositoryClient): List<ChatFunctionTool> = listOf(
         ChatFunctionTool(
             name = "github_list_files",
-            description = "List files from the public GitHub repository and branch/ref explicitly supplied by the user (the default branch when no ref is present). Use this before choosing source files to read. For branch names containing '/', use an explicit ?ref= query (or a percent-encoded ref segment), because unescaped path segments are ambiguous. Pass path_prefix to focus on a folder when the tree is large.",
+            description = "List files from the public GitHub repository and branch/ref explicitly supplied by the user in recent conversation context sent with this turn (the default branch when no ref is present). Use this before choosing source files to read. For branch names containing '/', use an explicit ?ref= query (or a percent-encoded ref segment), because unescaped path segments are ambiguous. Pass path_prefix to focus on a folder when the tree is large.",
             parameters = objectSchema(
                 properties = JSONObject().put("path_prefix", stringProperty("Optional repository folder prefix, such as app/src/main")),
                 required = emptyList()
@@ -77,7 +77,7 @@ object DefaultAgentTools {
         ) { args -> client.listFiles(repository, args.optString("path_prefix").takeIf { it.isNotBlank() }) },
         ChatFunctionTool(
             name = "github_read_file",
-            description = "Read one UTF-8 text file from the exact public GitHub repository and branch/ref supplied by the user. Use paths returned by github_list_files; sensitive key files and binary files are blocked.",
+            description = "Read one UTF-8 text file from the exact public GitHub repository and branch/ref supplied by the user in recent conversation context sent with this turn. Use paths returned by github_list_files; sensitive key files and binary files are blocked.",
             parameters = objectSchema(
                 properties = JSONObject().put("path", stringProperty("Repository-relative path returned by github_list_files")),
                 required = listOf("path")

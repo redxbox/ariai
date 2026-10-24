@@ -14,6 +14,7 @@ import com.ariai.app.data.remote.shouldOfferCalculatorTool
 import com.ariai.app.data.remote.shouldStreamToolFreeChat
 import com.ariai.app.data.remote.GitHubRepositoryClient
 import com.ariai.app.data.remote.PublicUrlFetcher
+import com.ariai.app.data.remote.userResearchTargets
 import com.ariai.app.data.repository.ChatRepository
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -24,13 +25,6 @@ import kotlinx.coroutines.launch
 enum class ChatMode { TEXT, IMAGE, VIDEO, AUDIO }
 
 private const val MAX_MEDIA_BYTES_PER_REQUEST = 16L * 1024L * 1024L
-private val USER_URL_REGEX = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)
-
-private fun extractUserUrls(text: String): List<String> = USER_URL_REGEX.findAll(text)
-    .map { it.value.trimEnd('.', ',', ';', ')', ']', '،', '؛') }
-    .distinct()
-    .take(5)
-    .toList()
 
 private const val DEFAULT_MOBILE_REPLY_STYLE =
     "Reply in the same language as the user's latest message. For multi-part questions, begin with a short direct answer, then use clear Markdown headings and concise bullets. Use short paragraphs; avoid wide tables on phones unless they improve comparison. Keep simple answers brief and do not invent information."
@@ -882,11 +876,11 @@ class AppViewModel(
                     }
                     val customSystemPrompt = getCurrentChat()?.systemPrompt?.takeIf { it.isNotBlank() }
                         ?: getAgentSystemPrompt()
-                    val userProvidedUrls = mutableListOf<String>()
-                    for (url in extractUserUrls(sentContent)) {
-                        if (publicUrlFetcher.isSafePublicUrl(url)) userProvidedUrls += url
-                    }
-                    val githubRepository = GitHubRepositoryClient.Repository.fromUserText(sentContent)
+                    // Keep links from recent user turns available for follow-up prompts such as
+                    // “review that repository”, but never treat assistant-provided links as permission.
+                    val researchTargets = userResearchTargets(history, publicUrlFetcher::isSafePublicUrl)
+                    val userProvidedUrls = researchTargets.publicUrls
+                    val githubRepository = researchTargets.githubRepository
                     val webUrls = userProvidedUrls.filterNot { GitHubRepositoryClient.Repository.fromUserText(it) != null }
                     val functionTools: List<ChatFunctionTool> = if (current?.supportsFunctionCalling != false) {
                         buildList {
@@ -1025,10 +1019,11 @@ class AppViewModel(
                     val errorMsg = when {
                         e.message?.startsWith("This provider has no built-in web search") == true ||
                             e.message?.startsWith("This model is marked as not supporting tool calling") == true -> "⚠️ ${e.message?.take(300)}"
-                        e.message?.contains("API Error 401") == true -> tx("🔑 Invalid API key. Please check your provider settings in AI Providers.")
+                        e.message?.contains("API Error 401") == true ->
+                            tx("🔑 The selected provider rejected the API key (HTTP 401). Check its key and Base URL in AI Providers.") + " (${provider.name})"
                         e.message?.contains("API Error 429") == true -> tx("⏳ Rate limit exceeded. Please wait a moment or try another provider.")
                         e.message?.contains("Unable to resolve host") == true -> tx("🌐 No internet connection. Please check your network.")
-                        else -> "❌ Error: ${e.message?.take(300)}\n\nPlease check your API key and provider settings."
+                        else -> "❌ Error: ${e.message?.take(300) ?: e::class.java.simpleName}"
                     }
 
                     val errorMessage = ChatMessage(
