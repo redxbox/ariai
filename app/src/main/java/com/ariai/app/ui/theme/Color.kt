@@ -19,9 +19,11 @@ val AriSecondary = Color(0xFF00D4AA)
 val AriSecondaryLight = Color(0xFF5CFFD6)
 val AriSecondaryDark = Color(0xFF00A381)
 
-// The single colour accent. Used only for one small element per screen.
-val AriAccent = Color(0xFFD9704A)
-val AriAccentLight = Color(0xFFFF9E9E)
+// AriAi's vivid indigo accent anchors primary actions, active navigation, and chat highlights.
+val AriAccent = Color(0xFF6957E8)
+val AriAccentLight = Color(0xFFB9AEFF)
+val AriAccentDark = Color(0xFF4E3BCC)
+val AriAccentSoft = Color(0xFFE9E6FF)
 
 val AriBackground = Color(0xFF0F0F13)
 val AriSurface = Color(0xFF1A1A1F)

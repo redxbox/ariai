@@ -30,7 +30,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 /** Local data overview with a chat list export and a guarded "clear all". */
 @OptIn(ExperimentalMaterial3Api::class)

@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 enum class McpTransport(val label: String) { SSE("SSE"), STREAMABLE_HTTP("Streamable HTTP") }
 

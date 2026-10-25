@@ -44,25 +44,25 @@ fun ChatListScreen(
             floatingActionButton = {
                 FloatingActionButton(
                     onClick = onNewChat,
-                    containerColor = AriInk,
+                    containerColor = AriAccent,
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.size(56.dp)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = tx("New Chat"), tint = AriCard)
+                    Icon(Icons.Default.Edit, contentDescription = tx("New Chat"), tint = Color.White)
                 }
             }
         ) { padding ->
             if (chats.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(32.dp)) {
-                        Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(AriInk.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Chat, contentDescription = null, tint = AriInk, modifier = Modifier.size(36.dp))
+                        Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(AriAccent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Chat, contentDescription = null, tint = AriAccent, modifier = Modifier.size(36.dp))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(tx("No conversations yet"), fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AriInk)
                             Text(tx("Start a new chat to begin"), color = AriInk.copy(alpha = 0.5f), fontSize = 14.sp)
                         }
-                        Button(onClick = onNewChat, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = AriInk), modifier = Modifier.padding(top = 8.dp)) {
+                        Button(onClick = onNewChat, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White), modifier = Modifier.padding(top = 8.dp)) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(tx("New Chat"))

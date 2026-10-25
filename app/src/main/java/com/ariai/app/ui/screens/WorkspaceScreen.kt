@@ -56,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +71,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.ariai.app.data.models.WorkspaceFile
 import com.ariai.app.data.repository.executeWorkspaceConsole
 import com.ariai.app.data.repository.renderStaticHtmlPreview
+import com.ariai.app.ui.theme.AriAccent
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
@@ -225,7 +227,7 @@ fun WorkspaceScreen(
                                     }
                                 },
                                 enabled = draft != savedDraft,
-                                colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
+                                colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                             ) { Text(tx("Save file")) }
                             if (notice.isNotBlank()) Text(notice, color = AriMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             else if (draft == savedDraft) Text(tx("Saved"), color = AriMuted, fontSize = 12.sp)
@@ -289,7 +291,7 @@ fun WorkspaceScreen(
                                 consoleOutput = runWorkspaceCommand(consoleCommand, files, consoleOutput)
                                 consoleCommand = ""
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
+                            colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                         ) { Text(tx("Run")) }
                     }
                 }
@@ -448,7 +450,7 @@ private fun EmptyWorkspace(onCreate: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         Text(tx("Create an HTML, CSS, or text file to begin."), color = AriMuted, fontSize = 13.sp)
         Spacer(Modifier.height(14.dp))
-        Button(onClick = onCreate, colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)) {
+        Button(onClick = onCreate, colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text(tx("New file"))

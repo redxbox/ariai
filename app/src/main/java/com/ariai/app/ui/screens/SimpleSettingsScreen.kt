@@ -138,11 +138,11 @@ fun SimpleGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 fun SimpleChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) AriInk else AriTint,
+        color = if (selected) AriAccent else AriTint,
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-            Text(label, color = if (selected) AriCard else AriInk, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(label, color = if (selected) Color.White else AriInk, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }

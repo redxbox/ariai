@@ -13,11 +13,11 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 
-// Monochrome: white and black, with one small accent used per screen.
+// A confident indigo brand accent sits over soft, cool-toned surfaces in both themes.
 private val DarkColorScheme = darkColorScheme(
-    primary = Color.White,
-    onPrimary = Color(0xFF111111),
-    secondary = Color(0xFFBDBDBD),
+    primary = AriAccentLight,
+    onPrimary = Color(0xFF211A50),
+    secondary = Color(0xFF9FCFC7),
     tertiary = AriAccent,
     background = DarkAriPalette.paper,
     surface = DarkAriPalette.paper,
@@ -28,9 +28,9 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = LightAriPalette.ink,
+    primary = AriAccent,
     onPrimary = Color.White,
-    secondary = Color(0xFF555555),
+    secondary = Color(0xFF5364A6),
     tertiary = AriAccent,
     background = LightAriPalette.paper,
     surface = LightAriPalette.paper,

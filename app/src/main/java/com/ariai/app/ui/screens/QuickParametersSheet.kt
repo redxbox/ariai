@@ -25,9 +25,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ariai.app.ui.theme.AriAccent
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
@@ -112,7 +114,7 @@ fun QuickParametersSheet(
                         onSave(temperatureValue.coerceIn(0f, 2f), topPValue.coerceIn(0f, 1f), promptValue.trim().takeIf { it.isNotEmpty() })
                     },
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriCard)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                 ) { Text(tx("Save settings")) }
             }
         }

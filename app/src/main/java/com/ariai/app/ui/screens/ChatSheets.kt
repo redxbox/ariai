@@ -32,7 +32,7 @@ import com.ariai.app.data.models.ReasoningLevel
 import com.ariai.app.data.models.SearchMode
 import kotlin.math.roundToInt
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Tile: Color @Composable @ReadOnlyComposable get() = AriTint
 /** Actions offered by the "+" button above the chat input. */

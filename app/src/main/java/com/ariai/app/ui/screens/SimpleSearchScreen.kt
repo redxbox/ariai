@@ -131,9 +131,9 @@ fun SimpleSearchScreen(
                     }
                 } else {
                     item {
-                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = AriInk.copy(alpha = 0.1f)), modifier = Modifier.fillMaxWidth().clickable { onSearch(query) }) {
+                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = AriAccent.copy(alpha = 0.1f)), modifier = Modifier.fillMaxWidth().clickable { onSearch(query) }) {
                             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = AriInk)
+                                Icon(Icons.Default.Search, contentDescription = null, tint = AriAccent)
                                 Column {
                                     Text(tx("Search for") + " \"$query\"", fontWeight = FontWeight.Medium, color = AriInk, fontSize = 14.sp)
                                     Text(tx("Press to search with AI"), color = AriInk.copy(alpha = 0.6f), fontSize = 12.sp)

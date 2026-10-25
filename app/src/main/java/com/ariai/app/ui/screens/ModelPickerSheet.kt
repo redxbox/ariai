@@ -38,7 +38,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 /**
  * Bottom sheet to pick the model for the current chat. Shows favorites first, then

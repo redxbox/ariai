@@ -503,7 +503,7 @@ fun AddProviderScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
-                                .background(if (selected) AriInk else AriCard)
+                                .background(if (selected) AriAccent else AriCard)
                                 .clickable {
                                     selectedType = preset.type
                                     baseUrl = preset.baseUrl
@@ -524,7 +524,7 @@ fun AddProviderScreen(
                                 preset.label,
                                 fontSize = 11.sp,
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (selected) AriPaper else AriInk.copy(alpha = 0.7f),
+                                color = if (selected) Color.White else AriInk.copy(alpha = 0.7f),
                                 maxLines = 1
                             )
                         }
@@ -756,7 +756,7 @@ private fun ProviderSaveButton(fetching: Boolean, enabled: Boolean, onClick: () 
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AriInk),
+        colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White),
         modifier = Modifier.fillMaxWidth().height(52.dp)
     ) {
         Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
@@ -958,7 +958,7 @@ private fun AddModelSheet(
                     onClick = { submitModel() },
                     enabled = modelId.isNotBlank() && bodyValid,
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriInk),
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White),
                     modifier = Modifier.height(44.dp)
                 ) { Text(tx("Add"), fontWeight = FontWeight.SemiBold) }
             }

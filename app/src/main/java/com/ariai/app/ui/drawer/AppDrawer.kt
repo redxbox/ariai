@@ -26,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -120,15 +121,33 @@ fun ColumnScope.AppDrawerContent(
         out
     }
 
-    // Status-bar inset only: no decorative header or extra top margin.
     Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
-    Spacer(Modifier.height(12.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(15.dp))
+                .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text("AriAI", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+            Text(tx("Your AI, your way"), color = AriMuted, fontSize = 11.sp)
+        }
+        Box(Modifier.size(8.dp).clip(CircleShape).background(AriAccent))
+    }
 
     Button(
         onClick = onNewChat,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(50.dp),
+        shape = RoundedCornerShape(17.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
     ) {
         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
@@ -139,14 +158,14 @@ fun ColumnScope.AppDrawerContent(
         value = query,
         onValueChange = { query = it },
         singleLine = true,
-        placeholder = { Text(tx("Search conversations"), color = Ink.copy(alpha = 0.4f), fontSize = 14.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(18.dp)) },
-        shape = RoundedCornerShape(16.dp),
+        placeholder = { Text(tx("Search conversations"), color = AriMuted, fontSize = 14.sp) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriAccent, modifier = Modifier.size(18.dp)) },
+        shape = RoundedCornerShape(17.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = AriCard,
-            unfocusedContainerColor = AriCard,
-            focusedBorderColor = AriInk.copy(alpha = 0.35f),
-            unfocusedBorderColor = AriInk.copy(alpha = 0.06f)
+            focusedContainerColor = AriTint,
+            unfocusedContainerColor = AriTint,
+            focusedBorderColor = AriAccent.copy(alpha = 0.6f),
+            unfocusedBorderColor = AriLine
         ),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
     )
@@ -200,14 +219,18 @@ fun ColumnScope.AppDrawerContent(
 
     // Local profile and active provider: no cloud account is implied.
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = AriCard,
+        shape = RoundedCornerShape(18.dp),
+        color = AriTint,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
             .clickable { onNavigate("workspace") }
     ) {
-        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp).clip(CircleShape).background(AriTint), contentAlignment = Alignment.Center) {
-                Text("A", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(36.dp).clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("A", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -365,7 +388,17 @@ private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, on
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Icon(icon, contentDescription = label, tint = AriAccent, modifier = Modifier.size(22.dp))
-        Text(label, fontSize = 15.sp, color = Ink, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = if (selected) AriAccent else AriMuted,
+            modifier = Modifier.size(21.dp)
+        )
+        Text(
+            label,
+            fontSize = 14.sp,
+            color = if (selected) AriAccent else Ink,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }

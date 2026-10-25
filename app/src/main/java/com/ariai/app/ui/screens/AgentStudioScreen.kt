@@ -159,7 +159,7 @@ fun AgentStudioScreen(
                     onClick = { editingAgent = newAgentDraft() },
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -232,7 +232,7 @@ private fun AgentCard(agent: Agent, onStart: () -> Unit, onEdit: () -> Unit) {
                     onClick = onStart,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(13.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(6.dp))
@@ -407,7 +407,7 @@ private fun AgentEditorSheet(
                     },
                     enabled = name.isNotBlank() && prompt.isNotBlank(),
                     modifier = Modifier.weight(1.3f),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriInk, contentColor = AriPaper)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(5.dp))

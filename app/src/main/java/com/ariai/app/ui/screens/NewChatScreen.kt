@@ -59,6 +59,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -90,7 +91,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Muted: Color @Composable @ReadOnlyComposable get() = AriMuted
 private val PageBg: Color @Composable @ReadOnlyComposable get() = AriPaper
@@ -657,8 +658,8 @@ fun NewChatScreen(
                 Surface(
                     shape = RoundedCornerShape(26.dp),
                     color = AriCard,
-                    shadowElevation = 0.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    shadowElevation = 3.dp,
+                    modifier = Modifier.fillMaxWidth().border(1.dp, AriLine, RoundedCornerShape(26.dp))
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
                         // Long messages get an expand button that opens a full-screen editor.
@@ -754,12 +755,64 @@ fun NewChatScreen(
     ) { padding ->
         if (messages.isEmpty() && !hasStreamingText && !isSending) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(AriTint), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Chat, contentDescription = null, tint = AriAccent, modifier = Modifier.size(30.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(modifier = Modifier.size(108.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.size(104.dp).clip(CircleShape)
+                                .background(Brush.radialGradient(listOf(AriAccent.copy(alpha = 0.18f), Color.Transparent)))
+                        )
+                        Box(
+                            modifier = Modifier.size(72.dp).clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp))
+                        }
+                        Box(
+                            modifier = Modifier.align(Alignment.TopEnd).offset(x = (-12).dp, y = 9.dp)
+                                .size(13.dp).clip(CircleShape).background(AriAccentLight)
+                        )
                     }
-                    Text(tx("How can I help you?"), color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-                    Text(tx("Type a message below to start."), color = Muted, fontSize = 13.sp)
+                    Text("AriAI", color = AriAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.8.sp)
+                    Text(
+                        tx("How can I help you?"),
+                        color = Ink,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        tx("Type a message below to start."),
+                        color = Muted,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        AssistChip(
+                            onClick = { inputText = tx("Help me brainstorm a few ideas.") },
+                            label = { Text(tx("Brainstorm")) },
+                            leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = AriCard,
+                                labelColor = Ink,
+                                leadingIconContentColor = AriAccent
+                            )
+                        )
+                        AssistChip(
+                            onClick = { inputText = tx("Summarize this for me.") },
+                            label = { Text(tx("Summarize")) },
+                            leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = AriCard,
+                                labelColor = Ink,
+                                leadingIconContentColor = AriAccent
+                            )
+                        )
+                    }
                 }
             }
         } else {
@@ -840,10 +893,11 @@ private fun ProviderModelTitle(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(28.dp).clip(CircleShape).background(AriTint),
+            modifier = Modifier.size(30.dp).clip(CircleShape)
+                .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
             contentAlignment = Alignment.Center
         ) {
-            Text(providerName.firstOrNull()?.uppercase() ?: "A", color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(providerName.firstOrNull()?.uppercase() ?: "A", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
