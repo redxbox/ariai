@@ -131,6 +131,39 @@ class ProviderAndChatUiTest {
     }
 
     @Test
+    fun welcomeSuggestionsStayAboveTheComposerSendButton() {
+        val chat = Chat(id = "chat-welcome-layout-test", title = "New chat", modelId = "mock-model")
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                NewChatScreen(
+                    chat = chat,
+                    messages = emptyList(),
+                    isStreaming = false,
+                    currentStreamingContent = "",
+                    selectedModel = "mock-model",
+                    onSendMessage = { _, _, _, _, _ -> false },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
+                    onCheckProvider = { ConnectionResult.Ok(0) }
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        val suggestions = compose.onNodeWithTag("welcome-suggestions")
+            .assertIsDisplayed().fetchSemanticsNode()
+        val sendButton = compose.onNodeWithTag("chat-send-button")
+            .assertIsDisplayed().fetchSemanticsNode()
+        assertTrue(
+            "welcome suggestions must stay clear of the bottom send button",
+            suggestions.boundsInRoot.bottom < sendButton.boundsInRoot.top
+        )
+    }
+
+    @Test
     fun modelPickerKeepsAddAndManageProviderActionsAfterAProviderExists() {
         val provider = Provider(
             id = "provider-model-picker-test",

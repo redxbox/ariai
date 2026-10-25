@@ -46,6 +46,8 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,6 +61,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -736,7 +739,8 @@ fun NewChatScreen(
                                 Box(
                                     modifier = Modifier.size(40.dp).clip(CircleShape)
                                         .background(animateColorAsState(if (canSend) AriAccent else AriTint, tween(200), label = "send").value)
-                                        .clickable(enabled = canSend) { send() },
+                                        .clickable(enabled = canSend) { send() }
+                                        .testTag("chat-send-button"),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -754,64 +758,90 @@ fun NewChatScreen(
         }
     ) { padding ->
         if (messages.isEmpty() && !hasStreamingText && !isSending) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            val compactWelcome = imeBottom > 0
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding).clipToBounds(),
+                contentAlignment = Alignment.Center
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    modifier = Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(if (compactWelcome) 6.dp else 10.dp)
                 ) {
-                    Box(modifier = Modifier.size(108.dp), contentAlignment = Alignment.Center) {
+                    val orbSize = if (compactWelcome) 76.dp else 108.dp
+                    Box(modifier = Modifier.size(orbSize), contentAlignment = Alignment.Center) {
                         Box(
-                            modifier = Modifier.size(104.dp).clip(CircleShape)
+                            modifier = Modifier.size(if (compactWelcome) 72.dp else 104.dp).clip(CircleShape)
                                 .background(Brush.radialGradient(listOf(AriAccent.copy(alpha = 0.18f), Color.Transparent)))
                         )
                         Box(
-                            modifier = Modifier.size(72.dp).clip(CircleShape)
+                            modifier = Modifier.size(if (compactWelcome) 56.dp else 72.dp).clip(CircleShape)
                                 .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp))
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(if (compactWelcome) 24.dp else 30.dp)
+                            )
                         }
-                        Box(
-                            modifier = Modifier.align(Alignment.TopEnd).offset(x = (-12).dp, y = 9.dp)
-                                .size(13.dp).clip(CircleShape).background(AriAccentLight)
-                        )
+                        if (!compactWelcome) {
+                            Box(
+                                modifier = Modifier.align(Alignment.TopEnd).offset(x = (-12).dp, y = 9.dp)
+                                    .size(13.dp).clip(CircleShape).background(AriAccentLight)
+                            )
+                        }
                     }
-                    Text("AriAI", color = AriAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.8.sp)
+                    Text(
+                        "AriAI",
+                        color = AriAccent,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (compactWelcome) 11.sp else 12.sp,
+                        letterSpacing = 1.8.sp
+                    )
                     Text(
                         tx("How can I help you?"),
                         color = Ink,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
+                        fontSize = if (compactWelcome) 18.sp else 22.sp,
                         textAlign = TextAlign.Center
                     )
-                    Text(
-                        tx("Type a message below to start."),
-                        color = Muted,
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        AssistChip(
-                            onClick = { inputText = tx("Help me brainstorm a few ideas.") },
-                            label = { Text(tx("Brainstorm")) },
-                            leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = AriCard,
-                                labelColor = Ink,
-                                leadingIconContentColor = AriAccent
-                            )
+                    if (!compactWelcome) {
+                        Text(
+                            tx("Type a message below to start."),
+                            color = Muted,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
                         )
-                        AssistChip(
-                            onClick = { inputText = tx("Summarize this for me.") },
-                            label = { Text(tx("Summarize")) },
-                            leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = AriCard,
-                                labelColor = Ink,
-                                leadingIconContentColor = AriAccent
+                        Row(
+                            modifier = Modifier.testTag("welcome-suggestions"),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AssistChip(
+                                onClick = { inputText = tx("Help me brainstorm a few ideas.") },
+                                label = { Text(tx("Brainstorm")) },
+                                leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = AriCard,
+                                    labelColor = Ink,
+                                    leadingIconContentColor = AriAccent
+                                )
                             )
-                        )
+                            AssistChip(
+                                onClick = { inputText = tx("Summarize this for me.") },
+                                label = { Text(tx("Summarize")) },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = AriCard,
+                                    labelColor = Ink,
+                                    leadingIconContentColor = AriAccent
+                                )
+                            )
+                        }
                     }
                 }
             }

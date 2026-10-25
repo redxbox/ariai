@@ -124,7 +124,7 @@ fun ColumnScope.AppDrawerContent(
     Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -144,7 +144,7 @@ fun ColumnScope.AppDrawerContent(
 
     Button(
         onClick = onNewChat,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(50.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
         shape = RoundedCornerShape(17.dp),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
         colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
@@ -167,7 +167,7 @@ fun ColumnScope.AppDrawerContent(
             focusedBorderColor = AriAccent.copy(alpha = 0.6f),
             unfocusedBorderColor = AriLine
         ),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
     )
 
     // Conversation list
@@ -224,7 +224,7 @@ fun ColumnScope.AppDrawerContent(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
             .clickable { onNavigate("workspace") }
     ) {
-        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(36.dp).clip(CircleShape)
                     .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
@@ -384,7 +384,7 @@ private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, on
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .background(if (selected) AriTint else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
