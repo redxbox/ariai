@@ -203,7 +203,7 @@ fun ColumnScope.AppDrawerContent(
         shape = RoundedCornerShape(16.dp),
         color = AriCard,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
-            .clickable { onNavigate("providers") }
+            .clickable { onNavigate("workspace") }
     ) {
         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(34.dp).clip(CircleShape).background(AriTint), contentAlignment = Alignment.Center) {
@@ -227,6 +227,7 @@ fun ColumnScope.AppDrawerContent(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
+        FooterAction(Icons.Default.FolderOpen, tx("Workspace"), currentRoute == "workspace") { onNavigate("workspace") }
         FooterAction(Icons.Default.Person, tx("Agents & prompts"), currentRoute == "agents") { onNavigate("agents") }
         FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }
         FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }

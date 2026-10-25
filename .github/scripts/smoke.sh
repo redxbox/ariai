@@ -272,6 +272,7 @@ expect_text "Thinking depth"
 expect_text "Not every model supports this"
 shot 03-thinking-sheet
 back
+tap "More"
 tap "Rename chat"
 expect_text "Save"
 expect_text "Cancel"

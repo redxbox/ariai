@@ -7,12 +7,14 @@ AriAi is an Android chat client for connecting to AI providers with your own cre
 ## Current features
 
 - **Providers:** OpenAI, Google Gemini, Anthropic, Ollama, and OpenAI-compatible endpoints. Add your own endpoint and credentials; the app does not automatically create a free demo provider.
-- **Chat:** streaming preference for ordinary tool-free replies, conversation history, message branching, retry, and Markdown for headings, lists, links, simple tables, and fenced code blocks. Tool-routed replies use a non-streaming request path.
+- **Chat:** streaming preference for ordinary tool-free replies, searchable model switching, provider health/latency checks, an approximate context-use gauge, conversation folders, branching, retry, per-chat temperature/top-P/system-prompt controls, and Markdown for headings, lists, links, simple tables, and fenced code blocks with basic syntax coloring and line numbers. Tool-routed replies use a non-streaming request path.
+- **Agents:** built-in and custom agents, prompt variables/examples, provider/model binding, temperature/top-P defaults, and opt-in calculator/web-search tools. Settings are stored locally; unsupported tools (MCP, arbitrary code execution, persistent memory, callable image generation) are visibly unavailable.
+- **Workspace:** small UTF-8 text files in private app storage, a static HTML preview with JavaScript and network requests blocked, and a read-only console limited to listing/reading those workspace files.
 - **Tools:** request-scoped calculator, configured web search, reading a URL supplied by the user, and read-only access to public GitHub repository files where the selected model supports tool calls. MCP server setup is currently a preview; it does not connect to servers or expose MCP tools to chats.
 - **Web search:** native provider search when supported, or a configured Tavily, Brave Search, Exa, or Serper API key. Keys are saved on the device. Search results and availability depend on the service and its account limits.
 - **Attachments:** scaled images, videos up to 12 MB, and supported plain-text/code files. Video bytes are sent only to compatible Gemini requests; other providers receive a note that the video cannot be viewed. PDF and DOCX extraction are not implemented.
 - **Media:** image, video, or audio generation is available only when a configured provider/model exposes the relevant capability. Provider API support and costs vary. Image editing is not available for Gemini providers.
-- **Appearance and language:** light/dark/system theme; translated UI strings are available in English and Persian. Some unkeyed descriptions and provider-returned error details remain in English.
+- **Appearance and language:** light/dark/system theme, optional Android 12+ dynamic accent colors, and translated UI strings in English and Persian. Some unkeyed descriptions and provider-returned error details remain in English.
 
 ## Configure a provider
 
@@ -47,6 +49,7 @@ The app version is **2.2.1-stable** (`versionCode` 4). The Gradle build uses Kot
 
 ## Known limitations
 
+- The workspace console is deliberately not a general-purpose terminal: it has no shell, PRoot, package manager, or code execution. The HTML preview is static and does not run JavaScript, remote assets, or app frameworks.
 - MCP configuration is preview-only; server discovery and tool calls are not implemented.
 - PDF/DOCX text extraction, persistent memory controls, QR scanning, and LaTeX/Mermaid rendering are not implemented.
 - Provider-specific features may fail or be unavailable when an endpoint does not implement the expected API. Check that provider's documentation and model capabilities.

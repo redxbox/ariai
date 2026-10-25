@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val app = application as AriAiApp
-            val viewModelFactory = AppViewModelFactory(app.repository, app.preferencesManager)
+            val viewModelFactory = AppViewModelFactory(app.repository, app.preferencesManager, app.workspaceRepository)
             val viewModel: AppViewModel = viewModel(factory = viewModelFactory)
 
             val language by viewModel.language.collectAsState()
@@ -95,6 +95,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val theme by viewModel.theme.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
     val agents by viewModel.agents.collectAsState()
+    val workspaceFiles by viewModel.workspaceFiles.collectAsState()
     val searchKeys by viewModel.searchKeys.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
     val mcpServers = remember { mutableStateListOf<McpServerItem>() }
@@ -235,6 +236,16 @@ fun AppRoot(viewModel: AppViewModel) {
                             val id = viewModel.createNewChat(agentId = agent.id)
                             navController.navigate("chat/$id") { launchSingleTop = true }
                         }
+                    )
+                }
+
+                composable("workspace") {
+                    WorkspaceScreen(
+                        files = workspaceFiles,
+                        onBack = { navController.popBackStack() },
+                        onCreateFile = { name, content, onResult -> viewModel.createWorkspaceFile(name, content, onResult) },
+                        onSaveFile = { name, content, onResult -> viewModel.saveWorkspaceFile(name, content, onResult) },
+                        onDeleteFile = { name, onResult -> viewModel.deleteWorkspaceFile(name, onResult) }
                     )
                 }
 
@@ -469,12 +480,13 @@ fun AppRoot(viewModel: AppViewModel) {
 
 class AppViewModelFactory(
     private val repository: com.ariai.app.data.repository.ChatRepository,
-    private val prefs: com.ariai.app.data.local.PreferencesManager
+    private val prefs: com.ariai.app.data.local.PreferencesManager,
+    private val workspaceRepository: com.ariai.app.data.repository.WorkspaceRepository
 ) : androidx.lifecycle.ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AppViewModel::class.java)) {
-            return AppViewModel(repository, prefs) as T
+            return AppViewModel(repository, prefs, workspaceRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

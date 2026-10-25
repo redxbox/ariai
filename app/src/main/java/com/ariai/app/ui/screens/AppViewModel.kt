@@ -16,6 +16,7 @@ import com.ariai.app.data.remote.GitHubRepositoryClient
 import com.ariai.app.data.remote.PublicUrlFetcher
 import com.ariai.app.data.remote.userResearchTargets
 import com.ariai.app.data.repository.ChatRepository
+import com.ariai.app.data.repository.WorkspaceRepository
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -45,7 +46,8 @@ Capability and tool honesty:
 
 class AppViewModel(
     private val repository: ChatRepository,
-    private val prefs: PreferencesManager
+    private val prefs: PreferencesManager,
+    private val workspaceRepository: WorkspaceRepository
 ) : ViewModel() {
     private val publicUrlFetcher = PublicUrlFetcher()
     private val githubRepositoryClient = GitHubRepositoryClient()
@@ -82,6 +84,7 @@ class AppViewModel(
     val providers = repository.getProviders().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val chats = repository.getChats().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val agents = repository.getAgents().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val workspaceFiles = workspaceRepository.files.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Chat state
     private val _currentChatId = MutableStateFlow<String?>(null)
@@ -213,6 +216,10 @@ class AppViewModel(
 
     init {
         viewModelScope.launch { refreshGeneratedMediaBytes() }
+        viewModelScope.launch {
+            runCatching { workspaceRepository.load() }
+                .onFailure { com.ariai.app.util.AppLog.warn(it, "load local workspace") }
+        }
     }
 
     private val _isGeneratingImage = MutableStateFlow(false)
@@ -1201,6 +1208,48 @@ class AppViewModel(
                 repository.saveChat(chat.copy(folder = normalized))
             } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "set chat folder")
+            }
+        }
+    }
+
+    fun saveWorkspaceFile(name: String, content: String, onResult: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                workspaceRepository.saveFile(name, content)
+                onResult(null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                com.ariai.app.util.AppLog.warn(error, "save workspace file")
+                onResult(error.message ?: "Could not save the file.")
+            }
+        }
+    }
+
+    fun createWorkspaceFile(name: String, content: String, onResult: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                workspaceRepository.createFile(name, content)
+                onResult(null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                com.ariai.app.util.AppLog.warn(error, "create workspace file")
+                onResult(error.message ?: "Could not create the file.")
+            }
+        }
+    }
+
+    fun deleteWorkspaceFile(name: String, onResult: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                if (workspaceRepository.deleteFile(name)) onResult(null)
+                else onResult("The file could not be found.")
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                com.ariai.app.util.AppLog.warn(error, "delete workspace file")
+                onResult(error.message ?: "Could not delete the file.")
             }
         }
     }

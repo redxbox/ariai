@@ -8,6 +8,7 @@ import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.remote.AIClient
 import com.ariai.app.data.remote.SearchClient
 import com.ariai.app.data.repository.ChatRepository
+import com.ariai.app.data.repository.WorkspaceRepository
 
 class AriAiApp : Application() {
     override fun onCreate() {
@@ -49,5 +50,9 @@ class AriAiApp : Application() {
 
     val repository by lazy {
         ChatRepository(database, aiClient, searchClient)
+    }
+
+    val workspaceRepository by lazy {
+        WorkspaceRepository(filesDir)
     }
 }
