@@ -20,11 +20,14 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /** What the next message in a chat produces. */
 enum class ChatMode { TEXT, IMAGE, VIDEO, AUDIO }
 
 private const val MAX_MEDIA_BYTES_PER_REQUEST = 16L * 1024L * 1024L
+
+private data class ChatOptionOverride(val temperature: Float, val topP: Float, val systemPrompt: String?)
 
 private const val DEFAULT_MOBILE_REPLY_STYLE =
     "Reply in the same language as the user's latest message. For multi-part questions, begin with a short direct answer, then use clear Markdown headings and concise bullets. Use short paragraphs; avoid wide tables on phones unless they improve comparison. Keep simple answers brief and do not invent information."
@@ -46,6 +49,7 @@ class AppViewModel(
 ) : ViewModel() {
     private val publicUrlFetcher = PublicUrlFetcher()
     private val githubRepositoryClient = GitHubRepositoryClient()
+    private val chatOptionOverrides = ConcurrentHashMap<String, ChatOptionOverride>()
 
     // Preferences
     val language = prefs.languageFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "en")
@@ -276,13 +280,16 @@ class AppViewModel(
 
     fun createNewChat(providerId: String? = null, modelId: String? = null, agentId: String? = null): String {
         val id = java.util.UUID.randomUUID().toString()
+        val selectedAgent = agentId?.let { requested -> agents.value.firstOrNull { it.id == requested } }
+        val requestedProviderId = providerId ?: selectedAgent?.providerId
+        val requestedModelId = modelId ?: selectedAgent?.modelId
         val availableProviders = providers.value.filter { it.enabled }
-        val selectedProvider = providerId?.let { requested ->
+        val selectedProvider = requestedProviderId?.let { requested ->
             availableProviders.firstOrNull { it.id == requested }
         } ?: defaultProviderId.value?.let { requested ->
             availableProviders.firstOrNull { it.id == requested }
         } ?: availableProviders.firstOrNull()
-        val selectedModel = modelId?.takeIf { requested -> selectedProvider?.models?.any { it.id == requested } == true }
+        val selectedModel = requestedModelId?.takeIf { requested -> selectedProvider?.models?.any { it.id == requested } == true }
             ?: defaultModelId.value?.takeIf { requested -> selectedProvider?.models?.any { it.id == requested } == true }
             ?: selectedProvider?.models?.firstOrNull()?.id
         val chat = Chat(
@@ -290,7 +297,9 @@ class AppViewModel(
             title = "New Chat",
             providerId = selectedProvider?.id,
             modelId = selectedModel,
-            agentId = agentId
+            agentId = agentId,
+            temperature = selectedAgent?.temperature ?: 0.7f,
+            topP = selectedAgent?.topP ?: 1.0f
         )
         // Set active state synchronously: callers navigate to this id immediately after return.
         cancelActiveChatStreams()
@@ -349,6 +358,7 @@ class AppViewModel(
         }
         viewModelScope.launch {
             uniqueIds.forEach { id ->
+                chatOptionOverrides.remove(id)
                 // A first chat save may still be in flight. Delete only after it completes so the
                 // insert cannot race behind the delete and resurrect the chat.
                 chatPersistenceGate.await(id)
@@ -882,18 +892,27 @@ class AppViewModel(
                     val history = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         recentForModel(allHistory, historyBudgetWindow)
                     }
-                    val customSystemPrompt = getCurrentChat()?.systemPrompt?.takeIf { it.isNotBlank() }
-                        ?: getAgentSystemPrompt()
-                    // Keep links from recent user turns available for follow-up prompts such as
-                    // “review that repository”, but never treat assistant-provided links as permission.
+                    val turnChat = getCurrentChat()
+                    val turnAgent = turnChat?.agentId?.let { id -> agents.value.firstOrNull { it.id == id } }
+                    val enabledAgentTools = turnAgent?.tools?.toSet()
+                    fun agentAllows(tool: AgentTool): Boolean = enabledAgentTools == null || tool in enabledAgentTools
+                    val customSystemPrompt = turnChat?.systemPrompt?.takeIf { it.isNotBlank() }?.let { prompt ->
+                        resolvePromptVariables(prompt, turnAgent, turnChat)
+                    } ?: getAgentSystemPrompt()
+                    val allowWebSearch = agentAllows(AgentTool.WEB_SEARCH)
+                    val allowCalculator = agentAllows(AgentTool.CALCULATOR)
+                    if (searchMode != SearchMode.OFF && !allowWebSearch) {
+                        throw IllegalStateException("Web search is not enabled for this agent. Enable it in Agents & prompts or turn search off.")
+                    }
+                    // Only user-supplied URLs/repositories can be inspected; agent tool selection narrows access further.
                     val researchTargets = userResearchTargets(history, publicUrlFetcher::isSafePublicUrl)
-                    val userProvidedUrls = researchTargets.publicUrls
-                    val githubRepository = researchTargets.githubRepository
+                    val userProvidedUrls = if (allowWebSearch) researchTargets.publicUrls else emptyList()
+                    val githubRepository = if (allowWebSearch) researchTargets.githubRepository else null
                     val webUrls = userProvidedUrls.filterNot { GitHubRepositoryClient.Repository.fromUserText(it) != null }
                     val functionTools: List<ChatFunctionTool> = if (current?.supportsFunctionCalling != false) {
                         buildList {
-                            if (shouldOfferCalculatorTool(sentContent)) add(DefaultAgentTools.calculator())
-                            if (localSearchKey != null) {
+                            if (allowCalculator && shouldOfferCalculatorTool(sentContent)) add(DefaultAgentTools.calculator())
+                            if (allowWebSearch && localSearchKey != null) {
                                 val searchProvider = SearchProvider(
                                     name = localSearchKey.first,
                                     type = when (localSearchKey.first) {
@@ -911,23 +930,23 @@ class AppViewModel(
                                     else repository.formatSearchForLLM(results)
                                 })
                             }
-                            DefaultAgentTools.openUserUrl(webUrls, publicUrlFetcher)?.let(::add)
+                            if (allowWebSearch) DefaultAgentTools.openUserUrl(webUrls, publicUrlFetcher)?.let(::add)
                             githubRepository?.let { repo ->
                                 addAll(DefaultAgentTools.githubRepository(repo, githubRepositoryClient))
                             }
                         }
                     } else emptyList()
                     val configuredModelTools = provider.models.firstOrNull { it.id == requestModelId }?.builtInTools.orEmpty()
-                    val hasUrlContext = provider.type == ProviderType.GEMINI && "url_context" in configuredModelTools && userProvidedUrls.isNotEmpty()
-                    val nativeSearch = searchMode == SearchMode.MODEL && supportsNativeSearch(provider)
+                    val hasUrlContext = allowWebSearch && provider.type == ProviderType.GEMINI && "url_context" in configuredModelTools && userProvidedUrls.isNotEmpty()
+                    val nativeSearch = allowWebSearch && searchMode == SearchMode.MODEL && supportsNativeSearch(provider)
                     if (searchMode == SearchMode.MODEL && !nativeSearch && localSearchKey == null) {
                         throw IllegalStateException("This provider has no built-in web search and no local search API key is configured.")
                     }
                     if (searchMode != SearchMode.OFF && localSearchKey != null && current?.supportsFunctionCalling == false) {
                         throw IllegalStateException("This model is marked as not supporting tool calling, which is required for the selected search mode.")
                     }
-                    val hasProviderSearch = nativeSearch ||
-                        (provider.type == ProviderType.GEMINI && "google_search" in configuredModelTools)
+                    val hasProviderSearch = allowWebSearch && (nativeSearch ||
+                        (provider.type == ProviderType.GEMINI && "google_search" in configuredModelTools))
                     val availableCapabilities = buildList {
                         if ("calculate" in functionTools.map { it.name }) add("safe calculator")
                         if ("search_web" in functionTools.map { it.name } || hasProviderSearch) add("web search")
@@ -946,6 +965,7 @@ class AppViewModel(
                         CHAT_CAPABILITY_POLICY
                     ).joinToString("\n\n").ifBlank { null }
 
+                    val chatOptions = getCurrentChat()
                     val streamEnabled = shouldStreamToolFreeChat(streamResponse.value, functionTools.isNotEmpty())
                     val responseFlow = if (functionTools.isEmpty()) {
                         repository.streamChat(
@@ -953,6 +973,8 @@ class AppViewModel(
                             messages = history,
                             modelId = requestModelId,
                             systemPrompt = systemPrompt,
+                            temperature = chatOptions?.temperature ?: 0.7f,
+                            topP = chatOptions?.topP ?: 1.0f,
                             searchContext = searchContext,
                             reasoning = reasoning,
                             nativeSearch = nativeSearch,
@@ -968,6 +990,8 @@ class AppViewModel(
                             modelId = requestModelId,
                             systemPrompt = systemPrompt,
                             tools = functionTools,
+                            temperature = chatOptions?.temperature ?: 0.7f,
+                            topP = chatOptions?.topP ?: 1.0f,
                             searchContext = searchContext,
                             reasoning = reasoning,
                             nativeSearch = nativeSearch,
@@ -1147,6 +1171,40 @@ class AppViewModel(
         viewModelScope.launch { prefs.toggleFavoriteModel(favoriteKey(providerId, modelId)) }
     }
 
+    fun updateChatOptions(chatId: String, temperature: Float, topP: Float, systemPrompt: String?) {
+        val options = ChatOptionOverride(
+            temperature = temperature.coerceIn(0f, 2f),
+            topP = topP.coerceIn(0f, 1f),
+            systemPrompt = systemPrompt?.trim()?.takeIf { it.isNotEmpty() }
+        )
+        // Apply immediately so a message sent straight after closing the sheet uses the new settings.
+        chatOptionOverrides[chatId] = options
+        viewModelScope.launch {
+            try {
+                val chat = chats.value.find { it.id == chatId } ?: repository.getChatById(chatId) ?: return@launch
+                repository.saveChat(chat.copy(
+                    temperature = options.temperature,
+                    topP = options.topP,
+                    systemPrompt = options.systemPrompt
+                ))
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "update chat parameters")
+            }
+        }
+    }
+
+    fun setChatFolder(chatId: String, folder: String?) {
+        val normalized = folder?.trim()?.takeIf { it.isNotEmpty() }?.take(40)
+        viewModelScope.launch {
+            try {
+                val chat = chats.value.find { it.id == chatId } ?: repository.getChatById(chatId) ?: return@launch
+                repository.saveChat(chat.copy(folder = normalized))
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "set chat folder")
+            }
+        }
+    }
+
     fun updateChatProvider(chatId: String, providerId: String, modelId: String) {
         // Keep the choice in memory first so the chip and sending use it immediately,
         // then persist it to the chat row.
@@ -1315,17 +1373,36 @@ class AppViewModel(
 
     private fun getCurrentChat(): Chat? {
         val id = _currentChatId.value ?: return null
-        return chats.value.find { it.id == id }
+        val chat = chats.value.find { it.id == id } ?: return null
+        val options = chatOptionOverrides[id] ?: return chat
+        return chat.copy(
+            temperature = options.temperature,
+            topP = options.topP,
+            systemPrompt = options.systemPrompt
+        )
     }
 
     private fun getAgentSystemPrompt(): String? {
         val chat = getCurrentChat() ?: return null
-        val agentId = chat.agentId ?: return null
-        val agent = agents.value.find { it.id == agentId } ?: return null
-        return agent.systemPrompt
-            .replace("{time}", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date()))
-            .replace("{model}", chat.modelId ?: tx("AI"))
-            .replace("{date}", java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()))
+        val agent = chat.agentId?.let { id -> agents.value.find { it.id == id } } ?: return null
+        return resolvePromptVariables(agent.systemPrompt, agent, chat)
+    }
+
+    private fun resolvePromptVariables(prompt: String, agent: Agent?, chat: Chat): String {
+        val now = java.util.Date()
+        val time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(now)
+        val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(now)
+        val modelName = providers.value.firstOrNull { it.id == chat.providerId }
+            ?.models?.firstOrNull { it.id == chat.modelId }?.displayName ?: chat.modelId ?: tx("AI")
+        val replacements = mapOf(
+            "time" to time,
+            "date" to date,
+            "model" to modelName,
+            "model_name" to modelName
+        ) + agent?.promptVariables.orEmpty()
+        return replacements.entries.sortedByDescending { it.key.length }.fold(prompt) { text, (key, value) ->
+            if (key.isBlank()) text else text.replace("{{$key}}", value).replace("{$key}", value)
+        }
     }
 
     /** Renames a chat; blank titles are ignored. */

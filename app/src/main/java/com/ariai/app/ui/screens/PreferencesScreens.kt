@@ -91,6 +91,18 @@ fun PreferencesScreen(
                     }
                 }
             }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                item {
+                    SettingCard {
+                        SwitchRow(
+                            title = tx("Dynamic colors"),
+                            subtitle = tx("Use colors from your wallpaper while keeping AriAI's paper surfaces."),
+                            checked = dynamicColor,
+                            onChange = onDynamicColorChange
+                        )
+                    }
+                }
+            }
 
             item { SectionTitle(tx("Chat")) }
             item {

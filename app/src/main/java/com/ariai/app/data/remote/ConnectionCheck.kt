@@ -11,7 +11,7 @@ import javax.net.ssl.SSLException
 
 /** Result of checking a provider's address and key. */
 sealed class ConnectionResult {
-    data class Ok(val models: Int) : ConnectionResult()
+    data class Ok(val models: Int, val durationMs: Long = 0) : ConnectionResult()
     data class Failed(val problem: String, val hint: String, val code: String? = null) : ConnectionResult()
 }
 
@@ -37,14 +37,16 @@ suspend fun checkConnection(provider: Provider, fetch: suspend (Provider) -> Lis
         return ConnectionResult.Failed(tx("No API key entered"), tx("Paste the key from the provider's dashboard."))
     }
     return try {
+        val startedAt = System.nanoTime()
         val models = fetch(provider)
+        val durationMs = ((System.nanoTime() - startedAt) / 1_000_000L).coerceAtLeast(0L)
         if (models.isEmpty()) {
             ConnectionResult.Failed(
                 tx("Connected, but the provider returned no models"),
                 tx("Check that the Base URL is the API root, such as https://api.openai.com/v1")
             )
         } else {
-            ConnectionResult.Ok(models.size)
+            ConnectionResult.Ok(models.size, durationMs)
         }
     } catch (cancelled: CancellationException) {
         throw cancelled

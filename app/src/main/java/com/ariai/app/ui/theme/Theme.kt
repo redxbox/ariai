@@ -1,6 +1,7 @@
 package com.ariai.app.ui.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -9,6 +10,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 
 // Monochrome: white and black, with one small accent used per screen.
@@ -41,11 +43,27 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun AriAiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic colour is off: the palette must stay black and white.
-    dynamicColor: Boolean = false,
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val context = LocalContext.current
+    val palette = if (darkTheme) DarkAriPalette else LightAriPalette
+    val dynamicScheme = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dynamicColor
+    val baseScheme = when {
+        dynamicScheme && darkTheme -> dynamicDarkColorScheme(context)
+        dynamicScheme -> dynamicLightColorScheme(context)
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
+    // Keep AriAI's quiet paper surfaces while taking only Material You's accent colors.
+    val colorScheme = baseScheme.copy(
+        background = palette.paper,
+        surface = palette.paper,
+        surfaceVariant = palette.tint,
+        onBackground = palette.ink,
+        onSurface = palette.ink,
+        outline = palette.line
+    )
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -57,7 +75,7 @@ fun AriAiTheme(
         }
     }
 
-    CompositionLocalProvider(LocalAriPalette provides if (darkTheme) DarkAriPalette else LightAriPalette) {
+    CompositionLocalProvider(LocalAriPalette provides palette) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,

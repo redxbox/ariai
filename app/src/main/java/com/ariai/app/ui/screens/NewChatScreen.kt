@@ -80,6 +80,7 @@ import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.ReasoningLevel
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.remote.PublicUrlFetcher
+import com.ariai.app.data.remote.ConnectionResult
 import com.ariai.app.util.ReadResult
 import com.ariai.app.util.bitmapAttachment
 import com.ariai.app.util.readAttachment
@@ -131,6 +132,7 @@ fun NewChatScreen(
     onAddProvider: () -> Unit = {},
     onManageProviders: () -> Unit = {},
     onCheckProvider: suspend (Provider) -> com.ariai.app.data.remote.ConnectionResult,
+    onUpdateChatOptions: (Float, Float, String?) -> Unit = { _, _, _ -> },
     fontSize: Int = 15,
     modifier: Modifier = Modifier,
     screenChatId: String? = chat?.id,
@@ -185,6 +187,7 @@ fun NewChatScreen(
     }
     var pending by remember { mutableStateOf<List<Attachment>>(emptyList()) }
     var showModelSheet by remember { mutableStateOf(false) }
+    var showQuickParameters by remember { mutableStateOf(false) }
     var showFullEditor by remember { mutableStateOf(false) }
     var editingImage by remember { mutableStateOf<ChatMessage?>(null) }
     editingImage?.let { source ->
@@ -244,6 +247,8 @@ fun NewChatScreen(
 
     val currentProvider = providers.firstOrNull { it.id == selectedProviderId && it.enabled }
         ?: providers.firstOrNull { it.enabled }
+    var connectionResult by remember(currentProvider?.id) { mutableStateOf<ConnectionResult?>(null) }
+    var checkingConnection by remember(currentProvider?.id) { mutableStateOf(false) }
     val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
     val selectedModelCapabilities = currentProvider?.models?.firstOrNull { it.id == selectedModel }
     val selectedModelIsImageOnly = selectedModelCapabilities?.let { it.supportsImageGen && !it.outputsText } == true
@@ -433,6 +438,18 @@ fun NewChatScreen(
             onDismiss = { showModelSheet = false }
         )
     }
+    if (showQuickParameters) {
+        QuickParametersSheet(
+            temperature = chat?.temperature ?: 0.7f,
+            topP = chat?.topP ?: 1.0f,
+            systemPrompt = chat?.systemPrompt,
+            onSave = { temperature, topP, systemPrompt ->
+                onUpdateChatOptions(temperature, topP, systemPrompt)
+                showQuickParameters = false
+            },
+            onDismiss = { showQuickParameters = false }
+        )
+    }
     if (showAttachments) {
         AttachmentSheet(
             onPhoto = {
@@ -490,33 +507,44 @@ fun NewChatScreen(
                     }
                 },
                 title = {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth().clickable { showModelSheet = true }
-                    ) {
-                        Text(
-                            chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat"),
-                            color = Ink,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            selectedModel ?: tx("Tap to choose a model"),
-                            color = Muted,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    val statusColor = when {
+                        checkingConnection -> AriAccent
+                        connectionResult is ConnectionResult.Ok -> Color(0xFF37865B)
+                        connectionResult is ConnectionResult.Failed -> Color(0xFFC44949)
+                        else -> Muted.copy(alpha = 0.55f)
                     }
+                    ProviderModelTitle(
+                        providerName = currentProvider?.name ?: tx("No provider"),
+                        modelName = selectedModelCapabilities?.displayName
+                            ?: selectedModel?.substringAfterLast('/')
+                            ?: tx("Choose model"),
+                        chatTitle = chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat"),
+                        statusColor = statusColor,
+                        onClick = { showModelSheet = true }
+                    )
                 },
                 actions = {
-                    IconButton(onClick = {
-                        renameText = chat?.title ?: ""
-                        showRename = true
-                    }) {
-                        Icon(Icons.Default.Edit, contentDescription = tx("Rename chat"), tint = Ink)
+                    val contextLimit = selectedModelCapabilities?.contextWindow?.takeIf { it > 0 } ?: 0
+                    if (contextLimit > 0) {
+                        val actualPromptTokens = messages.lastOrNull {
+                            it.role == MessageRole.ASSISTANT && (it.usage?.promptTokens ?: 0) > 0
+                        }?.usage?.promptTokens
+                        val visibleChars = messages.filter { it.role != MessageRole.SYSTEM }.sumOf { message ->
+                            message.content.length + message.attachments.sumOf { it.textContent?.length ?: 0 }
+                        } + (chat?.systemPrompt?.length ?: 0)
+                        val tokenCount = actualPromptTokens ?: ((visibleChars + 3) / 4)
+                        ContextUsageIndicator(
+                            tokens = tokenCount,
+                            contextWindow = contextLimit,
+                            approximate = actualPromptTokens == null,
+                            onClick = {
+                                val prefix = if (actualPromptTokens == null) tx("Approx.") + " " else ""
+                                showNote("$prefix$tokenCount / $contextLimit ${tx("tokens in context")}")
+                            }
+                        )
+                    }
+                    IconButton(onClick = { showQuickParameters = true }) {
+                        Icon(Icons.Default.Tune, contentDescription = tx("Quick parameters"), tint = Ink)
                     }
                     Box {
                         IconButton(onClick = { showTopMenu = true }) {
@@ -528,6 +556,42 @@ fun NewChatScreen(
                             onDismissRequest = { showTopMenu = false },
                             modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(if (checkingConnection) tx("Checking…") else tx("Check connection")) },
+                                leadingIcon = { Icon(Icons.Default.NetworkCheck, contentDescription = null) },
+                                enabled = currentProvider != null && !checkingConnection,
+                                onClick = {
+                                    showTopMenu = false
+                                    val provider = currentProvider
+                                    if (provider != null) scope.launch {
+                                        checkingConnection = true
+                                        try {
+                                            connectionResult = onCheckProvider(provider)
+                                            when (val result = connectionResult) {
+                                                is ConnectionResult.Ok -> showNote("${tx("Connected")} · ${result.durationMs} ms · ${result.models} ${tx("models")}")
+                                                is ConnectionResult.Failed -> showNote(result.problem)
+                                                null -> Unit
+                                            }
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (error: Exception) {
+                                            connectionResult = ConnectionResult.Failed(tx("Could not connect"), error.message.orEmpty())
+                                            showNote(tx("Could not connect"))
+                                        } finally {
+                                            checkingConnection = false
+                                        }
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(tx("Rename chat")) },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                onClick = {
+                                    showTopMenu = false
+                                    renameText = chat?.title ?: ""
+                                    showRename = true
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text(tx("Copy conversation")) },
                                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
@@ -646,10 +710,6 @@ fun NewChatScreen(
                                 }
                             }
                             Spacer(Modifier.weight(1f))
-                            ModelChip(text = selectedModel?.substringAfterLast('/') ?: tx("Choose model")) {
-                                showModelSheet = true
-                            }
-                            Spacer(Modifier.width(6.dp))
                             val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && !isStreaming && !isSending
                             if (isStreaming || isSending) {
                                 // While a request is pending or a reply is coming in, allow cancellation.
@@ -750,6 +810,71 @@ fun NewChatScreen(
             }
 
         }
+    }
+}
+
+@Composable
+private fun ProviderModelTitle(
+    providerName: String,
+    modelName: String,
+    chatTitle: String,
+    statusColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(28.dp).clip(CircleShape).background(AriTint),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(providerName.firstOrNull()?.uppercase() ?: "A", color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    "$providerName · $modelName",
+                    color = Ink,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 13.sp
+                )
+                Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
+            }
+            Text(chatTitle, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun ContextUsageIndicator(
+    tokens: Int,
+    contextWindow: Int,
+    approximate: Boolean,
+    onClick: () -> Unit
+) {
+    val fraction = if (contextWindow > 0) (tokens.toFloat() / contextWindow).coerceIn(0f, 1f) else 0f
+    Box(
+        modifier = Modifier.size(42.dp).clip(CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            progress = fraction,
+            modifier = Modifier.size(28.dp),
+            strokeWidth = 2.5.dp,
+            color = if (fraction >= 0.9f) Color(0xFFC44949) else AriAccent,
+            trackColor = AriTint
+        )
+        Text(
+            if (approximate) "~" else "${(fraction * 100).toInt()}%",
+            color = Ink,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 

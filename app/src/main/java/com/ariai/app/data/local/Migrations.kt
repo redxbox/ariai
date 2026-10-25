@@ -46,3 +46,20 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         }
     }
 }
+
+/** Adds per-chat generation controls, folders, and persisted agent configuration. */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE chats ADD COLUMN temperature REAL NOT NULL DEFAULT 0.7")
+        db.execSQL("ALTER TABLE chats ADD COLUMN topP REAL NOT NULL DEFAULT 1.0")
+        db.execSQL("ALTER TABLE chats ADD COLUMN folder TEXT")
+        db.execSQL("ALTER TABLE agents ADD COLUMN toolsJson TEXT NOT NULL DEFAULT '[]'")
+        db.execSQL("ALTER TABLE agents ADD COLUMN promptVariablesJson TEXT NOT NULL DEFAULT '{}'")
+        db.execSQL("ALTER TABLE agents ADD COLUMN examplesJson TEXT NOT NULL DEFAULT '[]'")
+        // Restore built-in capabilities that were not persisted by version 6.
+        db.execSQL("UPDATE agents SET toolsJson = '[\"CALCULATOR\",\"WEB_SEARCH\"]' WHERE id = 'general'")
+        db.execSQL("UPDATE agents SET toolsJson = '[\"WEB_SEARCH\",\"CALCULATOR\"]' WHERE id IN ('coder', 'researcher')")
+        db.execSQL("UPDATE agents SET toolsJson = '[\"WEB_SEARCH\"]' WHERE id = 'translator'")
+        db.execSQL("UPDATE agents SET toolsJson = '[\"IMAGE_GENERATION\"]' WHERE id = 'artist'")
+    }
+}

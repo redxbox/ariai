@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
 
             val language by viewModel.language.collectAsState()
             val theme by viewModel.theme.collectAsState()
+            val dynamicColor by viewModel.dynamicColor.collectAsState()
             val strings = getStringsForLanguage(language)
 
             val isDarkTheme = when (theme) {
@@ -60,7 +61,7 @@ class MainActivity : ComponentActivity() {
             val direction = if (language == "fa" || language == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 CompositionLocalProvider(LocalStrings provides strings) {
-                    AriAiTheme(darkTheme = isDarkTheme) {
+                    AriAiTheme(darkTheme = isDarkTheme, dynamicColor = dynamicColor) {
                         AppRoot(viewModel = viewModel)
                     }
                 }
@@ -92,6 +93,8 @@ fun AppRoot(viewModel: AppViewModel) {
     val generatedMediaBytes by viewModel.generatedMediaBytes.collectAsState()
     val language by viewModel.language.collectAsState()
     val theme by viewModel.theme.collectAsState()
+    val dynamicColor by viewModel.dynamicColor.collectAsState()
+    val agents by viewModel.agents.collectAsState()
     val searchKeys by viewModel.searchKeys.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
     val mcpServers = remember { mutableStateListOf<McpServerItem>() }
@@ -105,6 +108,11 @@ fun AppRoot(viewModel: AppViewModel) {
     val defaultModelName = providers.firstOrNull { it.id == defaultProviderId }?.let { p ->
         p.models.firstOrNull { it.id == defaultModelId }?.let { "${it.displayName} · ${p.name}" }
     } ?: tx("Not chosen")
+    val activeChatForDrawer = chats.firstOrNull { it.id == currentChatId }
+    val drawerProviderId = activeChatForDrawer?.let { modelOverrides[it.id]?.first ?: it.providerId } ?: defaultProviderId
+    val drawerModelId = activeChatForDrawer?.let { modelOverrides[it.id]?.second ?: it.modelId } ?: defaultModelId
+    val drawerProvider = providers.firstOrNull { it.id == drawerProviderId && it.enabled }
+    val drawerModelName = drawerProvider?.models?.firstOrNull { it.id == drawerModelId }?.displayName
 
     fun go(route: String) {
         scope.launch { drawerState.close() }
@@ -167,10 +175,13 @@ fun AppRoot(viewModel: AppViewModel) {
                     chats = chats,
                     currentChatId = currentChatId,
                     currentRoute = currentRoute,
+                    activeProvider = drawerProvider,
+                    activeModelName = drawerModelName,
                     onNewChat = { newChat() },
                     onChatClick = { openChat(it.id) },
                     onPinChat = { viewModel.pinChat(it) },
                     onDeleteChat = { deleteChatFromUi(it.id) },
+                    onSetChatFolder = { chat, folder -> viewModel.setChatFolder(chat.id, folder) },
                     onNavigate = { go(it) },
                     onAbout = {
                         scope.launch {
@@ -209,6 +220,21 @@ fun AppRoot(viewModel: AppViewModel) {
                         onNewChat = { newChat() },
                         onDeleteChat = { deleteChatFromUi(it.id) },
                         onPinChat = { viewModel.pinChat(it) }
+                    )
+                }
+
+                composable("agents") {
+                    AgentStudioScreen(
+                        agents = agents,
+                        providers = providers,
+                        onBack = { navController.popBackStack() },
+                        onSaveAgent = { viewModel.saveAgent(it) },
+                        onDeleteAgent = { viewModel.deleteAgent(it) },
+                        onStartAgent = { agent ->
+                            scope.launch { drawerState.close() }
+                            val id = viewModel.createNewChat(agentId = agent.id)
+                            navController.navigate("chat/$id") { launchSingleTop = true }
+                        }
                     )
                 }
 
@@ -266,7 +292,10 @@ fun AppRoot(viewModel: AppViewModel) {
                         fontSize = fontSize,
                         onAddProvider = { navController.navigate("add_provider") },
                         onManageProviders = { navController.navigate("providers") },
-                        onCheckProvider = { provider -> com.ariai.app.data.remote.checkConnection(provider) { viewModel.fetchModels(it) } }
+                        onCheckProvider = { provider -> com.ariai.app.data.remote.checkConnection(provider) { viewModel.fetchModels(it) } },
+                        onUpdateChatOptions = { temperature, topP, systemPrompt ->
+                            viewModel.updateChatOptions(chatId, temperature, topP, systemPrompt)
+                        }
                     )
                 }
 
@@ -339,8 +368,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         onClearAll = { navController.navigate("storage") },
                         currentTheme = theme,
                         currentLanguage = language,
-                        dynamicColor = false,
-                        onDynamicColorChange = {},
+                        dynamicColor = dynamicColor,
+                        onDynamicColorChange = { viewModel.setDynamicColor(it) },
                         onThemeChange = { viewModel.setTheme(it) },
                         onLanguageChange = { viewModel.setLanguage(it) },
                         onDefaultModelClick = { navController.navigate("default_model") },
@@ -353,8 +382,8 @@ fun AppRoot(viewModel: AppViewModel) {
                     PreferencesScreen(
                         theme = theme,
                         onThemeChange = { viewModel.setTheme(it) },
-                        dynamicColor = false,
-                        onDynamicColorChange = {},
+                        dynamicColor = dynamicColor,
+                        onDynamicColorChange = { viewModel.setDynamicColor(it) },
                         reasoning = reasoningLevel,
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         fontSize = fontSize,

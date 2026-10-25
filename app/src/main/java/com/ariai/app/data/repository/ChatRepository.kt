@@ -286,6 +286,7 @@ class ChatRepository(
         systemPrompt: String?,
         tools: List<com.ariai.app.data.remote.ChatFunctionTool>,
         temperature: Float = 0.7f,
+        topP: Float = 1.0f,
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false,
@@ -310,6 +311,7 @@ class ChatRepository(
                 systemPrompt = stepPrompt,
                 tools = stepTools,
                 temperature = temperature,
+                topP = topP,
                 searchContext = searchContext,
                 reasoning = reasoning,
                 nativeSearch = nativeSearch,
@@ -325,6 +327,7 @@ class ChatRepository(
         modelId: String,
         systemPrompt: String?,
         temperature: Float = 0.7f,
+        topP: Float = 1.0f,
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false,
@@ -339,6 +342,7 @@ class ChatRepository(
             modelId = modelId,
             systemPrompt = systemPrompt,
             temperature = temperature,
+            topP = topP,
             searchContext = searchContext,
             reasoning = reasoning,
             nativeSearch = nativeSearch,
@@ -437,6 +441,9 @@ class ChatRepository(
         modelId = modelId,
         agentId = agentId,
         systemPrompt = systemPrompt,
+        temperature = temperature,
+        topP = topP,
+        folder = folder,
         isPinned = isPinned,
         isArchived = isArchived,
         memoryEnabled = memoryEnabled
@@ -451,6 +458,9 @@ class ChatRepository(
         modelId = modelId,
         agentId = agentId,
         systemPrompt = systemPrompt,
+        temperature = temperature,
+        topP = topP,
+        folder = folder,
         isPinned = isPinned,
         isArchived = isArchived,
         memoryEnabled = memoryEnabled
@@ -551,19 +561,44 @@ class ChatRepository(
         attachmentsJson = attachments.toJson()
     )
 
-    private fun AgentEntity.toModel() = Agent(
-        id = id,
-        name = name,
-        description = description,
-        systemPrompt = systemPrompt,
-        avatar = avatar,
-        modelId = modelId,
-        providerId = providerId,
-        temperature = temperature,
-        topP = topP,
-        isBuiltIn = isBuiltIn,
-        createdAt = createdAt
-    )
+    private fun AgentEntity.toModel(): Agent {
+        val storedTools = runCatching {
+            val json = org.json.JSONArray(toolsJson)
+            (0 until json.length()).mapNotNull { index ->
+                runCatching { AgentTool.valueOf(json.getString(index)) }.getOrNull()
+            }
+        }.getOrDefault(emptyList())
+        val storedVariables = runCatching {
+            val json = org.json.JSONObject(promptVariablesJson)
+            buildMap {
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    put(key, json.optString(key))
+                }
+            }
+        }.getOrDefault(emptyMap())
+        val storedExamples = runCatching {
+            val json = org.json.JSONArray(examplesJson)
+            (0 until json.length()).mapNotNull { json.optString(it).takeIf(String::isNotBlank) }
+        }.getOrDefault(emptyList())
+        return Agent(
+            id = id,
+            name = name,
+            description = description,
+            systemPrompt = systemPrompt,
+            avatar = avatar,
+            modelId = modelId,
+            providerId = providerId,
+            temperature = temperature,
+            topP = topP,
+            tools = storedTools,
+            promptVariables = storedVariables,
+            examples = storedExamples,
+            isBuiltIn = isBuiltIn,
+            createdAt = createdAt
+        )
+    }
 
     private fun Agent.toEntity() = AgentEntity(
         id = id,
@@ -575,6 +610,9 @@ class ChatRepository(
         providerId = providerId,
         temperature = temperature,
         topP = topP,
+        toolsJson = org.json.JSONArray(tools.map { it.name }).toString(),
+        promptVariablesJson = org.json.JSONObject(promptVariables).toString(),
+        examplesJson = org.json.JSONArray(examples).toString(),
         isBuiltIn = isBuiltIn,
         createdAt = createdAt
     )

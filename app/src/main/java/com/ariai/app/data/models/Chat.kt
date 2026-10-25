@@ -75,6 +75,11 @@ data class Chat(
     val modelId: String? = null,
     val agentId: String? = null,
     val systemPrompt: String? = null,
+    /** Per-conversation generation controls; providers that do not support a value ignore it. */
+    val temperature: Float = 0.7f,
+    val topP: Float = 1.0f,
+    /** Optional user-created workspace/category. */
+    val folder: String? = null,
     val messages: List<ChatMessage> = emptyList(),
     val isPinned: Boolean = false,
     val isArchived: Boolean = false,
@@ -100,6 +105,7 @@ data class Agent(
 ) : Parcelable
 
 enum class AgentTool {
+    CALCULATOR,
     WEB_SEARCH,
     IMAGE_GENERATION,
     CODE_EXECUTION,
@@ -114,6 +120,7 @@ fun getBuiltInAgents(): List<Agent> = listOf(
         description = "Helpful general purpose assistant",
         systemPrompt = "You are AriAi, a helpful AI assistant. You are friendly, knowledgeable and concise. Current time: {time}, Model: {model}",
         avatar = "🤖",
+        tools = listOf(AgentTool.CALCULATOR, AgentTool.WEB_SEARCH),
         isBuiltIn = true
     ),
     Agent(
@@ -122,7 +129,7 @@ fun getBuiltInAgents(): List<Agent> = listOf(
         description = "Expert programmer for all languages",
         systemPrompt = "You are an expert programmer. You write clean, efficient, well-documented code. You explain complex concepts clearly. Always provide code examples when relevant. Current time: {time}",
         avatar = "💻",
-        tools = listOf(AgentTool.WEB_SEARCH),
+        tools = listOf(AgentTool.WEB_SEARCH, AgentTool.CALCULATOR),
         isBuiltIn = true
     ),
     Agent(
@@ -148,7 +155,7 @@ fun getBuiltInAgents(): List<Agent> = listOf(
         description = "Deep research with web search",
         systemPrompt = "You are a research assistant. You provide thorough, well-sourced information. Use web search when needed. Always cite sources. Be objective and comprehensive. Time: {time}",
         avatar = "🔍",
-        tools = listOf(AgentTool.WEB_SEARCH),
+        tools = listOf(AgentTool.WEB_SEARCH, AgentTool.CALCULATOR),
         isBuiltIn = true
     ),
     Agent(

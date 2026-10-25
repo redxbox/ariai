@@ -100,6 +100,7 @@ class AIClient {
         modelId: String,
         systemPrompt: String? = null,
         temperature: Float = 0.7f,
+        topP: Float = 1.0f,
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false,
@@ -114,6 +115,7 @@ class AIClient {
             modelId = modelId,
             systemPrompt = systemPrompt,
             temperature = temperature,
+            topP = topP,
             searchContext = searchContext,
             isStream = true,
             reasoning = reasoning,
@@ -195,7 +197,7 @@ class AIClient {
 
         awaitClose { eventSource.cancel() }
     } else flow {
-        emit(requestNonStreaming(provider, messages, modelId, systemPrompt, temperature, searchContext, reasoning, nativeSearch, allowUrlContext))
+        emit(requestNonStreaming(provider, messages, modelId, systemPrompt, temperature, topP, searchContext, reasoning, nativeSearch, allowUrlContext))
     }
 
     private suspend fun requestNonStreaming(
@@ -204,6 +206,7 @@ class AIClient {
         modelId: String,
         systemPrompt: String?,
         temperature: Float,
+        topP: Float,
         searchContext: String?,
         reasoning: ReasoningLevel,
         nativeSearch: Boolean,
@@ -217,6 +220,7 @@ class AIClient {
                 modelId = modelId,
                 systemPrompt = systemPrompt,
                 temperature = temperature,
+                topP = topP,
                 searchContext = searchContext,
                 isStream = false,
                 reasoning = reasoning,
@@ -275,6 +279,7 @@ class AIClient {
         systemPrompt: String?,
         tools: List<ChatFunctionTool>,
         temperature: Float = 0.7f,
+        topP: Float = 1.0f,
         searchContext: String? = null,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false,
@@ -288,6 +293,7 @@ class AIClient {
                 modelId = modelId,
                 systemPrompt = systemPrompt,
                 temperature = temperature,
+                topP = topP,
                 searchContext = searchContext,
                 isStream = false,
                 reasoning = reasoning,
@@ -698,12 +704,13 @@ class AIClient {
     private fun ChatMessage.imageParts(): List<Attachment> =
         attachments.filter { it.type == AttachmentType.IMAGE && !it.base64Data.isNullOrBlank() }
 
-    private fun buildRequestBody(
+    internal fun buildRequestBody(
         provider: Provider,
         messages: List<ChatMessage>,
         modelId: String,
         systemPrompt: String?,
         temperature: Float,
+        topP: Float,
         searchContext: String?,
         isStream: Boolean = true,
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
@@ -758,7 +765,8 @@ class AIClient {
                     json.put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", systemPrompt))))
                 }
                 json.put("generationConfig", JSONObject().apply {
-                    put("temperature", temperature.toDouble())
+                    put("temperature", temperature.coerceIn(0f, 2f).toDouble())
+                    put("topP", topP.coerceIn(0f, 1f).toDouble())
                     reasoning.geminiBudget?.takeIf { it > 0 }?.let { put("thinkingConfig", JSONObject().put("thinkingBudget", it)) }
                 })
                 val nativeTools = modelTools(provider, modelId)
@@ -801,7 +809,8 @@ class AIClient {
                     // Extended thinking requires temperature 1 (the API default), so it is omitted here.
                     json.put("thinking", JSONObject().put("type", "enabled").put("budget_tokens", budget))
                 } else {
-                    json.put("temperature", temperature.toDouble())
+                    json.put("temperature", temperature.toDouble().coerceIn(0.0, 1.0))
+                    json.put("top_p", topP.toDouble().coerceIn(0.0, 1.0))
                 }
                 val systemText = listOfNotNull(
                     systemPrompt,
@@ -852,6 +861,7 @@ class AIClient {
 
                 json.put("model", actualModel)
                 json.put("temperature", temperature.toDouble().coerceIn(0.0, 2.0))
+                json.put("top_p", topP.toDouble().coerceIn(0.0, 1.0))
                 json.put("stream", isStream)
                 reasoning.effort?.let { json.put("reasoning_effort", it) }
                 if (nativeSearch && provider.baseUrl.contains("openrouter.ai")) {

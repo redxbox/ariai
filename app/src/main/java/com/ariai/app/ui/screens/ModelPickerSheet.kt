@@ -391,7 +391,7 @@ private fun ProviderCheckRow(provider: Provider, check: suspend (Provider) -> Co
         }
         when (val r = result) {
             is ConnectionResult.Ok -> Text(
-                "${tx("Connected")} · ${r.models} ${tx("models")}",
+                "${tx("Connected")} · ${r.durationMs} ms · ${r.models} ${tx("models")}",
                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AriInk
             )
             is ConnectionResult.Failed -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

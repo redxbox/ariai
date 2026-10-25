@@ -53,7 +53,7 @@ data class ProviderEntity(
     val customHeaders: String,
     val customBody: String?,
     val createdAt: Long,
-    @ColumnInfo(defaultValue = "[]") val modelsJson: String = "[]"
+    @ColumnInfo(defaultValue = "'[]'") val modelsJson: String = "[]"
 )
 
 @Entity(tableName = "chats", indices = [Index(value = ["updatedAt"], name = "index_chats_updatedAt")])
@@ -66,6 +66,9 @@ data class ChatEntity(
     val modelId: String?,
     val agentId: String?,
     val systemPrompt: String?,
+    @ColumnInfo(defaultValue = "0.7") val temperature: Float = 0.7f,
+    @ColumnInfo(defaultValue = "1.0") val topP: Float = 1.0f,
+    val folder: String? = null,
     val isPinned: Boolean,
     val isArchived: Boolean,
     val memoryEnabled: Boolean
@@ -85,7 +88,7 @@ data class MessageEntity(
     val branchChildren: String,
     val reasoning: String?,
     val imagePath: String? = null,
-    @ColumnInfo(defaultValue = "[]") val attachmentsJson: String = "[]"
+    @ColumnInfo(defaultValue = "'[]'") val attachmentsJson: String = "[]"
 )
 
 @Entity(tableName = "agents")
@@ -99,6 +102,9 @@ data class AgentEntity(
     val providerId: String?,
     val temperature: Float,
     val topP: Float,
+    @ColumnInfo(defaultValue = "'[]'") val toolsJson: String = "[]",
+    @ColumnInfo(defaultValue = "'{}'") val promptVariablesJson: String = "{}",
+    @ColumnInfo(defaultValue = "'[]'") val examplesJson: String = "[]",
     val isBuiltIn: Boolean,
     val createdAt: Long
 )
@@ -184,7 +190,7 @@ interface AgentDao {
 
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

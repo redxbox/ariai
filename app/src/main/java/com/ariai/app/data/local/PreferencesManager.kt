@@ -36,7 +36,7 @@ class PreferencesManager(private val context: Context) {
 
     val languageFlow: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "en" }
     val themeFlow: Flow<String> = context.dataStore.data.map { it[THEME] ?: "system" }
-    val dynamicColorFlow: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLOR] ?: false }
+    val dynamicColorFlow: Flow<Boolean> = context.dataStore.data.map { it[DYNAMIC_COLOR] ?: true }
     val defaultProviderFlow: Flow<String?> = context.dataStore.data.map { it[DEFAULT_PROVIDER_ID] }
     val defaultModelFlow: Flow<String?> = context.dataStore.data.map { it[DEFAULT_MODEL_ID] }
     val streamResponseFlow: Flow<Boolean> = context.dataStore.data.map { it[STREAM_RESPONSE] ?: true }

@@ -26,7 +26,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -34,24 +33,31 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Chat
+import com.ariai.app.data.models.Provider
 import java.util.Calendar
 
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private enum class DayBucket(val labelKey: String) {
-    PINNED("Pinned"), TODAY("Today"), YESTERDAY("Yesterday"), EARLIER("Earlier");
+    PINNED("Pinned"), TODAY("Today"), YESTERDAY("Yesterday"), PREVIOUS_7_DAYS("Previous 7 days"), EARLIER("Earlier");
 
     val label: String get() = tx(labelKey)
 }
 
 private fun bucketOf(timestamp: Long, now: Long = System.currentTimeMillis()): DayBucket {
-    val nowCal = Calendar.getInstance().apply { timeInMillis = now }
-    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
-    fun sameDay(a: Calendar, b: Calendar) = a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
-    val yesterday = (nowCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+    val todayStart = Calendar.getInstance().apply {
+        timeInMillis = now
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    val yesterdayStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+    val previousWeekStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }
     return when {
-        sameDay(cal, nowCal) -> DayBucket.TODAY
-        sameDay(cal, yesterday) -> DayBucket.YESTERDAY
+        timestamp >= todayStart.timeInMillis -> DayBucket.TODAY
+        timestamp >= yesterdayStart.timeInMillis -> DayBucket.YESTERDAY
+        timestamp >= previousWeekStart.timeInMillis -> DayBucket.PREVIOUS_7_DAYS
         else -> DayBucket.EARLIER
     }
 }
@@ -62,19 +68,21 @@ private sealed interface DrawerRow {
 }
 
 /**
- * Side drawer in the reference layout: brand header, new chat, searchable
- * conversation list grouped by Pinned / Today / Yesterday / Earlier,
- * and a compact navigation footer.
+ * Side drawer with searchable, date- and folder-grouped conversations, a local profile/provider card,
+ * and compact navigation to the app's main areas.
  */
 @Composable
 fun ColumnScope.AppDrawerContent(
     chats: List<Chat>,
     currentChatId: String?,
     currentRoute: String,
+    activeProvider: Provider?,
+    activeModelName: String?,
     onNewChat: () -> Unit,
     onChatClick: (Chat) -> Unit,
     onPinChat: (Chat) -> Unit,
     onDeleteChat: (Chat) -> Unit,
+    onSetChatFolder: (Chat, String?) -> Unit,
     onNavigate: (String) -> Unit,
     onAbout: () -> Unit
 ) {
@@ -91,8 +99,19 @@ fun ColumnScope.AppDrawerContent(
             pinned.forEach { out += DrawerRow.ChatRow(it) }
         }
         val rest = filtered.filterNot { it.isPinned }.sortedByDescending { it.updatedAt }
+        val folders = rest.mapNotNull { it.folder?.trim()?.takeIf(String::isNotEmpty) }
+            .distinctBy { it.lowercase() }
+            .sortedBy(String::lowercase)
+        folders.forEach { folder ->
+            val group = rest.filter { it.folder?.trim().equals(folder, ignoreCase = true) }
+            if (group.isNotEmpty()) {
+                out += DrawerRow.Header("header:folder:$folder", "▸ $folder")
+                group.forEach { out += DrawerRow.ChatRow(it) }
+            }
+        }
+        val unfiled = rest.filter { it.folder.isNullOrBlank() }
         DayBucket.values().filter { it != DayBucket.PINNED }.forEach { bucket ->
-            val group = rest.filter { bucketOf(it.updatedAt) == bucket }
+            val group = unfiled.filter { bucketOf(it.updatedAt) == bucket }
             if (group.isNotEmpty()) {
                 out += DrawerRow.Header("header:${bucket.name.lowercase()}", bucket.label)
                 group.forEach { out += DrawerRow.ChatRow(it) }
@@ -167,7 +186,11 @@ fun ColumnScope.AppDrawerContent(
                     selected = row.chat.id == currentChatId,
                     onClick = { onChatClick(row.chat) },
                     onPin = { onPinChat(row.chat) },
-                    onDelete = { onDeleteChat(row.chat) }
+                    onDelete = { onDeleteChat(row.chat) },
+                    folderNames = chats.mapNotNull { it.folder?.trim()?.takeIf(String::isNotEmpty) }
+                        .distinctBy { it.lowercase() }
+                        .sortedBy(String::lowercase),
+                    onSetFolder = { folder -> onSetChatFolder(row.chat, folder) }
                 )
             }
         }
@@ -175,11 +198,36 @@ fun ColumnScope.AppDrawerContent(
 
     HorizontalDivider(color = AriInk.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
 
+    // Local profile and active provider: no cloud account is implied.
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = AriCard,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+            .clickable { onNavigate("providers") }
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(34.dp).clip(CircleShape).background(AriTint), contentAlignment = Alignment.Center) {
+                Text("A", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(tx("Personal workspace"), color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                Text(
+                    activeProvider?.let { provider -> listOfNotNull(provider.name, activeModelName).joinToString(" · ") }
+                        ?: tx("No provider selected"),
+                    color = Ink.copy(alpha = 0.5f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+            Box(Modifier.size(7.dp).clip(CircleShape).background(if (activeProvider?.enabled == true) Color(0xFF37865B) else Ink.copy(alpha = 0.2f)))
+        }
+    }
+
     // Footer: quick access to the main areas. Each button opens a real screen.
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
+        FooterAction(Icons.Default.Person, tx("Agents & prompts"), currentRoute == "agents") { onNavigate("agents") }
         FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }
         FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }
         FooterAction(Icons.Default.Public, tx("Search"), currentRoute == "search_service") { onNavigate("search_service") }
@@ -190,8 +238,19 @@ fun ColumnScope.AppDrawerContent(
 }
 
 @Composable
-private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boolean, onClick: () -> Unit, onPin: () -> Unit, onDelete: () -> Unit) {
+private fun ChatRowItem(
+    modifier: Modifier = Modifier,
+    chat: Chat,
+    selected: Boolean,
+    folderNames: List<String>,
+    onClick: () -> Unit,
+    onPin: () -> Unit,
+    onDelete: () -> Unit,
+    onSetFolder: (String?) -> Unit
+) {
     var menu by remember { mutableStateOf(false) }
+    var showFolderDialog by remember { mutableStateOf(false) }
+    var folderName by remember(chat.id, chat.folder) { mutableStateOf(chat.folder.orEmpty()) }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -235,12 +294,63 @@ private fun ChatRowItem(modifier: Modifier = Modifier, chat: Chat, selected: Boo
                     onClick = { menu = false; onPin() }
                 )
                 DropdownMenuItem(
+                    text = { Text(tx("Move to folder")) },
+                    leadingIcon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
+                    onClick = { menu = false; folderName = chat.folder.orEmpty(); showFolderDialog = true }
+                )
+                DropdownMenuItem(
                     text = { Text(tx("Delete")) },
                     leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                     onClick = { menu = false; onDelete() }
                 )
             }
         }
+    }
+    if (showFolderDialog) {
+        val dialogShape = paperPopupShape(24.dp)
+        AlertDialog(
+            onDismissRequest = { showFolderDialog = false },
+            modifier = paperPopupModifier(dialogShape),
+            shape = dialogShape,
+            containerColor = AriCard,
+            title = { Text(tx("Move to folder")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = folderName,
+                        onValueChange = { folderName = it.take(40) },
+                        label = { Text(tx("Folder name")) },
+                        placeholder = { Text(tx("e.g. Projects")) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    val suggestions = folderNames.filterNot { it.equals(chat.folder, ignoreCase = true) }.take(4)
+                    if (suggestions.isNotEmpty()) {
+                        Text(tx("Existing folders"), color = Ink.copy(alpha = 0.5f), fontSize = 12.sp)
+                        suggestions.chunked(2).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                row.forEach { suggestion ->
+                                    AssistChip(onClick = { folderName = suggestion }, label = { Text(suggestion, maxLines = 1) })
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onSetFolder(folderName.trim().takeIf { it.isNotEmpty() }); showFolderDialog = false }) {
+                    Text(tx("Save"))
+                }
+            },
+            dismissButton = {
+                Row {
+                    if (!chat.folder.isNullOrBlank()) {
+                        TextButton(onClick = { onSetFolder(null); showFolderDialog = false }) { Text(tx("Remove folder")) }
+                    }
+                    TextButton(onClick = { showFolderDialog = false }) { Text(tx("Cancel")) }
+                }
+            }
+        )
     }
 }
 
