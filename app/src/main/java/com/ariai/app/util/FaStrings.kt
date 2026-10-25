@@ -270,6 +270,7 @@ internal val faStrings: Map<String, String> = mapOf(
         "Search providers" to "جستجوی ارائه‌دهنده‌ها",
         "Search service" to "سرویس جستجو",
         "Testing sends one search request and may use your provider quota." to "آزمایش یک درخواست جستجو می‌فرستد و ممکن است از سهمیهٔ سرویس استفاده کند.",
+        "Testing…" to "در حال آزمایش…",
         "Testing connection…" to "در حال آزمایش اتصال…",
         "Search request failed." to "درخواست جستجو ناموفق بود.",
         "Connection successful." to "اتصال با موفقیت برقرار شد.",
