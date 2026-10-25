@@ -21,6 +21,7 @@ import org.json.JSONArray
 import com.ariai.app.util.tx
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Name-based video detection. Used together with API metadata, because many providers
@@ -61,6 +62,56 @@ internal fun applyProviderClientIdentity(request: Request): Request {
 
 private val clientIdentityInterceptor = Interceptor { chain ->
     chain.proceed(applyProviderClientIdentity(chain.request()))
+}
+
+internal fun parseTokenUsage(json: JSONObject, providerType: ProviderType): TokenUsage? {
+    val usage = when (providerType) {
+        ProviderType.GEMINI -> json.optJSONObject("usageMetadata")
+            ?: json.optJSONObject("usage_metadata")
+            ?: json.optJSONObject("usage")
+        ProviderType.ANTHROPIC -> json.optJSONObject("usage")
+            ?: json.optJSONObject("message")?.optJSONObject("usage")
+        else -> json.optJSONObject("usage")
+            ?: json.optJSONObject("usage_metadata")
+    } ?: return null
+
+    fun read(keys: List<String>): Int = keys.firstNotNullOfOrNull { key ->
+        if (usage.has(key)) usage.optInt(key, 0).coerceAtLeast(0) else null
+    } ?: 0
+
+    val promptKeys = when (providerType) {
+        ProviderType.GEMINI -> listOf("promptTokenCount", "prompt_token_count", "prompt_tokens", "input_tokens")
+        ProviderType.ANTHROPIC -> listOf("input_tokens", "prompt_tokens")
+        else -> listOf("prompt_tokens", "input_tokens")
+    }
+    val completionKeys = when (providerType) {
+        ProviderType.GEMINI -> listOf("candidatesTokenCount", "candidates_token_count", "completion_tokens", "output_tokens")
+        ProviderType.ANTHROPIC -> listOf("output_tokens", "completion_tokens")
+        else -> listOf("completion_tokens", "output_tokens")
+    }
+    val totalKeys = if (providerType == ProviderType.GEMINI) {
+        listOf("totalTokenCount", "total_token_count", "total_tokens")
+    } else listOf("total_tokens")
+
+    val prompt = read(promptKeys)
+    val completion = read(completionKeys)
+    val reportedTotal = read(totalKeys)
+    if (prompt == 0 && completion == 0 && reportedTotal == 0) return null
+    val total = reportedTotal.takeIf { it > 0 } ?: (prompt.toLong() + completion).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    return TokenUsage(prompt, completion, total)
+}
+
+internal fun mergeTokenUsage(current: TokenUsage?, update: TokenUsage): TokenUsage {
+    val prompt = update.promptTokens.takeIf { it > 0 } ?: current?.promptTokens ?: 0
+    val completion = update.completionTokens.takeIf { it > 0 } ?: current?.completionTokens ?: 0
+    val sum = (prompt.toLong() + completion).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    val total = when {
+        update.totalTokens > 0 && update.promptTokens > 0 && update.completionTokens > 0 -> update.totalTokens
+        sum > 0 -> sum
+        update.totalTokens > 0 -> update.totalTokens
+        else -> current?.totalTokens ?: 0
+    }
+    return TokenUsage(prompt, completion, total)
 }
 
 class AIClient {
@@ -105,99 +156,114 @@ class AIClient {
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false,
         stream: Boolean = true,
-        allowUrlContext: Boolean = true
-    ): Flow<String> = if (stream) callbackFlow {
-        val producer = this
-        val url = buildChatUrl(provider, modelId)
-        val body = buildRequestBody(
-            provider = provider,
-            messages = messages,
-            modelId = modelId,
-            systemPrompt = systemPrompt,
-            temperature = temperature,
-            topP = topP,
-            searchContext = searchContext,
-            isStream = true,
-            reasoning = reasoning,
-            nativeSearch = nativeSearch,
-            allowUrlContext = allowUrlContext
-        )
-        val request = Request.Builder()
-            .url(url)
-            .post(body)
-            .header("Content-Type", "application/json")
-            .header("Accept", "text/event-stream, application/json")
-            .addProviderHeaders(provider, modelId)
-            .build()
-
-        val eventSource = EventSources.createFactory(client).newEventSource(
-            request,
-            object : EventSourceListener() {
-                override fun onOpen(eventSource: EventSource, response: Response) {
-                    if (!response.isSuccessful) {
-                        producer.close(IOException("API Error ${response.code}: ${response.message}"))
-                        eventSource.cancel()
-                    }
-                }
-
-                override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
-                    if (data.trim() == "[DONE]") {
-                        producer.close()
-                        eventSource.cancel()
-                        return
-                    }
-                    try {
-                        val json = JSONObject(data)
-                        if (json.optString("type") == "error" || json.has("error")) {
-                            val error = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
-                                ?: json.optString("error", "Provider returned an error")
-                            producer.close(IOException(error))
-                            eventSource.cancel()
-                            return
-                        }
-                        if (hasUnexecutedToolCalls(json, provider.type)) {
-                            producer.close(IOException("The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search."))
-                            eventSource.cancel()
-                            return
-                        }
-                        val text = if (provider.type == ProviderType.GEMINI) {
-                            parseGeminiResponse(json)
-                        } else {
-                            parseOpenAIStreamChunk(json)
-                        }
-                        if (text.isNotEmpty()) {
-                            val result = producer.trySend(text)
-                            if (result.isFailure) eventSource.cancel()
-                        }
-                    } catch (e: Exception) {
-                        // Ignore non-JSON keep-alive events; real provider errors are handled above.
-                        com.ariai.app.util.AppLog.warn(e, "SSE event parse")
-                    }
-                }
-
-                override fun onClosed(eventSource: EventSource) {
-                    producer.close()
-                }
-
-                override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                    val responseError = runCatching {
-                        response?.body?.readUtf8AtMost(HttpBodyLimits.ERROR_BYTES)?.take(500).orEmpty()
-                    }.getOrDefault("")
-                    val message = when {
-                        response != null && !response.isSuccessful -> "API Error ${response.code}: ${responseError.ifBlank { response.message }}"
-                        !responseError.isBlank() -> responseError
-                        else -> t?.message ?: "Streaming request failed"
-                    }
-                    response?.close()
-                    eventSource.cancel()
-                    producer.close(IOException(message, t))
-                }
+        allowUrlContext: Boolean = true,
+        onUsage: (TokenUsage) -> Unit = {}
+    ): Flow<String> {
+        val reportedUsage = AtomicReference<TokenUsage?>(null)
+        val reportUsage: (JSONObject) -> Unit = { json ->
+            parseTokenUsage(json, provider.type)?.let { update ->
+                val snapshot = reportedUsage.updateAndGet { current -> mergeTokenUsage(current, update) } ?: update
+                runCatching { onUsage(snapshot) }
+                    .onFailure { com.ariai.app.util.AppLog.warn(it, "report token usage") }
             }
-        )
+        }
+        return if (stream) callbackFlow {
+            val producer = this
+            val url = buildChatUrl(provider, modelId)
+            val body = buildRequestBody(
+                provider = provider,
+                messages = messages,
+                modelId = modelId,
+                systemPrompt = systemPrompt,
+                temperature = temperature,
+                topP = topP,
+                searchContext = searchContext,
+                isStream = true,
+                reasoning = reasoning,
+                nativeSearch = nativeSearch,
+                allowUrlContext = allowUrlContext
+            )
+            val request = Request.Builder()
+                .url(url)
+                .post(body)
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream, application/json")
+                .addProviderHeaders(provider, modelId)
+                .build()
 
-        awaitClose { eventSource.cancel() }
-    } else flow {
-        emit(requestNonStreaming(provider, messages, modelId, systemPrompt, temperature, topP, searchContext, reasoning, nativeSearch, allowUrlContext))
+            val eventSource = EventSources.createFactory(client).newEventSource(
+                request,
+                object : EventSourceListener() {
+                    override fun onOpen(eventSource: EventSource, response: Response) {
+                        if (!response.isSuccessful) {
+                            producer.close(IOException("API Error ${response.code}: ${response.message}"))
+                            eventSource.cancel()
+                        }
+                    }
+
+                    override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+                        if (data.trim() == "[DONE]") {
+                            producer.close()
+                            eventSource.cancel()
+                            return
+                        }
+                        try {
+                            val json = JSONObject(data)
+                            if (json.optString("type") == "error" || json.has("error")) {
+                                val error = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                                    ?: json.optString("error", "Provider returned an error")
+                                producer.close(IOException(error))
+                                eventSource.cancel()
+                                return
+                            }
+                            reportUsage(json)
+                            if (hasUnexecutedToolCalls(json, provider.type)) {
+                                producer.close(IOException("The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search."))
+                                eventSource.cancel()
+                                return
+                            }
+                            val text = if (provider.type == ProviderType.GEMINI) {
+                                parseGeminiResponse(json)
+                            } else {
+                                parseOpenAIStreamChunk(json)
+                            }
+                            if (text.isNotEmpty()) {
+                                val result = producer.trySend(text)
+                                if (result.isFailure) eventSource.cancel()
+                            }
+                        } catch (e: Exception) {
+                            // Ignore non-JSON keep-alive events; real provider errors are handled above.
+                            com.ariai.app.util.AppLog.warn(e, "SSE event parse")
+                        }
+                    }
+
+                    override fun onClosed(eventSource: EventSource) {
+                        producer.close()
+                    }
+
+                    override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                        val responseError = runCatching {
+                            response?.body?.readUtf8AtMost(HttpBodyLimits.ERROR_BYTES)?.take(500).orEmpty()
+                        }.getOrDefault("")
+                        val message = when {
+                            response != null && !response.isSuccessful -> "API Error ${response.code}: ${responseError.ifBlank { response.message }}"
+                            !responseError.isBlank() -> responseError
+                            else -> t?.message ?: "Streaming request failed"
+                        }
+                        response?.close()
+                        eventSource.cancel()
+                        producer.close(IOException(message, t))
+                    }
+                }
+            )
+
+            awaitClose { eventSource.cancel() }
+        } else flow {
+            emit(requestNonStreaming(
+                provider, messages, modelId, systemPrompt, temperature, topP, searchContext,
+                reasoning, nativeSearch, allowUrlContext, reportUsage
+            ))
+        }
     }
 
     private suspend fun requestNonStreaming(
@@ -210,7 +276,8 @@ class AIClient {
         searchContext: String?,
         reasoning: ReasoningLevel,
         nativeSearch: Boolean,
-        allowUrlContext: Boolean
+        allowUrlContext: Boolean,
+        reportUsage: (JSONObject) -> Unit
     ): String {
         val request = Request.Builder()
             .url(buildChatUrl(provider, modelId, forceNonStream = true))
@@ -248,6 +315,7 @@ class AIClient {
                             }
                             if (raw.isBlank()) throw IOException("Empty response from API")
                             val json = JSONObject(raw)
+                            reportUsage(json)
                             if (json.has("error")) {
                                 val error = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
                                     ?: json.optString("error", "Provider returned an error")
@@ -863,6 +931,10 @@ class AIClient {
                 json.put("temperature", temperature.toDouble().coerceIn(0.0, 2.0))
                 json.put("top_p", topP.toDouble().coerceIn(0.0, 1.0))
                 json.put("stream", isStream)
+                val endpointHost = runCatching { java.net.URI(provider.baseUrl).host }.getOrNull()
+                if (isStream && provider.type == ProviderType.OPENAI && endpointHost.equals("api.openai.com", ignoreCase = true)) {
+                    json.put("stream_options", JSONObject().put("include_usage", true))
+                }
                 reasoning.effort?.let { json.put("reasoning_effort", it) }
                 if (nativeSearch && provider.baseUrl.contains("openrouter.ai")) {
                     json.put("plugins", JSONArray().put(JSONObject().put("id", "web")))
@@ -1033,6 +1105,7 @@ class AIClient {
     }
 
     private fun parseAgentStep(json: JSONObject, providerType: ProviderType): AgentStep {
+        val usage = parseTokenUsage(json, providerType)
         return when (providerType) {
         ProviderType.GEMINI -> {
             val candidate = json.optJSONArray("candidates")?.optJSONObject(0)
@@ -1052,7 +1125,7 @@ class AIClient {
                         ?: "{}"
                 )
             }
-            AgentStep(text.toString(), calls)
+            AgentStep(text.toString(), calls, usage)
         }
         ProviderType.ANTHROPIC -> {
             val blocks = json.optJSONArray("content") ?: JSONArray()
@@ -1072,11 +1145,11 @@ class AIClient {
                     }
                 }
             }
-            AgentStep(text.toString(), calls)
+            AgentStep(text.toString(), calls, usage)
         }
         else -> {
             val message = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
-                ?: return AgentStep("", emptyList())
+                ?: return AgentStep("", emptyList(), usage)
             val text = responseText(message.opt("content"))
             val calls = mutableListOf<ToolCall>()
             val toolCalls = message.optJSONArray("tool_calls") ?: JSONArray()
@@ -1099,7 +1172,7 @@ class AIClient {
                     arguments = legacyCall.optString("arguments", "{}").ifBlank { "{}" }
                 )
             }
-            AgentStep(text, calls)
+            AgentStep(text, calls, usage)
         }
         }
     }

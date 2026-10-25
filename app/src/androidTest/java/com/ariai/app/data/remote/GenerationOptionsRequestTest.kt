@@ -9,6 +9,7 @@ import okhttp3.RequestBody
 import okio.Buffer
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -42,11 +43,26 @@ class GenerationOptionsRequestTest {
         assertEquals(0.65, json.getDouble("temperature"), 0.001)
     }
 
-    private fun requestBody(type: ProviderType): RequestBody = client.buildRequestBody(
+    @Test
+    fun requestsUsageForOfficialOpenAiStreams() {
+        val json = requestBody(
+            type = ProviderType.OPENAI,
+            baseUrl = "https://api.openai.com/v1",
+            isStream = true
+        ).toJsonObject()
+
+        assertTrue(json.getJSONObject("stream_options").getBoolean("include_usage"))
+    }
+
+    private fun requestBody(
+        type: ProviderType,
+        baseUrl: String = "https://example.invalid/v1",
+        isStream: Boolean = false
+    ): RequestBody = client.buildRequestBody(
         provider = Provider(
             name = "Test provider",
             type = type,
-            baseUrl = "https://example.invalid/v1",
+            baseUrl = baseUrl,
             apiKey = "test-key"
         ),
         messages = listOf(
@@ -57,7 +73,7 @@ class GenerationOptionsRequestTest {
         temperature = 0.65f,
         topP = 0.35f,
         searchContext = null,
-        isStream = false
+        isStream = isStream
     )
 
     private fun RequestBody.toJsonObject(): JSONObject {

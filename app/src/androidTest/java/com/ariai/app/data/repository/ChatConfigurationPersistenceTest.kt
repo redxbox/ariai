@@ -7,6 +7,9 @@ import com.ariai.app.data.local.AppDatabase
 import com.ariai.app.data.models.Agent
 import com.ariai.app.data.models.AgentTool
 import com.ariai.app.data.models.Chat
+import com.ariai.app.data.models.ChatMessage
+import com.ariai.app.data.models.MessageRole
+import com.ariai.app.data.models.TokenUsage
 import com.ariai.app.data.remote.AIClient
 import com.ariai.app.data.remote.SearchClient
 import kotlinx.coroutines.flow.first
@@ -43,6 +46,17 @@ class ChatConfigurationPersistenceTest {
             assertEquals(chat.temperature, restoredChat?.temperature ?: -1f, 0.001f)
             assertEquals(chat.topP, restoredChat?.topP ?: -1f, 0.001f)
             assertEquals(chat.folder, restoredChat?.folder)
+
+            val assistantMessage = ChatMessage(
+                id = "usage-message",
+                chatId = chat.id,
+                role = MessageRole.ASSISTANT,
+                content = "Saved response",
+                usage = TokenUsage(promptTokens = 123, completionTokens = 45, totalTokens = 168)
+            )
+            assertTrue(repository.saveMessage(assistantMessage))
+            val restoredMessage = repository.getMessagesSync(chat.id).single()
+            assertEquals(assistantMessage.usage, restoredMessage.usage)
 
             val agent = Agent(
                 id = "custom-agent",

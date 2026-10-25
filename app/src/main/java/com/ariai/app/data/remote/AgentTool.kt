@@ -1,5 +1,6 @@
 package com.ariai.app.data.remote
 
+import com.ariai.app.data.models.TokenUsage
 import com.ariai.app.data.models.ToolCall
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
@@ -15,7 +16,8 @@ data class ChatFunctionTool(
 /** One provider response step. Tool calls are executed by [AgentLoop], never by the model itself. */
 data class AgentStep(
     val text: String,
-    val toolCalls: List<ToolCall>
+    val toolCalls: List<ToolCall>,
+    val usage: TokenUsage? = null
 )
 
 /** A bounded, sequential tool loop: model -> tools -> model, returning only the final text. */

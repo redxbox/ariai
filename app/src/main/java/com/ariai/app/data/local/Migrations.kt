@@ -63,3 +63,12 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         db.execSQL("UPDATE agents SET toolsJson = '[\"IMAGE_GENERATION\"]' WHERE id = 'artist'")
     }
 }
+
+/** Persists provider-reported context and completion token counts with each assistant message. */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE messages ADD COLUMN promptTokens INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE messages ADD COLUMN completionTokens INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE messages ADD COLUMN totalTokens INTEGER NOT NULL DEFAULT 0")
+    }
+}

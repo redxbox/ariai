@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Visibility
@@ -88,7 +89,8 @@ fun WorkspaceScreen(
     onBack: () -> Unit,
     onCreateFile: (String, String, (String?) -> Unit) -> Unit,
     onSaveFile: (String, String, (String?) -> Unit) -> Unit,
-    onDeleteFile: (String, (String?) -> Unit) -> Unit
+    onDeleteFile: (String, (String?) -> Unit) -> Unit,
+    onGenerateFile: (String, String, String?, (WorkspaceFile?, String?) -> Unit) -> Unit
 ) {
     var selectedFileName by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(files) {
@@ -100,7 +102,11 @@ fun WorkspaceScreen(
     var selectedTab by remember { mutableStateOf(WorkspaceTab.EDITOR) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showGenerateDialog by remember { mutableStateOf(false) }
+    var isGenerating by remember { mutableStateOf(false) }
     var newFileName by remember { mutableStateOf("") }
+    var generationFileName by remember { mutableStateOf("index.html") }
+    var generationPrompt by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
     var consoleCommand by remember { mutableStateOf("") }
     var consoleOutput by remember { mutableStateOf(tx("Type help for available safe commands.")) }
@@ -118,6 +124,14 @@ fun WorkspaceScreen(
                 },
                 title = { Text(tx("Workspace"), color = AriInk, fontWeight = FontWeight.SemiBold) },
                 actions = {
+                    IconButton(onClick = {
+                        generationFileName = selectedFile?.name ?: "index.html"
+                        generationPrompt = ""
+                        notice = ""
+                        showGenerateDialog = true
+                    }) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = tx("Generate with AriAI"), tint = AriInk)
+                    }
                     IconButton(onClick = { newFileName = ""; notice = ""; showCreateDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = tx("New file"), tint = AriInk)
                     }
@@ -281,6 +295,70 @@ fun WorkspaceScreen(
                 }
             }
         }
+    }
+
+    if (showGenerateDialog) {
+        val dialogShape = paperPopupShape(24.dp)
+        AlertDialog(
+            onDismissRequest = { if (!isGenerating) showGenerateDialog = false },
+            modifier = paperPopupModifier(dialogShape),
+            shape = dialogShape,
+            containerColor = AriCard,
+            title = { Text(tx("Generate code")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text(tx("Uses the selected default AI provider and model."), color = AriMuted, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = generationFileName,
+                        onValueChange = { generationFileName = it.take(64); notice = "" },
+                        label = { Text(tx("File name")) },
+                        singleLine = true,
+                        enabled = !isGenerating
+                    )
+                    OutlinedTextField(
+                        value = generationPrompt,
+                        onValueChange = { generationPrompt = it.take(4_000); notice = "" },
+                        label = { Text(tx("Describe what to build or change")) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 6,
+                        enabled = !isGenerating
+                    )
+                    if (notice.isNotBlank()) Text(notice, color = AriMuted, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isGenerating && generationPrompt.isNotBlank(),
+                    onClick = {
+                        val name = generationFileName.trim()
+                        val existing = files.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                        if (existing != null && !existing.name.equals(selectedFile?.name, ignoreCase = true)) {
+                            notice = tx("Select the existing file you want to replace before generating.")
+                            return@TextButton
+                        }
+                        isGenerating = true
+                        val currentContent = existing?.let { if (it.name.equals(selectedFile?.name, ignoreCase = true)) draft else it.content }
+                        onGenerateFile(name, generationPrompt, currentContent) { generated, error ->
+                            isGenerating = false
+                            if (generated != null) {
+                                selectedFileName = generated.name
+                                selectedTab = WorkspaceTab.EDITOR
+                                draft = generated.content
+                                savedDraft = generated.content
+                                notice = tx("Generated file saved.")
+                                showGenerateDialog = false
+                            } else {
+                                notice = error ?: tx("Could not generate the file.")
+                            }
+                        }
+                    }
+                ) { Text(if (isGenerating) tx("Generating…") else tx("Generate")) }
+            },
+            dismissButton = {
+                TextButton(enabled = !isGenerating, onClick = { showGenerateDialog = false }) { Text(tx("Cancel")) }
+            }
+        )
     }
 
     if (showCreateDialog) {

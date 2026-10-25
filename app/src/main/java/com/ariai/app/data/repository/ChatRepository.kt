@@ -292,7 +292,8 @@ class ChatRepository(
         nativeSearch: Boolean = false,
         maxSteps: Int = 6,
         contextWindow: Int = 8192,
-        allowUrlContext: Boolean = true
+        allowUrlContext: Boolean = true,
+        onUsage: (TokenUsage) -> Unit = {}
     ): Flow<String> = kotlinx.coroutines.flow.flow {
         val readyMessages = messages.map { m -> m.copy(attachments = m.attachments.map { it.hydrated() }) }
         val toolBudget = ((contextWindow.coerceAtLeast(4096).toLong() * 3L) / 2L).coerceAtMost(20_000L).toInt()
@@ -304,7 +305,7 @@ class ChatRepository(
                     "Do not answer with an acknowledgement or progress-only message. Complete the request now using the available tool results, or clearly ask for the exact missing input. If a tool step limit was reached, summarize only what was actually retrieved."
                 ).joinToString("\n\n")
             } else systemPrompt
-            aiClient.chatCompletionStep(
+            val step = aiClient.chatCompletionStep(
                 provider = provider,
                 messages = stepMessages,
                 modelId = modelId,
@@ -317,6 +318,8 @@ class ChatRepository(
                 nativeSearch = nativeSearch,
                 allowUrlContext = allowUrlContext
             )
+            step.usage?.let(onUsage)
+            step
         }
         emit(answer)
     }.flowOn(Dispatchers.IO)
@@ -332,7 +335,8 @@ class ChatRepository(
         reasoning: ReasoningLevel = ReasoningLevel.AUTO,
         nativeSearch: Boolean = false,
         stream: Boolean = true,
-        allowUrlContext: Boolean = true
+        allowUrlContext: Boolean = true,
+        onUsage: (TokenUsage) -> Unit = {}
     ): Flow<String> = kotlinx.coroutines.flow.flow {
         // Load stored attachment bytes here, off the main thread, right before the request.
         val ready = messages.map { m -> m.copy(attachments = m.attachments.map { it.hydrated() }) }
@@ -347,7 +351,8 @@ class ChatRepository(
             reasoning = reasoning,
             nativeSearch = nativeSearch,
             stream = stream,
-            allowUrlContext = allowUrlContext
+            allowUrlContext = allowUrlContext,
+            onUsage = onUsage
         ))
     }
         // Network work must not run on the main thread.
@@ -539,7 +544,9 @@ class ChatRepository(
             branchChildren = if (branchChildren.isEmpty()) emptyList() else branchChildren.split("|||"),
             reasoning = reasoning,
             imagePath = imagePath,
-            attachments = parseAttachments(attachmentsJson)
+            attachments = parseAttachments(attachmentsJson),
+            usage = TokenUsage(promptTokens, completionTokens, totalTokens)
+                .takeIf { it.promptTokens > 0 || it.completionTokens > 0 || it.totalTokens > 0 }
         )
     } catch (e: Exception) {
         ChatMessage(id = id, chatId = chatId, role = MessageRole.USER, content = content, timestamp = timestamp)
@@ -558,7 +565,10 @@ class ChatRepository(
         branchChildren = branchChildren.joinToString("|||"),
         reasoning = reasoning,
         imagePath = imagePath,
-        attachmentsJson = attachments.toJson()
+        attachmentsJson = attachments.toJson(),
+        promptTokens = usage?.promptTokens ?: 0,
+        completionTokens = usage?.completionTokens ?: 0,
+        totalTokens = usage?.totalTokens ?: 0
     )
 
     private fun AgentEntity.toModel(): Agent {

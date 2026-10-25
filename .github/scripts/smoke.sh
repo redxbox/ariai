@@ -420,7 +420,26 @@ expect_text "Providers"
 expect_text "MCP"
 expect_text "Settings"
 expect_text "About"
+expect_text "Workspace"
 shot 25-navigation-drawer
+tap "Workspace"
+expect_text "No project files yet."
+expect_text "Read-only console"
+tap "Generate with AriAI"
+expect_text "Generate code"
+expect_text "Uses the selected default AI provider and model."
+tap "Describe what to build or change"
+type_text "Create a small static HTML page"
+hide_keyboard
+tap "Generate"
+expect_text "No provider configured"
+shot 25-workspace-generate-without-provider
+expect_text "Cancel"
+tap "Cancel"
+shot 25-workspace-empty
+back
+expect_text "Message AriAI"
+tap "Open menu"
 tap "About"
 expect_text "AriAI v1.0 - Personal AI"
 shot 25-drawer-about

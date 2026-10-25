@@ -528,13 +528,21 @@ fun NewChatScreen(
                 actions = {
                     val contextLimit = selectedModelCapabilities?.contextWindow?.takeIf { it > 0 } ?: 0
                     if (contextLimit > 0) {
-                        val actualPromptTokens = messages.lastOrNull {
-                            it.role == MessageRole.ASSISTANT && (it.usage?.promptTokens ?: 0) > 0
-                        }?.usage?.promptTokens
-                        val visibleChars = messages.filter { it.role != MessageRole.SYSTEM }.sumOf { message ->
-                            message.content.length + message.attachments.sumOf { it.textContent?.length ?: 0 }
-                        } + (chat?.systemPrompt?.length ?: 0)
-                        val tokenCount = actualPromptTokens ?: ((visibleChars + 3) / 4)
+                        val latestUserIndex = messages.indexOfLast { it.role == MessageRole.USER }
+                        val latestAssistantIndex = messages.indexOfLast { it.role == MessageRole.ASSISTANT }
+                        val actualPromptTokens = messages.getOrNull(latestAssistantIndex)
+                            ?.takeIf { latestAssistantIndex > latestUserIndex && it.status != MessageStatus.ERROR }
+                            ?.usage?.promptTokens?.takeIf { it > 0 }
+                        val visibleTokens = messages.filter { it.role != MessageRole.SYSTEM }.sumOf { message ->
+                            ((message.content.length + 3).toLong() / 4L) + message.attachments.sumOf { attachment ->
+                                ((attachment.textContent?.length ?: 0).toLong() + 3L) / 4L + when (attachment.type) {
+                                    AttachmentType.IMAGE -> 768L
+                                    AttachmentType.VIDEO -> 2048L
+                                    else -> 0L
+                                }
+                            }
+                        } + ((chat?.systemPrompt?.length ?: 0).toLong() + 3L) / 4L
+                        val tokenCount = actualPromptTokens ?: visibleTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
                         ContextUsageIndicator(
                             tokens = tokenCount,
                             contextWindow = contextLimit,
@@ -875,7 +883,7 @@ private fun ContextUsageIndicator(
             trackColor = AriTint
         )
         Text(
-            if (approximate) "~" else "${(fraction * 100).toInt()}%",
+            if (approximate) "~${(fraction * 100).toInt()}%" else "${(fraction * 100).toInt()}%",
             color = Ink,
             fontSize = 8.sp,
             fontWeight = FontWeight.SemiBold

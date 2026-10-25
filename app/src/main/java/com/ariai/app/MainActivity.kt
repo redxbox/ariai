@@ -245,7 +245,10 @@ fun AppRoot(viewModel: AppViewModel) {
                         onBack = { navController.popBackStack() },
                         onCreateFile = { name, content, onResult -> viewModel.createWorkspaceFile(name, content, onResult) },
                         onSaveFile = { name, content, onResult -> viewModel.saveWorkspaceFile(name, content, onResult) },
-                        onDeleteFile = { name, onResult -> viewModel.deleteWorkspaceFile(name, onResult) }
+                        onDeleteFile = { name, onResult -> viewModel.deleteWorkspaceFile(name, onResult) },
+                        onGenerateFile = { name, prompt, existingContent, onResult ->
+                            viewModel.generateWorkspaceFile(name, prompt, existingContent, onResult)
+                        }
                     )
                 }
 
