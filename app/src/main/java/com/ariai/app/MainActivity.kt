@@ -97,8 +97,8 @@ fun AppRoot(viewModel: AppViewModel) {
     val agents by viewModel.agents.collectAsState()
     val workspaceFiles by viewModel.workspaceFiles.collectAsState()
     val searchKeys by viewModel.searchKeys.collectAsState()
+    val mcpServers by viewModel.mcpServers.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
-    val mcpServers = remember { mutableStateListOf<McpServerItem>() }
     val defaultProviderId by viewModel.defaultProviderId.collectAsState()
     val defaultModelId by viewModel.defaultModelId.collectAsState()
     val reasoningLevel by viewModel.reasoningLevel.collectAsState()
@@ -423,6 +423,7 @@ fun AppRoot(viewModel: AppViewModel) {
                     SearchServiceScreen(
                         searchKeys = searchKeys,
                         onSaveKey = { name, key -> viewModel.setSearchKey(name, key) },
+                        onTestKey = { name, key, onResult -> viewModel.testSearchKey(name, key, onResult) },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -456,12 +457,9 @@ fun AppRoot(viewModel: AppViewModel) {
                 composable("mcp") {
                     SimpleMcpScreen(
                         servers = mcpServers,
-                        onToggle = { id ->
-                            val i = mcpServers.indexOfFirst { it.id == id }
-                            if (i >= 0) mcpServers[i] = mcpServers[i].copy(enabled = !mcpServers[i].enabled)
-                        },
-                        onAdd = { mcpServers.add(it) },
-                        onRemove = { id -> mcpServers.removeAll { it.id == id } },
+                        onToggle = viewModel::toggleMcpServer,
+                        onAdd = viewModel::addMcpServer,
+                        onRemove = viewModel::removeMcpServer,
                         onBack = { navController.popBackStack() }
                     )
                 }

@@ -956,7 +956,7 @@ private fun ContextUsageIndicator(
 ) {
     val fraction = if (contextWindow > 0) (tokens.toFloat() / contextWindow).coerceIn(0f, 1f) else 0f
     Box(
-        modifier = Modifier.size(42.dp).clip(CircleShape).clickable(onClick = onClick),
+        modifier = Modifier.size(42.dp).clip(CircleShape).clickable(onClick = onClick).testTag("chat-context-usage"),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(

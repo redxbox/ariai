@@ -66,6 +66,7 @@ class AppViewModel(
     val theme = prefs.themeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
     val dynamicColor = prefs.dynamicColorFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val searchKeys = prefs.searchKeysFlow.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val mcpServers = prefs.mcpServersFlow.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val defaultProviderId = prefs.defaultProviderFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val defaultModelId = prefs.defaultModelFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val streamResponse = prefs.streamResponseFlow.stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -247,6 +248,58 @@ class AppViewModel(
 
     fun setSearchKey(provider: String, key: String) {
         viewModelScope.launch { prefs.setSearchApiKey(provider, key) }
+    }
+
+    /** Uses one small real request only when the user explicitly asks to test a saved/draft key. */
+    fun testSearchKey(provider: String, key: String, onResult: (String?) -> Unit) {
+        val type = when (provider.lowercase()) {
+            "tavily" -> SearchProviderType.TAVILY
+            "brave" -> SearchProviderType.BRAVE
+            "exa" -> SearchProviderType.EXA
+            "serper" -> SearchProviderType.SERPER
+            else -> null
+        }
+        val trimmedKey = key.trim()
+        if (type == null || trimmedKey.isBlank()) {
+            onResult(tx("Enter a valid search service and API key."))
+            return
+        }
+        viewModelScope.launch {
+            val error = try {
+                repository.searchWeb(
+                    query = "AriAI search connection check",
+                    searchProvider = SearchProvider(name = provider, type = type, apiKey = trimmedKey)
+                )
+                null
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                failure.message ?: tx("Search request failed.")
+            }
+            onResult(error)
+        }
+    }
+
+    fun addMcpServer(server: McpServerItem) {
+        viewModelScope.launch {
+            prefs.updateMcpServers { current ->
+                if (current.any { it.id == server.id }) current else current + server
+            }
+        }
+    }
+
+    fun toggleMcpServer(id: String) {
+        viewModelScope.launch {
+            prefs.updateMcpServers { current ->
+                current.map { server -> if (server.id == id) server.copy(enabled = !server.enabled) else server }
+            }
+        }
+    }
+
+    fun removeMcpServer(id: String) {
+        viewModelScope.launch {
+            prefs.updateMcpServers { current -> current.filterNot { it.id == id } }
+        }
     }
 
     suspend fun fetchModels(provider: Provider): List<AIModel> = repository.fetchModels(provider)

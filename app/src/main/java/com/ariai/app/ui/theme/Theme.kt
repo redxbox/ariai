@@ -13,12 +13,12 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 
-// A confident indigo brand accent sits over soft, cool-toned surfaces in both themes.
+// Calm blue/green controls sit over bright neutral surfaces in the light theme and charcoal in dark mode.
 private val DarkColorScheme = darkColorScheme(
     primary = AriAccentLight,
-    onPrimary = Color(0xFF211A50),
-    secondary = Color(0xFF9FCFC7),
-    tertiary = AriAccent,
+    onPrimary = Color(0xFF17233C),
+    secondary = Color(0xFF9FD4C9),
+    tertiary = AriAccentGreen,
     background = DarkAriPalette.paper,
     surface = DarkAriPalette.paper,
     surfaceVariant = DarkAriPalette.tint,
@@ -30,7 +30,7 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = AriAccent,
     onPrimary = Color.White,
-    secondary = Color(0xFF5364A6),
+    secondary = AriAccentGreen,
     tertiary = AriAccent,
     background = LightAriPalette.paper,
     surface = LightAriPalette.paper,
@@ -43,7 +43,7 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun AriAiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current

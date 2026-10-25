@@ -10,20 +10,21 @@ val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
-// AriAi Premium Palette
-val AriPrimary = Color(0xFF6C4DFF)
-val AriPrimaryLight = Color(0xFF9A7DFF)
-val AriPrimaryDark = Color(0xFF4A2DCC)
+// Restrained RikkaHub-inspired accents: calm blue for primary actions and soft green for agent/MCP tools.
+val AriPrimary = Color(0xFF4D73C5)
+val AriPrimaryLight = Color(0xFFAFC4ED)
+val AriPrimaryDark = Color(0xFF36599F)
 
-val AriSecondary = Color(0xFF00D4AA)
-val AriSecondaryLight = Color(0xFF5CFFD6)
-val AriSecondaryDark = Color(0xFF00A381)
+val AriSecondary = Color(0xFF2C9281)
+val AriSecondaryLight = Color(0xFFA9D8CE)
+val AriSecondaryDark = Color(0xFF1E7569)
 
-// AriAi's vivid indigo accent anchors primary actions, active navigation, and chat highlights.
-val AriAccent = Color(0xFF6957E8)
-val AriAccentLight = Color(0xFFB9AEFF)
-val AriAccentDark = Color(0xFF4E3BCC)
-val AriAccentSoft = Color(0xFFE9E6FF)
+val AriAccent = Color(0xFF4D73C5)
+val AriAccentLight = Color(0xFFB7C9EE)
+val AriAccentDark = Color(0xFF36599F)
+val AriAccentSoft = Color(0xFFEAF0FC)
+val AriAccentGreen = Color(0xFF2C9281)
+val AriAccentGreenSoft = Color(0xFFE6F4F0)
 
 val AriBackground = Color(0xFF0F0F13)
 val AriSurface = Color(0xFF1A1A1F)

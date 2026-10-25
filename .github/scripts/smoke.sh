@@ -424,7 +424,7 @@ expect_text "Workspace"
 shot 25-navigation-drawer
 tap "Workspace"
 expect_text "No project files yet."
-expect_text "Read-only console"
+expect_text "Console"
 tap "Generate with AriAI"
 expect_text "Generate code"
 expect_text "Uses the selected default AI provider and model."

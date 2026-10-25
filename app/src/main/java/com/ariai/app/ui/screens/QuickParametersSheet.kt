@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,7 +59,7 @@ fun QuickParametersSheet(
         contentColor = AriInk
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(tx("Quick parameters"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -113,7 +115,7 @@ fun QuickParametersSheet(
                     onClick = {
                         onSave(temperatureValue.coerceIn(0f, 2f), topPValue.coerceIn(0f, 1f), promptValue.trim().takeIf { it.isNotEmpty() })
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("quick-parameters-save"),
                     colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                 ) { Text(tx("Save settings")) }
             }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -142,7 +144,7 @@ fun WorkspaceScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).navigationBarsPadding().imePadding().padding(horizontal = 14.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
@@ -176,10 +178,11 @@ fun WorkspaceScreen(
                 WorkspaceTab.values().forEach { tab ->
                     val enabled = tab != WorkspaceTab.PREVIEW || isHtmlFile == true
                     FilterChip(
+                        modifier = Modifier.weight(1f).testTag("workspace-tab-${tab.name.lowercase()}"),
                         selected = selectedTab == tab,
                         onClick = { if (enabled) selectedTab = tab },
                         enabled = enabled,
-                        label = { Text(tab.label()) },
+                        label = { Text(tab.label(), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = when (tab) {
                             WorkspaceTab.EDITOR -> ({ Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp)) })
                             WorkspaceTab.PREVIEW -> ({ Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(16.dp)) })
@@ -210,7 +213,7 @@ fun WorkspaceScreen(
                         OutlinedTextField(
                             value = draft,
                             onValueChange = { draft = it; notice = "" },
-                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            modifier = Modifier.fillMaxWidth().weight(1f).testTag("workspace-file-content"),
                             placeholder = { Text(tx("File contents")) },
                             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace, color = AriInk),
                             minLines = 12,
@@ -378,34 +381,38 @@ fun WorkspaceScreen(
                         onValueChange = { newFileName = it.take(64) },
                         label = { Text(tx("File name")) },
                         placeholder = { Text(tx("e.g. index.html")) },
+                        modifier = Modifier.testTag("workspace-create-name"),
                         singleLine = true
                     )
                     if (notice.isNotBlank()) Text(notice, color = AriMuted, fontSize = 12.sp)
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val name = newFileName.trim()
-                    if (name.isBlank()) {
-                        notice = tx("File name is required.")
-                        return@TextButton
+                TextButton(
+                    modifier = Modifier.testTag("workspace-create-submit"),
+                    onClick = {
+                        val name = newFileName.trim()
+                        if (name.isBlank()) {
+                            notice = tx("File name is required.")
+                            return@TextButton
+                        }
+                        if (files.any { it.name.equals(name, ignoreCase = true) }) {
+                            notice = tx("A file with this name already exists.")
+                            return@TextButton
+                        }
+                        val initialContent = starterContent(name)
+                        onCreateFile(name, initialContent) { error ->
+                            if (error == null) {
+                                selectedFileName = name
+                                selectedTab = WorkspaceTab.EDITOR
+                                draft = initialContent
+                                savedDraft = initialContent
+                                notice = tx("File saved")
+                                showCreateDialog = false
+                            } else notice = error
+                        }
                     }
-                    if (files.any { it.name.equals(name, ignoreCase = true) }) {
-                        notice = tx("A file with this name already exists.")
-                        return@TextButton
-                    }
-                    val initialContent = starterContent(name)
-                    onCreateFile(name, initialContent) { error ->
-                        if (error == null) {
-                            selectedFileName = name
-                            selectedTab = WorkspaceTab.EDITOR
-                            draft = initialContent
-                            savedDraft = initialContent
-                            notice = tx("File saved")
-                            showCreateDialog = false
-                        } else notice = error
-                    }
-                }) { Text(tx("Create file")) }
+                ) { Text(tx("Create file")) }
             },
             dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text(tx("Cancel")) } }
         )
@@ -504,7 +511,7 @@ private fun StaticPreviewWebView(html: String, modifier: Modifier = Modifier) {
 private fun WorkspaceTab.label(): String = when (this) {
     WorkspaceTab.EDITOR -> tx("Editor")
     WorkspaceTab.PREVIEW -> tx("Preview")
-    WorkspaceTab.CONSOLE -> tx("Read-only console")
+    WorkspaceTab.CONSOLE -> tx("Console")
 }
 
 private fun starterContent(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {

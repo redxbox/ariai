@@ -15,11 +15,16 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
-class SearchClient {
-    private val client = OkHttpClient.Builder()
+class SearchClient(
+    private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+        .build(),
+    /** Injectable only to keep provider protocol tests local; production uses the official endpoints. */
+    private val endpointOverrides: Map<SearchProviderType, String> = emptyMap()
+) {
+    private fun endpoint(type: SearchProviderType, officialUrl: String): String =
+        endpointOverrides[type] ?: officialUrl
 
     suspend fun search(
         query: String,
@@ -49,7 +54,7 @@ class SearchClient {
             put("max_results", 5)
         }
         val request = Request.Builder()
-            .url("https://api.tavily.com/search")
+            .url(endpoint(SearchProviderType.TAVILY, "https://api.tavily.com/search"))
             .post(json.toString().toRequestBody("application/json".toMediaType()))
             .build()
         val body = executeJson(request, "Tavily")
@@ -69,7 +74,7 @@ class SearchClient {
     private suspend fun searchBrave(query: String, apiKey: String): SearchResponse {
         val encodedQuery = URLEncoder.encode(query, Charsets.UTF_8.name())
         val request = Request.Builder()
-            .url("https://api.search.brave.com/res/v1/web/search?q=$encodedQuery&count=5")
+            .url("${endpoint(SearchProviderType.BRAVE, "https://api.search.brave.com/res/v1/web/search")}?q=$encodedQuery&count=5")
             .header("X-Subscription-Token", apiKey)
             .header("Accept", "application/json")
             .get()
@@ -96,7 +101,7 @@ class SearchClient {
             put("type", "auto")
         }
         val request = Request.Builder()
-            .url("https://api.exa.ai/search")
+            .url(endpoint(SearchProviderType.EXA, "https://api.exa.ai/search"))
             .post(json.toString().toRequestBody("application/json".toMediaType()))
             .header("x-api-key", apiKey)
             .header("Content-Type", "application/json")
@@ -121,7 +126,7 @@ class SearchClient {
             put("num", 5)
         }
         val request = Request.Builder()
-            .url("https://google.serper.dev/search")
+            .url(endpoint(SearchProviderType.SERPER, "https://google.serper.dev/search"))
             .post(json.toString().toRequestBody("application/json".toMediaType()))
             .header("X-API-KEY", apiKey)
             .build()
@@ -156,7 +161,8 @@ class SearchClient {
                     response.use { received ->
                         val body = received.body?.readUtf8AtMost(HttpBodyLimits.SEARCH_BYTES).orEmpty()
                         if (!received.isSuccessful) {
-                            throw IOException("$service search failed: HTTP ${received.code}: ${body.take(300)}")
+                            // Do not surface or log provider error bodies; some vendors echo credential details.
+                            throw IOException("$service search failed (HTTP ${received.code})")
                         }
                         if (body.isBlank()) throw IOException("$service search returned an empty response")
                         JSONObject(body)

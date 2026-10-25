@@ -17,6 +17,7 @@ import com.ariai.app.data.models.MessageRole
 import com.ariai.app.data.models.MessageStatus
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
+import com.ariai.app.data.models.TokenUsage
 import com.ariai.app.data.remote.ConnectionResult
 import com.ariai.app.ui.screens.ChatListScreen
 import com.ariai.app.ui.screens.NewChatScreen
@@ -197,5 +198,64 @@ class ProviderAndChatUiTest {
         compose.onNodeWithText("Manage providers").assertIsDisplayed().performClick()
         assertEquals(1, addCalls)
         assertEquals(1, manageCalls)
+    }
+
+    @Test
+    fun contextGaugeDistinguishesProviderReportedTokensFromAnEstimate() {
+        val provider = Provider(
+            id = "provider-token-gauge",
+            name = "Token provider",
+            type = ProviderType.OPENAI_COMPATIBLE,
+            baseUrl = "https://api.example.test/v1",
+            apiKey = "test-key",
+            models = listOf(AIModel("token-model", "Token model", "provider-token-gauge", contextWindow = 4096))
+        )
+        val chat = Chat(
+            id = "chat-token-gauge",
+            title = "Token gauge",
+            providerId = provider.id,
+            modelId = "token-model"
+        )
+        val messages = mutableStateOf(
+            listOf(
+                ChatMessage(id = "token-user", chatId = chat.id, role = MessageRole.USER, content = "question"),
+                ChatMessage(
+                    id = "token-assistant",
+                    chatId = chat.id,
+                    role = MessageRole.ASSISTANT,
+                    content = "answer",
+                    usage = TokenUsage(promptTokens = 123, completionTokens = 45, totalTokens = 168)
+                )
+            )
+        )
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false, dynamicColor = false) {
+                NewChatScreen(
+                    chat = chat,
+                    messages = messages.value,
+                    isStreaming = false,
+                    currentStreamingContent = "",
+                    selectedModel = "token-model",
+                    selectedProviderId = provider.id,
+                    providers = listOf(provider),
+                    onSendMessage = { _, _, _, _, _ -> false },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
+                    onCheckProvider = { ConnectionResult.Ok(0) }
+                )
+            }
+        }
+
+        compose.onNodeWithTag("chat-context-usage").assertIsDisplayed()
+        compose.onNodeWithText("3%", useUnmergedTree = true).assertExists()
+
+        messages.value = messages.value.map { message ->
+            if (message.role == MessageRole.ASSISTANT) message.copy(usage = null) else message
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("~0%", useUnmergedTree = true).assertExists()
     }
 }

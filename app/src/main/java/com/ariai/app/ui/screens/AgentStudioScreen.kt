@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -64,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,7 +73,7 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Agent
 import com.ariai.app.data.models.AgentTool
 import com.ariai.app.data.models.Provider
-import com.ariai.app.ui.theme.AriAccent
+import com.ariai.app.ui.theme.AriAccentGreen
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
@@ -124,8 +126,8 @@ fun AgentStudioScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).navigationBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
@@ -159,7 +161,7 @@ fun AgentStudioScreen(
                     onClick = { editingAgent = newAgentDraft() },
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccentGreen, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -232,7 +234,7 @@ private fun AgentCard(agent: Agent, onStart: () -> Unit, onEdit: () -> Unit) {
                     onClick = onStart,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(13.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccentGreen, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(6.dp))
@@ -280,7 +282,7 @@ private fun AgentEditorSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = AriCard, contentColor = AriInk) {
         Column(
-            modifier = Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(if (agent.isBuiltIn) tx("Customize agent") else tx("Agent configuration"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -290,7 +292,7 @@ private fun AgentEditorSheet(
                 onValueChange = { name = it.take(48) },
                 label = { Text(tx("Agent name")) },
                 leadingIcon = { Text(avatar.ifBlank { "✦" }, modifier = Modifier.clickable { avatar = if (avatar == "✦") "✧" else "✦" }) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("agent-name"),
                 singleLine = true
             )
             OutlinedTextField(
@@ -306,7 +308,7 @@ private fun AgentEditorSheet(
                 onValueChange = { prompt = it.take(12_000) },
                 label = { Text(tx("System prompt")) },
                 placeholder = { Text(tx("Describe the role, style, and boundaries for this agent.")) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("agent-system-prompt"),
                 minLines = 5,
                 maxLines = 10
             )
@@ -406,8 +408,8 @@ private fun AgentEditorSheet(
                         )
                     },
                     enabled = name.isNotBlank() && prompt.isNotBlank(),
-                    modifier = Modifier.weight(1.3f),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
+                    modifier = Modifier.weight(1.3f).testTag("agent-save"),
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccentGreen, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(5.dp))
@@ -458,7 +460,7 @@ private fun AgentToolSwitch(label: String, description: String, checked: Boolean
             checked = checked,
             onCheckedChange = onChange,
             enabled = enabled,
-            colors = SwitchDefaults.colors(checkedTrackColor = AriAccent)
+            colors = SwitchDefaults.colors(checkedTrackColor = AriAccentGreen)
         )
     }
 }
