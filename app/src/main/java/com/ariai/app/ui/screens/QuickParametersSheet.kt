@@ -95,7 +95,7 @@ fun QuickParametersSheet(
                 placeholder = { Text(tx("Optional instructions for this conversation")) },
                 minLines = 3,
                 maxLines = 7,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().testTag("quick-parameters-prompt")
             )
             Text(
                 tx("An empty prompt keeps the selected agent's instructions, if any."),

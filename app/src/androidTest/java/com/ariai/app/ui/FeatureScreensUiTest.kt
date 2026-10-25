@@ -136,7 +136,7 @@ class FeatureScreensUiTest {
             }
         }
 
-        compose.onNodeWithText("Optional instructions for this conversation").performTextInput("Be concise and cite assumptions.")
+        compose.onNodeWithTag("quick-parameters-prompt").performTextInput("Be concise and cite assumptions.")
         compose.onNodeWithTag("quick-parameters-save").performScrollTo().assertIsDisplayed().performClick()
 
         assertEquals("Be concise and cite assumptions.", savedPrompt)
