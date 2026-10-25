@@ -538,8 +538,8 @@ for model_index in 0 1; do
   fi
 done
 
-printf 'completed=%s/%s\nsource_evidence=%s/%s\n' \\
-  "$completed_review_count" "$expected_review_count" \\
+printf 'completed=%s/%s\nsource_evidence=%s/%s\n' \
+  "$completed_review_count" "$expected_review_count" \
   "$verified_review_count" "$expected_review_count" > smoke-out/live-review-count.txt
 if (( completed_review_count != expected_review_count )); then
   echo "::error title=Live GitHub research::Completed $completed_review_count of $expected_review_count independent model reviews."
@@ -551,7 +551,7 @@ if (( verified_review_count != expected_review_count )); then
 fi
 echo "::notice title=Live GitHub research::Completed $completed_review_count independent model reviews; every response cited the target ref and a source file."
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-  printf '\n**Independent reviews completed:** %d/%d. **Responses with target-ref/source evidence:** %d/%d.\n' \\
+  printf '\n**Independent reviews completed:** %d/%d. **Responses with target-ref/source evidence:** %d/%d.\n' \
     "$completed_review_count" "$expected_review_count" "$verified_review_count" "$expected_review_count" >> "$GITHUB_STEP_SUMMARY"
 fi
 
