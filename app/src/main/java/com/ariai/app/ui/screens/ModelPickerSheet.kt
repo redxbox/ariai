@@ -6,10 +6,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -94,12 +99,14 @@ fun ModelPickerSheet(
                 singleLine = true,
                 placeholder = { Text(tx("Search models"), color = Ink.copy(alpha = 0.4f)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.4f)) },
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(50),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = AriCard,
                     unfocusedContainerColor = AriCard,
-                    focusedBorderColor = Accent.copy(alpha = 0.35f),
-                    unfocusedBorderColor = AriInk.copy(alpha = 0.06f)
+                    focusedBorderColor = Accent.copy(alpha = 0.45f),
+                    unfocusedBorderColor = AriLine.copy(alpha = 0.75f),
+                    focusedLabelColor = Accent,
+                    cursorColor = Accent
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -174,13 +181,25 @@ fun ModelPickerSheet(
                 // A single provider is selected: its connection can be checked from here.
                 enabled.firstOrNull { it.id == providerFilter }?.let { ProviderCheckRow(provider = it, check = onCheckProvider) }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    FilterChip(selected = providerFilter == null, onClick = { providerFilter = null }, label = { Text(tx("All")) })
-                    enabled.forEach { p ->
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
+                ) {
+                    item(key = "provider-filter:all") {
                         FilterChip(
-                            selected = providerFilter == p.id,
-                            onClick = { providerFilter = p.id },
-                            label = { Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            selected = providerFilter == null,
+                            onClick = { providerFilter = null },
+                            label = { Text(tx("All")) },
+                            shape = RoundedCornerShape(50)
+                        )
+                    }
+                    items(enabled, key = { provider -> "provider-filter:${provider.id}" }) { provider ->
+                        FilterChip(
+                            selected = providerFilter == provider.id,
+                            onClick = { providerFilter = provider.id },
+                            label = { Text(provider.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            shape = RoundedCornerShape(50)
                         )
                     }
                 }
@@ -223,7 +242,13 @@ private fun ProviderCard(
     onToggle: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    Surface(shape = RoundedCornerShape(16.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
+    val shape = RoundedCornerShape(20.dp)
+    Surface(
+        shape = shape,
+        color = AriCard,
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
+        modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing))
+    ) {
         Column {
             Row(
                 modifier = Modifier
@@ -307,10 +332,19 @@ private fun ModelRow(
     onSelect: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
+    val rowColor by animateColorAsState(
+        targetValue = if (selected) Accent.copy(alpha = 0.10f) else AriCard,
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
+        label = "model-row-selection"
+    )
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) Accent.copy(alpha = 0.10f) else AriCard,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect)
+        shape = RoundedCornerShape(18.dp),
+        color = rowColor,
+        border = BorderStroke(
+            0.75.dp,
+            if (selected) Accent.copy(alpha = 0.22f) else AriLine.copy(alpha = 0.75f)
+        ),
+        modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)).clickable(onClick = onSelect)
     ) {
         Row(
             modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
@@ -333,9 +367,9 @@ private fun ModelRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (model.supportsVision) CapabilityTag(tx("Vision"))
-                    if (model.supportsFunctionCalling) CapabilityTag(tx("Tools"))
-                    if (model.supportsImageGen) CapabilityTag(tx("Image"))
+                    if (model.supportsVision) CapabilityTag(tx("Vision"), AriTagGreenBg, AriTagGreenFg)
+                    if (model.supportsFunctionCalling) CapabilityTag(tx("Tools"), AriTagBlueBg, AriTagBlueFg)
+                    if (model.supportsImageGen) CapabilityTag(tx("Image"), AriTagAmberBg, AriTagAmberFg)
                 }
             }
             if (selected) {
@@ -354,14 +388,14 @@ private fun ModelRow(
 }
 
 @Composable
-private fun CapabilityTag(label: String) {
-    Surface(shape = RoundedCornerShape(6.dp), color = Accent.copy(alpha = 0.08f)) {
+private fun CapabilityTag(label: String, background: Color, foreground: Color) {
+    Surface(shape = RoundedCornerShape(50), color = background) {
         Text(
             label,
-            color = Accent,
+            color = foreground,
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
         )
     }
 }
@@ -377,8 +411,15 @@ private fun ProviderCheckRow(provider: Provider, check: suspend (Provider) -> Co
                 checking = true
                 result = null
                 scope.launch {
-                    result = check(provider)
-                    checking = false
+                    try {
+                        result = check(provider)
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        result = ConnectionResult.Failed(tx("Could not connect"), tx("Check your connection, or the Base URL."))
+                    } finally {
+                        checking = false
+                    }
                 }
             },
             enabled = !checking,
@@ -392,12 +433,12 @@ private fun ProviderCheckRow(provider: Provider, check: suspend (Provider) -> Co
         when (val r = result) {
             is ConnectionResult.Ok -> Text(
                 "${tx("Connected")} · ${r.durationMs} ms · ${r.models} ${tx("models")}",
-                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AriInk
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AriAccentGreen
             )
             is ConnectionResult.Failed -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     r.problem + (r.code?.let { " (HTTP $it)" } ?: ""),
-                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AriAccent
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AriError
                 )
                 Text(r.hint, fontSize = 12.sp, color = AriMuted)
             }

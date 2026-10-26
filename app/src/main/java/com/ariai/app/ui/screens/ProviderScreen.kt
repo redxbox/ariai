@@ -4,6 +4,12 @@ import com.ariai.app.util.tx
 
 import com.ariai.app.ui.theme.*
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,11 +26,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.*
+import com.ariai.app.data.remote.ConnectionResult
+import com.ariai.app.data.remote.checkConnection
 import com.ariai.app.util.LocalStrings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -297,6 +306,7 @@ fun AddProviderScreen(
     fetchModels: suspend (Provider) -> List<AIModel>,
     onSave: (Provider) -> Unit,
     onBack: () -> Unit,
+    onCheckProvider: suspend (Provider) -> ConnectionResult = { provider -> checkConnection(provider, fetchModels) },
     onDelete: (String) -> Unit = {},
     existingProviderNames: Set<String> = emptySet(),
     modifier: Modifier = Modifier
@@ -341,6 +351,9 @@ fun AddProviderScreen(
     val scope = rememberCoroutineScope()
     var fetching by remember { mutableStateOf(false) }
     var fetchError by remember { mutableStateOf<String?>(null) }
+    var showConnectionDialog by remember { mutableStateOf(false) }
+    var checkingConnection by remember { mutableStateOf(false) }
+    var connectionResult by remember { mutableStateOf<ConnectionResult?>(null) }
     // Key of the URL/key/type the models were last fetched for. Save fetches again when it changes.
     fun sourceKey() = "${baseUrl.trim()}|${apiKey.trim()}|$selectedType"
     var fetchedKey by remember {
@@ -359,6 +372,27 @@ fun AddProviderScreen(
         createdAt = initialProvider?.createdAt ?: System.currentTimeMillis(),
         apiKeyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
     )
+    fun runConnectionCheck() {
+        val requestProvider = draftProvider(models)
+        showConnectionDialog = true
+        checkingConnection = true
+        connectionResult = null
+        scope.launch {
+            val result = try {
+                onCheckProvider(requestProvider)
+            } catch (cancelled: CancellationException) {
+                checkingConnection = false
+                throw cancelled
+            } catch (_: Exception) {
+                ConnectionResult.Failed(
+                    problem = tx("Could not connect"),
+                    hint = tx("Check your connection, or the Base URL.")
+                )
+            }
+            connectionResult = result
+            checkingConnection = false
+        }
+    }
     fun fetchAndMerge(
         onDone: (List<AIModel>) -> Unit,
         showModelsWhenFetched: Boolean = false
@@ -407,8 +441,6 @@ fun AddProviderScreen(
     val visibleModels = models.filter {
         modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
     }
-    // Keep Save near the screen edge only for genuinely short model lists.
-    val pinSaveToBottom = tab == 1 && models.size <= 2
     fun saveProviderDraft() {
         if (sourceKey() != fetchedKey) {
             // URL, key or type changed: refresh the models before saving.
@@ -419,6 +451,15 @@ fun AddProviderScreen(
     }
     val modelListState = rememberLazyListState()
     LaunchedEffect(tab) { modelListState.scrollToItem(0) }
+    if (showConnectionDialog) {
+        ProviderConnectionDialog(
+            providerName = name.trim().ifBlank { tx("New provider") },
+            checking = checkingConnection,
+            result = connectionResult,
+            onRetry = { runConnectionCheck() },
+            onDismiss = { showConnectionDialog = false }
+        )
+    }
     if (showAddModel) {
         AddModelSheet(
             providerId = providerId,
@@ -457,15 +498,15 @@ fun AddProviderScreen(
             )
         },
         bottomBar = {
-            if (pinSaveToBottom) {
-                Box(modifier = Modifier.fillMaxWidth().background(AriPaper).navigationBarsPadding().padding(16.dp)) {
-                    ProviderSaveButton(
-                        fetching = fetching,
-                        enabled = canSave && !fetching,
-                        onClick = { saveProviderDraft() }
-                    )
-                }
-            }
+            ProviderActionBar(
+                isEdit = isEdit,
+                fetching = fetching,
+                checkingConnection = checkingConnection,
+                canSave = canSave && !fetching,
+                onSave = { saveProviderDraft() },
+                onCheckConnection = { if (!checkingConnection && !fetching) runConnectionCheck() },
+                onDelete = { confirmDelete = true }
+            )
         }
     ) { padding ->
         Column(modifier = modifier.fillMaxSize().padding(padding)) {
@@ -488,22 +529,27 @@ fun AddProviderScreen(
             }
             LazyColumn(
                 state = modelListState,
-                modifier = Modifier.weight(1f).fillMaxWidth().imePadding(),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (tab == 0) {
-            // Provider type: one pill row, the selected type is solid ink
+            // Provider type: one pill row, the selected type uses the shared slate-blue accent
             item { SectionLabel(tx("Provider")) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     providerPresets.forEach { preset ->
                         val selected = selectedType == preset.type
+                        val optionBackground by animateColorAsState(
+                            targetValue = if (selected) AriAccent else AriCard,
+                            animationSpec = tween(220, easing = FastOutSlowInEasing),
+                            label = "provider-preset-background"
+                        )
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
-                                .background(if (selected) AriAccent else AriCard)
+                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(18.dp))
+                                .background(optionBackground)
                                 .clickable {
                                     selectedType = preset.type
                                     baseUrl = preset.baseUrl
@@ -534,7 +580,13 @@ fun AddProviderScreen(
 
             // Connection
             item {
-                Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = AriCard,
+                    shadowElevation = 0.dp,
+                    border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = name,
@@ -570,7 +622,7 @@ fun AddProviderScreen(
                             },
                             shape = RoundedCornerShape(14.dp),
                             colors = providerFieldColors(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("provider-api-key")
                         )
                         Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
                         if (keyNeedsReentry) {
@@ -594,7 +646,13 @@ fun AddProviderScreen(
 
             // Advanced: collapsed by default. Headers and body are sent to every model of this provider.
             item {
-                Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = AriCard,
+                    shadowElevation = 0.dp,
+                    border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
+                    modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing))
+                ) {
                     Column {
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable { advancedOpen = !advancedOpen }
@@ -633,19 +691,16 @@ fun AddProviderScreen(
                 }
             }
 
-                if (isEdit) {
-                    item {
-                        OutlinedButton(
-                            onClick = { confirmDelete = true },
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth().height(52.dp)
-                        ) { Text(tx("Delete provider"), color = AriAccent, fontWeight = FontWeight.SemiBold) }
-                    }
-                }
             } else {
             // Models: one grouped list. Fetch fills it from the API; rows can be removed.
             item {
-                Surface(shape = RoundedCornerShape(22.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = AriCard,
+                    shadowElevation = 0.dp,
+                    border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
+                    modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing))
+                ) {
                     Column {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 6.dp),
@@ -735,13 +790,87 @@ fun AddProviderScreen(
 
             }
 
-                if (!pinSaveToBottom) {
-                    item {
-                        Spacer(Modifier.height(8.dp))
-                        ProviderSaveButton(
-                            fetching = fetching,
-                            enabled = canSave && !fetching,
-                            onClick = { saveProviderDraft() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderActionBar(
+    isEdit: Boolean,
+    fetching: Boolean,
+    checkingConnection: Boolean,
+    canSave: Boolean,
+    onSave: () -> Unit,
+    onCheckConnection: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.testTag("provider-save-action-bar"),
+            shape = CircleShape,
+            color = AriAccentSoft,
+            shadowElevation = 8.dp,
+            border = BorderStroke(0.75.dp, AriAccent.copy(alpha = 0.12f))
+        ) {
+            Row(
+                modifier = Modifier.padding(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Button(
+                    onClick = onSave,
+                    enabled = canSave,
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White),
+                    modifier = Modifier.height(50.dp).widthIn(min = 132.dp).testTag("provider-save")
+                ) {
+                    if (fetching) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White
+                        )
+                    } else {
+                        Text(tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(20.dp))
+                    }
+                }
+                IconButton(
+                    onClick = onCheckConnection,
+                    enabled = !checkingConnection && !fetching,
+                    modifier = Modifier.size(48.dp).testTag("provider-test-connection")
+                ) {
+                    if (checkingConnection) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = AriAccent)
+                    } else {
+                        Icon(
+                            Icons.Default.NetworkCheck,
+                            contentDescription = tx("Check connection"),
+                            tint = AriAccentDark,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                if (isEdit) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(48.dp).testTag("provider-delete")
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteOutline,
+                            contentDescription = tx("Delete provider"),
+                            tint = AriMuted,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
@@ -751,16 +880,101 @@ fun AddProviderScreen(
 }
 
 @Composable
-private fun ProviderSaveButton(fetching: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White),
-        modifier = Modifier.fillMaxWidth().height(52.dp)
-    ) {
-        Text(if (fetching) tx("Loading models…") else tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-    }
+private fun ProviderConnectionDialog(
+    providerName: String,
+    checking: Boolean,
+    result: ConnectionResult?,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val dialogShape = paperPopupShape(28.dp)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = paperPopupModifier(dialogShape).testTag("provider-connection-dialog"),
+        shape = dialogShape,
+        containerColor = AriTint,
+        tonalElevation = 8.dp,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    modifier = Modifier.size(42.dp).clip(CircleShape).background(AriAccentSoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = AriAccent, modifier = Modifier.size(22.dp))
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(tx("Check connection"), fontWeight = FontWeight.SemiBold, color = AriInk)
+                    Text(providerName, fontSize = 12.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                AnimatedVisibility(visible = checking) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = AriAccent)
+                        Text(tx("Checking…"), color = AriMuted, fontSize = 14.sp)
+                    }
+                }
+                AnimatedVisibility(visible = result != null) {
+                    when (val current = result) {
+                        is ConnectionResult.Ok -> Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = AriAccentGreenSoft,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AriAccentGreen, modifier = Modifier.size(22.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        "${tx("Connected")} · ${current.models} ${tx("models")}",
+                                        color = AriAccentGreen,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp
+                                    )
+                                    Text("${current.durationMs} ms", color = AriMuted, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        is ConnectionResult.Failed -> Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = AriError.copy(alpha = 0.08f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Text(
+                                    current.problem + (current.code?.let { " (HTTP $it)" } ?: ""),
+                                    color = AriError,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp
+                                )
+                                Text(current.hint, color = AriMuted, fontSize = 12.sp)
+                            }
+                        }
+                        null -> Unit
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (result is ConnectionResult.Failed && !checking) {
+                    TextButton(onClick = onRetry) { Text(tx("Retry"), color = AriAccent) }
+                }
+                TextButton(onClick = onDismiss) { Text(tx("Close"), color = AriAccent) }
+            }
+        }
+    )
 }
 
 @Composable
@@ -1061,16 +1275,16 @@ private fun FetchModelsRow(fetching: Boolean, canFetch: Boolean, status: String?
 
 @Composable
 private fun providerFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = AriInk,
+    focusedBorderColor = AriAccent,
     unfocusedBorderColor = AriLine,
-    focusedLabelColor = AriInk,
+    focusedLabelColor = AriAccent,
     unfocusedLabelColor = AriMuted,
-    cursorColor = AriInk,
-    focusedContainerColor = AriPaper,
-    unfocusedContainerColor = AriPaper,
-    errorBorderColor = AriAccent,
-    errorLabelColor = AriAccent,
-    errorSupportingTextColor = AriAccent
+    cursorColor = AriAccent,
+    focusedContainerColor = AriCard,
+    unfocusedContainerColor = AriCard,
+    errorBorderColor = AriError,
+    errorLabelColor = AriError,
+    errorSupportingTextColor = AriError
 )
 
 @Composable
@@ -1089,18 +1303,24 @@ private fun ProviderEditHeader(
     val iconLetter = providerPreset?.label?.firstOrNull()?.uppercase()
         ?: name.trim().firstOrNull()?.uppercase()
         ?: "?"
-    Surface(shape = RoundedCornerShape(20.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = AriCard,
+        shadowElevation = 1.dp,
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(brand),
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(brand.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     iconLetter,
-                    color = AriPaper,
+                    color = brand,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -1127,8 +1347,9 @@ private fun ProviderEditHeader(
                 checked = enabled,
                 onCheckedChange = onToggle,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = AriPaper,
-                    checkedTrackColor = brand,
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = AriAccent,
+                    checkedBorderColor = AriAccent,
                     uncheckedThumbColor = AriMuted,
                     uncheckedTrackColor = AriTint,
                     uncheckedBorderColor = AriLine
@@ -1141,24 +1362,36 @@ private fun ProviderEditHeader(
 @Composable
 private fun SegmentedTabs(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(AriTint).padding(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(50))
+            .background(AriTint)
+            .padding(4.dp)
+            .animateContentSize(tween(220, easing = FastOutSlowInEasing)),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         labels.forEachIndexed { index, label ->
             val isSelected = index == selected
+            val tabColor by animateColorAsState(
+                targetValue = if (isSelected) AriAccent else Color.Transparent,
+                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                label = "provider-tab-background"
+            )
+            val textColor by animateColorAsState(
+                targetValue = if (isSelected) Color.White else AriInk.copy(alpha = 0.72f),
+                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                label = "provider-tab-foreground"
+            )
             Box(
-                modifier = Modifier.weight(1f).clip(RoundedCornerShape(50))
-                    .background(if (isSelected) AriInk else androidx.compose.ui.graphics.Color.Transparent)
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(tabColor)
                     .clickable { onSelect(index) }
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 11.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    label,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = if (isSelected) AriPaper else AriInk
-                )
+                Text(label, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = textColor)
             }
         }
     }

@@ -278,8 +278,8 @@ private fun ChatRowItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) AriTint else Color.Transparent)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) AriAccentSoft else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -381,8 +381,8 @@ private fun ChatRowItem(
 @Composable
 private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-            .background(if (selected) AriTint else Color.Transparent)
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            .background(if (selected) AriAccentSoft else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

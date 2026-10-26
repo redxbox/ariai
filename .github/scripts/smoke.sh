@@ -523,7 +523,13 @@ expect_text "No providers yet"
 # Also verify the direct + route to the provider editor.
 tap "Add provider"
 expect_text "Add provider"
+expect_text "Save"
 shot 38-add-provider-direct
+tap "Check connection"
+wait_for_text "No API key entered" 10
+expect_text "Close"
+shot 38a-provider-connection-dialog
+tap "Close"
 back
 back
 expect_text "Message AriAI"

@@ -1,10 +1,15 @@
 package com.ariai.app.ui
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -19,6 +24,7 @@ import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.TokenUsage
 import com.ariai.app.data.remote.ConnectionResult
+import com.ariai.app.ui.screens.AddProviderScreen
 import com.ariai.app.ui.screens.ChatListScreen
 import com.ariai.app.ui.screens.NewChatScreen
 import com.ariai.app.ui.screens.ModelPickerSheet
@@ -34,6 +40,28 @@ import org.junit.runner.RunWith
 class ProviderAndChatUiTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun lightThemeUsesLavenderPaperWhiteCardsAndSlateBlueAccent() {
+        val colors = mutableStateOf<Triple<Color, Color, Color>?>(null)
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                SideEffect {
+                    colors.value = Triple(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+
+        assertEquals(
+            Triple(Color(0xFFF3F2F8), Color(0xFFF8F7FD), Color(0xFF4D6090)),
+            colors.value
+        )
+    }
 
     @Test
     fun providerCanBeDisabledAndChatCanBeOpenedWithoutNetwork() {
@@ -89,6 +117,43 @@ class ProviderAndChatUiTest {
         compose.onNodeWithText(chat.title).assertExists().performClick()
         compose.waitForIdle()
         assertEquals(chat.id, openedChatId)
+    }
+
+    @Test
+    fun providerEditorKeepsFloatingActionsReachableAndShowsConnectionDialogResult() {
+        var savedProvider: Provider? = null
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                AddProviderScreen(
+                    presetType = ProviderType.OPENAI,
+                    fetchModels = { listOf(AIModel("mock-model", "Mock model", "provider-editor-test")) },
+                    onSave = { savedProvider = it },
+                    onBack = {},
+                    onCheckProvider = { ConnectionResult.Ok(models = 1, durationMs = 12) }
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        val actionBar = compose.onNodeWithTag("provider-save-action-bar")
+            .assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        val rootBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("provider actions should stay clear of the screen edge", actionBar.bottom < rootBottom)
+
+        compose.onNodeWithTag("provider-test-connection").assertIsDisplayed().performClick()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithText("Connected", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("provider-connection-dialog").assertIsDisplayed()
+        compose.onNodeWithText("Connected", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithTag("provider-connection-dialog").assertDoesNotExist()
+
+        compose.onNodeWithTag("provider-save").assertIsDisplayed().performClick()
+        compose.waitUntil(timeoutMillis = 5_000) { savedProvider != null }
+        assertEquals("OpenAI", savedProvider?.name)
     }
 
     @Test

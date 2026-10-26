@@ -3,41 +3,66 @@ package com.ariai.app.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
-// Calm blue/green controls sit over bright neutral surfaces in the light theme and charcoal in dark mode.
 private val DarkColorScheme = darkColorScheme(
     primary = AriAccentLight,
-    onPrimary = Color(0xFF17233C),
-    secondary = Color(0xFF9FD4C9),
-    tertiary = AriAccentGreen,
+    onPrimary = Color(0xFF1B2743),
+    primaryContainer = Color(0xFF35476E),
+    onPrimaryContainer = Color(0xFFE0E7FA),
+    secondary = Color(0xFFA7DDAF),
+    onSecondary = Color(0xFF18331F),
+    secondaryContainer = Color(0xFF2E4935),
+    onSecondaryContainer = Color(0xFFC4EAC9),
+    tertiary = AriAccentLight,
     background = DarkAriPalette.paper,
-    surface = DarkAriPalette.paper,
+    surface = DarkAriPalette.card,
     surfaceVariant = DarkAriPalette.tint,
     onBackground = DarkAriPalette.ink,
     onSurface = DarkAriPalette.ink,
-    outline = DarkAriPalette.line
+    onSurfaceVariant = DarkAriPalette.muted,
+    outline = DarkAriPalette.line,
+    outlineVariant = DarkAriPalette.fold,
+    error = Color(0xFFFFB4AB)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = AriAccent,
     onPrimary = Color.White,
+    primaryContainer = AriAccentSoft,
+    onPrimaryContainer = AriAccentDark,
     secondary = AriAccentGreen,
+    onSecondary = Color.White,
+    secondaryContainer = AriAccentGreenSoft,
+    onSecondaryContainer = Color(0xFF315D3D),
     tertiary = AriAccent,
     background = LightAriPalette.paper,
-    surface = LightAriPalette.paper,
+    surface = LightAriPalette.card,
     surfaceVariant = LightAriPalette.tint,
     onBackground = LightAriPalette.ink,
     onSurface = LightAriPalette.ink,
-    outline = LightAriPalette.line
+    onSurfaceVariant = LightAriPalette.muted,
+    outline = LightAriPalette.line,
+    outlineVariant = LightAriPalette.fold,
+    error = AriError
+)
+
+private val AriShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(30.dp)
 )
 
 @Composable
@@ -55,14 +80,16 @@ fun AriAiTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
-    // Keep AriAI's quiet paper surfaces while taking only Material You's accent colors.
+    // Dynamic accents remain user-controlled, while AriAI keeps its lavender paper/card contrast.
     val colorScheme = baseScheme.copy(
         background = palette.paper,
-        surface = palette.paper,
+        surface = palette.card,
         surfaceVariant = palette.tint,
         onBackground = palette.ink,
         onSurface = palette.ink,
-        outline = palette.line
+        onSurfaceVariant = palette.muted,
+        outline = palette.line,
+        outlineVariant = palette.fold
     )
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -79,6 +106,7 @@ fun AriAiTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,
+            shapes = AriShapes,
             content = content
         )
     }

@@ -62,7 +62,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -515,8 +514,8 @@ fun NewChatScreen(
                 title = {
                     val statusColor = when {
                         checkingConnection -> AriAccent
-                        connectionResult is ConnectionResult.Ok -> Color(0xFF37865B)
-                        connectionResult is ConnectionResult.Failed -> Color(0xFFC44949)
+                        connectionResult is ConnectionResult.Ok -> AriAccentGreen
+                        connectionResult is ConnectionResult.Failed -> AriError
                         else -> Muted.copy(alpha = 0.55f)
                     }
                     ProviderModelTitle(
@@ -658,13 +657,20 @@ fun NewChatScreen(
                     }
                 }
 
+                val composerShape = RoundedCornerShape(26.dp)
                 Surface(
-                    shape = RoundedCornerShape(26.dp),
+                    shape = composerShape,
                     color = AriCard,
-                    shadowElevation = 3.dp,
-                    modifier = Modifier.fillMaxWidth().border(1.dp, AriLine, RoundedCornerShape(26.dp))
+                    shadowElevation = 2.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize(tween(220, easing = FastOutSlowInEasing))
+                        .border(1.dp, AriLine.copy(alpha = 0.9f), composerShape)
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                            .animateContentSize(tween(220, easing = FastOutSlowInEasing))
+                    ) {
                         // Long messages get an expand button that opens a full-screen editor.
                         if (inputText.length > 120 || inputText.contains('\n')) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -770,43 +776,31 @@ fun NewChatScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(if (compactWelcome) 6.dp else 10.dp)
                 ) {
-                    val orbSize = if (compactWelcome) 76.dp else 108.dp
-                    Box(modifier = Modifier.size(orbSize), contentAlignment = Alignment.Center) {
-                        Box(
-                            modifier = Modifier.size(if (compactWelcome) 72.dp else 104.dp).clip(CircleShape)
-                                .background(Brush.radialGradient(listOf(AriAccent.copy(alpha = 0.18f), Color.Transparent)))
+                    Box(
+                        modifier = Modifier.size(if (compactWelcome) 38.dp else 48.dp)
+                            .clip(CircleShape)
+                            .background(AriAccentSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = AriAccentDark,
+                            modifier = Modifier.size(if (compactWelcome) 18.dp else 22.dp)
                         )
-                        Box(
-                            modifier = Modifier.size(if (compactWelcome) 56.dp else 72.dp).clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(if (compactWelcome) 24.dp else 30.dp)
-                            )
-                        }
-                        if (!compactWelcome) {
-                            Box(
-                                modifier = Modifier.align(Alignment.TopEnd).offset(x = (-12).dp, y = 9.dp)
-                                    .size(13.dp).clip(CircleShape).background(AriAccentLight)
-                            )
-                        }
                     }
                     Text(
                         "AriAI",
-                        color = AriAccent,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = if (compactWelcome) 11.sp else 12.sp,
-                        letterSpacing = 1.8.sp
+                        color = Muted,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.2.sp
                     )
                     Text(
                         tx("How can I help you?"),
                         color = Ink,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = if (compactWelcome) 18.sp else 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = if (compactWelcome) 17.sp else 19.sp,
                         textAlign = TextAlign.Center
                     )
                     if (!compactWelcome) {
@@ -923,26 +917,31 @@ private fun ProviderModelTitle(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(30.dp).clip(CircleShape)
-                .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
+            modifier = Modifier.size(30.dp).clip(CircleShape).background(AriAccentSoft),
             contentAlignment = Alignment.Center
         ) {
-            Text(providerName.firstOrNull()?.uppercase() ?: "A", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(providerName.firstOrNull()?.uppercase() ?: "A", color = AriAccentDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
         Spacer(Modifier.width(8.dp))
-        Column(modifier = Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                chatTitle,
+                color = Ink,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 15.sp
+            )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
                     "$providerName · $modelName",
-                    color = Ink,
-                    fontWeight = FontWeight.SemiBold,
+                    color = Muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    fontSize = 13.sp
+                    fontSize = 10.sp
                 )
-                Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
+                Box(Modifier.size(6.dp).clip(CircleShape).background(statusColor))
             }
-            Text(chatTitle, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -963,7 +962,7 @@ private fun ContextUsageIndicator(
             progress = fraction,
             modifier = Modifier.size(28.dp),
             strokeWidth = 2.5.dp,
-            color = if (fraction >= 0.9f) Color(0xFFC44949) else AriAccent,
+            color = if (fraction >= 0.9f) AriError else AriAccent,
             trackColor = AriTint
         )
         Text(
@@ -979,8 +978,8 @@ private fun ContextUsageIndicator(
 private fun ModelChip(text: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = AriTint
+        shape = RoundedCornerShape(50),
+        color = AriAccentSoft
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -1274,13 +1273,24 @@ private fun ActionIcon(icon: ImageVector, description: String, onClick: () -> Un
 
 @Composable
 private fun IconCircle(icon: ImageVector, description: String, active: Boolean, onClick: () -> Unit) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (active) AriAccentSoft else AriTint,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "composer-action-background"
+    )
+    val iconColor by animateColorAsState(
+        targetValue = if (active) Accent else Ink.copy(alpha = 0.7f),
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "composer-action-foreground"
+    )
     Box(
         modifier = Modifier.size(36.dp).clip(CircleShape)
-            .background(if (active) Accent.copy(alpha = 0.14f) else AriTint)
+            .background(backgroundColor)
+            .animateContentSize(tween(180, easing = FastOutSlowInEasing))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = description, tint = if (active) Accent else Ink.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = description, tint = iconColor, modifier = Modifier.size(20.dp))
     }
 }
 

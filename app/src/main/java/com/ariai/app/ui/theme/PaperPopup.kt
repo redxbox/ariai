@@ -13,34 +13,36 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 private val DEFAULT_PAPER_FOLD_SIZE = 12.dp
 
-/** Standard rounded surface; [foldSize] remains for source compatibility with older call sites. */
+/** Shared rounded geometry for menus and centered dialogs. */
 fun paperPopupShape(
     cornerRadius: Dp,
     @Suppress("UNUSED_PARAMETER") foldSize: Dp = DEFAULT_PAPER_FOLD_SIZE
 ): Shape = RoundedCornerShape(cornerRadius)
 
-/** Rounded top corners without decorative cut-outs, matching the rest of the light interface. */
+/** Large, soft top corners make sheets read as floating surfaces rather than hard panels. */
 fun paperSheetShape(
     cornerRadius: Dp,
     @Suppress("UNUSED_PARAMETER") foldSize: Dp = DEFAULT_PAPER_FOLD_SIZE
 ): Shape = RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)
 
-/** A restrained outline for menus/dialogs; no clipped corner or paper-fold overlay. */
+/** A hairline outline keeps light dialogs distinct from the lavender page behind them. */
 @Composable
 fun paperPopupModifier(
     shape: Shape,
     @Suppress("UNUSED_PARAMETER") foldSize: Dp = DEFAULT_PAPER_FOLD_SIZE
-): Modifier = Modifier.border(BorderStroke(1.dp, AriLine), shape)
+): Modifier = Modifier.border(BorderStroke(0.75.dp, AriLine.copy(alpha = 0.9f)), shape)
 
 /**
- * Shared modal sheet with a conventional drag handle and explicit system-bar/keyboard clearance.
- * The insets are consumed here so sheet actions remain reachable above Android navigation.
+ * Shared modal sheet with a conventional drag handle, soft scrim, and explicit system-bar/keyboard
+ * clearance. The Material sheet supplies its spring-driven slide/dismiss motion; this wrapper keeps
+ * every sheet on the same surface, edge, and safe-area treatment.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,9 +54,11 @@ fun PaperBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         shape = shape,
+        modifier = Modifier.border(BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)), shape),
         containerColor = AriCard,
         contentColor = AriInk,
         tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = 0.34f),
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(

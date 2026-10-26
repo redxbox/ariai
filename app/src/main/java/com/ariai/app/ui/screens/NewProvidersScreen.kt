@@ -7,6 +7,10 @@ import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -143,14 +147,14 @@ fun NewProvidersScreen(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text(tx("Search providers"), color = Ink.copy(alpha = 0.45f)) },
-                    trailingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.5f)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriAccent) },
                     singleLine = true,
                     shape = RoundedCornerShape(50),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Ink.copy(alpha = 0.35f),
-                        unfocusedBorderColor = Ink.copy(alpha = 0.2f),
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent
+                        focusedBorderColor = AriAccent.copy(alpha = 0.45f),
+                        unfocusedBorderColor = AriLine.copy(alpha = 0.7f),
+                        focusedContainerColor = AriCard,
+                        unfocusedContainerColor = AriCard
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -212,41 +216,55 @@ private fun SectionTitle(text: String) {
 }
 
 /**
- * One provider per row: a solid monogram, the host, a live status line and the switch.
- * Black and white with the single accent used only for the "on" state.
+ * Rounded provider card with a soft brand monogram, compact metadata chips, and a stable enable switch.
  */
 @Composable
 private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -> Unit) {
     val host = remember(provider.baseUrl) {
         provider.baseUrl.trim().removePrefix("https://").removePrefix("http://").substringBefore('/')
     }
-    val shape = RoundedCornerShape(18.dp)
+    val brand = providerBrandColor(provider.type)
+    val avatarBackground by animateColorAsState(
+        targetValue = if (provider.enabled) brand.copy(alpha = 0.14f) else AriTint,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "provider-avatar-background"
+    )
+    val statusBackground = if (provider.enabled) AriTagGreenBg else AriTint
+    val statusForeground = if (provider.enabled) AriTagGreenFg else AriMuted
+    val shape = RoundedCornerShape(24.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth().clip(shape).clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(tween(220, easing = FastOutSlowInEasing))
+            .clip(shape)
+            .clickable(onClick = onClick)
+            .testTag("provider-card-${provider.id}"),
         shape = shape,
         color = AriCard,
         tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        border = BorderStroke(0.5.dp, AriLine)
+        shadowElevation = 1.dp,
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f))
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
-                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(14.dp))
-                    .background(if (provider.enabled) AriInk else AriTint),
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(avatarBackground),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     provider.name.firstOrNull()?.uppercase() ?: "P",
-                    color = if (provider.enabled) AriPaper else AriMuted,
+                    color = if (provider.enabled) brand else AriMuted,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
                 Text(
                     provider.name,
                     fontWeight = FontWeight.SemiBold,
@@ -262,22 +280,19 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(
-                        modifier = Modifier.size(7.dp).clip(CircleShape)
-                            .background(if (provider.enabled) AriAccent else AriLine)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    MiniChip(
+                        text = if (provider.models.isEmpty()) tx("No models") else "${provider.models.size} ${tx("models")}",
+                        bg = AriTagBlueBg,
+                        fg = AriTagBlueFg
                     )
-                    Text(
-                        if (provider.enabled) tx("Active") else tx("Turned off"),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (provider.enabled) AriAccent else AriMuted
-                    )
-                    Text("·", fontSize = 12.sp, color = AriMuted)
-                    Text(
-                        if (provider.models.isEmpty()) tx("No models") else "${provider.models.size} ${tx("models")}",
-                        fontSize = 12.sp,
-                        color = AriMuted
+                    MiniChip(
+                        text = if (provider.enabled) tx("Active") else tx("Turned off"),
+                        bg = statusBackground,
+                        fg = statusForeground
                     )
                 }
             }
@@ -286,9 +301,9 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
                 checked = provider.enabled,
                 onCheckedChange = { onToggle() },
                 colors = SwitchDefaults.colors(
-                    checkedTrackColor = AriInk,
-                    checkedThumbColor = AriPaper,
-                    checkedBorderColor = AriInk,
+                    checkedTrackColor = AriAccentGreen.copy(alpha = 0.42f),
+                    checkedThumbColor = AriAccentGreen,
+                    checkedBorderColor = AriAccentGreen,
                     uncheckedTrackColor = AriTint,
                     uncheckedThumbColor = AriMuted,
                     uncheckedBorderColor = AriLine

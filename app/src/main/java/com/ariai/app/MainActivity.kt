@@ -13,6 +13,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.*
@@ -166,10 +167,13 @@ fun AppRoot(viewModel: AppViewModel) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = true,
+        scrimColor = Color.Black.copy(alpha = 0.34f),
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = AriPaper,
+                drawerShape = RoundedCornerShape(topEnd = 30.dp, bottomEnd = 30.dp),
+                drawerContainerColor = AriCard,
                 drawerContentColor = AriInk,
+                drawerTonalElevation = 0.dp,
                 modifier = Modifier.width(312.dp)
             ) {
                 AppDrawerContent(
