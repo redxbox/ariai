@@ -111,6 +111,7 @@ fun ModelPickerSheet(
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,
+        skipPartiallyExpanded = true
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
@@ -145,7 +146,7 @@ fun ModelPickerSheet(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 300.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 360.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (providerFilter == null && favoriteEntries.isNotEmpty()) {

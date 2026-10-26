@@ -49,10 +49,15 @@ fun paperPopupModifier(
 fun PaperBottomSheet(
     onDismissRequest: () -> Unit,
     shape: Shape,
+    skipPartiallyExpanded: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(
+        skipPartiallyExpanded = skipPartiallyExpanded
+    )
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
         shape = shape,
         modifier = Modifier.border(BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)), shape),
         containerColor = AriCard,
