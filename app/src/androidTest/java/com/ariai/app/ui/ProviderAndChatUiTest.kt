@@ -4,14 +4,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -46,11 +47,12 @@ class ProviderAndChatUiTest {
         val colors = mutableStateOf<Triple<Color, Color, Color>?>(null)
         compose.setContent {
             AriAiTheme(darkTheme = false) {
+                val colorScheme = MaterialTheme.colorScheme
                 SideEffect {
                     colors.value = Triple(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surface,
-                        MaterialTheme.colorScheme.primary
+                        colorScheme.background,
+                        colorScheme.surface,
+                        colorScheme.primary
                     )
                 }
             }
@@ -149,7 +151,9 @@ class ProviderAndChatUiTest {
         compose.onNodeWithTag("provider-connection-dialog").assertIsDisplayed()
         compose.onNodeWithText("Connected", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Close").performClick()
-        compose.onNodeWithTag("provider-connection-dialog").assertDoesNotExist()
+        assertTrue(
+            compose.onAllNodesWithTag("provider-connection-dialog").fetchSemanticsNodes().isEmpty()
+        )
 
         compose.onNodeWithTag("provider-save").assertIsDisplayed().performClick()
         compose.waitUntil(timeoutMillis = 5_000) { savedProvider != null }
