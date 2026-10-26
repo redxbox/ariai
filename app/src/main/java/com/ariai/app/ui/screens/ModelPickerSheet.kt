@@ -34,10 +34,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.favoriteKey
 import com.ariai.app.data.remote.ConnectionResult
+import com.ariai.app.ui.components.ProviderBrandMark
+import com.ariai.app.ui.components.providerBrandColor
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.rememberCoroutineScope
@@ -56,6 +59,7 @@ fun ModelPickerSheet(
     selectedProviderId: String?,
     selectedModelId: String?,
     favorites: Set<String>,
+    modelUsageCounts: Map<Pair<String, String>, Int> = emptyMap(),
     onToggleFavorite: (providerId: String, modelId: String) -> Unit,
     onSelect: (providerId: String, modelId: String) -> Unit,
     onAddProvider: () -> Unit,
@@ -64,9 +68,13 @@ fun ModelPickerSheet(
     onDismiss: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    var providerFilter by remember { mutableStateOf<String?>(null) }
-    // Provider ids whose full model list is open. Closed sections show only their top model.
+    var providerFilter by remember(selectedProviderId, providers) {
+        mutableStateOf(
+            selectedProviderId?.takeIf { id -> providers.any { it.id == id && it.enabled && it.models.isNotEmpty() } }
+        )
+    }
     var expandedProviders by remember { mutableStateOf(setOf<String>()) }
+    var favoritesExpanded by remember { mutableStateOf(false) }
 
     val enabled = providers.filter { it.enabled && it.models.isNotEmpty() }
 
@@ -76,12 +84,27 @@ fun ModelPickerSheet(
             model.id.contains(query, true) ||
             provider.name.contains(query, true)
 
-    val favoriteEntries = enabled.flatMap { p ->
-        p.models.filter { favorites.contains(favoriteKey(p.id, it.id)) && matches(p, it) }.map { p to it }
-    }
+    fun rankedModels(provider: Provider, models: List<AIModel>): List<AIModel> = models.withIndex()
+        .sortedWith(
+            compareByDescending<IndexedValue<AIModel>> { modelUsageCounts[provider.id to it.value.id] ?: 0 }
+                .thenByDescending { favorites.contains(favoriteKey(provider.id, it.value.id)) }
+                .thenByDescending { isSelectedModel(provider.id, it.value.id, selectedProviderId, selectedModelId) }
+                .thenBy { it.index }
+        )
+        .map { it.value }
+
+    val allFavoriteEntries = enabled.flatMap { provider ->
+        rankedModels(provider, provider.models)
+            .filter { favorites.contains(favoriteKey(provider.id, it.id)) && matches(provider, it) }
+            .map { provider to it }
+    }.sortedWith(
+        compareByDescending<Pair<Provider, AIModel>> { modelUsageCounts[it.first.id to it.second.id] ?: 0 }
+            .thenByDescending { isSelectedModel(it.first.id, it.second.id, selectedProviderId, selectedModelId) }
+    )
+    val favoriteEntries = if (query.isNotBlank() || favoritesExpanded) allFavoriteEntries else allFavoriteEntries.take(3)
     val sections = enabled
         .filter { providerFilter == null || it.id == providerFilter }
-        .map { p -> p to p.models.filter { matches(p, it) } }
+        .map { provider -> provider to rankedModels(provider, provider.models).filter { matches(provider, it) } }
         .filter { it.second.isNotEmpty() }
 
     val sheetShape = paperSheetShape(28.dp)
@@ -90,8 +113,8 @@ fun ModelPickerSheet(
         shape = sheetShape,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             OutlinedTextField(
                 value = query,
@@ -122,87 +145,83 @@ fun ModelPickerSheet(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (providerFilter == null && favoriteEntries.isNotEmpty()) {
                         item(key = "h_favorites") { SectionTitle(tx("Favorites")) }
-                        items(favoriteEntries, key = { (p, m) -> "fav_${p.id}_${m.id}" }) { (p, m) ->
+                        items(favoriteEntries, key = { (provider, model) -> "fav_${provider.id}_${model.id}" }) { (provider, model) ->
                             ModelRow(
-                                model = m,
-                                selected = isSelectedModel(p.id, m.id, selectedProviderId, selectedModelId),
-                                favorite = true,
-                                onSelect = { onSelect(p.id, m.id); onDismiss() },
-                                onToggleFavorite = { onToggleFavorite(p.id, m.id) }
-                            )
-                        }
-                    }
-                    sections.forEach { (provider, allModels) ->
-                        // While searching, show every match so nothing is hidden.
-                        val isOpen = query.isNotBlank() || expandedProviders.contains(provider.id)
-                        val shown = if (isOpen) allModels else allModels.take(1)
-                        val canToggle = query.isBlank() && allModels.size > 1
-                        val onToggle: () -> Unit = {
-                            expandedProviders = if (isOpen) expandedProviders - provider.id else expandedProviders + provider.id
-                        }
-                        val first = shown.firstOrNull()
-                        // The provider name, count and arrow sit inside the card of the first model.
-                        item(key = "h_${provider.id}") {
-                            ProviderCard(
-                                name = provider.name,
-                                count = allModels.size,
-                                open = isOpen,
-                                canToggle = canToggle,
-                                onToggle = onToggle
-                            ) {
-                                if (first != null) {
-                                    ModelRow(
-                                        model = first,
-                                        selected = isSelectedModel(provider.id, first.id, selectedProviderId, selectedModelId),
-                                        favorite = favorites.contains(favoriteKey(provider.id, first.id)),
-                                        onSelect = { onSelect(provider.id, first.id); onDismiss() },
-                                        onToggleFavorite = { onToggleFavorite(provider.id, first.id) }
-                                    )
-                                }
-                            }
-                        }
-                        items(shown.drop(1), key = { m -> "${provider.id}_${m.id}" }) { model ->
-                            ModelRow(
+                                provider = provider,
                                 model = model,
                                 selected = isSelectedModel(provider.id, model.id, selectedProviderId, selectedModelId),
-                                favorite = favorites.contains(favoriteKey(provider.id, model.id)),
+                                favorite = true,
+                                usageCount = modelUsageCounts[provider.id to model.id] ?: 0,
                                 onSelect = { onSelect(provider.id, model.id); onDismiss() },
                                 onToggleFavorite = { onToggleFavorite(provider.id, model.id) }
                             )
                         }
+                        if (query.isBlank() && allFavoriteEntries.size > 3) {
+                            item(key = "favorites-expand") {
+                                ExpandModelsButton(
+                                    expanded = favoritesExpanded,
+                                    count = allFavoriteEntries.size,
+                                    testTag = "model-picker-expand-favorites",
+                                    onClick = { favoritesExpanded = !favoritesExpanded }
+                                )
+                            }
+                        }
+                    }
+
+                    sections.forEach { (provider, allModels) ->
+                        // Searching intentionally bypasses the compact preview so no match is hidden.
+                        val expanded = query.isNotBlank() || expandedProviders.contains(provider.id)
+                        val shown = if (expanded) allModels else allModels.take(3)
+                        item(key = "h_${provider.id}") {
+                            ProviderSectionHeader(
+                                provider = provider,
+                                count = allModels.size,
+                                selected = provider.id == selectedProviderId
+                            )
+                        }
+                        items(shown, key = { model -> "${provider.id}_${model.id}" }) { model ->
+                            ModelRow(
+                                provider = provider,
+                                model = model,
+                                selected = isSelectedModel(provider.id, model.id, selectedProviderId, selectedModelId),
+                                favorite = favorites.contains(favoriteKey(provider.id, model.id)),
+                                usageCount = modelUsageCounts[provider.id to model.id] ?: 0,
+                                onSelect = { onSelect(provider.id, model.id); onDismiss() },
+                                onToggleFavorite = { onToggleFavorite(provider.id, model.id) }
+                            )
+                        }
+                        if (query.isBlank() && allModels.size > 3) {
+                            item(key = "expand_${provider.id}") {
+                                ExpandModelsButton(
+                                    expanded = expanded,
+                                    count = allModels.size,
+                                    testTag = "model-picker-expand-${provider.id}",
+                                    onClick = {
+                                        expandedProviders = if (expanded) {
+                                            expandedProviders - provider.id
+                                        } else {
+                                            expandedProviders + provider.id
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 
-                // A single provider is selected: its connection can be checked from here.
-                enabled.firstOrNull { it.id == providerFilter }?.let { ProviderCheckRow(provider = it, check = onCheckProvider) }
-
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    item(key = "provider-filter:all") {
-                        FilterChip(
-                            selected = providerFilter == null,
-                            onClick = { providerFilter = null },
-                            label = { Text(tx("All")) },
-                            shape = RoundedCornerShape(50)
-                        )
-                    }
-                    items(enabled, key = { provider -> "provider-filter:${provider.id}" }) { provider ->
-                        FilterChip(
-                            selected = providerFilter == provider.id,
-                            onClick = { providerFilter = provider.id },
-                            label = { Text(provider.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            shape = RoundedCornerShape(50)
-                        )
-                    }
+                enabled.firstOrNull { it.id == providerFilter }?.let { provider ->
+                    ProviderCheckRow(provider = provider, check = onCheckProvider)
                 }
+                ProviderDock(
+                    providers = enabled,
+                    selectedProviderId = providerFilter,
+                    onSelect = { providerFilter = it }
+                )
             }
 
             Row(
@@ -234,81 +253,128 @@ fun ModelPickerSheet(
 }
 
 @Composable
-private fun ProviderCard(
-    name: String,
-    count: Int,
-    open: Boolean,
-    canToggle: Boolean,
-    onToggle: () -> Unit,
-    content: @Composable () -> Unit
-) {
-    val shape = RoundedCornerShape(20.dp)
-    Surface(
-        shape = shape,
-        color = AriCard,
-        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
-        modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing))
+private fun ProviderSectionHeader(provider: Provider, count: Int, selected: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(if (canToggle) Modifier.clickable(onClick = onToggle) else Modifier)
-                    .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    name,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Ink.copy(alpha = 0.5f),
-                    modifier = Modifier.weight(1f)
-                )
-                if (canToggle) {
-                    Text("$count", fontSize = 12.sp, color = Ink.copy(alpha = 0.4f))
-                    Icon(
-                        if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (open) tx("Collapse") else tx("Expand"),
-                        tint = Ink.copy(alpha = 0.5f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-            content()
+        ProviderBrandMark(provider = provider, size = 28.dp)
+        Spacer(Modifier.width(9.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(provider.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+            Text("$count ${tx("models")}", fontSize = 10.sp, color = Ink.copy(alpha = 0.48f))
+        }
+        Spacer(Modifier.weight(1f))
+        if (selected) {
+            Text(tx("Selected"), fontSize = 10.sp, fontWeight = FontWeight.Medium, color = AriAccent)
         }
     }
 }
 
 @Composable
-private fun ProviderHeader(
-    name: String,
+private fun ExpandModelsButton(
+    expanded: Boolean,
     count: Int,
-    open: Boolean,
-    canToggle: Boolean,
-    onToggle: () -> Unit
+    testTag: String,
+    onClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = canToggle, onClick = onToggle)
-            .padding(top = 8.dp, start = 4.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(42.dp).testTag(testTag),
+        shape = RoundedCornerShape(15.dp),
+        colors = ButtonDefaults.textButtonColors(contentColor = AriAccent)
     ) {
-        Text(
-            name,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Ink.copy(alpha = 0.5f),
-            modifier = Modifier.weight(1f)
+        Icon(
+            if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            modifier = Modifier.size(19.dp)
         )
-        if (canToggle) {
-            Text("$count", fontSize = 12.sp, color = Ink.copy(alpha = 0.4f))
-            Icon(
-                if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (open) tx("Collapse") else tx("Expand"),
-                tint = Ink.copy(alpha = 0.5f),
-                modifier = Modifier.size(20.dp)
-            )
+        Spacer(Modifier.width(5.dp))
+        Text(if (expanded) tx("Show less") else "${tx("Show all")} $count", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun ProviderDock(
+    providers: List<Provider>,
+    selectedProviderId: String?,
+    onSelect: (String?) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = Color.White.copy(alpha = 0.68f),
+        shadowElevation = 5.dp,
+        border = BorderStroke(0.8.dp, AriLine.copy(alpha = 0.85f)),
+        modifier = Modifier.fillMaxWidth().testTag("model-picker-provider-dock")
+    ) {
+        Column(modifier = Modifier.padding(top = 8.dp, bottom = 6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(tx("Providers"), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = AriMuted)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    providers.firstOrNull { it.id == selectedProviderId }?.name ?: tx("All"),
+                    fontSize = 10.sp,
+                    color = AriAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                item(key = "provider-filter:all") {
+                    ProviderFilterButton(
+                        provider = null,
+                        label = tx("All"),
+                        selected = selectedProviderId == null,
+                        tag = "provider-filter-all",
+                        onClick = { onSelect(null) }
+                    )
+                }
+                items(providers, key = { provider -> "provider-filter:${provider.id}" }) { provider ->
+                    ProviderFilterButton(
+                        provider = provider,
+                        label = provider.name,
+                        selected = selectedProviderId == provider.id,
+                        tag = "provider-filter-${provider.id}",
+                        onClick = { onSelect(provider.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderFilterButton(
+    provider: Provider?,
+    label: String,
+    selected: Boolean,
+    tag: String,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(15.dp)
+    val providerColor = providerBrandColor(provider)
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = if (selected) providerColor.copy(alpha = 0.13f) else Color.White.copy(alpha = 0.62f),
+        border = BorderStroke(1.dp, if (selected) providerColor.copy(alpha = 0.32f) else AriLine.copy(alpha = 0.8f)),
+        modifier = Modifier.height(38.dp).testTag(tag)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            ProviderBrandMark(provider = provider, size = 23.dp)
+            Text(label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (selected) providerColor else Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -326,34 +392,41 @@ private fun SectionTitle(text: String) {
 
 @Composable
 private fun ModelRow(
+    provider: Provider,
     model: AIModel,
     selected: Boolean,
     favorite: Boolean,
+    usageCount: Int,
     onSelect: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
     val rowColor by animateColorAsState(
-        targetValue = if (selected) Accent.copy(alpha = 0.10f) else AriCard,
+        targetValue = if (selected) AriAccentSoft.copy(alpha = 0.82f) else providerBrandColor(provider).copy(alpha = 0.075f),
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "model-row-selection"
     )
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(19.dp),
         color = rowColor,
         border = BorderStroke(
-            0.75.dp,
-            if (selected) Accent.copy(alpha = 0.22f) else AriLine.copy(alpha = 0.75f)
+            0.8.dp,
+            if (selected) Accent.copy(alpha = 0.25f) else AriLine.copy(alpha = 0.72f)
         ),
-        modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)).clickable(onClick = onSelect)
+        modifier = Modifier.fillMaxWidth()
+            .animateContentSize(tween(200, easing = FastOutSlowInEasing))
+            .clickable(onClick = onSelect)
+            .testTag("model-row-${provider.id}-${model.id}")
     ) {
         Row(
-            modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            ProviderBrandMark(provider = provider, size = 40.dp)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     model.displayName,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                     color = if (selected) Accent else Ink,
                     fontSize = 14.sp,
                     maxLines = 1,
@@ -361,15 +434,16 @@ private fun ModelRow(
                 )
                 Text(
                     model.id,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     color = Ink.copy(alpha = 0.45f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (model.supportsVision) CapabilityTag(tx("Vision"), AriTagGreenBg, AriTagGreenFg)
                     if (model.supportsFunctionCalling) CapabilityTag(tx("Tools"), AriTagBlueBg, AriTagBlueFg)
                     if (model.supportsImageGen) CapabilityTag(tx("Image"), AriTagAmberBg, AriTagAmberFg)
+                    if (usageCount > 0) CapabilityTag("${usageCount}×", AriAccentSoft, AriAccentDark)
                 }
             }
             if (selected) {

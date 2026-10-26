@@ -60,7 +60,7 @@ class ProviderAndChatUiTest {
         compose.waitForIdle()
 
         assertEquals(
-            Triple(Color(0xFFF3F2F8), Color(0xFFF8F7FD), Color(0xFF4D6090)),
+            Triple(Color(0xFFF7F6FC), Color(0xFFFCFBFF), Color(0xFF4D6090)),
             colors.value
         )
     }
@@ -124,6 +124,7 @@ class ProviderAndChatUiTest {
     @Test
     fun providerEditorKeepsFloatingActionsReachableAndShowsConnectionDialogResult() {
         var savedProvider: Provider? = null
+        var connectionRequests = 0
 
         compose.setContent {
             AriAiTheme(darkTheme = false) {
@@ -132,7 +133,10 @@ class ProviderAndChatUiTest {
                     fetchModels = { listOf(AIModel("mock-model", "Mock model", "provider-editor-test")) },
                     onSave = { savedProvider = it },
                     onBack = {},
-                    onCheckProvider = { ConnectionResult.Ok(models = 1, durationMs = 12) }
+                    onCheckProvider = {
+                        connectionRequests++
+                        ConnectionResult.Ok(models = 1, durationMs = 12)
+                    }
                 )
             }
         }
@@ -149,7 +153,12 @@ class ProviderAndChatUiTest {
             compose.onAllNodesWithText("Connected", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("provider-connection-dialog").assertIsDisplayed()
+        val resultCard = compose.onNodeWithTag("provider-connection-result")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue("the complete connection result should remain visible", resultCard.height >= 60f)
         compose.onNodeWithText("Connected", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("12 ms").assertIsDisplayed()
+        assertEquals(1, connectionRequests)
         compose.onNodeWithText("Close").performClick()
         assertTrue(
             compose.onAllNodesWithTag("provider-connection-dialog").fetchSemanticsNodes().isEmpty()
@@ -241,7 +250,20 @@ class ProviderAndChatUiTest {
             type = ProviderType.OPENAI_COMPATIBLE,
             baseUrl = "https://api.example.test/v1",
             apiKey = "test-key",
-            models = listOf(AIModel("saved-model", "Saved model", "provider-model-picker-test"))
+            models = listOf(
+                AIModel("popular-three", "Most used three", "provider-model-picker-test"),
+                AIModel("popular-one", "Most used one", "provider-model-picker-test"),
+                AIModel("popular-two", "Most used two", "provider-model-picker-test"),
+                AIModel("long-tail", "Long tail model", "provider-model-picker-test")
+            )
+        )
+        val alternateProvider = Provider(
+            id = "provider-model-picker-alternate",
+            name = "Alternate provider",
+            type = ProviderType.GEMINI,
+            baseUrl = "https://api.example.test/v1",
+            apiKey = "test-key",
+            models = listOf(AIModel("alternate-model", "Alternative model", "provider-model-picker-alternate"))
         )
         var addCalls = 0
         var manageCalls = 0
@@ -249,10 +271,15 @@ class ProviderAndChatUiTest {
         compose.setContent {
             AriAiTheme(darkTheme = false) {
                 ModelPickerSheet(
-                    providers = listOf(provider),
+                    providers = listOf(provider, alternateProvider),
                     selectedProviderId = provider.id,
-                    selectedModelId = "saved-model",
+                    selectedModelId = "popular-one",
                     favorites = emptySet(),
+                    modelUsageCounts = mapOf(
+                        (provider.id to "popular-one") to 12,
+                        (provider.id to "popular-two") to 8,
+                        (provider.id to "popular-three") to 4
+                    ),
                     onToggleFavorite = { _, _ -> },
                     onSelect = { _, _ -> },
                     onAddProvider = { addCalls++ },
@@ -263,10 +290,74 @@ class ProviderAndChatUiTest {
             }
         }
 
+        compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
+        compose.onNodeWithTag("provider-filter-${alternateProvider.id}").assertIsDisplayed()
+        val firstPopularTop = compose.onNodeWithText("Most used one").assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
+        val secondPopularTop = compose.onNodeWithText("Most used two").assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
+        val thirdPopularTop = compose.onNodeWithText("Most used three").assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
+        assertTrue(firstPopularTop < secondPopularTop && secondPopularTop < thirdPopularTop)
+        assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText("Alternative model").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithTag("model-picker-expand-${provider.id}").performClick()
+        compose.onNodeWithText("Long tail model").assertIsDisplayed()
+        compose.onNodeWithTag("provider-filter-${alternateProvider.id}").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Alternative model").assertIsDisplayed()
+        assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
+
         compose.onNodeWithText("Add provider").assertIsDisplayed().performClick()
         compose.onNodeWithText("Manage providers").assertIsDisplayed().performClick()
         assertEquals(1, addCalls)
         assertEquals(1, manageCalls)
+    }
+
+    @Test
+    fun floatingModelPebbleOpensProviderDockNearTheComposer() {
+        val provider = Provider(
+            id = "provider-floater-test",
+            name = "Pebble provider",
+            type = ProviderType.OPENAI_COMPATIBLE,
+            baseUrl = "https://api.example.test/v1",
+            apiKey = "test-key",
+            models = listOf(
+                AIModel("model-one", "Model one", "provider-floater-test"),
+                AIModel("model-two", "Model two", "provider-floater-test"),
+                AIModel("model-three", "Model three", "provider-floater-test"),
+                AIModel("model-hidden", "Hidden model", "provider-floater-test")
+            )
+        )
+        val chat = Chat(
+            id = "chat-floater-test",
+            title = "Floating selector",
+            providerId = provider.id,
+            modelId = "model-one"
+        )
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                NewChatScreen(
+                    chat = chat,
+                    messages = emptyList(),
+                    isStreaming = false,
+                    currentStreamingContent = "",
+                    selectedModel = "model-one",
+                    selectedProviderId = provider.id,
+                    providers = listOf(provider),
+                    onSendMessage = { _, _, _, _, _ -> false },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
+                    onCheckProvider = { ConnectionResult.Ok(0) }
+                )
+            }
+        }
+
+        compose.onNodeWithTag("chat-model-floater").assertIsDisplayed().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
+        compose.onNodeWithText("Model one").assertExists()
+        assertTrue(compose.onAllNodesWithText("Hidden model").fetchSemanticsNodes().isEmpty())
     }
 
     @Test

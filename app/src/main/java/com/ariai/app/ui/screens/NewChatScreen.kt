@@ -2,6 +2,7 @@ package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
 import com.ariai.app.ui.components.ReplyContent
+import com.ariai.app.ui.components.ProviderBrandMark
 import com.ariai.app.util.UiLang
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ariai.app.data.remote.supportsNativeSearch
@@ -114,6 +115,7 @@ fun NewChatScreen(
     reasoning: ReasoningLevel = ReasoningLevel.AUTO,
     searchMode: SearchMode = SearchMode.OFF,
     favorites: Set<String> = emptySet(),
+    modelUsageCounts: Map<Pair<String, String>, Int> = emptyMap(),
     localSearchConfigured: Boolean = false,
     onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode, (Boolean) -> Unit) -> Boolean,
     onStopGeneration: () -> Unit = {},
@@ -256,6 +258,9 @@ fun NewChatScreen(
     var checkingConnection by remember(currentProvider?.id) { mutableStateOf(false) }
     val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
     val selectedModelCapabilities = currentProvider?.models?.firstOrNull { it.id == selectedModel }
+    val selectedModelLabel = selectedModelCapabilities?.displayName
+        ?: selectedModel?.substringAfterLast('/')
+        ?: tx("Choose model")
     val selectedModelIsImageOnly = selectedModelCapabilities?.let { it.supportsImageGen && !it.outputsText } == true
     val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
     val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
@@ -435,6 +440,7 @@ fun NewChatScreen(
             selectedProviderId = selectedProviderId,
             selectedModelId = selectedModel,
             favorites = favorites,
+            modelUsageCounts = modelUsageCounts,
             onToggleFavorite = onToggleFavorite,
             onSelect = onSelectModel,
             onAddProvider = { showModelSheet = false; onAddProvider() },
@@ -519,10 +525,8 @@ fun NewChatScreen(
                         else -> Muted.copy(alpha = 0.55f)
                     }
                     ProviderModelTitle(
-                        providerName = currentProvider?.name ?: tx("No provider"),
-                        modelName = selectedModelCapabilities?.displayName
-                            ?: selectedModel?.substringAfterLast('/')
-                            ?: tx("Choose model"),
+                        provider = currentProvider,
+                        modelName = selectedModelLabel,
                         chatTitle = chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat"),
                         statusColor = statusColor,
                         onClick = { showModelSheet = true }
@@ -655,6 +659,20 @@ fun NewChatScreen(
                             PendingChip(attachment) { pending = pending.filterNot { it.id == attachment.id } }
                         }
                     }
+                }
+
+                // A distinct floating model pebble keeps model switching close to the composer,
+                // without copying the reference app's long provider dock.
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(end = 6.dp, top = 2.dp, bottom = 1.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    ModelSelectorFloater(
+                        provider = currentProvider,
+                        modelName = selectedModelLabel,
+                        onClick = { showModelSheet = true },
+                        modifier = Modifier.testTag("chat-model-floater")
+                    )
                 }
 
                 val composerShape = RoundedCornerShape(26.dp)
@@ -902,12 +920,13 @@ fun NewChatScreen(
 
 @Composable
 private fun ProviderModelTitle(
-    providerName: String,
+    provider: Provider?,
     modelName: String,
     chatTitle: String,
     statusColor: Color,
     onClick: () -> Unit
 ) {
+    val providerName = provider?.name ?: tx("No provider")
     Row(
         modifier = Modifier.fillMaxWidth()
             .semantics { contentDescription = tx("Open models") }
@@ -916,12 +935,7 @@ private fun ProviderModelTitle(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.size(30.dp).clip(CircleShape).background(AriAccentSoft),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(providerName.firstOrNull()?.uppercase() ?: "A", color = AriAccentDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
+        ProviderBrandMark(provider = provider, size = 30.dp)
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
@@ -942,6 +956,58 @@ private fun ProviderModelTitle(
                 )
                 Box(Modifier.size(6.dp).clip(CircleShape).background(statusColor))
             }
+        }
+    }
+}
+
+@Composable
+private fun ModelSelectorFloater(
+    provider: Provider?,
+    modelName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(topStart = 21.dp, topEnd = 21.dp, bottomEnd = 21.dp, bottomStart = 9.dp)
+    Surface(
+        onClick = onClick,
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = tx("Choose model") },
+        shape = shape,
+        color = Color.White.copy(alpha = 0.84f),
+        contentColor = Ink,
+        shadowElevation = 9.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, AriLine.copy(alpha = 0.84f))
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 7.dp, end = 11.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box {
+                ProviderBrandMark(provider = provider, size = 34.dp)
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd).size(8.dp)
+                        .clip(CircleShape).background(AriAccent)
+                        .border(1.dp, Color.White, CircleShape)
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    provider?.name ?: tx("No provider"),
+                    color = Muted,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    modelName,
+                    color = Ink,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = AriAccent, modifier = Modifier.size(18.dp))
         }
     }
 }

@@ -107,6 +107,14 @@ fun AppRoot(viewModel: AppViewModel) {
     val searchModeState by viewModel.searchMode.collectAsState()
     val favoriteModels by viewModel.favoriteModels.collectAsState()
     val fontSize by viewModel.fontSize.collectAsState()
+    val modelUsageCounts = remember(chats, modelOverrides) {
+        chats.mapNotNull { savedChat ->
+            val override = modelOverrides[savedChat.id]
+            val providerId = override?.first ?: savedChat.providerId
+            val modelId = override?.second ?: savedChat.modelId
+            if (providerId != null && modelId != null) providerId to modelId else null
+        }.groupingBy { it }.eachCount()
+    }
     val defaultModelName = providers.firstOrNull { it.id == defaultProviderId }?.let { p ->
         p.models.firstOrNull { it.id == defaultModelId }?.let { "${it.displayName} · ${p.name}" }
     } ?: tx("Not chosen")
@@ -276,6 +284,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         reasoning = reasoningLevel,
                         searchMode = searchModeState,
                         favorites = favoriteModels,
+                        modelUsageCounts = modelUsageCounts,
                         localSearchConfigured = searchKeys.values.any { it.isNotBlank() },
                         onSendMessage = { text, files, level, mode, onSaved ->
                             viewModel.sendMessage(text, files, level, mode, onSaved)

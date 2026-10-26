@@ -4,7 +4,7 @@ import com.ariai.app.util.tx
 
 import com.ariai.app.ui.theme.*
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -23,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -373,6 +375,7 @@ fun AddProviderScreen(
         apiKeyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
     )
     fun runConnectionCheck() {
+        if (checkingConnection || fetching) return
         val requestProvider = draftProvider(models)
         showConnectionDialog = true
         checkingConnection = true
@@ -810,68 +813,74 @@ private fun ProviderActionBar(
             .fillMaxWidth()
             .navigationBarsPadding()
             .imePadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            modifier = Modifier.testTag("provider-save-action-bar"),
-            shape = CircleShape,
-            color = AriAccentSoft,
-            shadowElevation = 8.dp,
-            border = BorderStroke(0.75.dp, AriAccent.copy(alpha = 0.12f))
+        Row(
+            modifier = Modifier
+                .testTag("provider-save-action-bar")
+                .animateContentSize(tween(180, easing = FastOutSlowInEasing)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            val saveShape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomStart = 10.dp, bottomEnd = 22.dp)
+            Button(
+                onClick = onSave,
+                enabled = canSave,
+                shape = saveShape,
+                contentPadding = PaddingValues(horizontal = 19.dp, vertical = 0.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AriAccent,
+                    contentColor = Color.White,
+                    disabledContainerColor = AriAccent.copy(alpha = 0.42f),
+                    disabledContentColor = Color.White.copy(alpha = 0.82f)
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 7.dp, pressedElevation = 2.dp),
+                modifier = Modifier.height(54.dp).widthIn(min = 144.dp).testTag("provider-save")
             ) {
-                Button(
-                    onClick = onSave,
-                    enabled = canSave,
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White),
-                    modifier = Modifier.height(50.dp).widthIn(min = 132.dp).testTag("provider-save")
-                ) {
-                    if (fetching) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = Color.White
-                        )
-                    } else {
-                        Text(tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                        Spacer(Modifier.width(8.dp))
-                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(20.dp))
-                    }
+                if (fetching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Text(tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(19.dp))
                 }
+            }
+
+            val glassShape = RoundedCornerShape(17.dp)
+            Surface(
+                shape = glassShape,
+                color = Color.White.copy(alpha = 0.82f),
+                border = BorderStroke(1.dp, AriLine.copy(alpha = 0.85f)),
+                shadowElevation = 8.dp
+            ) {
                 IconButton(
                     onClick = onCheckConnection,
                     enabled = !checkingConnection && !fetching,
-                    modifier = Modifier.size(48.dp).testTag("provider-test-connection")
+                    modifier = Modifier.size(52.dp).testTag("provider-test-connection")
                 ) {
-                    if (checkingConnection) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = AriAccent)
-                    } else {
-                        Icon(
-                            Icons.Default.NetworkCheck,
-                            contentDescription = tx("Check connection"),
-                            tint = AriAccentDark,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                    Icon(
+                        Icons.Default.NetworkCheck,
+                        contentDescription = tx("Check connection"),
+                        tint = if (checkingConnection) AriAccent else AriAccentDark,
+                        modifier = Modifier.size(23.dp)
+                    )
                 }
-                if (isEdit) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(48.dp).testTag("provider-delete")
-                    ) {
-                        Icon(
-                            Icons.Default.DeleteOutline,
-                            contentDescription = tx("Delete provider"),
-                            tint = AriMuted,
-                            modifier = Modifier.size(22.dp)
-                        )
+            }
+
+            if (isEdit) {
+                Surface(
+                    shape = glassShape,
+                    color = Color.White.copy(alpha = 0.72f),
+                    border = BorderStroke(1.dp, AriLine.copy(alpha = 0.75f)),
+                    shadowElevation = 6.dp
+                ) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(48.dp).testTag("provider-delete")) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = tx("Delete provider"), tint = AriMuted, modifier = Modifier.size(21.dp))
                     }
                 }
             }
@@ -887,94 +896,138 @@ private fun ProviderConnectionDialog(
     onRetry: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val dialogShape = paperPopupShape(28.dp)
-    AlertDialog(
+    val dialogShape = paperPopupShape(29.dp)
+    Dialog(
         onDismissRequest = onDismiss,
-        modifier = paperPopupModifier(dialogShape).testTag("provider-connection-dialog"),
-        shape = dialogShape,
-        containerColor = AriTint,
-        tonalElevation = 8.dp,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .widthIn(max = 420.dp)
+                .then(paperPopupModifier(dialogShape))
+                .testTag("provider-connection-dialog"),
+            shape = dialogShape,
+            color = AriTint,
+            tonalElevation = 8.dp,
+            shadowElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
+                    Box(
+                        modifier = Modifier.size(46.dp).clip(RoundedCornerShape(16.dp)).background(AriAccentSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = AriAccent, modifier = Modifier.size(23.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            tx("Check connection"),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 20.sp,
+                            color = AriInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(providerName, fontSize = 12.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+
+                // One fixed-height status slot and a single crossfade prevent the dialog from
+                // changing height twice (the old visibility + size animations caused clipping/jitter).
                 Box(
-                    modifier = Modifier.size(42.dp).clip(CircleShape).background(AriAccentSoft),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 104.dp, max = 120.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = AriAccent, modifier = Modifier.size(22.dp))
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(tx("Check connection"), fontWeight = FontWeight.SemiBold, color = AriInk)
-                    Text(providerName, fontSize = 12.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                AnimatedVisibility(visible = checking) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = AriAccent)
-                        Text(tx("Checking…"), color = AriMuted, fontSize = 14.sp)
-                    }
-                }
-                AnimatedVisibility(visible = result != null) {
-                    when (val current = result) {
-                        is ConnectionResult.Ok -> Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            color = AriAccentGreenSoft,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    Crossfade(
+                        targetState = checking to result,
+                        animationSpec = tween(170, easing = FastOutSlowInEasing),
+                        label = "provider-connection-status"
+                    ) { (isChecking, current) ->
+                        when {
+                            isChecking -> Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = AriAccentSoft.copy(alpha = 0.58f),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AriAccentGreen, modifier = Modifier.size(22.dp))
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        "${tx("Connected")} · ${current.models} ${tx("models")}",
-                                        color = AriAccentGreen,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp
-                                    )
-                                    Text("${current.durationMs} ms", color = AriMuted, fontSize = 12.sp)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(11.dp)
+                                ) {
+                                    Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = AriAccent, modifier = Modifier.size(22.dp))
+                                    Text(tx("Checking…"), color = AriMuted, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                                 }
                             }
-                        }
-                        is ConnectionResult.Failed -> Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            color = AriError.copy(alpha = 0.08f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            current is ConnectionResult.Ok -> Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = AriAccentGreenSoft,
+                                modifier = Modifier.fillMaxWidth().testTag("provider-connection-result")
                             ) {
-                                Text(
-                                    current.problem + (current.code?.let { " (HTTP $it)" } ?: ""),
-                                    color = AriError,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp
-                                )
-                                Text(current.hint, color = AriMuted, fontSize = 12.sp)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 13.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(11.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AriAccentGreen, modifier = Modifier.size(23.dp))
+                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text(
+                                            "${tx("Connected")} · ${current.models} ${tx("models")}",
+                                            color = AriAccentGreen,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 14.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text("${current.durationMs} ms", color = AriMuted, fontSize = 12.sp)
+                                    }
+                                }
                             }
+                            current is ConnectionResult.Failed -> Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = AriError.copy(alpha = 0.08f),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-connection-result")
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        current.problem + (current.code?.let { " (HTTP $it)" } ?: ""),
+                                        color = AriError,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(current.hint, color = AriMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                            else -> Spacer(Modifier.height(1.dp))
                         }
-                        null -> Unit
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (result is ConnectionResult.Failed && !checking) {
+                        TextButton(onClick = onRetry, modifier = Modifier.testTag("provider-connection-retry")) {
+                            Text(tx("Retry"), color = AriAccent)
+                        }
+                    }
+                    TextButton(onClick = onDismiss, modifier = Modifier.testTag("provider-connection-close")) {
+                        Text(tx("Close"), color = AriAccent)
                     }
                 }
             }
-        },
-        confirmButton = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (result is ConnectionResult.Failed && !checking) {
-                    TextButton(onClick = onRetry) { Text(tx("Retry"), color = AriAccent) }
-                }
-                TextButton(onClick = onDismiss) { Text(tx("Close"), color = AriAccent) }
-            }
         }
-    )
+    }
 }
 
 @Composable

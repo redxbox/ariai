@@ -18,13 +18,13 @@ data class AriPalette(
 
 val LightAriPalette = AriPalette(
     // Soft lavender paper and near-white cards, sampled from the supplied RikkaHub references.
-    paper = Color(0xFFF3F2F8),
-    card = Color(0xFFF8F7FD),
+    paper = Color(0xFFF7F6FC),
+    card = Color(0xFFFCFBFF),
     ink = Color(0xFF26262D),
     muted = Color(0xFF747681),
-    line = Color(0xFFE1E0E9),
-    tint = Color(0xFFE8E7EF),
-    fold = Color(0xFFD6D5E0)
+    line = Color(0xFFE7E5EE),
+    tint = Color(0xFFEBEAF3),
+    fold = Color(0xFFDAD9E4)
 )
 
 val DarkAriPalette = AriPalette(
