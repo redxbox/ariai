@@ -128,6 +128,10 @@ jobs:
               safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
               echo "::error title=Provider/chat UI test failure::$safe"
             done
+            tail -n 30 instrumentation.log | while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
+              echo "::notice title=Provider/chat UI log tail::$safe"
+            done
           fi
 
       - name: Upload UI test report
