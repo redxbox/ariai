@@ -358,7 +358,7 @@ class ProviderAndChatUiTest {
         compose.onNodeWithTag("chat-model-floater").assertIsDisplayed().performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
-        compose.onNodeWithText("Model one").assertExists()
+        compose.onNodeWithText("Model one").assertIsDisplayed()
         assertTrue(compose.onAllNodesWithText("Hidden model").fetchSemanticsNodes().isEmpty())
     }
 

@@ -145,7 +145,7 @@ fun ModelPickerSheet(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 360.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 300.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (providerFilter == null && favoriteEntries.isNotEmpty()) {
@@ -217,11 +217,6 @@ fun ModelPickerSheet(
                 enabled.firstOrNull { it.id == providerFilter }?.let { provider ->
                     ProviderCheckRow(provider = provider, check = onCheckProvider)
                 }
-                ProviderDock(
-                    providers = enabled,
-                    selectedProviderId = providerFilter,
-                    onSelect = { providerFilter = it }
-                )
             }
 
             Row(
@@ -247,6 +242,14 @@ fun ModelPickerSheet(
                     Spacer(Modifier.width(6.dp))
                     Text(tx("Add provider"), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+            }
+
+            if (enabled.isNotEmpty()) {
+                ProviderDock(
+                    providers = enabled,
+                    selectedProviderId = providerFilter,
+                    onSelect = { providerFilter = it }
+                )
             }
         }
     }
