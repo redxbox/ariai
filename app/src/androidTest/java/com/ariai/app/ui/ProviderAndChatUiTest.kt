@@ -396,10 +396,23 @@ class ProviderAndChatUiTest {
         assertDisplayed("provider dock opened from chat") {
             compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
         }
-        val selectedModelRow = compose.onNodeWithTag("model-row-${provider.id}-model-one")
+        val rowTag = "model-row-${provider.id}-model-one"
+        val selectedModelRow = compose.onNodeWithTag(rowTag, useUnmergedTree = true)
         val rowBounds = runCatching { selectedModelRow.fetchSemanticsNode().boundsInRoot }.getOrNull()
+        val modelListBounds = runCatching {
+            compose.onNodeWithTag("model-picker-model-list", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        }.getOrNull()
         val rootBounds = compose.onRoot().fetchSemanticsNode().boundsInRoot
-        assertDisplayed("selected model row in picker bounds=$rowBounds root=$rootBounds") {
+        val rowCount = compose.onAllNodesWithTag(rowTag, useUnmergedTree = true).fetchSemanticsNodes().size
+        val modelTextCount = compose.onAllNodesWithText("Model one", useUnmergedTree = true).fetchSemanticsNodes().size
+        val expandButtonCount = compose.onAllNodesWithTag(
+            "model-picker-expand-${provider.id}",
+            useUnmergedTree = true
+        ).fetchSemanticsNodes().size
+        assertDisplayed(
+            "selected model row in picker bounds=$rowBounds list=$modelListBounds root=$rootBounds " +
+                "rowCount=$rowCount modelTextCount=$modelTextCount expandButtonCount=$expandButtonCount"
+        ) {
             selectedModelRow.assertIsDisplayed()
         }
         assertTrue(compose.onAllNodesWithText("Hidden model").fetchSemanticsNodes().isEmpty())

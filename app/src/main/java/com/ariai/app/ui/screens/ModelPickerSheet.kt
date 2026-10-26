@@ -147,7 +147,7 @@ fun ModelPickerSheet(
                 Spacer(Modifier.weight(1f))
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f).testTag("model-picker-model-list"),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (providerFilter == null && favoriteEntries.isNotEmpty()) {
