@@ -289,6 +289,7 @@ class ProviderAndChatUiTest {
                 )
             }
         }
+        compose.waitForIdle()
 
         compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
         compose.onNodeWithTag("provider-filter-${alternateProvider.id}").assertIsDisplayed()
@@ -352,6 +353,7 @@ class ProviderAndChatUiTest {
                 )
             }
         }
+        compose.waitForIdle()
 
         compose.onNodeWithTag("chat-model-floater").assertIsDisplayed().performClick()
         compose.waitForIdle()
