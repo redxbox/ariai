@@ -114,7 +114,7 @@ fun ModelPickerSheet(
         skipPartiallyExpanded = true
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+            modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(horizontal = 16.dp).padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             OutlinedTextField(
@@ -144,9 +144,10 @@ fun ModelPickerSheet(
                     Text(tx("No models available"), fontWeight = FontWeight.SemiBold, color = Ink)
                     Text(tx("Add a provider with at least one model."), color = Ink.copy(alpha = 0.5f), fontSize = 13.sp)
                 }
+                Spacer(Modifier.weight(1f))
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 360.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (providerFilter == null && favoriteEntries.isNotEmpty()) {

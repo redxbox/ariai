@@ -50,6 +50,14 @@ class ProviderAndChatUiTest {
         }
     }
 
+    private inline fun clickWithLabel(description: String, click: () -> Unit) {
+        try {
+            click()
+        } catch (error: Throwable) {
+            throw AssertionError("$description click failed", error)
+        }
+    }
+
     @Test
     fun lightThemeUsesLavenderPaperWhiteCardsAndSlateBlueAccent() {
         val colors = mutableStateOf<Triple<Color, Color, Color>?>(null)
@@ -317,19 +325,23 @@ class ProviderAndChatUiTest {
         assertTrue(firstPopularTop < secondPopularTop && secondPopularTop < thirdPopularTop)
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
         assertTrue(compose.onAllNodesWithText("Alternative model").fetchSemanticsNodes().isEmpty())
-        compose.onNodeWithTag("model-picker-expand-${provider.id}").performClick()
+        clickWithLabel("show-all models button") {
+            compose.onNodeWithTag("model-picker-expand-${provider.id}").performClick()
+        }
         assertDisplayed("expanded long-tail model") { compose.onNodeWithText("Long tail model").assertIsDisplayed() }
-        compose.onNodeWithTag("provider-filter-${alternateProvider.id}").performClick()
+        clickWithLabel("alternate provider filter") {
+            compose.onNodeWithTag("provider-filter-${alternateProvider.id}").performClick()
+        }
         compose.waitForIdle()
         assertDisplayed("alternate provider model") { compose.onNodeWithText("Alternative model").assertIsDisplayed() }
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
 
         val addProviderButton = compose.onNodeWithText("Add provider")
         assertDisplayed("add provider button") { addProviderButton.assertIsDisplayed() }
-        addProviderButton.performClick()
+        clickWithLabel("add provider button") { addProviderButton.performClick() }
         val manageProvidersButton = compose.onNodeWithText("Manage providers")
         assertDisplayed("manage providers button") { manageProvidersButton.assertIsDisplayed() }
-        manageProvidersButton.performClick()
+        clickWithLabel("manage providers button") { manageProvidersButton.performClick() }
         assertEquals(1, addCalls)
         assertEquals(1, manageCalls)
     }
@@ -379,12 +391,17 @@ class ProviderAndChatUiTest {
 
         val modelFloater = compose.onNodeWithTag("chat-model-floater")
         assertDisplayed("chat model floater") { modelFloater.assertIsDisplayed() }
-        modelFloater.performClick()
+        clickWithLabel("chat model floater") { modelFloater.performClick() }
         compose.waitForIdle()
         assertDisplayed("provider dock opened from chat") {
             compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
         }
-        assertDisplayed("selected model in picker") { compose.onNodeWithText("Model one").assertIsDisplayed() }
+        val selectedModelRow = compose.onNodeWithTag("model-row-${provider.id}-model-one")
+        val rowBounds = runCatching { selectedModelRow.fetchSemanticsNode().boundsInRoot }.getOrNull()
+        val rootBounds = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertDisplayed("selected model row in picker bounds=$rowBounds root=$rootBounds") {
+            selectedModelRow.assertIsDisplayed()
+        }
         assertTrue(compose.onAllNodesWithText("Hidden model").fetchSemanticsNodes().isEmpty())
     }
 
