@@ -402,9 +402,11 @@ class ProviderAndChatUiTest {
         val modelListBounds = runCatching {
             compose.onNodeWithTag("model-picker-model-list", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         }.getOrNull()
-        val rootBounds = compose.onRoot().fetchSemanticsNode().boundsInRoot
-        val dockBounds = compose.onNodeWithTag("model-picker-provider-dock", useUnmergedTree = true)
-            .fetchSemanticsNode().boundsInRoot
+        val rootBounds = runCatching { compose.onRoot().fetchSemanticsNode().boundsInRoot }.getOrNull()
+        val dockBounds = runCatching {
+            compose.onNodeWithTag("model-picker-provider-dock", useUnmergedTree = true)
+                .fetchSemanticsNode().boundsInRoot
+        }.getOrNull()
         val rowCount = compose.onAllNodesWithTag(rowTag, useUnmergedTree = true).fetchSemanticsNodes().size
         val modelTextCount = compose.onAllNodesWithText("Model one", useUnmergedTree = true).fetchSemanticsNodes().size
         val expandButtonCount = compose.onAllNodesWithTag(
