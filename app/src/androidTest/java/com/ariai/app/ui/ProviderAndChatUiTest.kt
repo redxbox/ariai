@@ -42,6 +42,14 @@ class ProviderAndChatUiTest {
     @get:Rule
     val compose = createComposeRule()
 
+    private inline fun assertDisplayed(description: String, assertion: () -> Unit) {
+        try {
+            assertion()
+        } catch (error: AssertionError) {
+            throw AssertionError("$description should be displayed", error)
+        }
+    }
+
     @Test
     fun lightThemeUsesLavenderPaperWhiteCardsAndSlateBlueAccent() {
         val colors = mutableStateOf<Triple<Color, Color, Color>?>(null)
@@ -291,23 +299,37 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
-        compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
-        compose.onNodeWithTag("provider-filter-${alternateProvider.id}").assertIsDisplayed()
-        val firstPopularTop = compose.onNodeWithText("Most used one").assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
-        val secondPopularTop = compose.onNodeWithText("Most used two").assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
-        val thirdPopularTop = compose.onNodeWithText("Most used three").assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
+        assertDisplayed("provider dock") {
+            compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
+        }
+        assertDisplayed("alternate provider chip") {
+            compose.onNodeWithTag("provider-filter-${alternateProvider.id}").assertIsDisplayed()
+        }
+        val firstPopular = compose.onNodeWithText("Most used one")
+        val secondPopular = compose.onNodeWithText("Most used two")
+        val thirdPopular = compose.onNodeWithText("Most used three")
+        assertDisplayed("most-used model one") { firstPopular.assertIsDisplayed() }
+        assertDisplayed("most-used model two") { secondPopular.assertIsDisplayed() }
+        assertDisplayed("most-used model three") { thirdPopular.assertIsDisplayed() }
+        val firstPopularTop = firstPopular.fetchSemanticsNode().boundsInRoot.top
+        val secondPopularTop = secondPopular.fetchSemanticsNode().boundsInRoot.top
+        val thirdPopularTop = thirdPopular.fetchSemanticsNode().boundsInRoot.top
         assertTrue(firstPopularTop < secondPopularTop && secondPopularTop < thirdPopularTop)
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
         assertTrue(compose.onAllNodesWithText("Alternative model").fetchSemanticsNodes().isEmpty())
         compose.onNodeWithTag("model-picker-expand-${provider.id}").performClick()
-        compose.onNodeWithText("Long tail model").assertIsDisplayed()
+        assertDisplayed("expanded long-tail model") { compose.onNodeWithText("Long tail model").assertIsDisplayed() }
         compose.onNodeWithTag("provider-filter-${alternateProvider.id}").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Alternative model").assertIsDisplayed()
+        assertDisplayed("alternate provider model") { compose.onNodeWithText("Alternative model").assertIsDisplayed() }
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
 
-        compose.onNodeWithText("Add provider").assertIsDisplayed().performClick()
-        compose.onNodeWithText("Manage providers").assertIsDisplayed().performClick()
+        val addProviderButton = compose.onNodeWithText("Add provider")
+        assertDisplayed("add provider button") { addProviderButton.assertIsDisplayed() }
+        addProviderButton.performClick()
+        val manageProvidersButton = compose.onNodeWithText("Manage providers")
+        assertDisplayed("manage providers button") { manageProvidersButton.assertIsDisplayed() }
+        manageProvidersButton.performClick()
         assertEquals(1, addCalls)
         assertEquals(1, manageCalls)
     }
@@ -355,10 +377,14 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
-        compose.onNodeWithTag("chat-model-floater").assertIsDisplayed().performClick()
+        val modelFloater = compose.onNodeWithTag("chat-model-floater")
+        assertDisplayed("chat model floater") { modelFloater.assertIsDisplayed() }
+        modelFloater.performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
-        compose.onNodeWithText("Model one").assertIsDisplayed()
+        assertDisplayed("provider dock opened from chat") {
+            compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
+        }
+        assertDisplayed("selected model in picker") { compose.onNodeWithText("Model one").assertIsDisplayed() }
         assertTrue(compose.onAllNodesWithText("Hidden model").fetchSemanticsNodes().isEmpty())
     }
 
