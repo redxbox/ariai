@@ -375,7 +375,8 @@ class ProviderAndChatUiTest {
     }
 
     @Test
-    fun neuralGlassSelectorOpensProviderDockNearTheComposer() {
+    fun compactTopModelSelectorStaysOutOfChatAndOpensProviderDock() {
+        val responseStreaming = mutableStateOf(false)
         val provider = Provider(
             id = "provider-floater-test",
             name = "Pebble provider",
@@ -401,8 +402,8 @@ class ProviderAndChatUiTest {
                 NewChatScreen(
                     chat = chat,
                     messages = emptyList(),
-                    isStreaming = false,
-                    currentStreamingContent = "",
+                    isStreaming = responseStreaming.value,
+                    currentStreamingContent = if (responseStreaming.value) "Streaming response preview" else "",
                     selectedModel = "model-one",
                     selectedProviderId = provider.id,
                     providers = listOf(provider),
@@ -420,22 +421,44 @@ class ProviderAndChatUiTest {
         assertDisplayed("chat title stays in the top bar") {
             compose.onNodeWithTag("chat-title-header").assertIsDisplayed()
         }
+        assertDisplayed("selected model name in the compact dropdown") {
+            compose.onNodeWithText("AriAI (Model one)", useUnmergedTree = true).assertIsDisplayed()
+        }
         val modelFloater = compose.onNodeWithTag("chat-model-floater")
-        val sendButton = compose.onNodeWithTag("chat-send-button")
-        val composerBounds = compose.onNodeWithTag("chat-composer-container")
+        val selectorRowBounds = compose.onNodeWithTag("chat-model-selector-container")
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val modelBounds = modelFloater.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val sendBounds = sendButton.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val screenBounds = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val composerBounds = compose.onNodeWithTag("chat-composer-container")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val sendBounds = compose.onNodeWithTag("chat-send-button")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val rootCenterX = (screenBounds.left + screenBounds.right) / 2f
+        val selectorCenterX = (modelBounds.left + modelBounds.right) / 2f
         assertTrue(
-            "Provider/model selector should be compact within the composer: selector=$modelBounds composer=$composerBounds",
-            modelBounds.left >= composerBounds.left && modelBounds.right <= composerBounds.right &&
-                modelBounds.width < composerBounds.width * 0.72f
+            "Selector should remain a small centered pill below the top bar: selector=$modelBounds row=$selectorRowBounds root=$screenBounds",
+            modelBounds.width < screenBounds.width * 0.72f &&
+                modelBounds.height < screenBounds.height * 0.08f &&
+                kotlin.math.abs(selectorCenterX - rootCenterX) < screenBounds.width * 0.03f &&
+                modelBounds.top >= selectorRowBounds.top && modelBounds.bottom <= selectorRowBounds.bottom
         )
         assertTrue(
-            "Send should stay above the model selector inside the composer: send=$sendBounds selector=$modelBounds",
-            sendBounds.bottom <= modelBounds.top && sendBounds.left >= composerBounds.left &&
-                sendBounds.right <= composerBounds.right
+            "Top selector must not cover the composer or Send button: selector=$modelBounds composer=$composerBounds send=$sendBounds",
+            modelBounds.bottom < composerBounds.top &&
+                sendBounds.left >= composerBounds.left && sendBounds.right <= composerBounds.right &&
+                sendBounds.top >= composerBounds.top && sendBounds.bottom <= composerBounds.bottom
         )
+
+        responseStreaming.value = true
+        compose.waitForIdle()
+        val streamingBounds = modelFloater.fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Selector should stay pinned while the assistant is responding: before=$modelBounds after=$streamingBounds",
+            kotlin.math.abs(streamingBounds.left - modelBounds.left) < 1f &&
+                kotlin.math.abs(streamingBounds.top - modelBounds.top) < 1f
+        )
+        responseStreaming.value = false
+        compose.waitForIdle()
         clickWithLabel("chat model floater") { modelFloater.performClick() }
         compose.waitForIdle()
         assertDisplayed("provider dock opened from chat") {

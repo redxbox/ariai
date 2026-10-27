@@ -550,7 +550,7 @@ fun AddProviderScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (tab == 0) {
-            // Provider type presets use their own muted brand tint while staying within AriAI's paper palette.
+            // Keep provider presets crisp and recognizable on AriAI's paper palette.
             item { SectionLabel(tx("Provider")) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -591,7 +591,7 @@ fun AddProviderScreen(
                                     preset.label,
                                     fontSize = 10.sp,
                                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (selected) Color.White else AriInk.copy(alpha = 0.76f),
+                                    color = if (selected) Color.White else AriInk.copy(alpha = 0.92f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

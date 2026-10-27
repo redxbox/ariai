@@ -65,7 +65,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -265,12 +264,6 @@ fun NewChatScreen(
     val selectedModelLabel = selectedModelCapabilities?.displayName
         ?: selectedModel?.substringAfterLast('/')
         ?: tx("Choose model")
-    val providerStatusColor = when {
-        checkingConnection -> AriAccent
-        connectionResult is ConnectionResult.Ok -> AriAccentGreen
-        connectionResult is ConnectionResult.Failed -> AriError
-        else -> Muted.copy(alpha = 0.55f)
-    }
     val selectedModelIsImageOnly = selectedModelCapabilities?.let { it.supportsImageGen && !it.outputsText } == true
     val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
     val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
@@ -520,129 +513,143 @@ fun NewChatScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
-                navigationIcon = {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = tx("Open menu"), tint = Ink)
-                    }
-                },
-                title = {
-                    ChatHeaderTitle(
-                        chatTitle = chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat")
-                    )
-                },
-                actions = {
-                    val contextLimit = selectedModelCapabilities?.contextWindow?.takeIf { it > 0 } ?: 0
-                    if (contextLimit > 0) {
-                        val latestUserIndex = messages.indexOfLast { it.role == MessageRole.USER }
-                        val latestAssistantIndex = messages.indexOfLast { it.role == MessageRole.ASSISTANT }
-                        val actualPromptTokens = messages.getOrNull(latestAssistantIndex)
-                            ?.takeIf { latestAssistantIndex > latestUserIndex && it.status != MessageStatus.ERROR }
-                            ?.usage?.promptTokens?.takeIf { it > 0 }
-                        val visibleTokens = messages.filter { it.role != MessageRole.SYSTEM }.sumOf { message ->
-                            ((message.content.length + 3).toLong() / 4L) + message.attachments.sumOf { attachment ->
-                                ((attachment.textContent?.length ?: 0).toLong() + 3L) / 4L + when (attachment.type) {
-                                    AttachmentType.IMAGE -> 768L
-                                    AttachmentType.VIDEO -> 2048L
-                                    else -> 0L
-                                }
-                            }
-                        } + ((chat?.systemPrompt?.length ?: 0).toLong() + 3L) / 4L
-                        val tokenCount = actualPromptTokens ?: visibleTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-                        ContextUsageIndicator(
-                            tokens = tokenCount,
-                            contextWindow = contextLimit,
-                            approximate = actualPromptTokens == null,
-                            onClick = {
-                                val prefix = if (actualPromptTokens == null) tx("Approx.") + " " else ""
-                                showNote("$prefix$tokenCount / $contextLimit ${tx("tokens in context")}")
-                            }
-                        )
-                    }
-                    IconButton(onClick = { showQuickParameters = true }) {
-                        Icon(Icons.Default.Tune, contentDescription = tx("Quick parameters"), tint = Ink)
-                    }
-                    Box {
-                        IconButton(onClick = { showTopMenu = true }) {
-                            Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
+            Column(modifier = Modifier.fillMaxWidth().background(PageBg)) {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
+                    navigationIcon = {
+                        IconButton(onClick = onOpenDrawer) {
+                            Icon(Icons.Default.Menu, contentDescription = tx("Open menu"), tint = Ink)
                         }
-                        val menuShape = paperPopupShape(18.dp, 12.dp)
-                        DropdownMenu(
-                            expanded = showTopMenu,
-                            onDismissRequest = { showTopMenu = false },
-                            modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(if (checkingConnection) tx("Checking…") else tx("Check connection")) },
-                                leadingIcon = { Icon(Icons.Default.NetworkCheck, contentDescription = null) },
-                                enabled = currentProvider != null && !checkingConnection,
-                                onClick = {
-                                    showTopMenu = false
-                                    val provider = currentProvider
-                                    if (provider != null) scope.launch {
-                                        checkingConnection = true
-                                        try {
-                                            connectionResult = onCheckProvider(provider)
-                                            when (val result = connectionResult) {
-                                                is ConnectionResult.Ok -> showNote("${tx("Connected")} · ${result.durationMs} ms · ${result.models} ${tx("models")}")
-                                                is ConnectionResult.Failed -> showNote(result.problem)
-                                                null -> Unit
-                                            }
-                                        } catch (cancelled: CancellationException) {
-                                            throw cancelled
-                                        } catch (error: Exception) {
-                                            connectionResult = ConnectionResult.Failed(tx("Could not connect"), error.message.orEmpty())
-                                            showNote(tx("Could not connect"))
-                                        } finally {
-                                            checkingConnection = false
-                                        }
+                    },
+                    title = {
+                        ChatHeaderTitle(
+                            chatTitle = chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat")
+                        )
+                    },
+                    actions = {
+                        val contextLimit = selectedModelCapabilities?.contextWindow?.takeIf { it > 0 } ?: 0
+                        if (contextLimit > 0) {
+                            val latestUserIndex = messages.indexOfLast { it.role == MessageRole.USER }
+                            val latestAssistantIndex = messages.indexOfLast { it.role == MessageRole.ASSISTANT }
+                            val actualPromptTokens = messages.getOrNull(latestAssistantIndex)
+                                ?.takeIf { latestAssistantIndex > latestUserIndex && it.status != MessageStatus.ERROR }
+                                ?.usage?.promptTokens?.takeIf { it > 0 }
+                            val visibleTokens = messages.filter { it.role != MessageRole.SYSTEM }.sumOf { message ->
+                                ((message.content.length + 3).toLong() / 4L) + message.attachments.sumOf { attachment ->
+                                    ((attachment.textContent?.length ?: 0).toLong() + 3L) / 4L + when (attachment.type) {
+                                        AttachmentType.IMAGE -> 768L
+                                        AttachmentType.VIDEO -> 2048L
+                                        else -> 0L
                                     }
                                 }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(tx("Rename chat")) },
-                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            } + ((chat?.systemPrompt?.length ?: 0).toLong() + 3L) / 4L
+                            val tokenCount = actualPromptTokens ?: visibleTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                            ContextUsageIndicator(
+                                tokens = tokenCount,
+                                contextWindow = contextLimit,
+                                approximate = actualPromptTokens == null,
                                 onClick = {
-                                    showTopMenu = false
-                                    renameText = chat?.title ?: ""
-                                    showRename = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(tx("Copy conversation")) },
-                                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                                onClick = {
-                                    showTopMenu = false
-                                    copyToClipboard(messages.filter { it.role != MessageRole.SYSTEM }.joinToString("\n\n") { it.content })
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(tx("Image chat")) },
-                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = AriAccent) },
-                                onClick = {
-                                    showTopMenu = false
-                                    if (imageGenerationAvailable) onNewImageChat()
-                                    else showNote(tx("No image model found. Add an image model, or fetch the models in provider settings."))
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(tx("Choose model")) },
-                                leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null, tint = AriAccent) },
-                                onClick = { showTopMenu = false; showModelSheet = true }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(tx("Compress history")) },
-                                leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
-                                onClick = {
-                                    showTopMenu = false
-                                    onCompressHistory { showNote(it) }
+                                    val prefix = if (actualPromptTokens == null) tx("Approx.") + " " else ""
+                                    showNote("$prefix$tokenCount / $contextLimit ${tx("tokens in context")}")
                                 }
                             )
                         }
+                        IconButton(onClick = { showQuickParameters = true }) {
+                            Icon(Icons.Default.Tune, contentDescription = tx("Quick parameters"), tint = Ink)
+                        }
+                        Box {
+                            IconButton(onClick = { showTopMenu = true }) {
+                                Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
+                            }
+                            val menuShape = paperPopupShape(18.dp, 12.dp)
+                            DropdownMenu(
+                                expanded = showTopMenu,
+                                onDismissRequest = { showTopMenu = false },
+                                modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (checkingConnection) tx("Checking…") else tx("Check connection")) },
+                                    leadingIcon = { Icon(Icons.Default.NetworkCheck, contentDescription = null) },
+                                    enabled = currentProvider != null && !checkingConnection,
+                                    onClick = {
+                                        showTopMenu = false
+                                        val provider = currentProvider
+                                        if (provider != null) scope.launch {
+                                            checkingConnection = true
+                                            try {
+                                                connectionResult = onCheckProvider(provider)
+                                                when (val result = connectionResult) {
+                                                    is ConnectionResult.Ok -> showNote("${tx("Connected")} · ${result.durationMs} ms · ${result.models} ${tx("models")}")
+                                                    is ConnectionResult.Failed -> showNote(result.problem)
+                                                    null -> Unit
+                                                }
+                                            } catch (cancelled: CancellationException) {
+                                                throw cancelled
+                                            } catch (error: Exception) {
+                                                connectionResult = ConnectionResult.Failed(tx("Could not connect"), error.message.orEmpty())
+                                                showNote(tx("Could not connect"))
+                                            } finally {
+                                                checkingConnection = false
+                                            }
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Rename chat")) },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    onClick = {
+                                        showTopMenu = false
+                                        renameText = chat?.title ?: ""
+                                        showRename = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Copy conversation")) },
+                                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                                    onClick = {
+                                        showTopMenu = false
+                                        copyToClipboard(messages.filter { it.role != MessageRole.SYSTEM }.joinToString("\n\n") { it.content })
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Image chat")) },
+                                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = AriAccent) },
+                                    onClick = {
+                                        showTopMenu = false
+                                        if (imageGenerationAvailable) onNewImageChat()
+                                        else showNote(tx("No image model found. Add an image model, or fetch the models in provider settings."))
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Choose model")) },
+                                    leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null, tint = AriAccent) },
+                                    onClick = { showTopMenu = false; showModelSheet = true }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Compress history")) },
+                                    leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                                    onClick = {
+                                        showTopMenu = false
+                                        onCompressHistory { showNote(it) }
+                                    }
+                                )
+                            }
+                        }
                     }
+                )
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
+                        .testTag("chat-model-selector-container"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ChatModelSelector(
+                        provider = currentProvider,
+                        modelName = selectedModelLabel,
+                        onClick = { showModelSheet = true },
+                        modifier = Modifier.testTag("chat-model-floater")
+                    )
                 }
-            )
+            }
         },
         bottomBar = {
             Column(
@@ -661,7 +668,7 @@ fun NewChatScreen(
                     }
                 }
 
-                // Keep the model selector compact inside the composer, directly below Send.
+                // Keep model selection above the conversation so it never crowds message entry.
                 val composerShape = RoundedCornerShape(26.dp)
                 Surface(
                     shape = composerShape,
@@ -779,13 +786,6 @@ fun NewChatScreen(
                                 }
                             }
                             Spacer(Modifier.weight(1f))
-                            ModelSelectorFloater(
-                                provider = currentProvider,
-                                modelName = selectedModelLabel,
-                                statusColor = providerStatusColor,
-                                onClick = { showModelSheet = true },
-                                modifier = Modifier.testTag("chat-model-floater")
-                            )
                         }
                     }
                 }
@@ -950,110 +950,53 @@ private fun ChatHeaderTitle(chatTitle: String) {
 }
 
 @Composable
-private fun ModelSelectorFloater(
+private fun ChatModelSelector(
     provider: Provider?,
     modelName: String,
-    statusColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val accent = providerBrandColor(provider)
-    val shape = RoundedCornerShape(24.dp)
+    val providerAccent = providerBrandColor(provider)
+    val label = when {
+        provider == null -> tx("Choose model")
+        modelName.isBlank() || modelName == tx("Choose model") -> "AriAI (${provider.name})"
+        else -> "AriAI ($modelName)"
+    }
+    val shape = RoundedCornerShape(50)
     Surface(
         onClick = onClick,
-        modifier = modifier.widthIn(min = 132.dp, max = 188.dp)
+        modifier = modifier.widthIn(min = 144.dp, max = 272.dp).height(40.dp)
             .semantics(mergeDescendants = true) {
                 contentDescription = tx("Choose model")
                 stateDescription = "${provider?.name ?: tx("No provider")} · $modelName"
             },
         shape = shape,
-        color = Color.White.copy(alpha = 0.94f),
+        color = Color.White.copy(alpha = 0.97f),
         contentColor = Ink,
-        shadowElevation = 4.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.34f))
+        shadowElevation = 3.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, providerAccent.copy(alpha = 0.28f))
     ) {
-        Box {
-            Box(
-                modifier = Modifier.matchParentSize().clip(shape).background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.97f),
-                            AriAccentSoft.copy(alpha = 0.72f),
-                            accent.copy(alpha = 0.11f)
-                        )
-                    )
-                )
+        Row(
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AriBinaryBrainMark(size = 22.dp, tint = AriAccentDark)
+            Text(
+                text = label,
+                modifier = Modifier.widthIn(max = 196.dp),
+                color = AriAccentDark,
+                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Row(
-                modifier = Modifier.heightIn(min = 46.dp).padding(horizontal = 8.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
-                Box(modifier = Modifier.size(34.dp)) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.White.copy(alpha = 0.68f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.92f)),
-                        tonalElevation = 0.dp
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            AriBinaryBrainMark(size = 23.dp, tint = accent)
-                        }
-                    }
-                    Surface(
-                        modifier = Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp),
-                        shape = RoundedCornerShape(6.dp),
-                        color = accent,
-                        contentColor = Color.White,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
-                        tonalElevation = 1.dp
-                    ) {
-                        Text(
-                            "01",
-                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
-                            fontSize = 7.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    if (provider != null) {
-                        ProviderBrandMark(
-                            provider = provider,
-                            modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp),
-                            size = 15.dp
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Text(
-                            provider?.name ?: tx("No provider"),
-                            modifier = Modifier.weight(1f),
-                            color = Muted,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Box(Modifier.size(6.dp).clip(CircleShape).background(statusColor))
-                    }
-                    Text(
-                        modelName,
-                        color = Ink,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Icon(
-                    Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(19.dp)
-                )
-            }
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = AriAccentDark,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

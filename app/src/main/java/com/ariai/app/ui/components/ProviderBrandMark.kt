@@ -71,24 +71,24 @@ private fun ProviderBrandMarkContent(
     Surface(
         modifier = modifier.size(size),
         shape = CircleShape,
-        color = Color.White.copy(alpha = 0.96f),
-        border = BorderStroke(0.8.dp, brandColor.copy(alpha = 0.22f)),
+        color = Color.White,
+        border = BorderStroke(1.dp, brandColor.copy(alpha = 0.34f)),
         tonalElevation = 0.dp
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (mark) {
-                ProviderMarkKind.OPENAI -> BrandVectorMark(R.drawable.brand_openai, size * 0.68f)
-                ProviderMarkKind.GOOGLE -> BrandVectorMark(R.drawable.brand_google_g, size * 0.70f)
-                ProviderMarkKind.ANTHROPIC -> BrandVectorMark(R.drawable.brand_anthropic, size * 0.62f)
-                ProviderMarkKind.OLLAMA -> BrandVectorMark(R.drawable.brand_ollama, size * 0.68f)
-                ProviderMarkKind.CUSTOM -> SpectrumSparkle(size * 0.64f)
+                ProviderMarkKind.OPENAI -> BrandVectorMark(R.drawable.brand_openai, size * 0.72f)
+                ProviderMarkKind.GOOGLE -> BrandVectorMark(R.drawable.brand_google_g, size * 0.76f)
+                ProviderMarkKind.ANTHROPIC -> BrandVectorMark(R.drawable.brand_anthropic, size * 0.80f)
+                ProviderMarkKind.OLLAMA -> BrandVectorMark(R.drawable.brand_ollama, size * 0.80f)
+                ProviderMarkKind.CUSTOM -> SpectrumSparkle(size * 0.70f)
                 ProviderMarkKind.INITIAL -> Text(
                     name?.trim()?.firstOrNull()?.uppercase() ?: "A",
                     color = brandColor,
                     fontSize = (size.value * 0.43f).sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
-                ProviderMarkKind.NEURAL -> AriBinaryBrainMark(size = size * 0.68f, tint = brandColor)
+                ProviderMarkKind.NEURAL -> AriBinaryBrainMark(size = size * 0.72f, tint = brandColor)
             }
         }
     }

@@ -254,7 +254,7 @@ step "Chat home and model picker"
 expect_text "How can I help you?"
 expect_text "Send"
 shot 01-chat-home
-# The compact neural-glass model selector sits inside the composer, directly beneath Send.
+# The compact model dropdown is centered directly below the chat top bar, clear of the composer.
 tap "Choose model"
 wait_for_text "No models available" 30
 shot 02-model-picker
