@@ -288,11 +288,7 @@ hide_keyboard
 tap "Send"
 expect_text "No provider configured"
 shot 02a-send-without-provider
-tap "Open menu"
-tap "New chat"
-wait_for_text "Choose model" 10
-
-tap "Off"
+tap "Quick parameters"
 expect_text "Thinking depth"
 expect_text "Not every model supports this"
 shot 03-thinking-sheet
