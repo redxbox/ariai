@@ -50,6 +50,7 @@ fun PaperBottomSheet(
     onDismissRequest: () -> Unit,
     shape: Shape,
     skipPartiallyExpanded: Boolean = false,
+    showOutline: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState(
@@ -59,7 +60,7 @@ fun PaperBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
         shape = shape,
-        modifier = Modifier.border(BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)), shape),
+        modifier = if (showOutline) Modifier.border(BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)), shape) else Modifier,
         containerColor = AriCard,
         contentColor = AriInk,
         tonalElevation = 0.dp,

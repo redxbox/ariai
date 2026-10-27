@@ -11,7 +11,7 @@ AriAi is an Android chat client for connecting to AI providers with your own cre
 - **Agents:** built-in and custom agents, prompt variables/examples, provider/model binding, temperature/top-P defaults, and opt-in calculator/web-search tools. Settings are stored locally; unsupported tools (MCP, arbitrary code execution, persistent memory, callable image generation) are visibly unavailable.
 - **Workspace:** AI-assisted generation and updating of one text file at a time using the selected text model, small UTF-8 files in private app storage, a static HTML preview with JavaScript and network requests blocked, and a read-only console limited to listing/reading those workspace files.
 - **Tools:** request-scoped calculator, configured web search, reading a URL supplied by the user, and read-only access to public GitHub repository files where the selected model supports tool calls. MCP server setup is currently a preview; it does not connect to servers or expose MCP tools to chats.
-- **Web search:** native provider search when supported, or a configured Google Search (via Serper), Brave Search, Tavily, or Exa API key. Choose the active local search service in settings; keys are saved on the device. Search results and availability depend on the service and its account limits.
+- **Web search:** off by default. Gemini, Anthropic, and supported OpenRouter models can use built-in web search with the AI provider's existing API key; optional Google Search (via Serper), Brave Search, Tavily, or Exa keys support local search and fallback. Search API keys are saved on the device. Results and availability depend on the provider and account limits.
 - **Attachments:** scaled images, videos up to 12 MB, and supported plain-text/code files. Video bytes are sent only to compatible Gemini requests; other providers receive a note that the video cannot be viewed. PDF and DOCX extraction are not implemented.
 - **Media:** image, video, or audio generation is available only when a configured provider/model exposes the relevant capability. Provider API support and costs vary. Image editing is not available for Gemini providers.
 - **Appearance and language:** light/dark/system theme, optional Android 12+ dynamic accent colors, and translated UI strings in English and Persian. Some unkeyed descriptions and provider-returned error details remain in English.
@@ -27,9 +27,9 @@ The app does not provide keys, credits, or a built-in free demo account. Use onl
 
 ## Configure web search
 
-1. Open **Settings → Search service**.
-2. Add an API key for Google Search (through Serper), Brave Search, Tavily, or Exa; use the radio control to choose which configured service powers local search.
-3. In a chat, tap the composer search icon and choose **Local Search**, **Model search**, or **Off**. Provider-native search requires a compatible provider/model; local search uses your selected service key.
+1. In a chat, tap the composer search icon and choose a connected Gemini, Anthropic, or supported OpenRouter model to use its built-in search with the same AI provider API key; this stays off until selected.
+2. To use Local Search or provide a fallback key, open **Settings → Search service**, expand **Optional local search API keys**, and configure Google Search (through Serper), Brave Search, Tavily, or Exa.
+3. In the chat sheet, choose **Local Search** to use that separate search key, or **Off** to disable web search.
 
 ## Requirements and build
 

@@ -7,7 +7,6 @@ import com.ariai.app.ui.components.ProviderBrandMark
 import com.ariai.app.ui.components.providerBrandColor
 import com.ariai.app.util.UiLang
 import androidx.compose.ui.viewinterop.AndroidView
-import com.ariai.app.data.remote.supportsNativeSearch
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -261,7 +260,9 @@ fun NewChatScreen(
         ?: providers.firstOrNull { it.enabled }
     var connectionResult by remember(currentProvider?.id) { mutableStateOf<ConnectionResult?>(null) }
     var checkingConnection by remember(currentProvider?.id) { mutableStateOf(false) }
-    val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
+    val nativeSearchModels = remember(providers, selectedProviderId, selectedModel) {
+        availableNativeSearchModels(providers, selectedProviderId, selectedModel)
+    }
     val selectedModelCapabilities = currentProvider?.models?.firstOrNull { it.id == selectedModel }
     val selectedModelLabel = selectedModelCapabilities?.displayName
         ?: selectedModel?.substringAfterLast('/')
@@ -502,12 +503,16 @@ fun NewChatScreen(
     if (showSearch) {
         SearchSheet(
             mode = searchMode,
-            modelSearchAvailable = modelSearchAvailable,
             localSearchConfigured = localSearchConfigured,
             activeSearchProviderKey = activeSearchProviderKey,
             activeSearchProviderName = activeSearchProviderName,
+            nativeSearchModels = nativeSearchModels,
+            selectedProviderId = selectedProviderId,
+            selectedModelId = selectedModel,
             onModeChange = onSearchModeChange,
+            onSelectSearchModel = onSelectModel,
             onConfigureLocal = onOpenSearchSettings,
+            onManageProviders = onManageProviders,
             onDismiss = { showSearch = false }
         )
     }

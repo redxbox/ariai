@@ -16,10 +16,14 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ariai.app.data.models.Agent
+import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.McpServerItem
+import com.ariai.app.data.models.Provider
+import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.models.WorkspaceFile
 import com.ariai.app.ui.screens.AgentStudioScreen
+import com.ariai.app.ui.screens.NativeSearchModelChoice
 import com.ariai.app.ui.screens.QuickParametersSheet
 import com.ariai.app.ui.screens.SearchServiceScreen
 import com.ariai.app.ui.screens.SearchSheet
@@ -204,6 +208,8 @@ class FeatureScreensUiTest {
             }
         }
 
+        compose.onAllNodesWithText("No key").assertCountEquals(0)
+        compose.onNodeWithTag("search-services-toggle").performClick()
         compose.onAllNodesWithText("No key").assertCountEquals(4)
         compose.onNodeWithText("Google Search").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Tavily").performScrollTo().assertIsDisplayed().performClick()
@@ -236,6 +242,7 @@ class FeatureScreensUiTest {
             }
         }
 
+        compose.onNodeWithTag("search-services-toggle").performClick()
         compose.onNodeWithTag("search-provider-select-serper", useUnmergedTree = true).performScrollTo().performClick()
         assertEquals("serper", selectedProvider.value)
         compose.onNodeWithText("Google Search").assertIsDisplayed()
@@ -243,34 +250,95 @@ class FeatureScreensUiTest {
     }
 
     @Test
-    fun compactSearchSheetSwitchesModesAndOpensProviderSettings() {
+    fun compactSearchSheetSelectsNativeSearchModelsAndSwitchesModes() {
         val mode = mutableStateOf(SearchMode.OFF)
+        val gemini = Provider(
+            id = "gemini-ui",
+            name = "Google Gemini",
+            type = ProviderType.GEMINI,
+            baseUrl = "https://generativelanguage.googleapis.com",
+            apiKey = "gemini-test-key",
+            models = listOf(
+                AIModel("gemini-2.0-flash", "Gemini 2.0 Flash", "gemini-ui"),
+                AIModel("gemini-2.0-pro", "Gemini 2.0 Pro", "gemini-ui")
+            )
+        )
+        val anthropic = Provider(
+            id = "anthropic-ui",
+            name = "Anthropic",
+            type = ProviderType.ANTHROPIC,
+            baseUrl = "https://api.anthropic.com",
+            apiKey = "anthropic-test-key",
+            models = listOf(AIModel("claude-sonnet", "Claude Sonnet", "anthropic-ui"))
+        )
+        var selectedProvider: String? = null
+        var selectedModel: String? = null
         var settingsOpened = false
 
         compose.setContent {
             AriAiTheme(darkTheme = false, dynamicColor = false) {
                 SearchSheet(
                     mode = mode.value,
-                    modelSearchAvailable = true,
                     localSearchConfigured = true,
                     activeSearchProviderKey = "serper",
                     activeSearchProviderName = "Google Search",
+                    nativeSearchModels = listOf(
+                        NativeSearchModelChoice(gemini, gemini.models.first()),
+                        NativeSearchModelChoice(anthropic, anthropic.models.first()),
+                        NativeSearchModelChoice(gemini, gemini.models.last())
+                    ),
+                    selectedProviderId = "anthropic-ui",
+                    selectedModelId = "claude-sonnet",
                     onModeChange = { mode.value = it },
+                    onSelectSearchModel = { providerId, modelId ->
+                        selectedProvider = providerId
+                        selectedModel = modelId
+                    },
                     onConfigureLocal = { settingsOpened = true },
+                    onManageProviders = {},
                     onDismiss = {}
                 )
             }
         }
 
-        compose.onNodeWithText("Google Search").assertIsDisplayed()
+        compose.onNodeWithText("Gemini 2.0 Flash").assertIsDisplayed()
+        compose.onNodeWithText("Claude Sonnet").assertIsDisplayed()
+        compose.onNodeWithTag("search-models-toggle").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithText("Gemini 2.0 Pro").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("search-model-anthropic-ui-claude-sonnet").performClick()
+        assertEquals("anthropic-ui", selectedProvider)
+        assertEquals("claude-sonnet", selectedModel)
+        assertEquals(SearchMode.MODEL, mode.value)
         compose.onNodeWithTag("search-mode-local").performClick()
         assertEquals(SearchMode.LOCAL, mode.value)
         compose.onNodeWithTag("search-mode-local").performClick()
         assertEquals(SearchMode.OFF, mode.value)
-        compose.onNodeWithTag("search-mode-model").performClick()
-        assertEquals(SearchMode.MODEL, mode.value)
         compose.onNodeWithTag("search-provider-settings").performClick()
         assertTrue(settingsOpened)
+    }
+
+    @Test
+    fun searchSheetOffersSupportedProvidersBeforeOneIsConnected() {
+        var providersOpened = false
+        compose.setContent {
+            AriAiTheme(darkTheme = false, dynamicColor = false) {
+                SearchSheet(
+                    mode = SearchMode.OFF,
+                    localSearchConfigured = false,
+                    onModeChange = {},
+                    onSelectSearchModel = { _, _ -> },
+                    onConfigureLocal = {},
+                    onManageProviders = { providersOpened = true },
+                    onDismiss = {}
+                )
+            }
+        }
+
+        compose.onNodeWithTag("search-setup-gemini").assertIsDisplayed()
+        compose.onNodeWithTag("search-setup-anthropic").assertIsDisplayed()
+        compose.onAllNodesWithText("No provider configured").assertCountEquals(0)
+        compose.onNodeWithTag("search-setup-gemini").performClick()
+        assertTrue(providersOpened)
     }
 
     @Test

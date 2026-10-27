@@ -300,21 +300,29 @@ tap "Compress history"
 shot 08-compress-no-provider
 end_step
 
-step "Web search chooser and missing-key path"
+step "Web search chooser, provider-native search, and optional local keys"
 tap "Web search"
-expect_text "Model search"
+expect_text "Search with a connected AI model"
+expect_text "Google Gemini"
+expect_text "Anthropic Claude"
 expect_text "Local Search"
 expect_text "Off"
-expect_text "No provider configured"
 shot 09-web-search-sheet
 tap "Local Search"
 expect_text "Search service"
+expect_text "Optional local search API keys"
 shot 10-search-service-from-local-search
+tap "Optional local search API keys"
+expect_text "Google Search"
+expect_text "Brave Search"
+expect_text "Tavily"
+expect_text "Exa"
+shot 10a-optional-local-search-keys
 back
 tap "Web search"
-tap "Model search"
-expect_text "Search service"
-shot 11-search-service-from-model-search
+tap "Google Gemini"
+expect_text "Providers"
+shot 11-open-ai-provider-settings-from-search
 back
 end_step
 
@@ -543,10 +551,13 @@ step "Search-service settings for every provider"
 tap "Open menu"
 tap "Search"
 expect_text "Search service"
+expect_text "Optional local search API keys"
+tap "Optional local search API keys"
 expect_text "Tavily"
 shot 39-search-service
 for service in "Google Search" "Brave Search" "Tavily" "Exa"; do
   tap_scroll "$service"
+  tap "$service"
   expect_text "API key"
   shot "40-search-$service"
 done
@@ -598,6 +609,9 @@ shot 50-default-model-empty
 back
 
 tap_scroll "Search service"
+tap "Search service"
+expect_text "Optional local search API keys"
+tap "Optional local search API keys"
 expect_text "Tavily"
 shot 51-search-service-from-settings
 back

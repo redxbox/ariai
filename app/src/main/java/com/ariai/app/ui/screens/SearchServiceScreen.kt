@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -56,6 +58,7 @@ import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
 import com.ariai.app.ui.theme.AriPaper
 import com.ariai.app.data.models.resolveSearchProviderKey
+import com.ariai.app.data.models.searchProviderDisplayName
 import com.ariai.app.util.tx
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
@@ -82,7 +85,9 @@ fun SearchServiceScreen(
     onSelectProvider: (String) -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf<String?>(null) }
+    var showOptionalLocalApis by remember { mutableStateOf(false) }
     val activeKey = resolveSearchProviderKey(searchKeys, selectedSearchProvider)
+    val activeProviderName = searchProviderDisplayName(activeKey)
 
     Scaffold(
         containerColor = AriPaper,
@@ -105,13 +110,44 @@ fun SearchServiceScreen(
         ) {
             item {
                 Text(
-                    tx("Add an API key to a service, then select it for Local Search. Keys stay on this device."),
+                    tx("Built-in web search can use a connected AI model's own API key. Optional local search keys power Local Search and can serve as fallback when built-in search is unavailable."),
                     color = AriInk.copy(alpha = 0.62f),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            items(searchServices, key = { service -> "search-service:${service.key}" }) { service ->
+            item {
+                Surface(
+                    onClick = { showOptionalLocalApis = !showOptionalLocalApis },
+                    modifier = Modifier.fillMaxWidth().testTag("search-services-toggle"),
+                    shape = RoundedCornerShape(18.dp),
+                    color = AriCard,
+                    tonalElevation = 0.dp
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = AriAccent, modifier = Modifier.size(22.dp))
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(tx("Optional local search API keys"), fontWeight = FontWeight.SemiBold, color = AriInk)
+                            Text(
+                                activeProviderName?.let { "${tx("Active local service")}: ${tx(it)}" }
+                                    ?: tx("Not needed for built-in model search"),
+                                fontSize = 12.sp,
+                                color = AriMuted
+                            )
+                        }
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = tx(if (showOptionalLocalApis) "Collapse" else "Expand"),
+                            tint = AriMuted
+                        )
+                    }
+                }
+            }
+            items(if (showOptionalLocalApis) searchServices else emptyList(), key = { service -> "search-service:${service.key}" }) { service ->
                 val (mark, brand) = when (service.key) {
                     "serper" -> "G" to Color(0xFF4285F4)
                     "brave" -> "B" to Color(0xFFFB542B)
