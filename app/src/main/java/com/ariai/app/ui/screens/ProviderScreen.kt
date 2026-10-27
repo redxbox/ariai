@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.ConnectionResult
 import com.ariai.app.data.remote.checkConnection
+import com.ariai.app.ui.components.ProviderBrandMark
 import com.ariai.app.util.LocalStrings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -492,27 +495,37 @@ fun AddProviderScreen(
     }
 
     Scaffold(
-        containerColor = AriPaper,
+        modifier = modifier.fillMaxSize().background(
+            Brush.verticalGradient(
+                colors = listOf(AriPaper, AriAccentSoft.copy(alpha = 0.18f), AriPaper)
+            )
+        ),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = AriInk) } },
-                title = { Text(if (isEdit) tx("Edit provider") else tx("Add provider"), fontWeight = FontWeight.SemiBold, color = AriInk) }
+                title = { Text(if (isEdit) tx("Edit provider") else tx("Add provider"), fontWeight = FontWeight.SemiBold, color = AriInk) },
+                actions = {
+                    if (isEdit) {
+                        IconButton(onClick = { confirmDelete = true }, modifier = Modifier.testTag("provider-delete")) {
+                            Icon(Icons.Default.DeleteOutline, contentDescription = tx("Delete provider"), tint = AriMuted)
+                        }
+                    }
+                }
             )
         },
         bottomBar = {
             ProviderActionBar(
-                isEdit = isEdit,
                 fetching = fetching,
                 checkingConnection = checkingConnection,
                 canSave = canSave && !fetching,
                 onSave = { saveProviderDraft() },
-                onCheckConnection = { if (!checkingConnection && !fetching) runConnectionCheck() },
-                onDelete = { confirmDelete = true }
+                onCheckConnection = { if (!checkingConnection && !fetching) runConnectionCheck() }
             )
         }
     ) { padding ->
-        Column(modifier = modifier.fillMaxSize().padding(padding)) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -537,23 +550,25 @@ fun AddProviderScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (tab == 0) {
-            // Provider type: one pill row, the selected type uses the shared slate-blue accent
+            // Provider type presets use their own muted brand tint while staying within AriAI's paper palette.
             item { SectionLabel(tx("Provider")) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     providerPresets.forEach { preset ->
                         val selected = selectedType == preset.type
                         val optionBackground by animateColorAsState(
-                            targetValue = if (selected) AriAccent else AriCard,
+                            targetValue = if (selected) preset.color.copy(alpha = 0.11f) else AriCard.copy(alpha = 0.84f),
                             animationSpec = tween(220, easing = FastOutSlowInEasing),
                             label = "provider-preset-background"
                         )
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(18.dp))
-                                .background(optionBackground)
-                                .clickable {
+                        val optionBorder by animateColorAsState(
+                            targetValue = if (selected) preset.color.copy(alpha = 0.48f) else AriLine.copy(alpha = 0.85f),
+                            animationSpec = tween(220, easing = FastOutSlowInEasing),
+                            label = "provider-preset-border"
+                        )
+                        Surface(
+                            modifier = Modifier.weight(1f).heightIn(min = 88.dp)
+                                .selectable(selected = selected, role = Role.RadioButton) {
                                     selectedType = preset.type
                                     baseUrl = preset.baseUrl
                                     if (!nameManuallyEdited || name.isBlank()) {
@@ -561,21 +576,28 @@ fun AddProviderScreen(
                                         nameManuallyEdited = false
                                     }
                                 }
-                                .padding(vertical = 12.dp, horizontal = 4.dp)
+                                .testTag("provider-preset-${preset.type.name.lowercase()}"),
+                            shape = RoundedCornerShape(20.dp),
+                            color = optionBackground,
+                            border = BorderStroke(if (selected) 1.2.dp else 0.75.dp, optionBorder),
+                            shadowElevation = if (selected) 2.dp else 0.dp,
+                            tonalElevation = 0.dp
                         ) {
-                            Box(
-                                modifier = Modifier.size(34.dp).clip(CircleShape).background(preset.color),
-                                contentAlignment = Alignment.Center
+                            Column(
+                                modifier = Modifier.fillMaxSize().padding(vertical = 9.dp, horizontal = 3.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(preset.label.first().toString(), color = AriPaper, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                ProviderBrandMark(type = preset.type, name = preset.label, size = 40.dp)
+                                Text(
+                                    preset.label,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = if (selected) preset.color else AriInk.copy(alpha = 0.76f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
-                            Text(
-                                preset.label,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (selected) Color.White else AriInk.copy(alpha = 0.7f),
-                                maxLines = 1
-                            )
                         }
                     }
                 }
@@ -800,88 +822,88 @@ fun AddProviderScreen(
 
 @Composable
 private fun ProviderActionBar(
-    isEdit: Boolean,
     fetching: Boolean,
     checkingConnection: Boolean,
     canSave: Boolean,
     onSave: () -> Unit,
-    onCheckConnection: () -> Unit,
-    onDelete: () -> Unit
+    onCheckConnection: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .imePadding()
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .testTag("provider-save-action-bar")
                 .animateContentSize(tween(180, easing = FastOutSlowInEasing)),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val saveShape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomStart = 10.dp, bottomEnd = 22.dp)
             Button(
                 onClick = onSave,
-                enabled = canSave,
-                shape = saveShape,
-                contentPadding = PaddingValues(horizontal = 19.dp, vertical = 0.dp),
+                enabled = canSave && !fetching,
+                shape = RoundedCornerShape(22.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AriAccent,
                     contentColor = Color.White,
                     disabledContainerColor = AriAccent.copy(alpha = 0.42f),
                     disabledContentColor = Color.White.copy(alpha = 0.82f)
                 ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 7.dp, pressedElevation = 2.dp),
-                modifier = Modifier.height(54.dp).widthIn(min = 144.dp).testTag("provider-save")
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp, pressedElevation = 2.dp),
+                modifier = Modifier.weight(1f).height(58.dp).testTag("provider-save")
             ) {
                 if (fetching) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(19.dp),
                         strokeWidth = 2.dp,
                         color = Color.White
                     )
                 } else {
-                    Text(tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(19.dp))
+                    Text(tx("Save"), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1)
                 }
             }
 
-            val glassShape = RoundedCornerShape(17.dp)
             Surface(
-                shape = glassShape,
-                color = Color.White.copy(alpha = 0.82f),
-                border = BorderStroke(1.dp, AriLine.copy(alpha = 0.85f)),
-                shadowElevation = 8.dp
+                onClick = onCheckConnection,
+                enabled = !checkingConnection && !fetching,
+                modifier = Modifier.weight(1f).height(58.dp).testTag("provider-test-connection"),
+                shape = RoundedCornerShape(22.dp),
+                color = AriAccentGreenSoft.copy(alpha = 0.86f),
+                contentColor = AriAccentGreen,
+                border = BorderStroke(1.dp, AriAccentGreen.copy(alpha = 0.25f)),
+                shadowElevation = 5.dp,
+                tonalElevation = 0.dp
             ) {
-                IconButton(
-                    onClick = onCheckConnection,
-                    enabled = !checkingConnection && !fetching,
-                    modifier = Modifier.size(52.dp).testTag("provider-test-connection")
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.NetworkCheck,
-                        contentDescription = tx("Check connection"),
-                        tint = if (checkingConnection) AriAccent else AriAccentDark,
-                        modifier = Modifier.size(23.dp)
-                    )
-                }
-            }
-
-            if (isEdit) {
-                Surface(
-                    shape = glassShape,
-                    color = Color.White.copy(alpha = 0.72f),
-                    border = BorderStroke(1.dp, AriLine.copy(alpha = 0.75f)),
-                    shadowElevation = 6.dp
-                ) {
-                    IconButton(onClick = onDelete, modifier = Modifier.size(48.dp).testTag("provider-delete")) {
-                        Icon(Icons.Default.DeleteOutline, contentDescription = tx("Delete provider"), tint = AriMuted, modifier = Modifier.size(21.dp))
+                    if (checkingConnection) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(19.dp),
+                            strokeWidth = 2.dp,
+                            color = AriAccentGreen
+                        )
+                    } else {
+                        Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(20.dp))
                     }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (checkingConnection) tx("Checking…") else tx("Test"),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -1351,37 +1373,23 @@ private fun ProviderEditHeader(
     val host = remember(baseUrl) {
         runCatching { java.net.URI(baseUrl.trim()).host }.getOrNull()?.removePrefix("www.").orEmpty()
     }
-    val providerPreset = providerPresets.firstOrNull { it.type == type }
-    val brand = providerPreset?.color ?: AriInk
-    val iconLetter = providerPreset?.label?.firstOrNull()?.uppercase()
-        ?: name.trim().firstOrNull()?.uppercase()
-        ?: "?"
+    val displayName = name.trim().ifBlank { tx("New provider") }
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = AriCard,
+        color = AriCard.copy(alpha = 0.94f),
         shadowElevation = 1.dp,
         border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().testTag("provider-edit-header")
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(brand.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    iconLetter,
-                    color = brand,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-            }
+            ProviderBrandMark(type = type, name = displayName, size = 50.dp)
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    name.trim().ifBlank { tx("New provider") },
+                    displayName,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 17.sp,
                     color = AriInk,

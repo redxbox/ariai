@@ -29,17 +29,40 @@ fun ProviderBrandMark(
     modifier: Modifier = Modifier,
     size: Dp = 36.dp
 ) {
-    val color = providerBrandColor(provider)
-    val glyph = if (provider == null) {
-        "✦"
-    } else {
-        when (provider.type) {
-            ProviderType.OPENAI -> "✳"
-            ProviderType.GEMINI -> "✦"
-            ProviderType.ANTHROPIC -> "A"
-            ProviderType.OLLAMA -> "O"
-            ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> provider.name.trim().firstOrNull()?.uppercase() ?: "A"
-        }
+    ProviderBrandMarkContent(
+        type = provider?.type,
+        name = provider?.name,
+        modifier = modifier,
+        size = size
+    )
+}
+
+/** The same original marks can be used for presets before a Provider model exists. */
+@Composable
+fun ProviderBrandMark(
+    type: ProviderType,
+    name: String,
+    modifier: Modifier = Modifier,
+    size: Dp = 36.dp
+) {
+    ProviderBrandMarkContent(type = type, name = name, modifier = modifier, size = size)
+}
+
+@Composable
+private fun ProviderBrandMarkContent(
+    type: ProviderType?,
+    name: String?,
+    modifier: Modifier,
+    size: Dp
+) {
+    val color = providerBrandColor(type, name)
+    val glyph = when (type) {
+        null -> "✦"
+        ProviderType.OPENAI -> "✳"
+        ProviderType.GEMINI -> "✦"
+        ProviderType.ANTHROPIC -> "A"
+        ProviderType.OLLAMA -> "O"
+        ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> name?.trim()?.firstOrNull()?.uppercase() ?: "A"
     }
     Surface(
         modifier = modifier.size(size),
@@ -59,11 +82,13 @@ fun ProviderBrandMark(
     }
 }
 
-fun providerBrandColor(provider: Provider?): Color = when {
-    provider == null -> AriAccent
-    provider.type == ProviderType.OPENAI || provider.name.contains("openai", ignoreCase = true) -> AriOpenAI
-    provider.type == ProviderType.GEMINI || provider.name.contains("gemini", ignoreCase = true) -> AriGemini
-    provider.type == ProviderType.ANTHROPIC || provider.name.contains("anthropic", ignoreCase = true) -> AriAnthropic
-    provider.type == ProviderType.OLLAMA || provider.name.contains("ollama", ignoreCase = true) -> AriOllama
+fun providerBrandColor(provider: Provider?): Color = providerBrandColor(provider?.type, provider?.name)
+
+private fun providerBrandColor(type: ProviderType?, name: String?): Color = when {
+    type == null -> AriAccent
+    type == ProviderType.OPENAI || name?.contains("openai", ignoreCase = true) == true -> AriOpenAI
+    type == ProviderType.GEMINI || name?.contains("gemini", ignoreCase = true) == true -> AriGemini
+    type == ProviderType.ANTHROPIC || name?.contains("anthropic", ignoreCase = true) == true -> AriAnthropic
+    type == ProviderType.OLLAMA || name?.contains("ollama", ignoreCase = true) == true -> AriOllama
     else -> AriCustom
 }

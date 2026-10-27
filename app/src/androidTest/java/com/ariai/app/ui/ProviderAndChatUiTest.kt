@@ -161,8 +161,24 @@ class ProviderAndChatUiTest {
         val actionBar = compose.onNodeWithTag("provider-save-action-bar")
             .assertIsDisplayed()
             .fetchSemanticsNode().boundsInRoot
+        val saveAction = compose.onNodeWithTag("provider-save")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val testAction = compose.onNodeWithTag("provider-test-connection")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val rootBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("provider actions should stay clear of the screen edge", actionBar.bottom < rootBottom)
+        assertTrue("Save and Test should be full-size, balanced actions", saveAction.width > actionBar.width * 0.35f && testAction.width > actionBar.width * 0.35f)
+        assertDisplayed("OpenAI preset tile") { compose.onNodeWithTag("provider-preset-openai").assertIsDisplayed() }
+        assertDisplayed("Gemini preset tile") { compose.onNodeWithTag("provider-preset-gemini").assertIsDisplayed() }
+        clickWithLabel("Gemini provider preset") {
+            compose.onNodeWithTag("provider-preset-gemini").performClick()
+        }
+        assertDisplayed("Gemini base URL after preset selection") {
+            compose.onNodeWithText("https://generativelanguage.googleapis.com/v1beta").assertIsDisplayed()
+        }
+        clickWithLabel("OpenAI provider preset") {
+            compose.onNodeWithTag("provider-preset-openai").performClick()
+        }
 
         compose.onNodeWithTag("provider-test-connection").assertIsDisplayed().performClick()
         compose.waitUntil(timeoutMillis = 5_000) {
