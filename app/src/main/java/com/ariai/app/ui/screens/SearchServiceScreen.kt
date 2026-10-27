@@ -13,12 +13,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -28,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +55,7 @@ import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
 import com.ariai.app.ui.theme.AriPaper
+import com.ariai.app.data.models.resolveSearchProviderKey
 import com.ariai.app.util.tx
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
@@ -63,10 +64,10 @@ private data class SearchService(val key: String, val name: String, val descript
 }
 
 private val searchServices = listOf(
-    SearchService("tavily", "Tavily", "Research-focused search API"),
+    SearchService("serper", "Google Search", "Google results via Serper API"),
     SearchService("brave", "Brave Search", "Independent web index"),
-    SearchService("exa", "Exa", "Semantic neural search"),
-    SearchService("serper", "Serper", "Google results via API")
+    SearchService("tavily", "Tavily", "Research-focused search API"),
+    SearchService("exa", "Exa", "Semantic neural search")
 )
 
 /** Each key is encrypted in private DataStore; an explicit test makes one real search request. */
@@ -76,10 +77,12 @@ fun SearchServiceScreen(
     searchKeys: Map<String, String>,
     onSaveKey: (String, String) -> Unit,
     onTestKey: (String, String, (String?) -> Unit) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    selectedSearchProvider: String? = null,
+    onSelectProvider: (String) -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf<String?>(null) }
-    val activeKey = searchServices.firstOrNull { !searchKeys[it.key].isNullOrBlank() }?.key
+    val activeKey = resolveSearchProviderKey(searchKeys, selectedSearchProvider)
 
     Scaffold(
         containerColor = AriPaper,
@@ -102,14 +105,19 @@ fun SearchServiceScreen(
         ) {
             item {
                 Text(
-                    tx("Add an API key to let AriAI search the web before answering. Keys stay on this device."),
+                    tx("Add an API key to a service, then select it for Local Search. Keys stay on this device."),
                     color = AriInk.copy(alpha = 0.62f),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            itemsIndexed(searchServices, key = { _, service -> "search-service:${service.key}" }) { index, service ->
-                val brand = if (index % 2 == 0) AriAccent else AriAccentGreen
+            items(searchServices, key = { service -> "search-service:${service.key}" }) { service ->
+                val (mark, brand) = when (service.key) {
+                    "serper" -> "G" to Color(0xFF4285F4)
+                    "brave" -> "B" to Color(0xFFFB542B)
+                    "tavily" -> "T" to Color(0xFF14A89A)
+                    else -> "E" to Color(0xFF6658D3)
+                }
                 val key = searchKeys[service.key].orEmpty()
                 val isOpen = expanded == service.key
                 val isActive = activeKey == service.key
@@ -125,7 +133,7 @@ fun SearchServiceScreen(
                                 modifier = Modifier.size(40.dp).clip(CircleShape).background(brand.copy(alpha = 0.13f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = brand, modifier = Modifier.size(20.dp))
+                                Text(mark, color = brand, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(service.name, fontWeight = FontWeight.SemiBold, color = AriInk)
@@ -140,6 +148,12 @@ fun SearchServiceScreen(
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (isActive) AriAccentGreen else AriMuted
+                            )
+                            RadioButton(
+                                selected = isActive,
+                                onClick = { if (key.isNotBlank()) onSelectProvider(service.key) },
+                                enabled = key.isNotBlank(),
+                                modifier = Modifier.testTag("search-provider-select-${service.key}")
                             )
                         }
                         if (isOpen) {

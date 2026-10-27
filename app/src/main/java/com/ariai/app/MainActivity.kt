@@ -34,6 +34,8 @@ import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
 import com.ariai.app.util.LocalStrings
 import com.ariai.app.data.models.SearchMode
+import com.ariai.app.data.models.resolveSearchProviderKey
+import com.ariai.app.data.models.searchProviderDisplayName
 import com.ariai.app.util.UiLang
 import com.ariai.app.util.getStringsForLanguage
 import com.ariai.app.util.tx
@@ -98,6 +100,9 @@ fun AppRoot(viewModel: AppViewModel) {
     val agents by viewModel.agents.collectAsState()
     val workspaceFiles by viewModel.workspaceFiles.collectAsState()
     val searchKeys by viewModel.searchKeys.collectAsState()
+    val searchProvider by viewModel.searchProvider.collectAsState()
+    val activeSearchProviderKey = resolveSearchProviderKey(searchKeys, searchProvider)
+    val activeSearchProviderName = searchProviderDisplayName(activeSearchProviderKey)
     val mcpServers by viewModel.mcpServers.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
     val defaultProviderId by viewModel.defaultProviderId.collectAsState()
@@ -286,6 +291,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         favorites = favoriteModels,
                         modelUsageCounts = modelUsageCounts,
                         localSearchConfigured = searchKeys.values.any { it.isNotBlank() },
+                        activeSearchProviderKey = activeSearchProviderKey,
+                        activeSearchProviderName = activeSearchProviderName,
                         onSendMessage = { text, files, level, mode, onSaved ->
                             viewModel.sendMessage(text, files, level, mode, onSaved)
                         },
@@ -435,6 +442,8 @@ fun AppRoot(viewModel: AppViewModel) {
                 composable("search_service") {
                     SearchServiceScreen(
                         searchKeys = searchKeys,
+                        selectedSearchProvider = searchProvider,
+                        onSelectProvider = { viewModel.setSearchProvider(it) },
                         onSaveKey = { name, key -> viewModel.setSearchKey(name, key) },
                         onTestKey = { name, key, onResult -> viewModel.testSearchKey(name, key, onResult) },
                         onBack = { navController.popBackStack() }

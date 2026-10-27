@@ -303,10 +303,11 @@ end_step
 step "Web search chooser and missing-key path"
 tap "Web search"
 expect_text "Model search"
-expect_text "Local search"
-expect_text "Turn off search"
+expect_text "Local Search"
+expect_text "Off"
+expect_text "No provider configured"
 shot 09-web-search-sheet
-tap "Local search"
+tap "Local Search"
 expect_text "Search service"
 shot 10-search-service-from-local-search
 back
@@ -544,7 +545,7 @@ tap "Search"
 expect_text "Search service"
 expect_text "Tavily"
 shot 39-search-service
-for service in "Tavily" "Brave Search" "Exa" "Serper"; do
+for service in "Google Search" "Brave Search" "Tavily" "Exa"; do
   tap_scroll "$service"
   expect_text "API key"
   shot "40-search-$service"

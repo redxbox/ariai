@@ -8,7 +8,6 @@ import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,10 +19,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -172,13 +171,15 @@ fun ThinkingDepthSheet(
     }
 }
 
-/** Chooses where web results come from for the next message. */
+/** Compact search controls opened from the composer; API keys remain in Search service settings. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchSheet(
     mode: SearchMode,
     modelSearchAvailable: Boolean,
     localSearchConfigured: Boolean,
+    activeSearchProviderKey: String? = null,
+    activeSearchProviderName: String? = null,
     onModeChange: (SearchMode) -> Unit,
     onConfigureLocal: () -> Unit,
     onDismiss: () -> Unit
@@ -189,85 +190,184 @@ fun SearchSheet(
         shape = sheetShape,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(tx("Web search"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(tx("Web search"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                Text(
+                    tx("Choose how AriAI searches for your next answer."),
+                    fontSize = 12.sp,
+                    color = Ink.copy(alpha = 0.55f)
+                )
+            }
             Row(
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SearchCard(
-                    icon = Icons.Default.AutoAwesome,
-                    title = tx("Model search"),
-                    subtitle = when {
-                        modelSearchAvailable -> tx("Built into the provider")
-                        localSearchConfigured -> tx("Uses your search service")
-                        else -> tx("No key yet. Tap to set up")
-                    },
-                    selected = mode == SearchMode.MODEL,
-                    enabled = true,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    if (modelSearchAvailable || localSearchConfigured) onModeChange(SearchMode.MODEL) else onConfigureLocal()
-                    onDismiss()
-                }
-                VerticalDivider(
-                    modifier = Modifier.fillMaxHeight(),
-                    color = AriInk.copy(alpha = 0.14f)
-                )
-                SearchCard(
-                    icon = Icons.Default.Public,
-                    title = tx("Local search"),
-                    subtitle = if (localSearchConfigured) tx("Uses your search service") else tx("No key yet. Tap to set up"),
+                SearchModeChoice(
+                    label = tx("Local Search"),
                     selected = mode == SearchMode.LOCAL,
-                    enabled = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1.15f).testTag("search-mode-local")
                 ) {
-                    if (localSearchConfigured) onModeChange(SearchMode.LOCAL) else onConfigureLocal()
+                    when {
+                        mode == SearchMode.LOCAL -> {
+                            onModeChange(SearchMode.OFF)
+                            onDismiss()
+                        }
+                        localSearchConfigured -> {
+                            onModeChange(SearchMode.LOCAL)
+                            onDismiss()
+                        }
+                        else -> {
+                            onDismiss()
+                            onConfigureLocal()
+                        }
+                    }
+                }
+                SearchModeChoice(
+                    label = tx("Model search"),
+                    selected = mode == SearchMode.MODEL,
+                    modifier = Modifier.weight(1.25f).testTag("search-mode-model")
+                ) {
+                    when {
+                        mode == SearchMode.MODEL -> {
+                            onModeChange(SearchMode.OFF)
+                            onDismiss()
+                        }
+                        modelSearchAvailable || localSearchConfigured -> {
+                            onModeChange(SearchMode.MODEL)
+                            onDismiss()
+                        }
+                        else -> {
+                            onDismiss()
+                            onConfigureLocal()
+                        }
+                    }
+                }
+                SearchModeChoice(
+                    label = tx("Off"),
+                    selected = mode == SearchMode.OFF,
+                    modifier = Modifier.weight(0.72f).testTag("search-mode-off")
+                ) {
+                    if (mode != SearchMode.OFF) onModeChange(SearchMode.OFF)
                     onDismiss()
                 }
             }
-            TextButton(
-                onClick = { onModeChange(SearchMode.OFF); onDismiss() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = mode != SearchMode.OFF
-            ) {
-                Text(tx("Turn off search"), color = if (mode != SearchMode.OFF) Accent else Ink.copy(alpha = 0.35f))
-            }
+            HorizontalDivider(color = Ink.copy(alpha = 0.08f))
+            SearchProviderSettingsRow(
+                providerKey = activeSearchProviderKey,
+                providerName = activeSearchProviderName,
+                localSearchConfigured = localSearchConfigured,
+                mode = mode,
+                modelSearchAvailable = modelSearchAvailable,
+                onClick = {
+                    onDismiss()
+                    onConfigureLocal()
+                }
+            )
         }
     }
 }
 
 @Composable
-private fun SearchCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
+private fun SearchModeChoice(
+    label: String,
     selected: Boolean,
-    enabled: Boolean,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val cardShape = RoundedCornerShape(18.dp)
-    val cardColor = if (selected) Accent.copy(alpha = 0.10f) else AriTint
-    val borderColor = if (selected) Accent.copy(alpha = 0.32f) else AriInk.copy(alpha = 0.12f)
-    Column(
-        modifier = modifier
-            .clip(cardShape)
-            .background(cardColor, cardShape)
-            .border(BorderStroke(1.dp, borderColor), cardShape)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(16.dp)
-            .alpha(if (enabled) 1f else 0.5f),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+    val shape = RoundedCornerShape(14.dp)
+    val borderColor = if (selected) Accent.copy(alpha = 0.48f) else Ink.copy(alpha = 0.10f)
+    Surface(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 42.dp),
+        shape = shape,
+        color = if (selected) Accent.copy(alpha = 0.12f) else AriTint,
+        contentColor = if (selected) Accent else Ink.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, borderColor),
+        tonalElevation = 0.dp
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(22.dp))
-            if (selected) Icon(Icons.Default.CheckCircle, contentDescription = tx("Selected"), tint = Accent, modifier = Modifier.size(18.dp))
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                label,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                maxLines = 1,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                textAlign = TextAlign.Center
+            )
         }
-        Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (selected) Accent else Ink)
-        Text(subtitle, fontSize = 12.sp, color = Ink.copy(alpha = 0.55f))
+    }
+}
+
+@Composable
+private fun SearchProviderSettingsRow(
+    providerKey: String?,
+    providerName: String?,
+    localSearchConfigured: Boolean,
+    mode: SearchMode,
+    modelSearchAvailable: Boolean,
+    onClick: () -> Unit
+) {
+    val (mark, brand) = when (providerKey?.lowercase()) {
+        "serper" -> "G" to Color(0xFF4285F4)
+        "brave" -> "B" to Color(0xFFFB542B)
+        "tavily" -> "T" to Color(0xFF14A89A)
+        "exa" -> "E" to Color(0xFF6658D3)
+        else -> "⌕" to Accent
+    }
+    val detail = when {
+        mode == SearchMode.MODEL && modelSearchAvailable && !localSearchConfigured ->
+            tx("Built-in search is active · add a key for Local Search")
+        !localSearchConfigured -> tx("Add an API key to enable local search")
+        mode == SearchMode.LOCAL -> tx("Selected for Local Search")
+        mode == SearchMode.MODEL && modelSearchAvailable -> tx("Fallback provider · tap to manage")
+        mode == SearchMode.MODEL -> tx("Used by Model search · tap to manage")
+        else -> tx("Tap to manage this provider")
+    }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().testTag("search-provider-settings"),
+        shape = RoundedCornerShape(18.dp),
+        color = AriTint,
+        border = BorderStroke(1.dp, Ink.copy(alpha = 0.09f)),
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(brand.copy(alpha = 0.13f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (providerKey == null) {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = brand, modifier = Modifier.size(20.dp))
+                } else {
+                    Text(mark, color = brand, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    providerName?.let(::tx) ?: tx("No provider configured"),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Ink
+                )
+                Text(detail, fontSize = 11.sp, color = Ink.copy(alpha = 0.55f), maxLines = 1)
+            }
+            Icon(
+                Icons.Default.Settings,
+                contentDescription = tx("Search service settings"),
+                tint = Ink.copy(alpha = 0.58f),
+                modifier = Modifier.size(19.dp)
+            )
+        }
     }
 }

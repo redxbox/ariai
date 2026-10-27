@@ -36,6 +36,9 @@ class PreferencesManagerStorageTest {
             assertTrue(encrypted.startsWith("enc1:"))
             assertFalse(encrypted.contains(searchKey))
             assertEquals(searchKey, preferences.searchKeysFlow.first()["tavily"])
+            assertEquals("tavily", preferences.searchProviderFlow.first())
+            preferences.setSearchProvider("serper")
+            assertEquals("serper", preferences.searchProviderFlow.first())
 
             val server = McpServerItem(
                 id = "persisted-mcp-server",

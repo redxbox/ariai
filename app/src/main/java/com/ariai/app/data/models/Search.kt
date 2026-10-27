@@ -9,6 +9,33 @@ enum class SearchProviderType {
     CUSTOM
 }
 
+/** Providers that have working SearchClient implementations, ordered by the recommended fallback. */
+val LOCAL_SEARCH_PROVIDER_PRIORITY = listOf("serper", "brave", "tavily", "exa")
+
+/** Chooses the requested provider when its key exists; otherwise falls back to a configured service. */
+fun resolveSearchProviderKey(searchKeys: Map<String, String>, preferredProvider: String?): String? {
+    fun isConfigured(provider: String) = !searchKeys[provider].isNullOrBlank()
+    val preferred = preferredProvider?.trim()?.lowercase()
+        ?.takeIf { it in LOCAL_SEARCH_PROVIDER_PRIORITY && isConfigured(it) }
+    return preferred ?: LOCAL_SEARCH_PROVIDER_PRIORITY.firstOrNull(::isConfigured)
+}
+
+fun searchProviderTypeForKey(provider: String): SearchProviderType? = when (provider.trim().lowercase()) {
+    "tavily" -> SearchProviderType.TAVILY
+    "brave" -> SearchProviderType.BRAVE
+    "exa" -> SearchProviderType.EXA
+    "serper" -> SearchProviderType.SERPER
+    else -> null
+}
+
+fun searchProviderDisplayName(provider: String?): String? = when (provider?.trim()?.lowercase()) {
+    "tavily" -> "Tavily"
+    "brave" -> "Brave Search"
+    "exa" -> "Exa"
+    "serper" -> "Google Search"
+    else -> null
+}
+
 data class SearchProvider(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,

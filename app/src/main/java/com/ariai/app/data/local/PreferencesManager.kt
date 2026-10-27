@@ -52,6 +52,7 @@ class PreferencesManager(
     val firstLaunchFlow: Flow<Boolean> = dataStore.data.map { it[FIRST_LAUNCH] ?: true }
     val reasoningLevelFlow: Flow<String?> = dataStore.data.map { it[REASONING_LEVEL] }
     val searchModeFlow: Flow<String?> = dataStore.data.map { it[SEARCH_MODE] }
+    val searchProviderFlow: Flow<String?> = dataStore.data.map { it[SEARCH_PROVIDER] }
     val favoriteModelsFlow: Flow<Set<String>> = dataStore.data.map { it[FAVORITE_MODELS] ?: emptySet() }
 
     val searchKeysFlow: Flow<Map<String, String>> = dataStore.data.map { prefs ->
@@ -96,7 +97,8 @@ class PreferencesManager(
     }
 
     suspend fun setSearchApiKey(provider: String, key: String) {
-        val prefKey = when (provider.lowercase()) {
+        val normalizedProvider = provider.trim().lowercase()
+        val prefKey = when (normalizedProvider) {
             "tavily" -> TAVILY_API_KEY
             "brave" -> BRAVE_API_KEY
             "exa" -> EXA_API_KEY
@@ -104,7 +106,21 @@ class PreferencesManager(
             else -> SEARCH_API_KEY
         }
         val trimmed = key.trim()
-        dataStore.edit { it[prefKey] = KeyVault.encrypt(trimmed) }
+        dataStore.edit { prefs ->
+            prefs[prefKey] = KeyVault.encrypt(trimmed)
+            if (trimmed.isNotBlank() && normalizedProvider in setOf("tavily", "brave", "exa", "serper") &&
+                prefs[SEARCH_PROVIDER].isNullOrBlank()
+            ) {
+                prefs[SEARCH_PROVIDER] = normalizedProvider
+            }
+        }
+    }
+
+    suspend fun setSearchProvider(provider: String) {
+        val normalized = provider.trim().lowercase()
+        if (normalized in setOf("tavily", "brave", "exa", "serper")) {
+            dataStore.edit { it[SEARCH_PROVIDER] = normalized }
+        }
     }
 
     /** Encrypts legacy plain-text keys in place; already-encrypted values are left untouched. */

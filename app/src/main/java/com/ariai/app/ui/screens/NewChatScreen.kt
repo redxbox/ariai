@@ -120,6 +120,8 @@ fun NewChatScreen(
     favorites: Set<String> = emptySet(),
     modelUsageCounts: Map<Pair<String, String>, Int> = emptyMap(),
     localSearchConfigured: Boolean = false,
+    activeSearchProviderKey: String? = null,
+    activeSearchProviderName: String? = null,
     onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode, (Boolean) -> Unit) -> Boolean,
     onStopGeneration: () -> Unit = {},
     onBack: () -> Unit,
@@ -502,6 +504,8 @@ fun NewChatScreen(
             mode = searchMode,
             modelSearchAvailable = modelSearchAvailable,
             localSearchConfigured = localSearchConfigured,
+            activeSearchProviderKey = activeSearchProviderKey,
+            activeSearchProviderName = activeSearchProviderName,
             onModeChange = onSearchModeChange,
             onConfigureLocal = onOpenSearchSettings,
             onDismiss = { showSearch = false }
@@ -773,7 +777,7 @@ fun NewChatScreen(
                         ) {
                             IconCircle(Icons.Default.Add, tx("Add to message"), active = false) { showAttachments = true }
                             Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Public, tx("Web search"), active = searchMode != SearchMode.OFF) {
+                            IconCircle(Icons.Default.Search, tx("Web search"), active = searchMode != SearchMode.OFF) {
                                 showSearch = true
                             }
                             Spacer(Modifier.width(6.dp))

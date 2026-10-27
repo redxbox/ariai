@@ -66,6 +66,7 @@ class AppViewModel(
     val theme = prefs.themeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
     val dynamicColor = prefs.dynamicColorFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val searchKeys = prefs.searchKeysFlow.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val searchProvider = prefs.searchProviderFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val mcpServers = prefs.mcpServersFlow.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val defaultProviderId = prefs.defaultProviderFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val defaultModelId = prefs.defaultModelFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -252,13 +253,7 @@ class AppViewModel(
 
     /** Uses one small real request only when the user explicitly asks to test a saved/draft key. */
     fun testSearchKey(provider: String, key: String, onResult: (String?) -> Unit) {
-        val type = when (provider.lowercase()) {
-            "tavily" -> SearchProviderType.TAVILY
-            "brave" -> SearchProviderType.BRAVE
-            "exa" -> SearchProviderType.EXA
-            "serper" -> SearchProviderType.SERPER
-            else -> null
-        }
+        val type = searchProviderTypeForKey(provider)
         val trimmedKey = key.trim()
         if (type == null || trimmedKey.isBlank()) {
             onResult(tx("Enter a valid search service and API key."))
@@ -793,7 +788,7 @@ class AppViewModel(
         }
 
         val localSearchKey = if (searchMode == SearchMode.LOCAL || (searchMode == SearchMode.MODEL && !supportsNativeSearch(provider))) {
-            listOf("tavily", "brave", "exa", "serper").firstNotNullOfOrNull { name ->
+            resolveSearchProviderKey(searchKeys.value, searchProvider.value)?.let { name ->
                 searchKeys.value[name]?.takeIf { it.isNotBlank() }?.let { name to it }
             }
         } else {
@@ -985,13 +980,7 @@ class AppViewModel(
                             if (allowWebSearch && localSearchKey != null) {
                                 val searchProvider = SearchProvider(
                                     name = localSearchKey.first,
-                                    type = when (localSearchKey.first) {
-                                        "tavily" -> SearchProviderType.TAVILY
-                                        "brave" -> SearchProviderType.BRAVE
-                                        "exa" -> SearchProviderType.EXA
-                                        "serper" -> SearchProviderType.SERPER
-                                        else -> SearchProviderType.CUSTOM
-                                    },
+                                    type = searchProviderTypeForKey(localSearchKey.first) ?: SearchProviderType.CUSTOM,
                                     apiKey = localSearchKey.second
                                 )
                                 add(DefaultAgentTools.webSearch { query ->
@@ -1239,6 +1228,10 @@ class AppViewModel(
 
     fun setSearchMode(mode: SearchMode) {
         viewModelScope.launch { prefs.setSearchMode(mode.name) }
+    }
+
+    fun setSearchProvider(provider: String) {
+        viewModelScope.launch { prefs.setSearchProvider(provider) }
     }
 
     fun toggleFavoriteModel(providerId: String, modelId: String) {

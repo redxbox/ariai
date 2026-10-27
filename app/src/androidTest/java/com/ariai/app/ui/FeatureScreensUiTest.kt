@@ -17,10 +17,12 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ariai.app.data.models.Agent
 import com.ariai.app.data.models.McpServerItem
+import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.models.WorkspaceFile
 import com.ariai.app.ui.screens.AgentStudioScreen
 import com.ariai.app.ui.screens.QuickParametersSheet
 import com.ariai.app.ui.screens.SearchServiceScreen
+import com.ariai.app.ui.screens.SearchSheet
 import com.ariai.app.ui.screens.SimpleMcpScreen
 import com.ariai.app.ui.screens.WorkspaceScreen
 import com.ariai.app.ui.theme.AriAiTheme
@@ -203,7 +205,7 @@ class FeatureScreensUiTest {
         }
 
         compose.onAllNodesWithText("No key").assertCountEquals(4)
-        compose.onNodeWithText("Serper").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Google Search").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Tavily").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithTag("search-key-tavily").performTextInput("test-key-from-ui")
         compose.onNodeWithTag("search-test-tavily").performClick()
@@ -214,6 +216,61 @@ class FeatureScreensUiTest {
         compose.onNodeWithText("Save").performClick()
         assertEquals("test-key-from-ui", searchKeys.value["tavily"])
         compose.onNodeWithText("Active").assertExists()
+    }
+
+    @Test
+    fun searchProviderCanBeSelectedFromSavedServices() {
+        val selectedProvider = mutableStateOf("brave")
+        val searchKeys = mapOf("serper" to "google-key", "brave" to "brave-key")
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false, dynamicColor = false) {
+                SearchServiceScreen(
+                    searchKeys = searchKeys,
+                    selectedSearchProvider = selectedProvider.value,
+                    onSelectProvider = { selectedProvider.value = it },
+                    onSaveKey = { _, _ -> },
+                    onTestKey = { _, _, callback -> callback(null) },
+                    onBack = {}
+                )
+            }
+        }
+
+        compose.onNodeWithTag("search-provider-select-serper", useUnmergedTree = true).performScrollTo().performClick()
+        assertEquals("serper", selectedProvider.value)
+        compose.onNodeWithText("Google Search").assertIsDisplayed()
+        compose.onAllNodesWithText("Active").assertCountEquals(1)
+    }
+
+    @Test
+    fun compactSearchSheetSwitchesModesAndOpensProviderSettings() {
+        val mode = mutableStateOf(SearchMode.OFF)
+        var settingsOpened = false
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false, dynamicColor = false) {
+                SearchSheet(
+                    mode = mode.value,
+                    modelSearchAvailable = true,
+                    localSearchConfigured = true,
+                    activeSearchProviderKey = "serper",
+                    activeSearchProviderName = "Google Search",
+                    onModeChange = { mode.value = it },
+                    onConfigureLocal = { settingsOpened = true },
+                    onDismiss = {}
+                )
+            }
+        }
+
+        compose.onNodeWithText("Google Search").assertIsDisplayed()
+        compose.onNodeWithTag("search-mode-local").performClick()
+        assertEquals(SearchMode.LOCAL, mode.value)
+        compose.onNodeWithTag("search-mode-local").performClick()
+        assertEquals(SearchMode.OFF, mode.value)
+        compose.onNodeWithTag("search-mode-model").performClick()
+        assertEquals(SearchMode.MODEL, mode.value)
+        compose.onNodeWithTag("search-provider-settings").performClick()
+        assertTrue(settingsOpened)
     }
 
     @Test
