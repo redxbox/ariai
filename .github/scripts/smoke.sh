@@ -561,9 +561,7 @@ for service in "Google Search" "Brave Search" "Tavily" "Exa"; do
   expect_text "API key"
   shot "40-search-$service"
 done
-# Reveal/hide is safe with an empty key and does not persist a credential.
-tap_scroll "Show key"
-shot 41-search-key-visibility
+# The expanded service editors expose their API-key fields, but this walkthrough enters no credentials.
 back
 expect_text "Message AriAI"
 end_step
