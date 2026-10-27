@@ -525,7 +525,8 @@ tap "Add provider"
 expect_text "Add provider"
 expect_text "Save"
 shot 38-add-provider-direct
-tap "Check connection"
+# The provider editor now presents connection checking as the labeled Test action.
+tap_exact "Test"
 wait_for_text "No API key entered" 10
 expect_text "Close"
 shot 38a-provider-connection-dialog
