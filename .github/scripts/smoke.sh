@@ -288,7 +288,7 @@ hide_keyboard
 tap "Send"
 expect_text "No provider configured"
 shot 02a-send-without-provider
-tap "Quick parameters"
+tap "Off"
 expect_text "Thinking depth"
 expect_text "Not every model supports this"
 shot 03-thinking-sheet
