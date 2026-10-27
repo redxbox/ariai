@@ -3,10 +3,10 @@ package com.ariai.app.ui
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -240,7 +240,7 @@ class FeatureScreensUiTest {
         assertEquals("gemini-2.5-flash", selectedModel.value)
         assertEquals(SearchMode.MODEL, mode.value)
         compose.onNodeWithText("Web search is on. Tap the selected provider again to turn it off.").assertIsDisplayed()
-        compose.onNodeWithTag("native-search-editor-gemini").assertDoesNotExist()
+        compose.onAllNodesWithTag("native-search-editor-gemini").assertCountEquals(0)
     }
 
     @Test
