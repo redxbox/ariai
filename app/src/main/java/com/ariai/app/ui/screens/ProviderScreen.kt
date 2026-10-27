@@ -556,18 +556,16 @@ fun AddProviderScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     providerPresets.forEach { preset ->
                         val selected = selectedType == preset.type
-                        val optionBackground by animateColorAsState(
-                            targetValue = if (selected) preset.color.copy(alpha = 0.11f) else AriCard.copy(alpha = 0.84f),
-                            animationSpec = tween(220, easing = FastOutSlowInEasing),
-                            label = "provider-preset-background"
+                        // Keep selected cards saturated and stable; darken the brand tint slightly for white-label contrast.
+                        val selectedColor = preset.color.copy(
+                            red = preset.color.red * 0.82f,
+                            green = preset.color.green * 0.82f,
+                            blue = preset.color.blue * 0.82f
                         )
-                        val optionBorder by animateColorAsState(
-                            targetValue = if (selected) preset.color.copy(alpha = 0.48f) else AriLine.copy(alpha = 0.85f),
-                            animationSpec = tween(220, easing = FastOutSlowInEasing),
-                            label = "provider-preset-border"
-                        )
+                        val optionBackground = if (selected) selectedColor else AriCard.copy(alpha = 0.9f)
+                        val optionBorder = if (selected) Color.White.copy(alpha = 0.72f) else AriLine.copy(alpha = 0.9f)
                         Surface(
-                            modifier = Modifier.weight(1f).heightIn(min = 88.dp)
+                            modifier = Modifier.weight(1f).height(88.dp)
                                 .selectable(selected = selected, role = Role.RadioButton) {
                                     selectedType = preset.type
                                     baseUrl = preset.baseUrl
@@ -580,7 +578,7 @@ fun AddProviderScreen(
                             shape = RoundedCornerShape(20.dp),
                             color = optionBackground,
                             border = BorderStroke(if (selected) 1.2.dp else 0.75.dp, optionBorder),
-                            shadowElevation = if (selected) 2.dp else 0.dp,
+                            shadowElevation = 0.dp,
                             tonalElevation = 0.dp
                         ) {
                             Column(
@@ -593,7 +591,7 @@ fun AddProviderScreen(
                                     preset.label,
                                     fontSize = 10.sp,
                                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (selected) preset.color else AriInk.copy(alpha = 0.76f),
+                                    color = if (selected) Color.White else AriInk.copy(alpha = 0.76f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

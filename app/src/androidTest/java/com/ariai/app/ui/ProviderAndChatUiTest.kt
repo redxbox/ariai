@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -168,14 +169,22 @@ class ProviderAndChatUiTest {
         val rootBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("provider actions should stay clear of the screen edge", actionBar.bottom < rootBottom)
         assertTrue("Save and Test should be full-size, balanced actions", saveAction.width > actionBar.width * 0.35f && testAction.width > actionBar.width * 0.35f)
-        listOf("openai", "gemini", "anthropic", "ollama", "openai_compatible").forEach { providerTag ->
-            assertDisplayed("$providerTag branded provider preset") {
-                compose.onNodeWithTag("provider-preset-$providerTag").assertIsDisplayed()
-            }
+        val presetTags = listOf("openai", "gemini", "anthropic", "ollama", "openai_compatible")
+        val presetHeights = presetTags.map { providerTag ->
+            val preset = compose.onNodeWithTag("provider-preset-$providerTag")
+            assertDisplayed("$providerTag branded provider preset") { preset.assertIsDisplayed() }
+            preset.fetchSemanticsNode().boundsInRoot.height
         }
+        val presetHeight = presetHeights.first()
+        assertTrue(
+            "Provider tiles should keep a crisp, fixed height instead of resizing with selection: $presetHeights",
+            presetHeights.all { kotlin.math.abs(it - presetHeight) < 1f }
+        )
+        compose.onNodeWithTag("provider-preset-openai").assertIsSelected()
         clickWithLabel("Gemini provider preset") {
             compose.onNodeWithTag("provider-preset-gemini").performClick()
         }
+        compose.onNodeWithTag("provider-preset-gemini").assertIsSelected()
         assertDisplayed("Gemini base URL after preset selection") {
             compose.onNodeWithText("https://generativelanguage.googleapis.com/v1beta").assertIsDisplayed()
         }
@@ -412,7 +421,21 @@ class ProviderAndChatUiTest {
             compose.onNodeWithTag("chat-title-header").assertIsDisplayed()
         }
         val modelFloater = compose.onNodeWithTag("chat-model-floater")
-        assertDisplayed("in-chat provider and model selector") { modelFloater.assertIsDisplayed() }
+        val sendButton = compose.onNodeWithTag("chat-send-button")
+        val composerBounds = compose.onNodeWithTag("chat-composer-container")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val modelBounds = modelFloater.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val sendBounds = sendButton.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Provider/model selector should be compact within the composer: selector=$modelBounds composer=$composerBounds",
+            modelBounds.left >= composerBounds.left && modelBounds.right <= composerBounds.right &&
+                modelBounds.width < composerBounds.width * 0.72f
+        )
+        assertTrue(
+            "Send should stay above the model selector inside the composer: send=$sendBounds selector=$modelBounds",
+            sendBounds.bottom <= modelBounds.top && sendBounds.left >= composerBounds.left &&
+                sendBounds.right <= composerBounds.right
+        )
         clickWithLabel("chat model floater") { modelFloater.performClick() }
         compose.waitForIdle()
         assertDisplayed("provider dock opened from chat") {

@@ -661,21 +661,7 @@ fun NewChatScreen(
                     }
                 }
 
-                // The neural-glass selector keeps provider and model choices inside the chat,
-                // within easy reach of the composer.
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(end = 6.dp, top = 2.dp, bottom = 1.dp),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    ModelSelectorFloater(
-                        provider = currentProvider,
-                        modelName = selectedModelLabel,
-                        statusColor = providerStatusColor,
-                        onClick = { showModelSheet = true },
-                        modifier = Modifier.testTag("chat-model-floater")
-                    )
-                }
-
+                // Keep the model selector compact inside the composer, directly below Send.
                 val composerShape = RoundedCornerShape(26.dp)
                 Surface(
                     shape = composerShape,
@@ -685,6 +671,7 @@ fun NewChatScreen(
                         .fillMaxWidth()
                         .animateContentSize(tween(220, easing = FastOutSlowInEasing))
                         .border(1.dp, AriLine.copy(alpha = 0.9f), composerShape)
+                        .testTag("chat-composer-container")
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
@@ -706,29 +693,72 @@ fun NewChatScreen(
                                 ModeChip(mode = chatMode, onClose = { onChatModeChange(ChatMode.TEXT) }, modifier = Modifier)
                             }
                         }
-                        // Resolve paragraph direction from the input itself so Persian remains RTL
-                        // even when the app's interface language is English.
-                        TextField(
-                            value = inputText,
-                            onValueChange = { inputText = it },
-                            placeholder = { Text(tx("Message AriAI"), color = Muted) },
-                            textStyle = LocalTextStyle.current.copy(
-                                textAlign = TextAlign.Start,
-                                textDirection = TextDirection.ContentOrLtr
-                            ),
-                            modifier = Modifier.fillMaxWidth().testTag("chat-composer"),
-                            maxLines = 12,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = Accent,
-                                focusedTextColor = Ink,
-                                unfocusedTextColor = Ink
+                        val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && !isStreaming && !isSending
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Resolve paragraph direction from the input itself so Persian remains RTL
+                            // even when the app's interface language is English.
+                            TextField(
+                                value = inputText,
+                                onValueChange = { inputText = it },
+                                placeholder = { Text(tx("Message AriAI"), color = Muted) },
+                                textStyle = LocalTextStyle.current.copy(
+                                    textAlign = TextAlign.Start,
+                                    textDirection = TextDirection.ContentOrLtr
+                                ),
+                                modifier = Modifier.weight(1f).testTag("chat-composer"),
+                                maxLines = 12,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    cursorColor = Accent,
+                                    focusedTextColor = Ink,
+                                    unfocusedTextColor = Ink
+                                )
                             )
-                        )
+                            if (isStreaming || isSending) {
+                                // While a request is pending or a reply is coming in, allow cancellation.
+                                Surface(
+                                    onClick = { onStopGeneration() },
+                                    modifier = Modifier.size(42.dp).testTag("chat-send-button"),
+                                    shape = CircleShape,
+                                    color = AriAccentDark,
+                                    contentColor = Color.White,
+                                    shadowElevation = 3.dp,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Stop, contentDescription = tx("Stop"), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            } else {
+                                Surface(
+                                    onClick = { send() },
+                                    enabled = canSend,
+                                    modifier = Modifier.size(42.dp).testTag("chat-send-button"),
+                                    shape = CircleShape,
+                                    color = if (canSend) AriAccent else AriAccent.copy(alpha = 0.56f),
+                                    contentColor = Color.White,
+                                    shadowElevation = if (canSend) 4.dp else 1.dp,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.ArrowUpward,
+                                            contentDescription = tx("Send"),
+                                            tint = Color.White.copy(alpha = 0.94f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -749,33 +779,13 @@ fun NewChatScreen(
                                 }
                             }
                             Spacer(Modifier.weight(1f))
-                            val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && !isStreaming && !isSending
-                            if (isStreaming || isSending) {
-                                // While a request is pending or a reply is coming in, allow cancellation.
-                                Box(
-                                    modifier = Modifier.size(40.dp).clip(CircleShape)
-                                        .background(AriInk)
-                                        .clickable { onStopGeneration() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Stop, contentDescription = tx("Stop"), tint = AriCard, modifier = Modifier.size(18.dp))
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier.size(40.dp).clip(CircleShape)
-                                        .background(animateColorAsState(if (canSend) AriAccent else AriTint, tween(200), label = "send").value)
-                                        .clickable(enabled = canSend) { send() }
-                                        .testTag("chat-send-button"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.ArrowUpward,
-                                        contentDescription = tx("Send"),
-                                        tint = if (canSend) AriCard else Ink.copy(alpha = 0.35f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
+                            ModelSelectorFloater(
+                                provider = currentProvider,
+                                modelName = selectedModelLabel,
+                                statusColor = providerStatusColor,
+                                onClick = { showModelSheet = true },
+                                modifier = Modifier.testTag("chat-model-floater")
+                            )
                         }
                     }
                 }
@@ -951,7 +961,7 @@ private fun ModelSelectorFloater(
     val shape = RoundedCornerShape(24.dp)
     Surface(
         onClick = onClick,
-        modifier = modifier.widthIn(min = 210.dp, max = 300.dp)
+        modifier = modifier.widthIn(min = 132.dp, max = 188.dp)
             .semantics(mergeDescendants = true) {
                 contentDescription = tx("Choose model")
                 stateDescription = "${provider?.name ?: tx("No provider")} · $modelName"
@@ -959,8 +969,8 @@ private fun ModelSelectorFloater(
         shape = shape,
         color = Color.White.copy(alpha = 0.94f),
         contentColor = Ink,
-        shadowElevation = 11.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.28f))
+        shadowElevation = 4.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.34f))
     ) {
         Box {
             Box(
@@ -975,11 +985,11 @@ private fun ModelSelectorFloater(
                 )
             )
             Row(
-                modifier = Modifier.heightIn(min = 62.dp).padding(horizontal = 10.dp, vertical = 8.dp),
+                modifier = Modifier.heightIn(min = 46.dp).padding(horizontal = 8.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Box(modifier = Modifier.size(44.dp)) {
+                Box(modifier = Modifier.size(34.dp)) {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = Color.White.copy(alpha = 0.68f),
@@ -987,7 +997,7 @@ private fun ModelSelectorFloater(
                         tonalElevation = 0.dp
                     ) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            AriBinaryBrainMark(size = 29.dp, tint = accent)
+                            AriBinaryBrainMark(size = 23.dp, tint = accent)
                         }
                     }
                     Surface(
@@ -1009,7 +1019,7 @@ private fun ModelSelectorFloater(
                         ProviderBrandMark(
                             provider = provider,
                             modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp),
-                            size = 19.dp
+                            size = 15.dp
                         )
                     }
                 }

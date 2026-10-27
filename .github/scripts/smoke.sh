@@ -252,8 +252,9 @@ shot 00-app-home
 
 step "Chat home and model picker"
 expect_text "How can I help you?"
+expect_text "Send"
 shot 01-chat-home
-# Provider/model selection now lives in the neural-glass control beside the composer.
+# The compact neural-glass model selector sits inside the composer, directly beneath Send.
 tap "Choose model"
 wait_for_text "No models available" 30
 shot 02-model-picker
