@@ -2,7 +2,9 @@ package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
 import com.ariai.app.ui.components.ReplyContent
+import com.ariai.app.ui.components.AriBinaryBrainMark
 import com.ariai.app.ui.components.ProviderBrandMark
+import com.ariai.app.ui.components.providerBrandColor
 import com.ariai.app.util.UiLang
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ariai.app.data.remote.supportsNativeSearch
@@ -63,12 +65,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
@@ -261,6 +265,12 @@ fun NewChatScreen(
     val selectedModelLabel = selectedModelCapabilities?.displayName
         ?: selectedModel?.substringAfterLast('/')
         ?: tx("Choose model")
+    val providerStatusColor = when {
+        checkingConnection -> AriAccent
+        connectionResult is ConnectionResult.Ok -> AriAccentGreen
+        connectionResult is ConnectionResult.Failed -> AriError
+        else -> Muted.copy(alpha = 0.55f)
+    }
     val selectedModelIsImageOnly = selectedModelCapabilities?.let { it.supportsImageGen && !it.outputsText } == true
     val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
     val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
@@ -518,18 +528,8 @@ fun NewChatScreen(
                     }
                 },
                 title = {
-                    val statusColor = when {
-                        checkingConnection -> AriAccent
-                        connectionResult is ConnectionResult.Ok -> AriAccentGreen
-                        connectionResult is ConnectionResult.Failed -> AriError
-                        else -> Muted.copy(alpha = 0.55f)
-                    }
-                    ProviderModelTitle(
-                        provider = currentProvider,
-                        modelName = selectedModelLabel,
-                        chatTitle = chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat"),
-                        statusColor = statusColor,
-                        onClick = { showModelSheet = true }
+                    ChatHeaderTitle(
+                        chatTitle = chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat")
                     )
                 },
                 actions = {
@@ -661,8 +661,8 @@ fun NewChatScreen(
                     }
                 }
 
-                // A distinct floating model pebble keeps model switching close to the composer,
-                // without copying the reference app's long provider dock.
+                // The neural-glass selector keeps provider and model choices inside the chat,
+                // within easy reach of the composer.
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(end = 6.dp, top = 2.dp, bottom = 1.dp),
                     contentAlignment = Alignment.CenterEnd
@@ -670,6 +670,7 @@ fun NewChatScreen(
                     ModelSelectorFloater(
                         provider = currentProvider,
                         modelName = selectedModelLabel,
+                        statusColor = providerStatusColor,
                         onClick = { showModelSheet = true },
                         modifier = Modifier.testTag("chat-model-floater")
                     )
@@ -919,44 +920,22 @@ fun NewChatScreen(
 }
 
 @Composable
-private fun ProviderModelTitle(
-    provider: Provider?,
-    modelName: String,
-    chatTitle: String,
-    statusColor: Color,
-    onClick: () -> Unit
-) {
-    val providerName = provider?.name ?: tx("No provider")
+private fun ChatHeaderTitle(chatTitle: String) {
     Row(
-        modifier = Modifier.fillMaxWidth()
-            .semantics { contentDescription = tx("Open models") }
-            .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxWidth().testTag("chat-title-header").padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProviderBrandMark(provider = provider, size = 30.dp)
+        ProviderBrandMark(provider = null, size = 30.dp)
         Spacer(Modifier.width(8.dp))
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(
-                chatTitle,
-                color = Ink,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontSize = 15.sp
-            )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    "$providerName · $modelName",
-                    color = Muted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 10.sp
-                )
-                Box(Modifier.size(6.dp).clip(CircleShape).background(statusColor))
-            }
-        }
+        Text(
+            chatTitle,
+            modifier = Modifier.weight(1f),
+            color = Ink,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontSize = 15.sp
+        )
     }
 }
 
@@ -964,50 +943,107 @@ private fun ProviderModelTitle(
 private fun ModelSelectorFloater(
     provider: Provider?,
     modelName: String,
+    statusColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(topStart = 21.dp, topEnd = 21.dp, bottomEnd = 21.dp, bottomStart = 9.dp)
+    val accent = providerBrandColor(provider)
+    val shape = RoundedCornerShape(24.dp)
     Surface(
         onClick = onClick,
-        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = tx("Choose model") },
+        modifier = modifier.widthIn(min = 210.dp, max = 300.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = tx("Choose model")
+                stateDescription = "${provider?.name ?: tx("No provider")} · $modelName"
+            },
         shape = shape,
-        color = Color.White.copy(alpha = 0.84f),
+        color = Color.White.copy(alpha = 0.94f),
         contentColor = Ink,
-        shadowElevation = 9.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, AriLine.copy(alpha = 0.84f))
+        shadowElevation = 11.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.28f))
     ) {
-        Row(
-            modifier = Modifier.padding(start = 7.dp, end = 11.dp, top = 6.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box {
-                ProviderBrandMark(provider = provider, size = 34.dp)
-                Box(
-                    modifier = Modifier.align(Alignment.BottomEnd).size(8.dp)
-                        .clip(CircleShape).background(AriAccent)
-                        .border(1.dp, Color.White, CircleShape)
+        Box {
+            Box(
+                modifier = Modifier.matchParentSize().clip(shape).background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.97f),
+                            AriAccentSoft.copy(alpha = 0.72f),
+                            accent.copy(alpha = 0.11f)
+                        )
+                    )
+                )
+            )
+            Row(
+                modifier = Modifier.heightIn(min = 62.dp).padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                Box(modifier = Modifier.size(44.dp)) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White.copy(alpha = 0.68f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.92f)),
+                        tonalElevation = 0.dp
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            AriBinaryBrainMark(size = 29.dp, tint = accent)
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp),
+                        shape = RoundedCornerShape(6.dp),
+                        color = accent,
+                        contentColor = Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
+                        tonalElevation = 1.dp
+                    ) {
+                        Text(
+                            "01",
+                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (provider != null) {
+                        ProviderBrandMark(
+                            provider = provider,
+                            modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp),
+                            size = 19.dp
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(
+                            provider?.name ?: tx("No provider"),
+                            modifier = Modifier.weight(1f),
+                            color = Muted,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(statusColor))
+                    }
+                    Text(
+                        modelName,
+                        color = Ink,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(19.dp)
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    provider?.name ?: tx("No provider"),
-                    color = Muted,
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    modelName,
-                    color = Ink,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = AriAccent, modifier = Modifier.size(18.dp))
         }
     }
 }

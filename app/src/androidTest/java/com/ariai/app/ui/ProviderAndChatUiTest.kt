@@ -168,8 +168,11 @@ class ProviderAndChatUiTest {
         val rootBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("provider actions should stay clear of the screen edge", actionBar.bottom < rootBottom)
         assertTrue("Save and Test should be full-size, balanced actions", saveAction.width > actionBar.width * 0.35f && testAction.width > actionBar.width * 0.35f)
-        assertDisplayed("OpenAI preset tile") { compose.onNodeWithTag("provider-preset-openai").assertIsDisplayed() }
-        assertDisplayed("Gemini preset tile") { compose.onNodeWithTag("provider-preset-gemini").assertIsDisplayed() }
+        listOf("openai", "gemini", "anthropic", "ollama", "openai_compatible").forEach { providerTag ->
+            assertDisplayed("$providerTag branded provider preset") {
+                compose.onNodeWithTag("provider-preset-$providerTag").assertIsDisplayed()
+            }
+        }
         clickWithLabel("Gemini provider preset") {
             compose.onNodeWithTag("provider-preset-gemini").performClick()
         }
@@ -363,7 +366,7 @@ class ProviderAndChatUiTest {
     }
 
     @Test
-    fun floatingModelPebbleOpensProviderDockNearTheComposer() {
+    fun neuralGlassSelectorOpensProviderDockNearTheComposer() {
         val provider = Provider(
             id = "provider-floater-test",
             name = "Pebble provider",
@@ -405,8 +408,11 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
+        assertDisplayed("chat title stays in the top bar") {
+            compose.onNodeWithTag("chat-title-header").assertIsDisplayed()
+        }
         val modelFloater = compose.onNodeWithTag("chat-model-floater")
-        assertDisplayed("chat model floater") { modelFloater.assertIsDisplayed() }
+        assertDisplayed("in-chat provider and model selector") { modelFloater.assertIsDisplayed() }
         clickWithLabel("chat model floater") { modelFloater.performClick() }
         compose.waitForIdle()
         assertDisplayed("provider dock opened from chat") {

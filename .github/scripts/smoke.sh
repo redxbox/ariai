@@ -253,7 +253,8 @@ shot 00-app-home
 step "Chat home and model picker"
 expect_text "How can I help you?"
 shot 01-chat-home
-tap "Open models"
+# Provider/model selection now lives in the neural-glass control beside the composer.
+tap "Choose model"
 wait_for_text "No models available" 30
 shot 02-model-picker
 back
