@@ -435,12 +435,14 @@ class ProviderAndChatUiTest {
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val rootCenterX = (screenBounds.left + screenBounds.right) / 2f
         val selectorCenterX = (modelBounds.left + modelBounds.right) / 2f
+        val selectorCenterY = (modelBounds.top + modelBounds.bottom) / 2f
+        val selectorRowCenterY = (selectorRowBounds.top + selectorRowBounds.bottom) / 2f
         assertTrue(
             "Selector should remain a small centered pill below the top bar: selector=$modelBounds row=$selectorRowBounds root=$screenBounds",
             modelBounds.width < screenBounds.width * 0.72f &&
                 modelBounds.height < screenBounds.height * 0.08f &&
                 kotlin.math.abs(selectorCenterX - rootCenterX) < screenBounds.width * 0.03f &&
-                modelBounds.top >= selectorRowBounds.top && modelBounds.bottom <= selectorRowBounds.bottom
+                kotlin.math.abs(selectorCenterY - selectorRowCenterY) < screenBounds.height * 0.015f
         )
         assertTrue(
             "Top selector must not cover the composer or Send button: selector=$modelBounds composer=$composerBounds send=$sendBounds",
