@@ -4,22 +4,24 @@ import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativeSearchModelsTest {
     @Test
-    fun availableModelsRequireEnabledProviderAndItsApiKey() {
+    fun optionsContainOnlyGeminiAndAnthropicAndRequireTheirOwnUsableProviderKeys() {
         val gemini = provider(
             id = "gemini",
             type = ProviderType.GEMINI,
             apiKey = "gemini-key",
             models = listOf(
                 model("gemini-text", "Gemini Text", "gemini"),
-                model("gemini-text-v2", "Gemini Text v2", "gemini"),
                 model("imagen", "Imagen", "gemini", outputsText = false)
             )
         )
+        val anthropicWithoutKey = provider("anthropic-no-key", ProviderType.ANTHROPIC, apiKey = "")
         val openRouter = provider(
             id = "openrouter",
             type = ProviderType.OPENAI_COMPATIBLE,
@@ -27,30 +29,39 @@ class NativeSearchModelsTest {
             models = listOf(model("anthropic/claude", "Claude via OpenRouter", "openrouter")),
             baseUrl = "https://openrouter.ai/api/v1"
         )
-        val withoutKey = provider("anthropic-no-key", ProviderType.ANTHROPIC, apiKey = "")
-        val disabled = provider("gemini-disabled", ProviderType.GEMINI, enabled = false)
-        val locked = provider("gemini-locked", ProviderType.GEMINI, apiKeyNeedsReentry = true)
-        val incompatible = provider("openai", ProviderType.OPENAI, apiKey = "openai-key")
+        val openAI = provider("openai", ProviderType.OPENAI, apiKey = "openai-key")
 
-        val choices = availableNativeSearchModels(
-            listOf(withoutKey, incompatible, gemini, openRouter, disabled, locked),
+        val options = nativeSearchProviderOptions(
+            listOf(anthropicWithoutKey, openAI, openRouter, gemini),
             selectedProviderId = null,
             selectedModelId = null
         )
 
-        assertEquals(listOf("gemini-text", "anthropic/claude", "gemini-text-v2"), choices.map { it.model.id })
-        assertEquals(listOf("gemini", "openrouter", "gemini"), choices.map { it.provider.id })
+        assertEquals(listOf(ProviderType.GEMINI, ProviderType.ANTHROPIC), options.map { it.type })
+        assertEquals("gemini", options[0].provider?.id)
+        assertEquals("gemini-text", options[0].model?.id)
+        assertTrue(options[0].isReady)
+        assertEquals("anthropic-no-key", options[1].provider?.id)
+        assertFalse(options[1].hasUsableKey)
+        assertNull(options[1].model)
+        assertFalse(options[1].isReady)
     }
 
     @Test
-    fun currentModelAndAnotherProviderArePrioritizedInTheTwoVisibleChoices() {
-        val gemini = provider(
-            id = "gemini",
+    fun currentProviderAndTextModelArePreferredForEachNativeProvider() {
+        val firstGemini = provider(
+            id = "gemini-first",
             type = ProviderType.GEMINI,
-            apiKey = "gemini-key",
+            apiKey = "first-key",
+            models = listOf(model("gemini-first-model", "Gemini First", "gemini-first"))
+        )
+        val selectedGemini = provider(
+            id = "gemini-selected",
+            type = ProviderType.GEMINI,
+            apiKey = "selected-key",
             models = listOf(
-                model("gemini-first", "Gemini First", "gemini"),
-                model("gemini-selected", "Gemini Selected", "gemini")
+                model("image-only", "Imagen", "gemini-selected", outputsText = false),
+                model("gemini-selected-model", "Gemini Selected", "gemini-selected")
             )
         )
         val anthropic = provider(
@@ -60,14 +71,31 @@ class NativeSearchModelsTest {
             models = listOf(model("claude", "Claude", "anthropic"))
         )
 
-        val choices = availableNativeSearchModels(
-            listOf(gemini, anthropic),
-            selectedProviderId = "gemini",
-            selectedModelId = "gemini-selected"
+        val options = nativeSearchProviderOptions(
+            listOf(firstGemini, anthropic, selectedGemini),
+            selectedProviderId = "gemini-selected",
+            selectedModelId = "gemini-selected-model"
         )
 
-        assertEquals(listOf("gemini-selected", "claude", "gemini-first"), choices.map { it.model.id })
-        assertTrue(choices.all { it.provider.apiKey.isNotBlank() })
+        assertEquals("gemini-selected", options[0].provider?.id)
+        assertEquals("gemini-selected-model", options[0].model?.id)
+        assertEquals("anthropic", options[1].provider?.id)
+        assertEquals("claude", options[1].model?.id)
+        assertTrue(options.all { it.hasUsableKey })
+    }
+
+    @Test
+    fun disabledOrLockedProviderKeysCannotEnableNativeSearch() {
+        val disabled = provider("gemini-disabled", ProviderType.GEMINI, enabled = false)
+        val locked = provider("anthropic-locked", ProviderType.ANTHROPIC, apiKeyNeedsReentry = true)
+
+        val options = nativeSearchProviderOptions(listOf(disabled, locked), null, null)
+
+        assertEquals(2, options.size)
+        assertFalse(options[0].hasUsableKey)
+        assertFalse(options[1].hasUsableKey)
+        assertNull(options[0].model)
+        assertNull(options[1].model)
     }
 
     private fun provider(

@@ -53,6 +53,26 @@ expect_text() {
   echo "$output"
 }
 
+expect_absent_text() {
+  local label="$1"
+  local output
+  local status=0
+  output="$(python3 .github/scripts/ui_tap.py --assert "$label" 2>&1)" || status=$?
+  if [[ "$status" -eq 0 ]]; then
+    echo "::error title=Unexpected UI target::$label is present"
+    FAILED=1
+    capture_failure "$label"
+    return 1
+  elif [[ "$status" -ne 1 ]]; then
+    echo "$output"
+    echo "::error title=UI absence check failed::$label; ui_tap.py exited with status $status"
+    FAILED=1
+    capture_failure "$label"
+    return 1
+  fi
+  echo "Confirmed absent: $label"
+}
+
 tap() {
   local label="$1"
   local output
@@ -300,29 +320,22 @@ tap "Compress history"
 shot 08-compress-no-provider
 end_step
 
-step "Web search chooser, provider-native search, and optional local keys"
+step "Web search chooser and inline provider setup"
 tap "Web search"
-expect_text "Search with a connected AI model"
 expect_text "Google Gemini"
 expect_text "Anthropic Claude"
-expect_text "Local Search"
-expect_text "Off"
+expect_absent_text "Local Search"
+expect_absent_text "Google Search"
+expect_absent_text "Brave Search"
+expect_absent_text "Tavily"
+expect_absent_text "Exa"
 shot 09-web-search-sheet
-tap "Local Search"
-expect_text "Search service"
-expect_text "Optional local search API keys"
-shot 10-search-service-from-local-search
-tap "Optional local search API keys"
-expect_text "Google Search"
-expect_text "Brave Search"
-expect_text "Tavily"
-expect_text "Exa"
-shot 10a-optional-local-search-keys
-back
-tap "Web search"
-tap "Google Gemini"
-expect_text "Providers"
-shot 11-open-ai-provider-settings-from-search
+tap "Configure Gemini web search"
+expect_text "Provider API key"
+expect_text "Paste the provider API key"
+expect_text "No separate search key is needed"
+shot 10-inline-gemini-search-settings
+tap "Cancel"
 back
 end_step
 
@@ -547,21 +560,24 @@ back
 expect_text "Message AriAI"
 end_step
 
-step "Search-service settings for every provider"
+step "Search-service settings for Gemini and Anthropic"
 tap "Open menu"
 tap "Search"
 expect_text "Search service"
-expect_text "Optional local search API keys"
-tap "Optional local search API keys"
-expect_text "Tavily"
+expect_text "Built-in web search"
+expect_text "Google Gemini"
+expect_text "Anthropic Claude"
+expect_absent_text "Google Search"
+expect_absent_text "Brave Search"
+expect_absent_text "Tavily"
+expect_absent_text "Exa"
 shot 39-search-service
-for service in "Google Search" "Brave Search" "Tavily" "Exa"; do
-  tap_scroll "$service"
-  tap "$service"
-  expect_text "API key"
-  shot "40-search-$service"
-done
-# The expanded service editors expose their API-key fields, but this walkthrough enters no credentials.
+
+tap "Configure Anthropic web search"
+expect_text "Provider API key"
+expect_text "No separate search key is needed"
+shot 40-inline-anthropic-search-settings
+tap "Cancel"
 back
 expect_text "Message AriAI"
 end_step
@@ -608,9 +624,10 @@ back
 
 tap_scroll "Search service"
 tap "Search service"
-expect_text "Optional local search API keys"
-tap "Optional local search API keys"
-expect_text "Tavily"
+expect_text "Built-in web search"
+expect_text "Google Gemini"
+expect_text "Anthropic Claude"
+expect_absent_text "Local Search"
 shot 51-search-service-from-settings
 back
 

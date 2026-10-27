@@ -3,6 +3,7 @@ package com.ariai.app.ui
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -23,7 +24,6 @@ import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.models.WorkspaceFile
 import com.ariai.app.ui.screens.AgentStudioScreen
-import com.ariai.app.ui.screens.NativeSearchModelChoice
 import com.ariai.app.ui.screens.QuickParametersSheet
 import com.ariai.app.ui.screens.SearchServiceScreen
 import com.ariai.app.ui.screens.SearchSheet
@@ -186,159 +186,113 @@ class FeatureScreensUiTest {
     }
 
     @Test
-    fun searchKeyCanBeTestedWithoutSavingAndThenStoredByTheSettingsCallback() {
-        val searchKeys = mutableStateOf(emptyMap<String, String>())
-        var testedProvider: String? = null
-        var testedKey: String? = null
-
-        compose.setContent {
-            AriAiTheme(darkTheme = false, dynamicColor = false) {
-                SearchServiceScreen(
-                    searchKeys = searchKeys.value,
-                    onSaveKey = { name, key ->
-                        searchKeys.value = if (key.isBlank()) searchKeys.value - name else searchKeys.value + (name to key)
-                    },
-                    onTestKey = { name, key, callback ->
-                        testedProvider = name
-                        testedKey = key
-                        callback(null)
-                    },
-                    onBack = {}
-                )
-            }
-        }
-
-        compose.onAllNodesWithText("No key").assertCountEquals(0)
-        compose.onNodeWithTag("search-services-toggle").performClick()
-        compose.onAllNodesWithText("No key").assertCountEquals(4)
-        compose.onNodeWithText("Google Search").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Tavily").performScrollTo().assertIsDisplayed().performClick()
-        compose.onNodeWithTag("search-key-tavily").performTextInput("test-key-from-ui")
-        compose.onNodeWithTag("search-test-tavily").performClick()
-        compose.onNodeWithText("Connection successful.").assertIsDisplayed()
-        assertEquals("tavily", testedProvider)
-        assertEquals("test-key-from-ui", testedKey)
-
-        compose.onNodeWithText("Save").performClick()
-        assertEquals("test-key-from-ui", searchKeys.value["tavily"])
-        compose.onNodeWithText("Active").assertExists()
-    }
-
-    @Test
-    fun searchProviderCanBeSelectedFromSavedServices() {
-        val selectedProvider = mutableStateOf("brave")
-        val searchKeys = mapOf("serper" to "google-key", "brave" to "brave-key")
-
-        compose.setContent {
-            AriAiTheme(darkTheme = false, dynamicColor = false) {
-                SearchServiceScreen(
-                    searchKeys = searchKeys,
-                    selectedSearchProvider = selectedProvider.value,
-                    onSelectProvider = { selectedProvider.value = it },
-                    onSaveKey = { _, _ -> },
-                    onTestKey = { _, _, callback -> callback(null) },
-                    onBack = {}
-                )
-            }
-        }
-
-        compose.onNodeWithTag("search-services-toggle").performClick()
-        compose.onNodeWithTag("search-provider-select-serper", useUnmergedTree = true).performScrollTo().performClick()
-        assertEquals("serper", selectedProvider.value)
-        compose.onNodeWithText("Google Search").assertIsDisplayed()
-        compose.onAllNodesWithText("Active").assertCountEquals(1)
-    }
-
-    @Test
-    fun compactSearchSheetSelectsNativeSearchModelsAndSwitchesModes() {
+    fun searchSheetShowsOnlyGeminiAndAnthropicAndInlineSaveActivatesNativeSearch() {
         val mode = mutableStateOf(SearchMode.OFF)
-        val gemini = Provider(
-            id = "gemini-ui",
-            name = "Google Gemini",
-            type = ProviderType.GEMINI,
-            baseUrl = "https://generativelanguage.googleapis.com",
-            apiKey = "gemini-test-key",
-            models = listOf(
-                AIModel("gemini-2.0-flash", "Gemini 2.0 Flash", "gemini-ui"),
-                AIModel("gemini-2.0-pro", "Gemini 2.0 Pro", "gemini-ui")
-            )
-        )
-        val anthropic = Provider(
-            id = "anthropic-ui",
-            name = "Anthropic",
-            type = ProviderType.ANTHROPIC,
-            baseUrl = "https://api.anthropic.com",
-            apiKey = "anthropic-test-key",
-            models = listOf(AIModel("claude-sonnet", "Claude Sonnet", "anthropic-ui"))
-        )
-        var selectedProvider: String? = null
-        var selectedModel: String? = null
-        var settingsOpened = false
+        val providers = mutableStateListOf<Provider>()
+        val selectedProvider = mutableStateOf<String?>(null)
+        val selectedModel = mutableStateOf<String?>(null)
+        var savedProviderType: ProviderType? = null
+        var savedApiKey: String? = null
+        var savedProviderId: String? = null
 
         compose.setContent {
             AriAiTheme(darkTheme = false, dynamicColor = false) {
                 SearchSheet(
                     mode = mode.value,
-                    localSearchConfigured = true,
-                    activeSearchProviderKey = "serper",
-                    activeSearchProviderName = "Google Search",
-                    nativeSearchModels = listOf(
-                        NativeSearchModelChoice(gemini, gemini.models.first()),
-                        NativeSearchModelChoice(anthropic, anthropic.models.first()),
-                        NativeSearchModelChoice(gemini, gemini.models.last())
-                    ),
-                    selectedProviderId = "anthropic-ui",
-                    selectedModelId = "claude-sonnet",
+                    providers = providers,
+                    selectedProviderId = selectedProvider.value,
+                    selectedModelId = selectedModel.value,
                     onModeChange = { mode.value = it },
                     onSelectSearchModel = { providerId, modelId ->
-                        selectedProvider = providerId
-                        selectedModel = modelId
+                        selectedProvider.value = providerId
+                        selectedModel.value = modelId
                     },
-                    onConfigureLocal = { settingsOpened = true },
-                    onManageProviders = {},
+                    onSaveProvider = { draft, onSaved ->
+                        savedProviderType = draft.type
+                        savedApiKey = draft.apiKey
+                        val saved = draft.copy(
+                            models = listOf(AIModel("gemini-2.5-flash", "Gemini 2.5 Flash", draft.id))
+                        )
+                        savedProviderId = saved.id
+                        providers.add(saved)
+                        onSaved(saved)
+                    },
                     onDismiss = {}
                 )
             }
         }
 
-        compose.onNodeWithText("Gemini 2.0 Flash").assertIsDisplayed()
-        compose.onNodeWithText("Claude Sonnet").assertIsDisplayed()
-        compose.onNodeWithTag("search-models-toggle").performScrollTo().assertIsDisplayed().performClick()
-        compose.onNodeWithText("Gemini 2.0 Pro").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("search-model-anthropic-ui-claude-sonnet").performClick()
-        assertEquals("anthropic-ui", selectedProvider)
-        assertEquals("claude-sonnet", selectedModel)
+        compose.onNodeWithTag("native-search-provider-gemini").assertIsDisplayed()
+        compose.onNodeWithTag("native-search-provider-anthropic").assertIsDisplayed()
+        compose.onNodeWithTag("native-search-settings-gemini").assertIsDisplayed()
+        compose.onNodeWithTag("native-search-settings-anthropic").assertIsDisplayed()
+        listOf("Local Search", "Google Search", "Brave Search", "Tavily", "Exa", "Off")
+            .forEach { compose.onAllNodesWithText(it).assertCountEquals(0) }
+
+        compose.onNodeWithTag("native-search-settings-gemini").performClick()
+        compose.onNodeWithTag("native-search-editor-gemini").assertIsDisplayed()
+        compose.onNodeWithTag("native-search-key-gemini").performTextInput("gemini-provider-key")
+        compose.onNodeWithTag("native-search-save-gemini").performScrollTo().performClick()
+
+        assertEquals(ProviderType.GEMINI, savedProviderType)
+        assertEquals("gemini-provider-key", savedApiKey)
+        assertEquals(savedProviderId, selectedProvider.value)
+        assertEquals("gemini-2.5-flash", selectedModel.value)
         assertEquals(SearchMode.MODEL, mode.value)
-        compose.onNodeWithTag("search-mode-local").performClick()
-        assertEquals(SearchMode.LOCAL, mode.value)
-        compose.onNodeWithTag("search-mode-local").performClick()
-        assertEquals(SearchMode.OFF, mode.value)
-        compose.onNodeWithTag("search-provider-settings").performClick()
-        assertTrue(settingsOpened)
+        compose.onNodeWithText("Web search is on. Tap the selected provider again to turn it off.").assertIsDisplayed()
+        compose.onNodeWithTag("native-search-editor-gemini").assertDoesNotExist()
     }
 
     @Test
-    fun searchSheetOffersSupportedProvidersBeforeOneIsConnected() {
-        var providersOpened = false
+    fun searchServicePageKeepsOnlyGeminiAndAnthropicAndConfiguresKeysInline() {
+        val mode = mutableStateOf(SearchMode.OFF)
+        val providers = mutableStateListOf<Provider>()
+        val selectedProvider = mutableStateOf<String?>(null)
+        val selectedModel = mutableStateOf<String?>(null)
+        var savedProviderType: ProviderType? = null
+        var savedApiKey: String? = null
+
         compose.setContent {
             AriAiTheme(darkTheme = false, dynamicColor = false) {
-                SearchSheet(
-                    mode = SearchMode.OFF,
-                    localSearchConfigured = false,
-                    onModeChange = {},
-                    onSelectSearchModel = { _, _ -> },
-                    onConfigureLocal = {},
-                    onManageProviders = { providersOpened = true },
-                    onDismiss = {}
+                SearchServiceScreen(
+                    providers = providers,
+                    searchMode = mode.value,
+                    selectedProviderId = selectedProvider.value,
+                    selectedModelId = selectedModel.value,
+                    onModeChange = { mode.value = it },
+                    onSelectModel = { providerId, modelId ->
+                        selectedProvider.value = providerId
+                        selectedModel.value = modelId
+                    },
+                    onSaveProvider = { draft, onSaved ->
+                        savedProviderType = draft.type
+                        savedApiKey = draft.apiKey
+                        val saved = draft.copy(
+                            models = listOf(AIModel("claude-sonnet-4", "Claude Sonnet", draft.id))
+                        )
+                        providers.add(saved)
+                        onSaved(saved)
+                    },
+                    onBack = {}
                 )
             }
         }
 
-        compose.onNodeWithTag("search-setup-gemini").assertIsDisplayed()
-        compose.onNodeWithTag("search-setup-anthropic").assertIsDisplayed()
-        compose.onAllNodesWithText("No provider configured").assertCountEquals(0)
-        compose.onNodeWithTag("search-setup-gemini").performClick()
-        assertTrue(providersOpened)
+        compose.onNodeWithText("Built-in web search").assertIsDisplayed()
+        compose.onNodeWithTag("native-search-provider-gemini").assertIsDisplayed()
+        compose.onNodeWithTag("native-search-provider-anthropic").assertIsDisplayed()
+        listOf("Local Search", "Google Search", "Brave Search", "Tavily", "Exa")
+            .forEach { compose.onAllNodesWithText(it).assertCountEquals(0) }
+
+        compose.onNodeWithTag("native-search-settings-anthropic").performScrollTo().performClick()
+        compose.onNodeWithTag("native-search-editor-anthropic").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("native-search-key-anthropic").performTextInput("anthropic-provider-key")
+        compose.onNodeWithTag("native-search-save-anthropic").performScrollTo().performClick()
+
+        assertEquals(ProviderType.ANTHROPIC, savedProviderType)
+        assertEquals("anthropic-provider-key", savedApiKey)
+        assertEquals("claude-sonnet-4", selectedModel.value)
+        assertEquals(SearchMode.MODEL, mode.value)
     }
 
     @Test

@@ -7,7 +7,6 @@ import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -36,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.providerFromJson
+import com.ariai.app.ui.components.ProviderBrandMark
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val DisabledTint: Color @Composable @ReadOnlyComposable get() = AriTint
@@ -216,19 +216,13 @@ private fun SectionTitle(text: String) {
 }
 
 /**
- * Rounded provider card with a soft brand monogram, compact metadata chips, and a stable enable switch.
+ * Rounded provider card with a distinct brand mark, compact metadata chips, and a stable enable switch.
  */
 @Composable
 private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -> Unit) {
     val host = remember(provider.baseUrl) {
         provider.baseUrl.trim().removePrefix("https://").removePrefix("http://").substringBefore('/')
     }
-    val brand = providerBrandColor(provider.type)
-    val avatarBackground by animateColorAsState(
-        targetValue = if (provider.enabled) brand.copy(alpha = 0.14f) else AriTint,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "provider-avatar-background"
-    )
     val statusBackground = if (provider.enabled) AriTagGreenBg else AriTint
     val statusForeground = if (provider.enabled) AriTagGreenFg else AriMuted
     val shape = RoundedCornerShape(24.dp)
@@ -250,17 +244,7 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(avatarBackground),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    provider.name.firstOrNull()?.uppercase() ?: "P",
-                    color = if (provider.enabled) brand else AriMuted,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-            }
+            ProviderBrandMark(provider = provider, size = 48.dp)
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(5.dp)

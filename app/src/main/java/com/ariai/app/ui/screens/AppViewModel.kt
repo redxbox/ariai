@@ -300,6 +300,11 @@ class AppViewModel(
     suspend fun fetchModels(provider: Provider): List<AIModel> = repository.fetchModels(provider)
 
     fun saveProvider(provider: Provider, onSaved: (Boolean) -> Unit = {}) {
+        saveProviderAndReturn(provider) { savedProvider -> onSaved(savedProvider != null) }
+    }
+
+    /** Saves a provider and returns its fetched models for flows that immediately enable native search. */
+    fun saveProviderAndReturn(provider: Provider, onSaved: (Provider?) -> Unit) {
         viewModelScope.launch {
             val models = if (provider.models.isEmpty()) {
                 val fetched = try {
@@ -308,17 +313,18 @@ class AppViewModel(
                     throw cancelled
                 } catch (e: Exception) {
                     com.ariai.app.util.AppLog.warn(e, "fetch models before provider save")
-                    onSaved(false)
+                    onSaved(null)
                     return@launch
                 }
                 if (fetched.isEmpty()) {
-                    onSaved(false)
+                    onSaved(null)
                     return@launch
                 }
                 fetched
             } else provider.models
-            val saved = repository.saveProvider(provider.copy(models = models))
-            onSaved(saved)
+            val updatedProvider = provider.copy(models = models)
+            val saved = repository.saveProvider(updatedProvider)
+            onSaved(updatedProvider.takeIf { saved })
         }
     }
 

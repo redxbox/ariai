@@ -118,9 +118,6 @@ fun NewChatScreen(
     searchMode: SearchMode = SearchMode.OFF,
     favorites: Set<String> = emptySet(),
     modelUsageCounts: Map<Pair<String, String>, Int> = emptyMap(),
-    localSearchConfigured: Boolean = false,
-    activeSearchProviderKey: String? = null,
-    activeSearchProviderName: String? = null,
     onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode, (Boolean) -> Unit) -> Boolean,
     onStopGeneration: () -> Unit = {},
     onBack: () -> Unit,
@@ -139,9 +136,9 @@ fun NewChatScreen(
     chatMode: ChatMode = ChatMode.TEXT,
     onChatModeChange: (ChatMode) -> Unit = {},
     onOpenExtensions: () -> Unit = {},
-    onOpenSearchSettings: () -> Unit = {},
     onAddProvider: () -> Unit = {},
     onManageProviders: () -> Unit = {},
+    onSaveNativeSearchProvider: (Provider, (Provider?) -> Unit) -> Unit = { _, onSaved -> onSaved(null) },
     onCheckProvider: suspend (Provider) -> com.ariai.app.data.remote.ConnectionResult,
     onUpdateChatOptions: (Float, Float, String?) -> Unit = { _, _, _ -> },
     fontSize: Int = 15,
@@ -260,9 +257,6 @@ fun NewChatScreen(
         ?: providers.firstOrNull { it.enabled }
     var connectionResult by remember(currentProvider?.id) { mutableStateOf<ConnectionResult?>(null) }
     var checkingConnection by remember(currentProvider?.id) { mutableStateOf(false) }
-    val nativeSearchModels = remember(providers, selectedProviderId, selectedModel) {
-        availableNativeSearchModels(providers, selectedProviderId, selectedModel)
-    }
     val selectedModelCapabilities = currentProvider?.models?.firstOrNull { it.id == selectedModel }
     val selectedModelLabel = selectedModelCapabilities?.displayName
         ?: selectedModel?.substringAfterLast('/')
@@ -503,16 +497,12 @@ fun NewChatScreen(
     if (showSearch) {
         SearchSheet(
             mode = searchMode,
-            localSearchConfigured = localSearchConfigured,
-            activeSearchProviderKey = activeSearchProviderKey,
-            activeSearchProviderName = activeSearchProviderName,
-            nativeSearchModels = nativeSearchModels,
+            providers = providers,
             selectedProviderId = selectedProviderId,
             selectedModelId = selectedModel,
             onModeChange = onSearchModeChange,
             onSelectSearchModel = onSelectModel,
-            onConfigureLocal = onOpenSearchSettings,
-            onManageProviders = onManageProviders,
+            onSaveProvider = onSaveNativeSearchProvider,
             onDismiss = { showSearch = false }
         )
     }

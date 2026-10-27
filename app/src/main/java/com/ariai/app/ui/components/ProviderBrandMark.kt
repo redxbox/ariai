@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -77,7 +78,23 @@ private fun ProviderBrandMarkContent(
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (mark) {
-                ProviderMarkKind.OPENAI -> BrandVectorMark(R.drawable.brand_openai, size * 0.72f)
+                ProviderMarkKind.OPENAI -> Surface(
+                    modifier = Modifier.fillMaxSize().padding(3.dp),
+                    shape = CircleShape,
+                    color = Color(0xFF111318),
+                    tonalElevation = 0.dp
+                ) {}
+                ProviderMarkKind.GEMINI -> Surface(
+                    modifier = Modifier.fillMaxSize().padding(3.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFF0F3FF),
+                    tonalElevation = 0.dp
+                ) {}
+                else -> Unit
+            }
+            when (mark) {
+                ProviderMarkKind.OPENAI -> BrandVectorMark(R.drawable.brand_openai, size * 0.60f, tint = Color.White)
+                ProviderMarkKind.GEMINI -> GeminiSparkleMark(size * 0.70f)
                 ProviderMarkKind.GOOGLE -> BrandVectorMark(R.drawable.brand_google_g, size * 0.76f)
                 ProviderMarkKind.ANTHROPIC -> BrandVectorMark(R.drawable.brand_anthropic, size * 0.80f)
                 ProviderMarkKind.OLLAMA -> BrandVectorMark(R.drawable.brand_ollama, size * 0.80f)
@@ -95,16 +112,45 @@ private fun ProviderBrandMarkContent(
 }
 
 @Composable
-private fun BrandVectorMark(resource: Int, iconSize: Dp) {
+private fun BrandVectorMark(resource: Int, iconSize: Dp, tint: Color? = null) {
     Image(
         painter = painterResource(resource),
         contentDescription = null,
-        modifier = Modifier.size(iconSize)
+        modifier = Modifier.size(iconSize),
+        colorFilter = tint?.let { ColorFilter.tint(it) }
     )
+}
+
+/** A compact, gradient Gemini sparkle rather than the generic Google G. */
+@Composable
+private fun GeminiSparkleMark(iconSize: Dp) {
+    Canvas(modifier = Modifier.size(iconSize)) {
+        val w = this.size.width
+        val h = this.size.height
+        val cx = w / 2f
+        val cy = h / 2f
+        val sparkle = Path().apply {
+            moveTo(cx, 0f)
+            cubicTo(cx + w * 0.055f, cy - h * 0.20f, cx + w * 0.20f, cy - h * 0.055f, w, cy)
+            cubicTo(cx + w * 0.20f, cy + h * 0.055f, cx + w * 0.055f, cy + h * 0.20f, cx, h)
+            cubicTo(cx - w * 0.055f, cy + h * 0.20f, cx - w * 0.20f, cy + h * 0.055f, 0f, cy)
+            cubicTo(cx - w * 0.20f, cy - h * 0.055f, cx - w * 0.055f, cy - h * 0.20f, cx, 0f)
+            close()
+        }
+        drawPath(
+            sparkle,
+            Brush.linearGradient(
+                colors = listOf(Color(0xFF4285F4), Color(0xFF7B61FF), Color(0xFFB95FFF), Color(0xFF4285F4)),
+                start = androidx.compose.ui.geometry.Offset(0f, h),
+                end = androidx.compose.ui.geometry.Offset(w, 0f)
+            )
+        )
+    }
 }
 
 private enum class ProviderMarkKind {
     OPENAI,
+    GEMINI,
     GOOGLE,
     ANTHROPIC,
     OLLAMA,
@@ -117,14 +163,15 @@ private fun providerMarkKind(type: ProviderType?, name: String?): ProviderMarkKi
     if (type == null) return ProviderMarkKind.NEURAL
     return when (type) {
         ProviderType.OPENAI -> ProviderMarkKind.OPENAI
-        ProviderType.GEMINI -> ProviderMarkKind.GOOGLE
+        ProviderType.GEMINI -> ProviderMarkKind.GEMINI
         ProviderType.ANTHROPIC -> ProviderMarkKind.ANTHROPIC
         ProviderType.OLLAMA -> ProviderMarkKind.OLLAMA
         ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> {
             val normalizedName = name.orEmpty().trim().lowercase()
             when {
                 "openai" in normalizedName -> ProviderMarkKind.OPENAI
-                "gemini" in normalizedName || "google" in normalizedName -> ProviderMarkKind.GOOGLE
+                "gemini" in normalizedName -> ProviderMarkKind.GEMINI
+                "google" in normalizedName -> ProviderMarkKind.GOOGLE
                 "anthropic" in normalizedName || "claude" in normalizedName -> ProviderMarkKind.ANTHROPIC
                 "ollama" in normalizedName -> ProviderMarkKind.OLLAMA
                 normalizedName.isBlank() || normalizedName == "custom" -> ProviderMarkKind.CUSTOM

@@ -33,9 +33,9 @@ import com.ariai.app.ui.drawer.AppDrawerContent
 import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
 import com.ariai.app.util.LocalStrings
+import com.ariai.app.data.models.Provider
+import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.SearchMode
-import com.ariai.app.data.models.resolveSearchProviderKey
-import com.ariai.app.data.models.searchProviderDisplayName
 import com.ariai.app.util.UiLang
 import com.ariai.app.util.getStringsForLanguage
 import com.ariai.app.util.tx
@@ -99,10 +99,6 @@ fun AppRoot(viewModel: AppViewModel) {
     val dynamicColor by viewModel.dynamicColor.collectAsState()
     val agents by viewModel.agents.collectAsState()
     val workspaceFiles by viewModel.workspaceFiles.collectAsState()
-    val searchKeys by viewModel.searchKeys.collectAsState()
-    val searchProvider by viewModel.searchProvider.collectAsState()
-    val activeSearchProviderKey = resolveSearchProviderKey(searchKeys, searchProvider)
-    val activeSearchProviderName = searchProviderDisplayName(activeSearchProviderKey)
     val mcpServers by viewModel.mcpServers.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
     val defaultProviderId by viewModel.defaultProviderId.collectAsState()
@@ -175,6 +171,15 @@ fun AppRoot(viewModel: AppViewModel) {
         val id = viewModel.createNewChat(providerId, modelId)
         viewModel.setChatMode(id, ChatMode.IMAGE)
         navController.navigate("chat/$id") { launchSingleTop = true }
+    }
+
+    fun activateNativeSearch(provider: Provider) {
+        if (provider.type != ProviderType.GEMINI && provider.type != ProviderType.ANTHROPIC) return
+        if (!provider.enabled || provider.apiKey.isBlank() || provider.apiKeyNeedsReentry) return
+        val textModel = provider.models.firstOrNull { it.outputsText && it.id.isNotBlank() } ?: return
+        currentChatId?.let { viewModel.updateChatProvider(it, provider.id, textModel.id) }
+            ?: viewModel.setDefaultSelection(provider.id, textModel.id)
+        viewModel.setSearchMode(SearchMode.MODEL)
     }
 
     ModalNavigationDrawer(
@@ -290,9 +295,6 @@ fun AppRoot(viewModel: AppViewModel) {
                         searchMode = searchModeState,
                         favorites = favoriteModels,
                         modelUsageCounts = modelUsageCounts,
-                        localSearchConfigured = searchKeys.values.any { it.isNotBlank() },
-                        activeSearchProviderKey = activeSearchProviderKey,
-                        activeSearchProviderName = activeSearchProviderName,
                         onSendMessage = { text, files, level, mode, onSaved ->
                             viewModel.sendMessage(text, files, level, mode, onSaved)
                         },
@@ -322,10 +324,12 @@ fun AppRoot(viewModel: AppViewModel) {
                         chatMode = chatModes[chatId] ?: ChatMode.TEXT,
                         onChatModeChange = { viewModel.setChatMode(chatId, it) },
                         onOpenExtensions = { navController.navigate("mcp") },
-                        onOpenSearchSettings = { navController.navigate("search_service") },
                         fontSize = fontSize,
                         onAddProvider = { navController.navigate("add_provider") },
                         onManageProviders = { navController.navigate("providers") },
+                        onSaveNativeSearchProvider = { provider, onSaved ->
+                            viewModel.saveProviderAndReturn(provider, onSaved)
+                        },
                         onCheckProvider = { provider -> com.ariai.app.data.remote.checkConnection(provider) { viewModel.fetchModels(it) } },
                         onUpdateChatOptions = { temperature, topP, systemPrompt ->
                             viewModel.updateChatOptions(chatId, temperature, topP, systemPrompt)
@@ -339,8 +343,12 @@ fun AppRoot(viewModel: AppViewModel) {
                         onAddProvider = { navController.navigate("add_provider") },
                         onAddPreset = { navController.navigate("add_provider?preset=${it.name}") },
                         onImportProvider = { provider ->
-                            viewModel.saveProvider(provider) { saved ->
-                                if (!saved) scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                            viewModel.saveProviderAndReturn(provider) { savedProvider ->
+                                if (savedProvider == null) {
+                                    scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                                } else {
+                                    activateNativeSearch(savedProvider)
+                                }
                             }
                         },
                         onEditProvider = { navController.navigate("edit_provider/${it.id}") },
@@ -363,9 +371,13 @@ fun AppRoot(viewModel: AppViewModel) {
                         existingProviderNames = providers.map { it.name }.toSet(),
                         fetchModels = { viewModel.fetchModels(it) },
                         onSave = { provider ->
-                            viewModel.saveProvider(provider) { saved ->
-                                if (saved) navController.popBackStack()
-                                else scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                            viewModel.saveProviderAndReturn(provider) { savedProvider ->
+                                if (savedProvider != null) {
+                                    activateNativeSearch(savedProvider)
+                                    navController.popBackStack()
+                                } else {
+                                    scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                                }
                             }
                         },
                         onBack = { navController.popBackStack() }
@@ -382,9 +394,13 @@ fun AppRoot(viewModel: AppViewModel) {
                         existingProviderNames = providers.map { it.name }.toSet(),
                         fetchModels = { viewModel.fetchModels(it) },
                         onSave = { provider ->
-                            viewModel.saveProvider(provider) { saved ->
-                                if (saved) navController.popBackStack()
-                                else scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                            viewModel.saveProviderAndReturn(provider) { savedProvider ->
+                                if (savedProvider != null) {
+                                    activateNativeSearch(savedProvider)
+                                    navController.popBackStack()
+                                } else {
+                                    scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                                }
                             }
                         },
                         onBack = { navController.popBackStack() },
@@ -441,11 +457,18 @@ fun AppRoot(viewModel: AppViewModel) {
 
                 composable("search_service") {
                     SearchServiceScreen(
-                        searchKeys = searchKeys,
-                        selectedSearchProvider = searchProvider,
-                        onSelectProvider = { viewModel.setSearchProvider(it) },
-                        onSaveKey = { name, key -> viewModel.setSearchKey(name, key) },
-                        onTestKey = { name, key, onResult -> viewModel.testSearchKey(name, key, onResult) },
+                        providers = providers,
+                        searchMode = searchModeState,
+                        selectedProviderId = drawerProviderId,
+                        selectedModelId = drawerModelId,
+                        onModeChange = { viewModel.setSearchMode(it) },
+                        onSelectModel = { providerId, modelId ->
+                            currentChatId?.let { viewModel.updateChatProvider(it, providerId, modelId) }
+                                ?: viewModel.setDefaultSelection(providerId, modelId)
+                        },
+                        onSaveProvider = { provider, onSaved ->
+                            viewModel.saveProviderAndReturn(provider, onSaved)
+                        },
                         onBack = { navController.popBackStack() }
                     )
                 }
