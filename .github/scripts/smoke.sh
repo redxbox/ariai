@@ -288,6 +288,8 @@ hide_keyboard
 tap "Send"
 expect_text "No provider configured"
 shot 02a-send-without-provider
+tap "New chat"
+wait_for_text "Message AriAI" 10
 
 tap "Off"
 expect_text "Thinking depth"
