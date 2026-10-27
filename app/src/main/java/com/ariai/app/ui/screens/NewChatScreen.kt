@@ -638,8 +638,9 @@ fun NewChatScreen(
                     }
                 )
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
-                        .testTag("chat-model-selector-container"),
+                    modifier = Modifier.fillMaxWidth()
+                        .testTag("chat-model-selector-container")
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     ChatModelSelector(
