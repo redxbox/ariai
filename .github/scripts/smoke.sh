@@ -144,7 +144,7 @@ dismiss_external_picker() {
 return_to_chat_after_external() {
   local origin="$1"
   local activity
-  if python3 .github/scripts/ui_tap.py --assert "Message AriAI" >/dev/null 2>&1; then
+  if python3 .github/scripts/ui_tap.py --assert "Choose model" >/dev/null 2>&1; then
     return 0
   fi
 
@@ -152,7 +152,7 @@ return_to_chat_after_external() {
   if [[ "$activity" != *NexusLauncherActivity* ]]; then
     dismiss_external_picker
   fi
-  if python3 .github/scripts/ui_tap.py --assert "Message AriAI" >/dev/null 2>&1; then
+  if python3 .github/scripts/ui_tap.py --assert "Choose model" >/dev/null 2>&1; then
     return 0
   fi
 
@@ -160,9 +160,9 @@ return_to_chat_after_external() {
   if [[ "$activity" == *NexusLauncherActivity* ]]; then
     echo "::warning title=External intent return::$origin did not return directly to AriAI; reopening the app to continue the walkthrough. Foreground: ${activity:0:400}"
     adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/relaunch-after-${origin}.txt"
-    wait_for_text "Message AriAI" 30
+    wait_for_text "Choose model" 30
   else
-    wait_for_text "Message AriAI" 20
+    wait_for_text "Choose model" 20
   fi
 }
 
@@ -290,7 +290,7 @@ expect_text "No provider configured"
 shot 02a-send-without-provider
 tap "Open menu"
 tap "New chat"
-wait_for_text "Message AriAI" 10
+wait_for_text "Choose model" 10
 
 tap "Off"
 expect_text "Thinking depth"
@@ -361,7 +361,7 @@ tap_scroll_up "Photo"
 sleep 2
 shot 13-photo-picker
 dismiss_external_picker
-wait_for_text "Message AriAI" 20
+wait_for_text "Choose model" 20
 tap "Add to message"
 tap "Text file"
 sleep 2
@@ -373,7 +373,7 @@ if python3 .github/scripts/ui_tap.py --assert --exact "Open" >/dev/null 2>&1; th
 else
   shot 14-document-selected
 fi
-wait_for_text "Message AriAI" 20
+wait_for_text "Choose model" 20
 expect_text "ui.xml"
 tap "Remove attachment"
 camera_handler="$(adb shell cmd package resolve-activity --brief -a android.media.action.IMAGE_CAPTURE 2>&1 | tail -n1 || true)"
@@ -383,7 +383,7 @@ if [[ -z "$camera_handler" || "$camera_handler" == *"No activity found"* ]]; the
   expect_text "Camera"
   shot 15-camera-unavailable
   back
-  wait_for_text "Message AriAI" 20
+  wait_for_text "Choose model" 20
 else
   tap "Add to message"
   tap "Camera"
@@ -428,7 +428,7 @@ tap "Remove server"
 expect_text "No MCP servers yet"
 shot 23-mcp-server-removed
 back
-expect_text "Message AriAI"
+expect_text "Choose model"
 end_step
 
 step "Voice input permission surface"
@@ -437,7 +437,7 @@ sleep 2
 shot 24-voice-input
 # Dismiss a possible Android permission/recognizer surface without granting microphone access.
 back
-expect_text "Message AriAI"
+expect_text "Choose model"
 end_step
 
 step "Navigation drawer and provider screens"
@@ -465,7 +465,7 @@ expect_text "Cancel"
 tap "Cancel"
 shot 25-workspace-empty
 back
-expect_text "Message AriAI"
+expect_text "Choose model"
 tap "Open menu"
 tap "About"
 expect_text "AriAI v1.0 - Personal AI"
@@ -560,7 +560,7 @@ shot 38a-provider-connection-dialog
 tap "Close"
 back
 back
-expect_text "Message AriAI"
+expect_text "Choose model"
 end_step
 
 step "Search-service settings for Gemini and Anthropic"
@@ -582,7 +582,7 @@ expect_text "No separate search key is needed"
 shot 40-inline-anthropic-search-settings
 tap "Cancel"
 back
-expect_text "Message AriAI"
+expect_text "Choose model"
 end_step
 
 step "Settings, appearance, preferences, and default model"
@@ -668,7 +668,7 @@ tap_exact "About AriAI"
 wait_for_text "AriAI v1.0 - Personal AI" 8
 shot 54-settings-about
 back
-expect_text "Message AriAI"
+expect_text "Choose model"
 
 # Start a clean conversation after the intentional missing-provider error at the beginning.
 tap "Open menu"
