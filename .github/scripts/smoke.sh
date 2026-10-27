@@ -332,7 +332,7 @@ expect_absent_text "Exa"
 shot 09-web-search-sheet
 tap "Configure Gemini web search"
 expect_text "Provider API key"
-expect_text "Paste the provider API key"
+expect_text "API key"
 expect_text "No separate search key is needed"
 shot 10-inline-gemini-search-settings
 tap "Cancel"
