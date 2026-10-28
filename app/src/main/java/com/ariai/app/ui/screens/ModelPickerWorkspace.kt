@@ -614,8 +614,8 @@ private fun ModelDetailsPane(
                     val previewLimit = if (group.key == OTHER_MODELS_KEY) 3 else 5
                     val showAll = query.isNotBlank() || expandedGroups.contains(group.key)
                     val visibleEntries = if (showAll) group.entries else group.entries.take(previewLimit)
-                    val expandTag = if (group.key == OTHER_MODELS_KEY && providerFilter != null) {
-                        "model-picker-expand-$providerFilter"
+                    val expandTag = if (group.key == OTHER_MODELS_KEY && !isAllModels && provider != null) {
+                        "model-picker-expand-${provider.id}"
                     } else {
                         "model-picker-expand-${group.key}"
                     }
@@ -646,7 +646,12 @@ private fun ModelDetailsPane(
                                     count = group.entries.size,
                                     tag = expandTag,
                                     onClick = {
-                                        expandedGroups = if (showAll) expandedGroups - group.key else expandedGroups + group.key
+                                        val nextExpandedGroups = if (showAll) {
+                                            expandedGroups - group.key
+                                        } else {
+                                            expandedGroups + group.key
+                                        }
+                                        onExpandedGroupsChange(nextExpandedGroups)
                                     }
                                 )
                             }
