@@ -795,13 +795,18 @@ class AppViewModel(
 
         val localSearchKey = if (searchMode == SearchMode.LOCAL || (searchMode == SearchMode.MODEL && !supportsNativeSearch(provider))) {
             resolveSearchProviderKey(searchKeys.value, searchProvider.value)?.let { name ->
-                searchKeys.value[name]?.takeIf { it.isNotBlank() }?.let { name to it }
+                val apiKey = searchKeys.value[name].orEmpty()
+                if (searchProviderTypeForKey(name) == SearchProviderType.BING || apiKey.isNotBlank()) {
+                    name to apiKey
+                } else {
+                    null
+                }
             }
         } else {
             null
         }
         if (searchMode == SearchMode.LOCAL && requestContent.isNotBlank() && localSearchKey == null) {
-            postImmediateError("🔎 Local search needs an API key. Add one in Settings > Search service.")
+            postImmediateError(tx("The selected search service needs an API key. Configure it in Web Search settings."))
             return false
         }
 
@@ -1005,7 +1010,7 @@ class AppViewModel(
                     val hasUrlContext = allowWebSearch && provider.type == ProviderType.GEMINI && "url_context" in configuredModelTools && userProvidedUrls.isNotEmpty()
                     val nativeSearch = allowWebSearch && searchMode == SearchMode.MODEL && supportsNativeSearch(provider)
                     if (searchMode == SearchMode.MODEL && !nativeSearch && localSearchKey == null) {
-                        throw IllegalStateException("This provider has no built-in web search and no local search API key is configured.")
+                        throw IllegalStateException(tx("This provider has no built-in search, and the selected local service needs an API key."))
                     }
                     if (searchMode != SearchMode.OFF && localSearchKey != null && current?.supportsFunctionCalling == false) {
                         throw IllegalStateException("This model is marked as not supporting tool calling, which is required for the selected search mode.")

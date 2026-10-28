@@ -11,9 +11,14 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import org.w3c.dom.Element
+import org.xml.sax.InputSource
 import java.io.IOException
+import java.io.StringReader
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
 
 class SearchClient(
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -32,16 +37,36 @@ class SearchClient(
     ): SearchResponse = withContext(Dispatchers.IO) {
         if (query.isBlank()) throw IllegalArgumentException("Search query is empty")
         if (!provider.enabled) throw IllegalArgumentException("Search service is disabled")
-        if (provider.type != SearchProviderType.CUSTOM && provider.apiKey.isBlank()) {
+        if (provider.type !in setOf(SearchProviderType.BING, SearchProviderType.CUSTOM) && provider.apiKey.isBlank()) {
             throw IllegalArgumentException("Search API key is missing")
         }
         when (provider.type) {
+            SearchProviderType.BING -> searchBing(query)
             SearchProviderType.TAVILY -> searchTavily(query, provider.apiKey)
             SearchProviderType.BRAVE -> searchBrave(query, provider.apiKey)
             SearchProviderType.EXA -> searchExa(query, provider.apiKey)
             SearchProviderType.SERPER -> searchSerper(query, provider.apiKey)
             SearchProviderType.BOCHA -> throw IOException("Bocha search is not supported yet")
             SearchProviderType.CUSTOM -> throw IOException("Custom search endpoints are not supported yet")
+        }
+    }
+
+    /** Keyless Bing RSS search; only public result titles, links and snippets are retained. */
+    private suspend fun searchBing(query: String): SearchResponse {
+        val encodedQuery = URLEncoder.encode(query, Charsets.UTF_8.name())
+        val request = Request.Builder()
+            .url("${endpoint(SearchProviderType.BING, "https://www.bing.com/search")}?format=rss&q=$encodedQuery&count=5")
+            .header("User-Agent", "Mozilla/5.0 (Android 14; Mobile; rv:128.0) Gecko/128.0 Firefox/128.0")
+            .header("Accept", "application/rss+xml, application/xml;q=0.9, */*;q=0.8")
+            .get()
+            .build()
+        val body = executeBody(request, "Bing Search")
+        return try {
+            parseBingRss(query, body)
+        } catch (failure: IOException) {
+            throw failure
+        } catch (_: Exception) {
+            throw IOException("Bing Search returned an invalid RSS response")
         }
     }
 
@@ -144,7 +169,10 @@ class SearchClient(
         return SearchResponse(query, results, SearchProviderType.SERPER)
     }
 
-    private suspend fun executeJson(request: Request, service: String): JSONObject = suspendCancellableCoroutine { continuation ->
+    private suspend fun executeJson(request: Request, service: String): JSONObject =
+        JSONObject(executeBody(request, service))
+
+    private suspend fun executeBody(request: Request, service: String): String = suspendCancellableCoroutine { continuation ->
         val call = client.newCall(request)
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
@@ -165,7 +193,7 @@ class SearchClient(
                             throw IOException("$service search failed (HTTP ${received.code})")
                         }
                         if (body.isBlank()) throw IOException("$service search returned an empty response")
-                        JSONObject(body)
+                        body
                     }
                 }
                 if (continuation.isActive) continuation.resumeWith(result)
@@ -186,3 +214,51 @@ class SearchClient(
         }
     }
 }
+
+/** Parses Bing's public RSS response without permitting DTDs or external XML entities. */
+internal fun parseBingRss(query: String, xml: String): SearchResponse {
+    if (xml.contains("<!DOCTYPE", ignoreCase = true)) {
+        throw IOException("Bing Search responses cannot contain a document type")
+    }
+    val factory = DocumentBuilderFactory.newInstance().apply {
+        isNamespaceAware = false
+        isExpandEntityReferences = false
+        // These features vary slightly across Android/JAXP parsers; the precheck and resolver below
+        // still block DTD/entity access if a platform parser does not recognize one of them.
+        runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+        runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+        runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+    }
+    val builder = factory.newDocumentBuilder().apply {
+        setEntityResolver { _, _ -> InputSource(StringReader("")) }
+    }
+    val document = builder.parse(InputSource(StringReader(xml)))
+    if (document.documentElement?.tagName !in setOf("rss", "feed")) {
+        throw IOException("Bing Search returned an unexpected response")
+    }
+    val items = document.getElementsByTagName("item")
+    val results = (0 until minOf(items.length, 5)).mapNotNull { index ->
+        val item = items.item(index) as? Element ?: return@mapNotNull null
+        fun value(tag: String): String = item.getElementsByTagName(tag).item(0)?.textContent.orEmpty().trim()
+        val title = stripSearchMarkup(value("title")).take(300)
+        val url = value("link").take(2_000)
+        if (title.isBlank() || !(url.startsWith("https://", ignoreCase = true) || url.startsWith("http://", ignoreCase = true))) {
+            return@mapNotNull null
+        }
+        SearchResult(
+            title = title,
+            url = url,
+            content = stripSearchMarkup(value("description")).take(1_500),
+            score = 0.0,
+            publishedDate = value("pubDate").takeIf { it.isNotBlank() }?.take(100)
+        )
+    }
+    return SearchResponse(query, results, SearchProviderType.BING)
+}
+
+private fun stripSearchMarkup(value: String): String =
+    value.replace(Regex("<[^>]*>"), " ")
+        .replace("&nbsp;", " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()

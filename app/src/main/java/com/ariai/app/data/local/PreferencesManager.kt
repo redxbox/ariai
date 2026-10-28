@@ -118,7 +118,7 @@ class PreferencesManager(
 
     suspend fun setSearchProvider(provider: String) {
         val normalized = provider.trim().lowercase()
-        if (normalized in setOf("tavily", "brave", "exa", "serper")) {
+        if (normalized in setOf("bing", "brave")) {
             dataStore.edit { it[SEARCH_PROVIDER] = normalized }
         }
     }

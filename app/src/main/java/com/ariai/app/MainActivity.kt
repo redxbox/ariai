@@ -106,6 +106,8 @@ fun AppRoot(viewModel: AppViewModel) {
     val reasoningLevel by viewModel.reasoningLevel.collectAsState()
     val streamResponse by viewModel.streamResponse.collectAsState()
     val searchModeState by viewModel.searchMode.collectAsState()
+    val searchProviderState by viewModel.searchProvider.collectAsState()
+    val searchKeys by viewModel.searchKeys.collectAsState()
     val favoriteModels by viewModel.favoriteModels.collectAsState()
     val fontSize by viewModel.fontSize.collectAsState()
     val modelUsageCounts = remember(chats, modelOverrides) {
@@ -293,6 +295,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         providers = providers,
                         reasoning = reasoningLevel,
                         searchMode = searchModeState,
+                        searchProvider = searchProviderState,
+                        searchKeys = searchKeys,
                         favorites = favoriteModels,
                         modelUsageCounts = modelUsageCounts,
                         onSendMessage = { text, files, level, mode, onSaved ->
@@ -319,6 +323,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         onToggleFavorite = { pid, mid -> viewModel.toggleFavoriteModel(pid, mid) },
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         onSearchModeChange = { viewModel.setSearchMode(it) },
+                        onSearchProviderChange = { viewModel.setSearchProvider(it) },
+                        onSaveSearchKey = { provider, key -> viewModel.setSearchKey(provider, key) },
                         onCompressHistory = { done -> viewModel.compressHistory(done) },
                         onNewImageChat = { newImageChat() },
                         chatMode = chatModes[chatId] ?: ChatMode.TEXT,

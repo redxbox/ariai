@@ -59,6 +59,31 @@ class SearchClientTest {
     }
 
     @Test
+    fun bingUsesKeylessRssAndParsesSafeResultFields() = withServer { server ->
+        server.enqueue(
+            MockResponse().setBody(
+                """<?xml version="1.0"?><rss version="2.0"><channel><item><title>Example &amp; Guide</title><link>https://example.test/bing</link><description><![CDATA[Useful <b>summary</b> & details]]></description><pubDate>Tue, 27 Oct 2026 12:00:00 GMT</pubDate></item></channel></rss>"""
+            )
+        )
+        val client = clientFor(server, SearchProviderType.BING, "/bing")
+
+        val response = runBlocking {
+            client.search("Bing blue sky", SearchProvider(name = "Bing", type = SearchProviderType.BING, apiKey = ""))
+        }
+        val request = server.takeRequest()
+
+        assertEquals("GET", request.method)
+        assertEquals("/bing", request.requestUrl?.encodedPath)
+        assertEquals("rss", request.requestUrl?.queryParameter("format"))
+        assertEquals("Bing blue sky", request.requestUrl?.queryParameter("q"))
+        assertTrue(request.getHeader("Accept").orEmpty().contains("application/rss+xml"))
+        assertEquals(SearchProviderType.BING, response.provider)
+        assertEquals("Example & Guide", response.results.single().title)
+        assertEquals("Useful summary & details", response.results.single().content)
+        assertEquals("https://example.test/bing", response.results.single().url)
+    }
+
+    @Test
     fun exaSendsApiKeyHeaderAndParsesSemanticResults() = withServer { server ->
         server.enqueue(
             MockResponse().setBody(

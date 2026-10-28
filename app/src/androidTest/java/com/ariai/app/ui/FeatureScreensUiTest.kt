@@ -186,13 +186,15 @@ class FeatureScreensUiTest {
     }
 
     @Test
-    fun searchSheetShowsOnlyGeminiAndAnthropicAndInlineSaveActivatesNativeSearch() {
+    fun searchSheetShowsCompactBingBravePickerAndKeepsNativeSearchAvailable() {
         val mode = mutableStateOf(SearchMode.OFF)
         val providers = mutableStateListOf<Provider>()
         val selectedProvider = mutableStateOf<String?>(null)
         val selectedModel = mutableStateOf<String?>(null)
+        val searchProvider = mutableStateOf<String?>(null)
+        val searchKeys = mutableStateOf<Map<String, String>>(emptyMap())
         var savedProviderType: ProviderType? = null
-        var savedApiKey: String? = null
+        var savedAiApiKey: String? = null
         var savedProviderId: String? = null
 
         compose.setContent {
@@ -209,7 +211,7 @@ class FeatureScreensUiTest {
                     },
                     onSaveProvider = { draft, onSaved ->
                         savedProviderType = draft.type
-                        savedApiKey = draft.apiKey
+                        savedAiApiKey = draft.apiKey
                         val saved = draft.copy(
                             models = listOf(AIModel("gemini-2.5-flash", "Gemini 2.5 Flash", draft.id))
                         )
@@ -217,31 +219,52 @@ class FeatureScreensUiTest {
                         providers.add(saved)
                         onSaved(saved)
                     },
-                    onDismiss = {}
+                    onDismiss = {},
+                    searchProvider = searchProvider.value,
+                    searchKeys = searchKeys.value,
+                    onSearchProviderChange = { searchProvider.value = it },
+                    onSaveSearchKey = { provider, key ->
+                        searchKeys.value = searchKeys.value + (provider to key)
+                    }
                 )
             }
         }
 
+        compose.onNodeWithTag("search-mode-local").assertIsDisplayed()
+        compose.onNodeWithTag("search-mode-model").assertIsDisplayed()
+        compose.onNodeWithTag("search-mode-off").assertIsDisplayed()
+        compose.onAllNodesWithTag("native-search-provider-gemini").assertCountEquals(0)
+
+        compose.onNodeWithTag("search-mode-local").performClick()
+        assertEquals(SearchMode.LOCAL, mode.value)
+        assertEquals("bing", searchProvider.value)
+        compose.onNodeWithTag("search-provider-row").assertIsDisplayed()
+        compose.onNodeWithText("Bing").assertIsDisplayed()
+        compose.onNodeWithTag("search-provider-settings").assertIsDisplayed()
+        compose.onNodeWithTag("search-provider-dropdown").performClick()
+        compose.onNodeWithTag("search-provider-option-bing").assertIsDisplayed()
+        compose.onNodeWithTag("search-provider-option-brave").performClick()
+        assertEquals("brave", searchProvider.value)
+        compose.onNodeWithTag("search-provider-editor").assertIsDisplayed()
+        compose.onNodeWithTag("search-provider-key").performTextInput("brave-search-secret")
+        compose.onNodeWithTag("search-provider-save").performClick()
+        assertEquals("brave-search-secret", searchKeys.value["brave"])
+        compose.onNodeWithText("API key saved on this device").assertIsDisplayed()
+
+        compose.onNodeWithTag("search-mode-model").performClick()
+        assertEquals(SearchMode.MODEL, mode.value)
         compose.onNodeWithTag("native-search-provider-gemini").assertIsDisplayed()
         compose.onNodeWithTag("native-search-provider-anthropic").assertIsDisplayed()
-        compose.onNodeWithTag("native-search-settings-gemini").assertIsDisplayed()
-        compose.onNodeWithTag("native-search-settings-anthropic").assertIsDisplayed()
-        listOf("Local Search", "Google Search", "Brave Search", "Tavily", "Exa", "Off")
-            .forEach { compose.onAllNodesWithText(it).assertCountEquals(0) }
-
         compose.onNodeWithTag("native-search-settings-gemini").performClick()
         compose.onNodeWithTag("native-search-editor-gemini").assertIsDisplayed()
         compose.onNodeWithTag("native-search-key-gemini").performTextInput("gemini-provider-key")
         compose.onNodeWithTag("native-search-save-gemini").performScrollTo().performClick()
 
         assertEquals(ProviderType.GEMINI, savedProviderType)
-        assertEquals("gemini-provider-key", savedApiKey)
+        assertEquals("gemini-provider-key", savedAiApiKey)
         assertEquals(savedProviderId, selectedProvider.value)
         assertEquals("gemini-2.5-flash", selectedModel.value)
         assertEquals(SearchMode.MODEL, mode.value)
-        compose.onNodeWithText("Web search is on. Tap the selected provider again to turn it off.")
-            .performScrollTo()
-            .assertIsDisplayed()
         compose.onAllNodesWithTag("native-search-editor-gemini").assertCountEquals(0)
     }
 

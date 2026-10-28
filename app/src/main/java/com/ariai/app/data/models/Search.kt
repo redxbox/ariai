@@ -1,6 +1,7 @@
 package com.ariai.app.data.models
 
 enum class SearchProviderType {
+    BING,
     TAVILY,
     BRAVE,
     EXA,
@@ -9,18 +10,20 @@ enum class SearchProviderType {
     CUSTOM
 }
 
-/** Providers that have working SearchClient implementations, ordered by the recommended fallback. */
-val LOCAL_SEARCH_PROVIDER_PRIORITY = listOf("serper", "brave", "tavily", "exa")
+/** Local providers exposed in chat; Bing is keyless, while Brave uses its saved API key. */
+val LOCAL_SEARCH_PROVIDER_PRIORITY = listOf("brave", "bing")
 
-/** Chooses the requested provider when its key exists; otherwise falls back to a configured service. */
+/** Keeps an explicit choice while its key is being configured; defaults to keyed Brave, then keyless Bing. */
 fun resolveSearchProviderKey(searchKeys: Map<String, String>, preferredProvider: String?): String? {
-    fun isConfigured(provider: String) = !searchKeys[provider].isNullOrBlank()
     val preferred = preferredProvider?.trim()?.lowercase()
-        ?.takeIf { it in LOCAL_SEARCH_PROVIDER_PRIORITY && isConfigured(it) }
-    return preferred ?: LOCAL_SEARCH_PROVIDER_PRIORITY.firstOrNull(::isConfigured)
+        ?.takeIf { it in LOCAL_SEARCH_PROVIDER_PRIORITY }
+    return preferred ?: LOCAL_SEARCH_PROVIDER_PRIORITY.firstOrNull {
+        it == "bing" || !searchKeys[it].isNullOrBlank()
+    }
 }
 
 fun searchProviderTypeForKey(provider: String): SearchProviderType? = when (provider.trim().lowercase()) {
+    "bing" -> SearchProviderType.BING
     "tavily" -> SearchProviderType.TAVILY
     "brave" -> SearchProviderType.BRAVE
     "exa" -> SearchProviderType.EXA
@@ -29,6 +32,7 @@ fun searchProviderTypeForKey(provider: String): SearchProviderType? = when (prov
 }
 
 fun searchProviderDisplayName(provider: String?): String? = when (provider?.trim()?.lowercase()) {
+    "bing" -> "Bing"
     "tavily" -> "Tavily"
     "brave" -> "Brave Search"
     "exa" -> "Exa"

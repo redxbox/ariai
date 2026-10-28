@@ -116,6 +116,8 @@ fun NewChatScreen(
     providers: List<Provider> = emptyList(),
     reasoning: ReasoningLevel = ReasoningLevel.AUTO,
     searchMode: SearchMode = SearchMode.OFF,
+    searchProvider: String? = null,
+    searchKeys: Map<String, String> = emptyMap(),
     favorites: Set<String> = emptySet(),
     modelUsageCounts: Map<Pair<String, String>, Int> = emptyMap(),
     onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode, (Boolean) -> Unit) -> Boolean,
@@ -131,6 +133,8 @@ fun NewChatScreen(
     onToggleFavorite: (String, String) -> Unit = { _, _ -> },
     onReasoningChange: (ReasoningLevel) -> Unit = {},
     onSearchModeChange: (SearchMode) -> Unit = {},
+    onSearchProviderChange: (String) -> Unit = {},
+    onSaveSearchKey: (String, String) -> Unit = { _, _ -> },
     onCompressHistory: ((String) -> Unit) -> Unit = {},
     onNewImageChat: () -> Unit = {},
     chatMode: ChatMode = ChatMode.TEXT,
@@ -503,7 +507,11 @@ fun NewChatScreen(
             onModeChange = onSearchModeChange,
             onSelectSearchModel = onSelectModel,
             onSaveProvider = onSaveNativeSearchProvider,
-            onDismiss = { showSearch = false }
+            onDismiss = { showSearch = false },
+            searchProvider = searchProvider,
+            searchKeys = searchKeys,
+            onSearchProviderChange = onSearchProviderChange,
+            onSaveSearchKey = onSaveSearchKey
         )
     }
 

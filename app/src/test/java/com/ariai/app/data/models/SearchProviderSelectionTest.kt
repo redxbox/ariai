@@ -6,27 +6,32 @@ import org.junit.Test
 
 class SearchProviderSelectionTest {
     @Test
-    fun configuredPreferenceWinsOverRecommendedFallback() {
-        val keys = mapOf("serper" to "google-key", "brave" to "brave-key")
+    fun bingIsTheKeylessDefaultAndBraveCanBeSelectedOrPreferred() {
+        assertEquals("bing", resolveSearchProviderKey(emptyMap(), null))
+        assertEquals(SearchProviderType.BING, searchProviderTypeForKey("bing"))
+        assertEquals("Bing", searchProviderDisplayName("bing"))
 
-        assertEquals("brave", resolveSearchProviderKey(keys, "brave"))
+        val keys = mapOf("brave" to "brave-key")
+        assertEquals("brave", resolveSearchProviderKey(keys, null))
+        assertEquals("bing", resolveSearchProviderKey(keys, "bing"))
+        assertEquals("brave", resolveSearchProviderKey(emptyMap(), "brave"))
+        assertEquals(SearchProviderType.BRAVE, searchProviderTypeForKey("brave"))
+    }
+
+    @Test
+    fun legacySearchKeysDoNotOverrideTheNewBingAndBraveChoices() {
+        val keys = mapOf("serper" to "google-key", "tavily" to "tavily-key")
+
+        assertEquals("bing", resolveSearchProviderKey(keys, null))
+        assertEquals("bing", resolveSearchProviderKey(keys, "serper"))
         assertEquals("Google Search", searchProviderDisplayName("serper"))
         assertEquals(SearchProviderType.SERPER, searchProviderTypeForKey("serper"))
     }
 
     @Test
-    fun googleViaSerperIsTheRecommendedFallbackAndBraveIsNext() {
-        assertEquals("serper", resolveSearchProviderKey(mapOf("serper" to "google-key", "brave" to "brave-key"), null))
-        assertEquals("brave", resolveSearchProviderKey(mapOf("brave" to "brave-key", "exa" to "exa-key"), null))
-        assertEquals("tavily", resolveSearchProviderKey(mapOf("tavily" to "tavily-key"), null))
-    }
-
-    @Test
-    fun missingOrUnsupportedKeysNeverAppearAsActiveProviders() {
-        val keys = mapOf("serper" to "", "duckduckgo" to "unimplemented-key")
-
-        assertNull(resolveSearchProviderKey(keys, "duckduckgo"))
+    fun unsupportedProvidersStillHaveNoSearchImplementation() {
+        assertEquals("bing", resolveSearchProviderKey(mapOf("duckduckgo" to "unused-key"), "duckduckgo"))
         assertNull(searchProviderTypeForKey("duckduckgo"))
-        assertNull(searchProviderDisplayName("bing"))
+        assertNull(searchProviderDisplayName("duckduckgo"))
     }
 }
