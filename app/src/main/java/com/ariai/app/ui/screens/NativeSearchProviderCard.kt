@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -41,11 +42,13 @@ import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.ui.components.ProviderBrandMark
+import com.ariai.app.ui.theme.AriAccent
 import com.ariai.app.ui.theme.AriAnthropic
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriGemini
 import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
+import com.ariai.app.ui.theme.AriPaper
 import com.ariai.app.ui.theme.AriTint
 import com.ariai.app.util.tx
 import java.util.UUID
@@ -108,11 +111,26 @@ internal fun NativeSearchProviderCard(
     onModeChange: (SearchMode) -> Unit,
     onSelectModel: (String, String) -> Unit,
     onSaveProvider: (Provider, (Provider?) -> Unit) -> Unit,
-    onAfterSelection: () -> Unit = {}
+    onAfterSelection: () -> Unit = {},
+    chatSheetStyle: Boolean = false
 ) {
     val isSelected = mode == SearchMode.MODEL && option.model != null &&
         option.provider?.id == selectedProviderId && option.model.id == selectedModelId
     val brandColor = if (option.type == ProviderType.GEMINI) AriGemini else AriAnthropic
+    val selectedChatCard = chatSheetStyle && isSelected
+    val cardTextColor = if (selectedChatCard) Color.White else AriInk
+    val cardSubtitleColor = if (selectedChatCard) Color.White.copy(alpha = 0.82f) else AriMuted
+    val cardShape = RoundedCornerShape(if (chatSheetStyle) 20.dp else 16.dp)
+    val cardColor = when {
+        selectedChatCard -> AriAccent
+        isSelected -> brandColor.copy(alpha = 0.12f)
+        chatSheetStyle -> AriPaper
+        else -> AriTint
+    }
+    val cardBorder = if (chatSheetStyle) null else BorderStroke(
+        1.dp,
+        if (isSelected) brandColor.copy(alpha = 0.48f) else AriInk.copy(alpha = 0.09f)
+    )
     var editing by remember(option.type, option.provider?.id) { mutableStateOf(false) }
     var apiKey by remember(option.type, option.provider?.id, option.provider?.apiKey) {
         mutableStateOf(option.provider?.apiKey.orEmpty())
@@ -121,7 +139,7 @@ internal fun NativeSearchProviderCard(
     var saving by remember(option.type, option.provider?.id) { mutableStateOf(false) }
     var saveError by remember(option.type, option.provider?.id) { mutableStateOf<String?>(null) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (chatSheetStyle) 10.dp else 8.dp)) {
         Surface(
             onClick = {
                 if (option.isReady && option.provider != null && option.model != null) {
@@ -137,26 +155,33 @@ internal fun NativeSearchProviderCard(
                 }
             },
             modifier = Modifier.fillMaxWidth().testTag("native-search-provider-${option.type.name.lowercase()}"),
-            shape = RoundedCornerShape(16.dp),
-            color = if (isSelected) brandColor.copy(alpha = 0.12f) else AriTint,
-            border = BorderStroke(
-                1.dp,
-                if (isSelected) brandColor.copy(alpha = 0.48f) else AriInk.copy(alpha = 0.09f)
-            ),
+            shape = cardShape,
+            color = cardColor,
+            border = cardBorder,
             tonalElevation = 0.dp
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
+                modifier = Modifier.fillMaxWidth().padding(
+                    horizontal = if (chatSheetStyle) 16.dp else 13.dp,
+                    vertical = if (chatSheetStyle) 14.dp else 11.dp
+                ),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(11.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (chatSheetStyle) 13.dp else 11.dp)
             ) {
+                val markSize = if (chatSheetStyle) 42.dp else 38.dp
                 if (option.provider != null) {
-                    ProviderBrandMark(provider = option.provider, size = 38.dp)
+                    ProviderBrandMark(provider = option.provider, size = markSize)
                 } else {
-                    ProviderBrandMark(type = option.type, name = option.title, size = 38.dp)
+                    ProviderBrandMark(type = option.type, name = option.title, size = markSize)
                 }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(tx(option.title), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AriInk, maxLines = 1)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        tx(option.title),
+                        fontSize = if (chatSheetStyle) 15.sp else 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = cardTextColor,
+                        maxLines = 1
+                    )
                     Text(
                         when {
                             option.isReady -> "${option.model?.displayName.orEmpty()} · ${tx("Uses this AI provider API key")}"
@@ -164,23 +189,29 @@ internal fun NativeSearchProviderCard(
                             option.provider != null && !option.provider.enabled -> tx("Provider is turned off; configure it here")
                             else -> tx("Add the provider API key to enable native search")
                         },
-                        fontSize = 11.sp,
-                        color = AriMuted,
+                        fontSize = if (chatSheetStyle) 12.sp else 11.sp,
+                        color = cardSubtitleColor,
                         maxLines = 2
                     )
                 }
                 if (isSelected) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = tx("Selected"), tint = brandColor, modifier = Modifier.size(20.dp))
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = tx("Selected"),
+                        tint = if (selectedChatCard) Color.White else brandColor,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
                 IconButton(
                     onClick = { editing = !editing; saveError = null },
-                    modifier = Modifier.size(40.dp).testTag("native-search-settings-${option.type.name.lowercase()}")
+                    modifier = Modifier.size(if (chatSheetStyle) 44.dp else 40.dp)
+                        .testTag("native-search-settings-${option.type.name.lowercase()}")
                 ) {
                     Icon(
                         Icons.Default.Settings,
                         contentDescription = tx(if (option.type == ProviderType.GEMINI) "Configure Gemini web search" else "Configure Anthropic web search"),
-                        tint = if (editing) brandColor else AriMuted,
-                        modifier = Modifier.size(20.dp)
+                        tint = if (selectedChatCard) Color.White else if (editing) brandColor else AriMuted,
+                        modifier = Modifier.size(if (chatSheetStyle) 22.dp else 20.dp)
                     )
                 }
             }

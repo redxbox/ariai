@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,7 +36,8 @@ import kotlin.math.roundToInt
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private val Tile: Color @Composable @ReadOnlyComposable get() = AriTint
+private val Tile: Color @Composable @ReadOnlyComposable get() = AriAccentSoft
+
 /** Actions offered by the "+" button above the chat input. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,52 +52,51 @@ fun AttachmentSheet(
     onAudio: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetShape = paperSheetShape(28.dp)
     PaperBottomSheet(
         onDismissRequest = onDismiss,
-        shape = sheetShape,
+        shape = paperSheetShape(32.dp),
+        showOutline = false
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 640.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(tx("Add to message"), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                SheetTile(Icons.Default.Image, tx("Photo"), Modifier.weight(1f), com.ariai.app.ui.theme.AriGemini) { onDismiss(); onPhoto() }
-                SheetTile(Icons.Default.CameraAlt, tx("Camera"), Modifier.weight(1f), com.ariai.app.ui.theme.AriOpenAI) { onDismiss(); onCamera() }
-                SheetTile(Icons.Default.Description, tx("Text file"), Modifier.weight(1f), com.ariai.app.ui.theme.AriAnthropic) { onDismiss(); onFile() }
+            Text(tx("Add to message"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SheetTile(Icons.Outlined.Image, tx("Photo"), Modifier.weight(1f)) { onDismiss(); onPhoto() }
+                SheetTile(Icons.Outlined.CameraAlt, tx("Camera"), Modifier.weight(1f)) { onDismiss(); onCamera() }
+                SheetTile(Icons.Outlined.Description, tx("Text file"), Modifier.weight(1f)) { onDismiss(); onFile() }
             }
-            HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-            Text(tx("Generate"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
-            SheetRow(Icons.Default.Image, tx("Image"), tx("Next message makes an image")) { onDismiss(); onImage() }
-            SheetRow(Icons.Default.Movie, tx("Video"), tx("Next message makes a video")) { onDismiss(); onVideo() }
-            SheetRow(Icons.Default.MusicNote, tx("Audio"), tx("Next message makes audio")) { onDismiss(); onAudio() }
-            HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-            Text(tx("Conversation"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
-            SheetRow(Icons.Default.Archive, tx("Compress history"), tx("Summarize older messages to save context")) { onDismiss(); onCompress() }
-            SheetRow(Icons.Default.Extension, tx("Extensions"), tx("MCP preview; tool calls are not active yet")) { onDismiss(); onExtensions() }
+            Text(tx("Generate"), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Ink.copy(alpha = 0.55f))
+            SheetRow(Icons.Outlined.Image, tx("Image"), tx("Next message makes an image")) { onDismiss(); onImage() }
+            SheetRow(Icons.Outlined.Movie, tx("Video"), tx("Next message makes a video")) { onDismiss(); onVideo() }
+            SheetRow(Icons.Outlined.MusicNote, tx("Audio"), tx("Next message makes audio")) { onDismiss(); onAudio() }
+            Text(tx("Conversation"), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Ink.copy(alpha = 0.55f))
+            SheetRow(Icons.Outlined.Archive, tx("Compress history"), tx("Summarize older messages to save context")) { onDismiss(); onCompress() }
+            SheetRow(Icons.Outlined.Extension, tx("Extensions"), tx("MCP preview; tool calls are not active yet")) { onDismiss(); onExtensions() }
         }
     }
 }
 
 @Composable
-private fun SheetTile(icon: ImageVector, label: String, modifier: Modifier, tint: Color? = null, onClick: () -> Unit) {
+private fun SheetTile(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .height(82.dp)
+            .clip(RoundedCornerShape(26.dp))
             .background(Tile)
             .clickable(onClick = onClick)
-            .padding(vertical = 16.dp),
+            .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(icon, contentDescription = label, tint = tint ?: Accent, modifier = Modifier.size(24.dp))
-        Text(label, fontSize = 13.sp, color = Ink)
+        Icon(icon, contentDescription = label, tint = Accent, modifier = Modifier.size(28.dp))
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Ink)
     }
 }
 
@@ -104,17 +105,17 @@ private fun SheetRow(icon: ImageVector, title: String, subtitle: String, onClick
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Tile)
+            .clip(RoundedCornerShape(22.dp))
+            .background(AriPaper)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(22.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Ink)
-            Text(subtitle, fontSize = 12.sp, color = Ink.copy(alpha = 0.55f))
+        Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(24.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+            Text(subtitle, fontSize = 12.sp, color = Ink.copy(alpha = 0.55f), lineHeight = 16.sp)
         }
     }
 }
@@ -191,30 +192,55 @@ fun SearchSheet(
     }
     PaperBottomSheet(
         onDismissRequest = onDismiss,
-        shape = paperSheetShape(28.dp),
+        shape = paperSheetShape(32.dp),
         showOutline = false
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
                 .heightIn(max = 620.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(tx("Web search"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-            Text(
-                tx("Choose Gemini or Anthropic. Web search reuses the selected AI provider's API key; no separate search key is needed."),
-                fontSize = 12.sp,
-                color = Ink.copy(alpha = 0.58f)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(AriAccentSoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Public, contentDescription = null, tint = Accent, modifier = Modifier.size(34.dp))
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(tx("Web search"), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
+                    Text(
+                        tx("Choose Gemini or Anthropic. Web search reuses the selected AI provider's API key; no separate search key is needed."),
+                        fontSize = 12.sp,
+                        color = Ink.copy(alpha = 0.58f),
+                        lineHeight = 17.sp
+                    )
+                }
+            }
             if (mode == SearchMode.MODEL) {
-                Text(
-                    tx("Web search is on. Tap the selected provider again to turn it off."),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Accent
-                )
+                Surface(
+                    shape = RoundedCornerShape(50.dp),
+                    color = Accent,
+                    tonalElevation = 0.dp
+                ) {
+                    Text(
+                        tx("Web search is on. Tap the selected provider again to turn it off."),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                }
             }
             options.forEach { option ->
                 NativeSearchProviderCard(
@@ -225,7 +251,8 @@ fun SearchSheet(
                     onModeChange = onModeChange,
                     onSelectModel = onSelectSearchModel,
                     onSaveProvider = onSaveProvider,
-                    onAfterSelection = onDismiss
+                    onAfterSelection = onDismiss,
+                    chatSheetStyle = true
                 )
             }
         }
