@@ -55,6 +55,7 @@ fun AttachmentSheet(
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = paperSheetShape(32.dp),
+        skipPartiallyExpanded = true,
         showOutline = false
     ) {
         Column(
@@ -227,6 +228,19 @@ fun SearchSheet(
                     )
                 }
             }
+            options.forEach { option ->
+                NativeSearchProviderCard(
+                    option = option,
+                    mode = mode,
+                    selectedProviderId = selectedProviderId,
+                    selectedModelId = selectedModelId,
+                    onModeChange = onModeChange,
+                    onSelectModel = onSelectSearchModel,
+                    onSaveProvider = onSaveProvider,
+                    onAfterSelection = onDismiss,
+                    chatSheetStyle = true
+                )
+            }
             if (mode == SearchMode.MODEL) {
                 Surface(
                     shape = RoundedCornerShape(50.dp),
@@ -241,19 +255,6 @@ fun SearchSheet(
                         color = Color.White
                     )
                 }
-            }
-            options.forEach { option ->
-                NativeSearchProviderCard(
-                    option = option,
-                    mode = mode,
-                    selectedProviderId = selectedProviderId,
-                    selectedModelId = selectedModelId,
-                    onModeChange = onModeChange,
-                    onSelectModel = onSelectSearchModel,
-                    onSaveProvider = onSaveProvider,
-                    onAfterSelection = onDismiss,
-                    chatSheetStyle = true
-                )
             }
         }
     }

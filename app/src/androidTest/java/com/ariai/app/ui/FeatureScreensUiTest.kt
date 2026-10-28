@@ -239,7 +239,9 @@ class FeatureScreensUiTest {
         assertEquals(savedProviderId, selectedProvider.value)
         assertEquals("gemini-2.5-flash", selectedModel.value)
         assertEquals(SearchMode.MODEL, mode.value)
-        compose.onNodeWithText("Web search is on. Tap the selected provider again to turn it off.").assertIsDisplayed()
+        compose.onNodeWithText("Web search is on. Tap the selected provider again to turn it off.")
+            .performScrollTo()
+            .assertIsDisplayed()
         compose.onAllNodesWithTag("native-search-editor-gemini").assertCountEquals(0)
     }
 
