@@ -2,9 +2,10 @@ name: Android CI
 
 on:
   push:
-    branches: [ "main", "arena/*" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
