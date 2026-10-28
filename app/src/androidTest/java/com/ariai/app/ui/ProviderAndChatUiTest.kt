@@ -7,7 +7,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -15,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ariai.app.data.models.AIModel
@@ -338,6 +342,12 @@ class ProviderAndChatUiTest {
         assertDisplayed("provider dock") {
             compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
         }
+        compose.onNodeWithTag("provider-filter-all").assertTextContains("5 models")
+        compose.onNodeWithTag("model-picker-selected-count").assertTextEquals("4 models")
+        if (compose.onAllNodesWithTag("model-picker-provider-rail").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithTag("model-picker-provider-rail")
+                .performScrollToNode(hasTestTag("provider-filter-${alternateProvider.id}"))
+        }
         assertDisplayed("alternate provider chip") {
             compose.onNodeWithTag("provider-filter-${alternateProvider.id}").assertIsDisplayed()
         }
@@ -356,6 +366,8 @@ class ProviderAndChatUiTest {
         clickWithLabel("show-all models button") {
             compose.onNodeWithTag("model-picker-expand-${provider.id}").performClick()
         }
+        compose.onNodeWithTag("model-picker-model-list")
+            .performScrollToNode(hasText("Long tail model"))
         assertDisplayed("expanded long-tail model") { compose.onNodeWithText("Long tail model").assertIsDisplayed() }
         clickWithLabel("alternate provider filter") {
             compose.onNodeWithTag("provider-filter-${alternateProvider.id}").performClick()
@@ -364,12 +376,19 @@ class ProviderAndChatUiTest {
         assertDisplayed("alternate provider model") { compose.onNodeWithText("Alternative model").assertIsDisplayed() }
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
 
-        val addProviderButton = compose.onNodeWithText("Add provider")
-        assertDisplayed("add provider button") { addProviderButton.assertIsDisplayed() }
-        clickWithLabel("add provider button") { addProviderButton.performClick() }
-        val manageProvidersButton = compose.onNodeWithText("Manage providers")
-        assertDisplayed("manage providers button") { manageProvidersButton.assertIsDisplayed() }
-        clickWithLabel("manage providers button") { manageProvidersButton.performClick() }
+        clickWithLabel("model picker overflow menu") {
+            compose.onNodeWithTag("model-picker-overflow").performClick()
+        }
+        val addProviderButton = compose.onNodeWithTag("model-picker-add-menu")
+        assertDisplayed("add provider menu action") { addProviderButton.assertIsDisplayed() }
+        clickWithLabel("add provider menu action") { addProviderButton.performClick() }
+
+        clickWithLabel("model picker overflow menu after add") {
+            compose.onNodeWithTag("model-picker-overflow").performClick()
+        }
+        val manageProvidersButton = compose.onNodeWithTag("model-picker-manage-menu")
+        assertDisplayed("manage providers menu action") { manageProvidersButton.assertIsDisplayed() }
+        clickWithLabel("manage providers menu action") { manageProvidersButton.performClick() }
         assertEquals(1, addCalls)
         assertEquals(1, manageCalls)
     }

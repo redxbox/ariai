@@ -48,10 +48,7 @@ import kotlinx.coroutines.launch
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-/**
- * Bottom sheet to pick the model for the current chat. Shows favorites first, then
- * models grouped by provider, with capability tags and a provider filter.
- */
+/** Opens the responsive provider-and-model picker shown from the chat model control. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelPickerSheet(
@@ -67,194 +64,19 @@ fun ModelPickerSheet(
     onCheckProvider: suspend (Provider) -> ConnectionResult,
     onDismiss: () -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
-    var providerFilter by remember(selectedProviderId, providers) {
-        mutableStateOf(
-            selectedProviderId?.takeIf { id -> providers.any { it.id == id && it.enabled && it.models.isNotEmpty() } }
-        )
-    }
-    var expandedProviders by remember { mutableStateOf(setOf<String>()) }
-    var favoritesExpanded by remember { mutableStateOf(false) }
-
-    val enabled = providers.filter { it.enabled && it.models.isNotEmpty() }
-
-    fun matches(provider: Provider, model: AIModel): Boolean =
-        query.isBlank() ||
-            model.displayName.contains(query, true) ||
-            model.id.contains(query, true) ||
-            provider.name.contains(query, true)
-
-    fun rankedModels(provider: Provider, models: List<AIModel>): List<AIModel> = models.withIndex()
-        .sortedWith(
-            compareByDescending<IndexedValue<AIModel>> { modelUsageCounts[provider.id to it.value.id] ?: 0 }
-                .thenByDescending { favorites.contains(favoriteKey(provider.id, it.value.id)) }
-                .thenByDescending { isSelectedModel(provider.id, it.value.id, selectedProviderId, selectedModelId) }
-                .thenBy { it.index }
-        )
-        .map { it.value }
-
-    val allFavoriteEntries = enabled.flatMap { provider ->
-        rankedModels(provider, provider.models)
-            .filter { favorites.contains(favoriteKey(provider.id, it.id)) && matches(provider, it) }
-            .map { provider to it }
-    }.sortedWith(
-        compareByDescending<Pair<Provider, AIModel>> { modelUsageCounts[it.first.id to it.second.id] ?: 0 }
-            .thenByDescending { isSelectedModel(it.first.id, it.second.id, selectedProviderId, selectedModelId) }
+    ModelPickerWorkspace(
+        providers = providers,
+        selectedProviderId = selectedProviderId,
+        selectedModelId = selectedModelId,
+        favorites = favorites,
+        modelUsageCounts = modelUsageCounts,
+        onToggleFavorite = onToggleFavorite,
+        onSelect = onSelect,
+        onAddProvider = onAddProvider,
+        onManageProviders = onManageProviders,
+        onCheckProvider = onCheckProvider,
+        onDismiss = onDismiss
     )
-    val favoriteEntries = if (query.isNotBlank() || favoritesExpanded) allFavoriteEntries else allFavoriteEntries.take(3)
-    val sections = enabled
-        .filter { providerFilter == null || it.id == providerFilter }
-        .map { provider -> provider to rankedModels(provider, provider.models).filter { matches(provider, it) } }
-        .filter { it.second.isNotEmpty() }
-
-    val sheetShape = paperSheetShape(28.dp)
-    PaperBottomSheet(
-        onDismissRequest = onDismiss,
-        shape = sheetShape,
-        skipPartiallyExpanded = true
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(horizontal = 16.dp).padding(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                placeholder = { Text(tx("Search models"), color = Ink.copy(alpha = 0.4f)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.4f)) },
-                shape = RoundedCornerShape(50),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = AriCard,
-                    unfocusedContainerColor = AriCard,
-                    focusedBorderColor = Accent.copy(alpha = 0.45f),
-                    unfocusedBorderColor = AriLine.copy(alpha = 0.75f),
-                    focusedLabelColor = Accent,
-                    cursorColor = Accent
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            if (enabled.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(tx("No models available"), fontWeight = FontWeight.SemiBold, color = Ink)
-                    Text(tx("Add a provider with at least one model."), color = Ink.copy(alpha = 0.5f), fontSize = 13.sp)
-                }
-                Spacer(Modifier.weight(1f))
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f).testTag("model-picker-model-list"),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    if (providerFilter == null && favoriteEntries.isNotEmpty()) {
-                        item(key = "h_favorites") { SectionTitle(tx("Favorites")) }
-                        items(favoriteEntries, key = { (provider, model) -> "fav_${provider.id}_${model.id}" }) { (provider, model) ->
-                            ModelRow(
-                                provider = provider,
-                                model = model,
-                                selected = isSelectedModel(provider.id, model.id, selectedProviderId, selectedModelId),
-                                favorite = true,
-                                usageCount = modelUsageCounts[provider.id to model.id] ?: 0,
-                                onSelect = { onSelect(provider.id, model.id); onDismiss() },
-                                onToggleFavorite = { onToggleFavorite(provider.id, model.id) }
-                            )
-                        }
-                        if (query.isBlank() && allFavoriteEntries.size > 3) {
-                            item(key = "favorites-expand") {
-                                ExpandModelsButton(
-                                    expanded = favoritesExpanded,
-                                    count = allFavoriteEntries.size,
-                                    testTag = "model-picker-expand-favorites",
-                                    onClick = { favoritesExpanded = !favoritesExpanded }
-                                )
-                            }
-                        }
-                    }
-
-                    sections.forEach { (provider, allModels) ->
-                        // Searching intentionally bypasses the compact preview so no match is hidden.
-                        val expanded = query.isNotBlank() || expandedProviders.contains(provider.id)
-                        val shown = if (expanded) allModels else allModels.take(3)
-                        item(key = "h_${provider.id}") {
-                            ProviderSectionHeader(
-                                provider = provider,
-                                count = allModels.size,
-                                selected = provider.id == selectedProviderId
-                            )
-                        }
-                        items(shown, key = { model -> "${provider.id}_${model.id}" }) { model ->
-                            ModelRow(
-                                provider = provider,
-                                model = model,
-                                selected = isSelectedModel(provider.id, model.id, selectedProviderId, selectedModelId),
-                                favorite = favorites.contains(favoriteKey(provider.id, model.id)),
-                                usageCount = modelUsageCounts[provider.id to model.id] ?: 0,
-                                onSelect = { onSelect(provider.id, model.id); onDismiss() },
-                                onToggleFavorite = { onToggleFavorite(provider.id, model.id) }
-                            )
-                        }
-                        if (query.isBlank() && allModels.size > 3) {
-                            item(key = "expand_${provider.id}") {
-                                ExpandModelsButton(
-                                    expanded = expanded,
-                                    count = allModels.size,
-                                    testTag = "model-picker-expand-${provider.id}",
-                                    onClick = {
-                                        expandedProviders = if (expanded) {
-                                            expandedProviders - provider.id
-                                        } else {
-                                            expandedProviders + provider.id
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                enabled.firstOrNull { it.id == providerFilter }?.let { provider ->
-                    ProviderCheckRow(provider = provider, check = onCheckProvider)
-                }
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedButton(
-                    onClick = onManageProviders,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, AriInk.copy(alpha = 0.16f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink)
-                ) {
-                    Text(tx("Manage providers"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Button(
-                    onClick = onAddProvider,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Accent)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(tx("Add provider"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-
-            if (enabled.isNotEmpty()) {
-                ProviderDock(
-                    providers = enabled,
-                    selectedProviderId = providerFilter,
-                    onSelect = { providerFilter = it }
-                )
-            }
-        }
-    }
 }
 
 @Composable

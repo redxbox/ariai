@@ -2,9 +2,7 @@ package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
 import com.ariai.app.ui.components.ReplyContent
-import com.ariai.app.ui.components.AriBinaryBrainMark
 import com.ariai.app.ui.components.ProviderBrandMark
-import com.ariai.app.ui.components.providerBrandColor
 import com.ariai.app.util.UiLang
 import androidx.compose.ui.viewinterop.AndroidView
 
@@ -1015,16 +1013,14 @@ private fun ChatModelSelector(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val providerAccent = providerBrandColor(provider)
     val label = when {
-        provider == null -> tx("Choose model")
-        modelName.isBlank() || modelName == tx("Choose model") -> "AriAI (${provider.name})"
+        provider == null || modelName.isBlank() || modelName == tx("Choose model") -> tx("Choose model")
         else -> "AriAI ($modelName)"
     }
     val shape = RoundedCornerShape(50)
     Surface(
         onClick = onClick,
-        modifier = modifier.widthIn(min = 144.dp, max = 272.dp).heightIn(min = 48.dp)
+        modifier = modifier.widthIn(min = 160.dp, max = 272.dp).heightIn(min = 56.dp)
             .semantics(mergeDescendants = true) {
                 contentDescription = tx("Choose model")
                 stateDescription = "${provider?.name ?: tx("No provider")} · $modelName"
@@ -1032,29 +1028,29 @@ private fun ChatModelSelector(
         shape = shape,
         color = AriCard,
         contentColor = Ink,
-        shadowElevation = 3.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, providerAccent.copy(alpha = 0.28f))
+        shadowElevation = 5.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, AriAccentSoft.copy(alpha = 0.9f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            AriBinaryBrainMark(size = 22.dp, tint = MaterialTheme.colorScheme.primary)
+            ModelPickerGridBadge(size = 40.dp)
             Text(
                 text = label,
-                modifier = Modifier.widthIn(max = 196.dp),
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
+                modifier = Modifier.widthIn(max = 186.dp),
+                color = AriAccent,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Icon(
                 Icons.Default.KeyboardArrowDown,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
+                tint = AriAccent,
+                modifier = Modifier.size(21.dp)
             )
         }
     }
