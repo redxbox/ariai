@@ -1,151 +1,104 @@
 package com.ariai.app.ui.screens
 
-import com.ariai.app.util.tx
-
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
-import com.ariai.app.ui.theme.*
-
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ariai.app.data.models.Provider
+import com.ariai.app.data.models.SearchMode
+import com.ariai.app.ui.theme.AriCard
+import com.ariai.app.ui.theme.AriInk
+import com.ariai.app.ui.theme.AriMuted
+import com.ariai.app.ui.theme.AriPaper
+import com.ariai.app.util.tx
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
-private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private data class SearchService(val key: String, val name: String, val description: String)
-
-private val searchServices = listOf(
-    SearchService("tavily", "Tavily", tx("Research-focused search API")),
-    SearchService("brave", "Brave Search", tx("Independent web index")),
-    SearchService("exa", "Exa", tx("Semantic neural search")),
-    SearchService("serper", "Serper", tx("Google results via API"))
-)
-
-/**
- * Web search service settings. Each service stores its own API key.
- * The first service with a non-empty key is used for web search.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Manages Gemini and Anthropic provider keys, which are also used by built-in web search. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SearchServiceScreen(
-    searchKeys: Map<String, String>,
-    onSaveKey: (String, String) -> Unit,
+    providers: List<Provider>,
+    searchMode: SearchMode,
+    selectedProviderId: String?,
+    selectedModelId: String?,
+    onModeChange: (SearchMode) -> Unit,
+    onSelectModel: (String, String) -> Unit,
+    onSaveProvider: (Provider, (Provider?) -> Unit) -> Unit,
     onBack: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf<String?>(null) }
-    val activeKey = searchServices.firstOrNull { !searchKeys[it.key].isNullOrBlank() }?.key
+    val options = remember(providers, selectedProviderId, selectedModelId) {
+        nativeSearchProviderOptions(providers, selectedProviderId, selectedModelId)
+    }
 
     Scaffold(
         containerColor = AriPaper,
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
-                title = { Text(tx("Search service"), fontWeight = FontWeight.SemiBold, color = Ink) }
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = AriInk)
+                    }
+                },
+                title = { Text(tx("Search service"), fontWeight = FontWeight.SemiBold, color = AriInk) }
             )
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).navigationBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text(
-                    "Add an API key to let AriAI search the web before answering. Keys stay on this device.",
-                    color = Ink.copy(alpha = 0.6f),
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-            }
-            itemsIndexed(searchServices, key = { i, s -> "${s.key}_$i" }) { index, service ->
-                val brand = listOf(
-                    com.ariai.app.ui.theme.AriGemini,
-                    com.ariai.app.ui.theme.AriOpenAI,
-                    com.ariai.app.ui.theme.AriAnthropic,
-                    com.ariai.app.ui.theme.AriCustom
-                )[index % 4]
-                val key = searchKeys[service.key].orEmpty()
-                val isOpen = expanded == service.key
-                val isActive = activeKey == service.key
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
                     color = AriCard,
-                    shadowElevation = 0.dp,
-                    modifier = Modifier.fillMaxWidth().clickable { expanded = if (isOpen) null else service.key }
+                    tonalElevation = 0.dp
                 ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(brand), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = com.ariai.app.ui.theme.AriPaper, modifier = Modifier.size(20.dp))
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(service.name, fontWeight = FontWeight.SemiBold, color = Ink)
-                                Text(service.description, fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
-                            }
-                            Text(
-                                when {
-                                    isActive -> tx("Active")
-                                    key.isNotBlank() -> tx("Saved")
-                                    else -> tx("No key")
-                                },
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isActive) AriInk else Ink.copy(alpha = 0.45f)
-                            )
-                        }
-                        if (isOpen) {
-                            var draft by remember(service.key, isOpen) { mutableStateOf(key) }
-                            var reveal by remember { mutableStateOf(false) }
-                            OutlinedTextField(
-                                value = draft,
-                                onValueChange = { draft = it },
-                                label = { Text(tx("API key")) },
-                                singleLine = true,
-                                visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
-                                trailingIcon = {
-                                    IconButton(onClick = { reveal = !reveal }) {
-                                        Icon(Icons.Default.Visibility, contentDescription = tx("Show key"), tint = Ink.copy(alpha = 0.5f))
-                                    }
-                                },
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                OutlinedButton(
-                                    onClick = { onSaveKey(service.key, ""); draft = "" },
-                                    enabled = key.isNotBlank(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) { Text(tx("Remove")) }
-                                Button(
-                                    onClick = { onSaveKey(service.key, draft.trim()); expanded = null },
-                                    enabled = draft.isNotBlank() && draft.trim() != key,
-                                    shape = RoundedCornerShape(14.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Accent),
-                                    modifier = Modifier.weight(1f)
-                                ) { Text(tx("Save")) }
-                            }
-                        }
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(tx("Built-in web search"), fontWeight = FontWeight.SemiBold, color = AriInk)
+                        Text(
+                            tx("Manage the same Gemini or Anthropic API key used by your AI provider. Saving a key here selects that provider and turns on web search; no separate search key is stored."),
+                            fontSize = 13.sp,
+                            color = AriMuted
+                        )
                     }
                 }
+            }
+            items(options, key = { it.type.name }) { option ->
+                NativeSearchProviderCard(
+                    option = option,
+                    mode = searchMode,
+                    selectedProviderId = selectedProviderId,
+                    selectedModelId = selectedModelId,
+                    onModeChange = onModeChange,
+                    onSelectModel = onSelectModel,
+                    onSaveProvider = onSaveProvider
+                )
             }
         }
     }

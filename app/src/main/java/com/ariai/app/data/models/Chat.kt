@@ -38,9 +38,12 @@ data class ChatMessage(
     val modelId: String? = null,
     val providerId: String? = null,
     val attachments: List<Attachment> = emptyList(),
-    val parentId: String? = null, // For branching
+    val parentId: String? = null, // Branch parent, or the user turn associated with a retryable error.
     val branchChildren: List<String> = emptyList(),
     val toolCalls: List<ToolCall> = emptyList(),
+    /** Ephemeral tool-result linkage used only while an agent turn is running. */
+    val toolCallId: String? = null,
+    val toolName: String? = null,
     /** Absolute path of a generated image stored on this device. */
     val imagePath: String? = null,
     val reasoning: String? = null, // For o1/thinking models
@@ -72,6 +75,11 @@ data class Chat(
     val modelId: String? = null,
     val agentId: String? = null,
     val systemPrompt: String? = null,
+    /** Per-conversation generation controls; providers that do not support a value ignore it. */
+    val temperature: Float = 0.7f,
+    val topP: Float = 1.0f,
+    /** Optional user-created workspace/category. */
+    val folder: String? = null,
     val messages: List<ChatMessage> = emptyList(),
     val isPinned: Boolean = false,
     val isArchived: Boolean = false,
@@ -97,6 +105,7 @@ data class Agent(
 ) : Parcelable
 
 enum class AgentTool {
+    CALCULATOR,
     WEB_SEARCH,
     IMAGE_GENERATION,
     CODE_EXECUTION,
@@ -111,6 +120,7 @@ fun getBuiltInAgents(): List<Agent> = listOf(
         description = "Helpful general purpose assistant",
         systemPrompt = "You are AriAi, a helpful AI assistant. You are friendly, knowledgeable and concise. Current time: {time}, Model: {model}",
         avatar = "🤖",
+        tools = listOf(AgentTool.CALCULATOR, AgentTool.WEB_SEARCH),
         isBuiltIn = true
     ),
     Agent(
@@ -119,7 +129,7 @@ fun getBuiltInAgents(): List<Agent> = listOf(
         description = "Expert programmer for all languages",
         systemPrompt = "You are an expert programmer. You write clean, efficient, well-documented code. You explain complex concepts clearly. Always provide code examples when relevant. Current time: {time}",
         avatar = "💻",
-        tools = listOf(AgentTool.CODE_EXECUTION, AgentTool.WEB_SEARCH),
+        tools = listOf(AgentTool.WEB_SEARCH, AgentTool.CALCULATOR),
         isBuiltIn = true
     ),
     Agent(
@@ -145,7 +155,7 @@ fun getBuiltInAgents(): List<Agent> = listOf(
         description = "Deep research with web search",
         systemPrompt = "You are a research assistant. You provide thorough, well-sourced information. Use web search when needed. Always cite sources. Be objective and comprehensive. Time: {time}",
         avatar = "🔍",
-        tools = listOf(AgentTool.WEB_SEARCH, AgentTool.MEMORY),
+        tools = listOf(AgentTool.WEB_SEARCH, AgentTool.CALCULATOR),
         isBuiltIn = true
     ),
     Agent(

@@ -2,9 +2,11 @@ package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
 import com.ariai.app.ui.components.ReplyContent
+import com.ariai.app.ui.components.AriBinaryBrainMark
+import com.ariai.app.ui.components.ProviderBrandMark
+import com.ariai.app.ui.components.providerBrandColor
 import com.ariai.app.util.UiLang
 import androidx.compose.ui.viewinterop.AndroidView
-import com.ariai.app.data.remote.supportsNativeSearch
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -20,6 +22,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import android.content.ClipboardManager
@@ -33,10 +36,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -49,6 +48,8 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,10 +63,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,34 +83,45 @@ import com.ariai.app.data.models.AttachmentType
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
+import com.ariai.app.data.models.MessageStatus
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.ReasoningLevel
 import com.ariai.app.data.models.SearchMode
+import com.ariai.app.data.remote.PublicUrlFetcher
+import com.ariai.app.data.remote.ConnectionResult
 import com.ariai.app.util.ReadResult
 import com.ariai.app.util.bitmapAttachment
 import com.ariai.app.util.readAttachment
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Muted: Color @Composable @ReadOnlyComposable get() = AriMuted
 private val PageBg: Color @Composable @ReadOnlyComposable get() = AriPaper
+private val remoteImageFetcher by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { PublicUrlFetcher() }
+private const val MAX_REMOTE_IMAGE_SIDE = 2_048
+private const val MAX_REMOTE_IMAGE_PIXELS = 100_000_000L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewChatScreen(
     chat: Chat?,
     messages: List<ChatMessage>,
     isStreaming: Boolean,
+    isSending: Boolean = false,
     currentStreamingContent: String,
     selectedModel: String?,
+    selectedProviderId: String? = chat?.providerId,
     providers: List<Provider> = emptyList(),
     reasoning: ReasoningLevel = ReasoningLevel.AUTO,
     searchMode: SearchMode = SearchMode.OFF,
+    searchProvider: String? = null,
+    searchKeys: Map<String, String> = emptyMap(),
     favorites: Set<String> = emptySet(),
-    localSearchConfigured: Boolean = false,
-    onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode) -> Unit,
+    modelUsageCounts: Map<Pair<String, String>, Int> = emptyMap(),
+    onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode, (Boolean) -> Unit) -> Boolean,
     onStopGeneration: () -> Unit = {},
     onBack: () -> Unit,
     onRenameChat: (String) -> Unit = {},
@@ -114,17 +134,29 @@ fun NewChatScreen(
     onToggleFavorite: (String, String) -> Unit = { _, _ -> },
     onReasoningChange: (ReasoningLevel) -> Unit = {},
     onSearchModeChange: (SearchMode) -> Unit = {},
+    onSearchProviderChange: (String) -> Unit = {},
+    onSaveSearchKey: (String, String) -> Unit = { _, _ -> },
     onCompressHistory: ((String) -> Unit) -> Unit = {},
     onNewImageChat: () -> Unit = {},
     chatMode: ChatMode = ChatMode.TEXT,
     onChatModeChange: (ChatMode) -> Unit = {},
     onOpenExtensions: () -> Unit = {},
-    onOpenSearchSettings: () -> Unit = {},
     onAddProvider: () -> Unit = {},
+    onManageProviders: () -> Unit = {},
+    onSaveNativeSearchProvider: (Provider, (Provider?) -> Unit) -> Unit = { _, onSaved -> onSaved(null) },
     onCheckProvider: suspend (Provider) -> com.ariai.app.data.remote.ConnectionResult,
+    onUpdateChatOptions: (Float, Float, String?) -> Unit = { _, _, _ -> },
     fontSize: Int = 15,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    screenChatId: String? = chat?.id,
+    onChatScreenDisposed: (String) -> Unit = {}
 ) {
+    val onChatDisposedState = rememberUpdatedState(onChatScreenDisposed)
+    DisposableEffect(screenChatId) {
+        val disposedChatId = screenChatId
+        onDispose { disposedChatId?.let(onChatDisposedState.value) }
+    }
+
     var inputText by remember { mutableStateOf("") }
     // Voice input with the device's built-in speech recognizer. Spoken text is added to the input box.
     var listening by remember { mutableStateOf(false) }
@@ -168,6 +200,7 @@ fun NewChatScreen(
     }
     var pending by remember { mutableStateOf<List<Attachment>>(emptyList()) }
     var showModelSheet by remember { mutableStateOf(false) }
+    var showQuickParameters by remember { mutableStateOf(false) }
     var showFullEditor by remember { mutableStateOf(false) }
     var editingImage by remember { mutableStateOf<ChatMessage?>(null) }
     editingImage?.let { source ->
@@ -182,8 +215,12 @@ fun NewChatScreen(
     var showRename by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     if (showRename) {
+        val dialogShape = paperPopupShape(26.dp)
         AlertDialog(
             onDismissRequest = { showRename = false },
+            modifier = paperPopupModifier(dialogShape),
+            shape = dialogShape,
+            containerColor = AriCard,
             title = { Text(tx("Rename chat")) },
             text = {
                 OutlinedTextField(
@@ -221,8 +258,46 @@ fun NewChatScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val currentProvider = providers.find { it.id == chat?.providerId } ?: providers.firstOrNull()
-    val modelSearchAvailable = currentProvider?.let { supportsNativeSearch(it) } == true
+    val requestedProvider = providers.firstOrNull { it.id == selectedProviderId }
+    val currentProvider = requestedProvider?.takeIf { it.enabled } ?: providers.firstOrNull { it.enabled }
+    var connectionResult by remember(requestedProvider?.id) { mutableStateOf<ConnectionResult?>(null) }
+    var checkingConnection by remember(requestedProvider?.id) { mutableStateOf(false) }
+    val selectedModelCapabilities = requestedProvider?.models?.firstOrNull { it.id == selectedModel }
+    val selectedModelReady = requestedProvider?.enabled == true && selectedModelCapabilities != null
+    val modelSetupMessage = when {
+        providers.isEmpty() -> tx("Add your first AI provider to start chatting")
+        requestedProvider != null && !requestedProvider.enabled -> tx("Selected provider is disabled. Choose another model.")
+        currentProvider == null -> tx("No provider is enabled. Enable one to start chatting.")
+        currentProvider?.models?.isEmpty() == true -> tx("No models available. Manage providers to fetch models.")
+        else -> tx("Tap to choose a model")
+    }
+    val setupActionLabel = when {
+        providers.isEmpty() -> tx("Add provider")
+        currentProvider == null || currentProvider.models.isEmpty() -> tx("Manage providers")
+        !selectedModelReady -> tx("Choose model")
+        else -> null
+    }
+    val selectedModelLabel = selectedModelCapabilities?.displayName
+        ?: selectedModel?.substringAfterLast('/')
+        ?: tx("Choose model")
+    val selectedModelIsImageOnly = selectedModelCapabilities?.let { it.supportsImageGen && !it.outputsText } == true
+    val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
+    val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
+    val hasStreamingText = currentStreamingContent.isNotBlank()
+    val showWaitingStatus = isSending && !hasStreamingText
+    val waitingStatus = when {
+        chatMode == ChatMode.IMAGE || selectedModelIsImageOnly ->
+            tx("Preparing image generation…")
+        chatMode == ChatMode.VIDEO || selectedModelIsVideoOnly ->
+            tx("Preparing video generation…")
+        chatMode == ChatMode.AUDIO || selectedModelIsAudioOnly ->
+            tx("Preparing audio generation…")
+        searchMode != SearchMode.OFF -> tx("Searching the web…")
+        else -> tx("Thinking…")
+    }
+    val imageGenerationAvailable = providers.any { provider ->
+        provider.enabled && provider.models.any { it.supportsImageGen }
+    }
 
     // Follow the newest text only while the user is at the bottom. Once they scroll up, stay where they are.
     var followStream by remember { mutableStateOf(true) }
@@ -233,26 +308,36 @@ fun NewChatScreen(
             }
         }
     }
-    // Brings the last item into view. Used when text grows and when the keyboard opens or closes.
+    // Wait for the streamed text to be measured, then keep the bottom of its row inside the viewport.
+    // Streaming rows do not animate their size: an animated height would make the scroll chase stale layout.
     suspend fun followToEnd() {
-        val last = messages.size + if (currentStreamingContent.isNotEmpty()) 1 else 0
-        if (last <= 0) return
-        val target = last - 1
-        val info = listState.layoutInfo
-        val visible = info.visibleItemsInfo.firstOrNull { it.index == target }
-        if (visible == null) {
-            listState.scrollToItem(target)
-        }
-        val current = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == target } ?: return
-        val overflow = current.offset + current.size - listState.layoutInfo.viewportEndOffset
-        if (overflow > 0) {
-            // Scroll by the overflow relative to the current position (LazyListState has no scrollBy here).
-            listState.scrollToItem(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset + overflow)
+        val itemCount = messages.size + if (hasStreamingText || showWaitingStatus) 1 else 0
+        val target = itemCount - 1
+        if (target < 0) return
+
+        repeat(4) {
+            withFrameNanos { }
+            val info = listState.layoutInfo
+            if (target >= info.totalItemsCount) return@repeat
+            val lastItem = info.visibleItemsInfo.firstOrNull { it.index == target }
+            if (lastItem == null) {
+                listState.scrollToItem(target)
+                return@repeat
+            }
+            if (lastItem.size <= 0) return@repeat
+
+            val overflow = lastItem.offset + lastItem.size - info.viewportEndOffset
+            if (overflow <= 0) return
+            // scrollToItem's offset is relative to the first visible item, so add only the hidden tail.
+            listState.scrollToItem(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset + overflow
+            )
         }
     }
 
-    LaunchedEffect(messages.size, currentStreamingContent.length) {
-        if (currentStreamingContent.isEmpty() && messages.lastOrNull()?.role == MessageRole.USER) followStream = true
+    LaunchedEffect(messages.size, currentStreamingContent.length, showWaitingStatus) {
+        if (!hasStreamingText && messages.lastOrNull()?.role == MessageRole.USER) followStream = true
         if (followStream) followToEnd()
     }
     // The keyboard shrinks the list. If the user was at the bottom, keep the newest text visible.
@@ -285,22 +370,42 @@ fun NewChatScreen(
             showNote(tx("Saving needs Android 10 or newer"))
             return
         }
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "ariai_${System.currentTimeMillis()}.png")
-            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AriAI")
-        }
-        val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        if (uri == null) {
-            showNote(tx("Save failed"))
-            return
-        }
-        runCatching {
-            context.contentResolver.openOutputStream(uri)?.use { out ->
-                File(path).inputStream().use { it.copyTo(out) }
+        scope.launch {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    val file = File(path)
+                    val extension = file.extension.lowercase().takeIf { it in setOf("png", "jpg", "jpeg", "webp", "gif") } ?: "png"
+                    val mimeType = when (extension) {
+                        "jpg", "jpeg" -> "image/jpeg"
+                        "webp" -> "image/webp"
+                        "gif" -> "image/gif"
+                        else -> "image/png"
+                    }
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, "ariai_${System.currentTimeMillis()}.$extension")
+                        put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AriAI")
+                    }
+                    val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                        ?: throw java.io.IOException("Could not create image in MediaStore")
+                    try {
+                        val output = context.contentResolver.openOutputStream(uri)
+                            ?: throw java.io.IOException("Could not open image output stream")
+                        output.use { out -> file.inputStream().use { it.copyTo(out) } }
+                    } catch (e: Exception) {
+                        context.contentResolver.delete(uri, null, null)
+                        throw e
+                    }
+                }
+                Result.success(Unit)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
             }
-        }.onSuccess { showNote(tx("Saved to Pictures/AriAI")) }
-            .onFailure { showNote(tx("Save failed")) }
+            result.onSuccess { showNote(tx("Saved to Pictures/AriAI")) }
+                .onFailure { showNote(tx("Save failed")) }
+        }
     }
 
     fun addFiles(uris: List<Uri>) {
@@ -330,32 +435,75 @@ fun NewChatScreen(
 
     fun send() {
         val text = inputText.trim()
-        if ((text.isBlank() && pending.isEmpty()) || isStreaming) return
-        onSendMessage(text, pending, reasoning, searchMode)
-        inputText = ""
-        pending = emptyList()
+        val submittedAttachments = pending
+        if ((text.isBlank() && submittedAttachments.isEmpty()) || !selectedModelReady || isStreaming || isSending) return
+        onSendMessage(text, submittedAttachments, reasoning, searchMode) { saved ->
+            if (saved && inputText.trim() == text && pending == submittedAttachments) {
+                inputText = ""
+                pending = emptyList()
+            }
+        }
+    }
+
+    fun launchPickerAfterSheetCloses(launch: () -> Unit) {
+        // Let the modal finish dismissing before handing control to an external Android activity.
+        scope.launch {
+            delay(350)
+            launch()
+        }
     }
 
     if (showModelSheet) {
         ModelPickerSheet(
             providers = providers,
+            selectedProviderId = selectedProviderId,
             selectedModelId = selectedModel,
             favorites = favorites,
+            modelUsageCounts = modelUsageCounts,
             onToggleFavorite = onToggleFavorite,
             onSelect = onSelectModel,
             onAddProvider = { showModelSheet = false; onAddProvider() },
+            onManageProviders = { showModelSheet = false; onManageProviders() },
             onCheckProvider = onCheckProvider,
             onDismiss = { showModelSheet = false }
         )
     }
+    if (showQuickParameters) {
+        QuickParametersSheet(
+            temperature = chat?.temperature ?: 0.7f,
+            topP = chat?.topP ?: 1.0f,
+            systemPrompt = chat?.systemPrompt,
+            onSave = { temperature, topP, systemPrompt ->
+                onUpdateChatOptions(temperature, topP, systemPrompt)
+                showQuickParameters = false
+            },
+            onDismiss = { showQuickParameters = false }
+        )
+    }
     if (showAttachments) {
         AttachmentSheet(
-            onPhoto = { mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
-            onCamera = { cameraPicker.launch(null) },
-            onFile = { filePicker.launch(arrayOf("text/*", "application/json", "image/*")) },
+            onPhoto = {
+                launchPickerAfterSheetCloses {
+                    mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+            },
+            onVideoFile = {
+                launchPickerAfterSheetCloses {
+                    mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                }
+            },
+            onCamera = { launchPickerAfterSheetCloses { cameraPicker.launch(null) } },
+            onFile = {
+                launchPickerAfterSheetCloses {
+                    filePicker.launch(arrayOf("text/*", "application/json", "image/*", "video/*"))
+                }
+            },
             onCompress = { onCompressHistory { showNote(it) } },
             onExtensions = onOpenExtensions,
-            onImage = { onChatModeChange(ChatMode.IMAGE) },
+            onImage = {
+                if (imageGenerationAvailable) onChatModeChange(ChatMode.IMAGE)
+                else showNote(tx("No image model found. Add an image model, or fetch the models in provider settings."))
+            },
             onVideo = {
                 if (providers.any { p -> p.enabled && p.models.any { it.supportsVideoGen } }) onChatModeChange(ChatMode.VIDEO)
                 else showNote(tx("No video model. Fetch models in provider settings."))
@@ -373,11 +521,17 @@ fun NewChatScreen(
     if (showSearch) {
         SearchSheet(
             mode = searchMode,
-            modelSearchAvailable = modelSearchAvailable,
-            localSearchConfigured = localSearchConfigured,
+            providers = providers,
+            selectedProviderId = selectedProviderId,
+            selectedModelId = selectedModel,
             onModeChange = onSearchModeChange,
-            onConfigureLocal = onOpenSearchSettings,
-            onDismiss = { showSearch = false }
+            onSelectSearchModel = onSelectModel,
+            onSaveProvider = onSaveNativeSearchProvider,
+            onDismiss = { showSearch = false },
+            searchProvider = searchProvider,
+            searchKeys = searchKeys,
+            onSearchProviderChange = onSearchProviderChange,
+            onSaveSearchKey = onSaveSearchKey
         )
     }
 
@@ -386,83 +540,141 @@ fun NewChatScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
-                navigationIcon = {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = tx("Open menu"), tint = Ink)
-                    }
-                },
-                title = {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth().clickable { showModelSheet = true }
-                    ) {
-                        Text(
-                            chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat"),
-                            color = Ink,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            selectedModel ?: tx("Tap to choose a model"),
-                            color = Muted,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        renameText = chat?.title ?: ""
-                        showRename = true
-                    }) {
-                        Icon(Icons.Default.Edit, contentDescription = tx("Rename chat"), tint = Ink)
-                    }
-                    Box {
-                        IconButton(onClick = { showTopMenu = true }) {
-                            Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
+            Column(modifier = Modifier.fillMaxWidth().background(PageBg)) {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
+                    navigationIcon = {
+                        IconButton(onClick = onOpenDrawer) {
+                            Icon(Icons.Default.Menu, contentDescription = tx("Open menu"), tint = Ink)
                         }
-                        DropdownMenu(
-                            expanded = showTopMenu,
-                            onDismissRequest = { showTopMenu = false },
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .border(0.5.dp, AriLine, RoundedCornerShape(18.dp))
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(tx("Copy conversation")) },
-                                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                                onClick = {
-                                    showTopMenu = false
-                                    copyToClipboard(messages.filter { it.role != MessageRole.SYSTEM }.joinToString("\n\n") { it.content })
+                    },
+                    title = {
+                        ChatHeaderTitle(
+                            chatTitle = chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat")
+                        )
+                    },
+                    actions = {
+                        val contextLimit = selectedModelCapabilities?.contextWindow?.takeIf { it > 0 } ?: 0
+                        if (contextLimit > 0) {
+                            val latestUserIndex = messages.indexOfLast { it.role == MessageRole.USER }
+                            val latestAssistantIndex = messages.indexOfLast { it.role == MessageRole.ASSISTANT }
+                            val actualPromptTokens = messages.getOrNull(latestAssistantIndex)
+                                ?.takeIf { latestAssistantIndex > latestUserIndex && it.status != MessageStatus.ERROR }
+                                ?.usage?.promptTokens?.takeIf { it > 0 }
+                            val visibleTokens = messages.filter { it.role != MessageRole.SYSTEM }.sumOf { message ->
+                                ((message.content.length + 3).toLong() / 4L) + message.attachments.sumOf { attachment ->
+                                    ((attachment.textContent?.length ?: 0).toLong() + 3L) / 4L + when (attachment.type) {
+                                        AttachmentType.IMAGE -> 768L
+                                        AttachmentType.VIDEO -> 2048L
+                                        else -> 0L
+                                    }
                                 }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(tx("Image chat")) },
-                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = AriAccent) },
-                                onClick = { showTopMenu = false; onNewImageChat() }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(tx("Choose model")) },
-                                leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null, tint = AriAccent) },
-                                onClick = { showTopMenu = false; showModelSheet = true }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(tx("Compress history")) },
-                                leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                            } + ((chat?.systemPrompt?.length ?: 0).toLong() + 3L) / 4L
+                            val tokenCount = actualPromptTokens ?: visibleTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                            ContextUsageIndicator(
+                                tokens = tokenCount,
+                                contextWindow = contextLimit,
+                                approximate = actualPromptTokens == null,
                                 onClick = {
-                                    showTopMenu = false
-                                    onCompressHistory { showNote(it) }
+                                    val prefix = if (actualPromptTokens == null) tx("Approx.") + " " else ""
+                                    showNote("$prefix$tokenCount / $contextLimit ${tx("tokens in context")}")
                                 }
                             )
                         }
+                        Box {
+                            IconButton(onClick = { showTopMenu = true }) {
+                                Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
+                            }
+                            val menuShape = paperPopupShape(18.dp, 12.dp)
+                            DropdownMenu(
+                                expanded = showTopMenu,
+                                onDismissRequest = { showTopMenu = false },
+                                modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (checkingConnection) tx("Checking…") else tx("Check connection")) },
+                                    leadingIcon = { Icon(Icons.Default.NetworkCheck, contentDescription = null) },
+                                    enabled = requestedProvider?.enabled == true && !checkingConnection,
+                                    onClick = {
+                                        showTopMenu = false
+                                        val provider = requestedProvider?.takeIf { it.enabled }
+                                        if (provider != null) scope.launch {
+                                            checkingConnection = true
+                                            try {
+                                                connectionResult = onCheckProvider(provider)
+                                                when (val result = connectionResult) {
+                                                    is ConnectionResult.Ok -> showNote("${tx("Connected")} · ${result.durationMs} ms · ${result.models} ${tx("models")}")
+                                                    is ConnectionResult.Failed -> showNote(result.problem)
+                                                    null -> Unit
+                                                }
+                                            } catch (cancelled: CancellationException) {
+                                                throw cancelled
+                                            } catch (error: Exception) {
+                                                connectionResult = ConnectionResult.Failed(tx("Could not connect"), error.message.orEmpty())
+                                                showNote(tx("Could not connect"))
+                                            } finally {
+                                                checkingConnection = false
+                                            }
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Quick parameters")) },
+                                    leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                                    onClick = { showTopMenu = false; showQuickParameters = true }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Rename chat")) },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    onClick = {
+                                        showTopMenu = false
+                                        renameText = chat?.title ?: ""
+                                        showRename = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Copy conversation")) },
+                                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                                    onClick = {
+                                        showTopMenu = false
+                                        copyToClipboard(messages.filter { it.role != MessageRole.SYSTEM }.joinToString("\n\n") { it.content })
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Image chat")) },
+                                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = AriAccent) },
+                                    onClick = {
+                                        showTopMenu = false
+                                        if (imageGenerationAvailable) onNewImageChat()
+                                        else showNote(tx("No image model found. Add an image model, or fetch the models in provider settings."))
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tx("Compress history")) },
+                                    leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                                    onClick = {
+                                        showTopMenu = false
+                                        onCompressHistory { showNote(it) }
+                                    }
+                                )
+                            }
+                        }
                     }
+                )
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .testTag("chat-model-selector-container")
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ChatModelSelector(
+                        provider = requestedProvider ?: currentProvider,
+                        modelName = selectedModelLabel,
+                        onClick = { showModelSheet = true },
+                        modifier = Modifier.testTag("chat-model-floater")
+                    )
                 }
-            )
+            }
         },
         bottomBar = {
             Column(
@@ -481,22 +693,33 @@ fun NewChatScreen(
                     }
                 }
 
+                // Keep model selection above the conversation so it never crowds message entry.
+                val composerShape = RoundedCornerShape(26.dp)
                 Surface(
-                    shape = RoundedCornerShape(26.dp),
+                    shape = composerShape,
                     color = AriCard,
-                    shadowElevation = 0.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    shadowElevation = 2.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize(tween(220, easing = FastOutSlowInEasing))
+                        .border(1.dp, AriLine.copy(alpha = 0.9f), composerShape)
+                        .testTag("chat-composer-container")
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                            .animateContentSize(tween(220, easing = FastOutSlowInEasing))
+                    ) {
                         // Long messages get an expand button that opens a full-screen editor.
                         if (inputText.length > 120 || inputText.contains('\n')) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                Icon(
-                                    Icons.Default.OpenInFull,
-                                    contentDescription = tx("Expand message"),
-                                    tint = Ink.copy(alpha = 0.55f),
-                                    modifier = Modifier.size(20.dp).clickable { showFullEditor = true }
-                                )
+                                IconButton(onClick = { showFullEditor = true }) {
+                                    Icon(
+                                        Icons.Default.OpenInFull,
+                                        contentDescription = tx("Expand message"),
+                                        tint = Ink.copy(alpha = 0.55f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                         if (chatMode != ChatMode.TEXT) {
@@ -504,34 +727,83 @@ fun NewChatScreen(
                                 ModeChip(mode = chatMode, onClose = { onChatModeChange(ChatMode.TEXT) }, modifier = Modifier)
                             }
                         }
-                        TextField(
-                            value = inputText,
-                            onValueChange = { inputText = it },
-                            placeholder = { Text(tx("Message AriAI"), color = Muted) },
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 12,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = Accent,
-                                focusedTextColor = Ink,
-                                unfocusedTextColor = Ink
+                        val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && selectedModelReady && !isStreaming && !isSending
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Resolve paragraph direction from the input itself so Persian remains RTL
+                            // even when the app's interface language is English.
+                            TextField(
+                                value = inputText,
+                                onValueChange = { inputText = it },
+                                placeholder = { Text(tx("Message AriAI"), color = Muted) },
+                                textStyle = LocalTextStyle.current.copy(
+                                    textAlign = TextAlign.Start,
+                                    textDirection = TextDirection.ContentOrLtr
+                                ),
+                                modifier = Modifier.weight(1f).testTag("chat-composer"),
+                                maxLines = 12,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    cursorColor = Accent,
+                                    focusedTextColor = Ink,
+                                    unfocusedTextColor = Ink
+                                )
                             )
-                        )
+                            if (isStreaming || isSending) {
+                                // While a request is pending or a reply is coming in, allow cancellation.
+                                Surface(
+                                    onClick = { onStopGeneration() },
+                                    modifier = Modifier.size(48.dp).testTag("chat-send-button"),
+                                    shape = CircleShape,
+                                    color = AriAccentDark,
+                                    contentColor = Color.White,
+                                    shadowElevation = 3.dp,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Stop, contentDescription = tx("Stop"), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            } else {
+                                Surface(
+                                    onClick = { send() },
+                                    enabled = canSend,
+                                    modifier = Modifier.size(48.dp).testTag("chat-send-button"),
+                                    shape = CircleShape,
+                                    color = if (canSend) AriAccent else AriAccent.copy(alpha = 0.56f),
+                                    contentColor = Color.White,
+                                    shadowElevation = if (canSend) 4.dp else 1.dp,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.ArrowUpward,
+                                            contentDescription = tx("Send"),
+                                            tint = Color.White.copy(alpha = 0.94f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconCircle(Icons.Default.Add, tx("Add to message"), active = false) { showAttachments = true }
                             Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Public, tx("Web search"), active = searchMode != SearchMode.OFF) {
+                            IconCircle(Icons.Default.Search, tx("Web search"), active = searchMode != SearchMode.OFF, stateful = true) {
                                 showSearch = true
                             }
                             Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Mic, tx("Voice input"), active = listening) {
+                            IconCircle(Icons.Default.Mic, tx("Voice input"), active = listening, stateful = true) {
                                 when {
                                     listening -> recognizer?.stopListening()
                                     androidx.core.content.ContextCompat.checkSelfPermission(
@@ -541,124 +813,285 @@ fun NewChatScreen(
                                 }
                             }
                             Spacer(Modifier.weight(1f))
-                            ModelChip(text = selectedModel?.substringAfterLast('/') ?: tx("Choose model")) {
-                                showModelSheet = true
-                            }
-                            Spacer(Modifier.width(6.dp))
-                            val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && !isStreaming
-                            if (isStreaming) {
-                                // While a reply is coming in, the same button stops it.
-                                Box(
-                                    modifier = Modifier.size(40.dp).clip(CircleShape)
-                                        .background(AriInk)
-                                        .clickable { onStopGeneration() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Default.Stop, contentDescription = tx("Stop"), tint = AriCard, modifier = Modifier.size(18.dp))
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier.size(40.dp).clip(CircleShape)
-                                        .background(animateColorAsState(if (canSend) AriAccent else AriTint, tween(200), label = "send").value)
-                                        .clickable(enabled = canSend) { send() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.ArrowUpward,
-                                        contentDescription = tx("Send"),
-                                        tint = if (canSend) AriCard else Ink.copy(alpha = 0.35f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
                         }
                     }
                 }
             }
         }
     ) { padding ->
-        if (messages.isEmpty() && currentStreamingContent.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(AriTint), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Chat, contentDescription = null, tint = AriAccent, modifier = Modifier.size(30.dp))
-                    }
-                    Text(tx("How can I help you?"), color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-                    Text(tx("Type a message below to start."), color = Muted, fontSize = 13.sp)
-                }
-            }
-        } else {
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+        if (messages.isEmpty() && !hasStreamingText && !isSending) {
+            val compactWelcome = imeBottom > 0
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding).clipToBounds(),
+                contentAlignment = Alignment.Center
             ) {
-                items(count = messages.size, key = { i -> "${messages[i].id}_$i" }) { i ->
-                    val m = messages[i]
-                    when (m.role) {
-                        MessageRole.SYSTEM -> AppearIn(m.id) { CompressedNotice() }
-                        MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }
-                        else -> AppearIn(m.id) {
-                            AssistantBlock(
-                                text = m.content,
-                                fontSize = fontSize,
-                                imagePath = m.imagePath,
-                                onCopy = { copyToClipboard(m.content) },
-                                onShare = { shareText(m.content) },
-                                onEdit = { editingImage = m },
-                                onSave = { m.imagePath?.let { saveImage(it) } },
-                                onBranch = { onBranchMessage(m) },
-                                onRetry = { onRegenerate(m) }
-                            )
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(if (compactWelcome) 6.dp else 10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(if (compactWelcome) 38.dp else 48.dp)
+                            .clip(CircleShape)
+                            .background(AriAccentSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = AriAccentDark,
+                            modifier = Modifier.size(if (compactWelcome) 18.dp else 22.dp)
+                        )
+                    }
+                    Text(
+                        "AriAI",
+                        color = Muted,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.2.sp
+                    )
+                    Text(
+                        tx("How can I help you?"),
+                        color = Ink,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = if (compactWelcome) 17.sp else 19.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    if (!selectedModelReady) {
+                        Text(
+                            modelSetupMessage,
+                            color = Muted,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        if (!compactWelcome && setupActionLabel != null) {
+                            Button(
+                                onClick = {
+                                    when {
+                                        providers.isEmpty() -> onAddProvider()
+                                        currentProvider == null || currentProvider.models.isEmpty() -> onManageProviders()
+                                        else -> showModelSheet = true
+                                    }
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
+                            ) {
+                                Icon(
+                                    if (providers.isEmpty()) Icons.Default.Add else Icons.Default.Tune,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(setupActionLabel, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    } else if (!compactWelcome) {
+                        Text(
+                            tx("Type a message below to start."),
+                            color = Muted,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth().testTag("welcome-suggestions"),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            item(key = "suggestion:brainstorm") {
+                                AssistChip(
+                                    onClick = { inputText = tx("Help me brainstorm a few ideas.") },
+                                    label = { Text(tx("Brainstorm")) },
+                                    leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = AriCard,
+                                        labelColor = Ink,
+                                        leadingIconContentColor = AriAccent
+                                    )
+                                )
+                            }
+                            item(key = "suggestion:summarize") {
+                                AssistChip(
+                                    onClick = { inputText = tx("Summarize this for me.") },
+                                    label = { Text(tx("Summarize")) },
+                                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = AriCard,
+                                        labelColor = Ink,
+                                        leadingIconContentColor = AriAccent
+                                    )
+                                )
+                            }
                         }
                     }
                 }
-                if (currentStreamingContent.isNotEmpty()) {
-                    item(key = "streaming") {
-                        AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                // Keep this control in normal layout flow so it reserves room above the first
+                // message instead of obscuring the message text beneath it.
+                ThinkingChip(
+                    level = reasoning,
+                    onClick = { showThinking = true },
+                    modifier = Modifier
+                        .padding(start = 12.dp, top = 6.dp, bottom = 4.dp)
+                        .testTag("chat-thinking-chip")
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    items(count = messages.size, key = { i -> messages[i].id }) { i ->
+                        val m = messages[i]
+                        val isError = m.status == MessageStatus.ERROR
+                        val retryUserId = if (isError) m.parentId else null
+                        val associatedUserId = retryUserId ?: messages.take(i)
+                            .lastOrNull { it.role == MessageRole.USER }
+                            ?.id
+                        val canRetry = m.role == MessageRole.ASSISTANT && associatedUserId?.let { userId ->
+                            messages.any { it.id == userId && it.role == MessageRole.USER }
+                        } == true
+                        when (m.role) {
+                            MessageRole.SYSTEM -> AppearIn(m.id) { CompressedNotice() }
+                            MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }
+                            else -> AppearIn(m.id) {
+                                AssistantBlock(
+                                    text = m.content,
+                                    fontSize = fontSize,
+                                    imagePath = m.imagePath,
+                                    isError = isError,
+                                    retryable = canRetry && !isStreaming && !isSending,
+                                    onCopy = { copyToClipboard(m.content) },
+                                    onShare = { shareText(m.content) },
+                                    onEdit = { editingImage = m },
+                                    onSave = { m.imagePath?.let { saveImage(it) } },
+                                    onBranch = { onBranchMessage(m) },
+                                    onRetry = { onRegenerate(m) }
+                                )
+                            }
+                        }
+                    }
+                    if (hasStreamingText) {
+                        item(key = "streaming") {
+                            AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
+                        }
+                    } else if (showWaitingStatus) {
+                        item(key = "waiting-status") { WaitingStatus(waitingStatus) }
                     }
                 }
             }
-            ThinkingChip(
-                level = reasoning,
-                onClick = { showThinking = true },
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 6.dp)
-            )
-            }
+
         }
     }
 }
 
 @Composable
-private fun ModelChip(text: String, onClick: () -> Unit) {
+private fun ChatHeaderTitle(chatTitle: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("chat-title-header").padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ProviderBrandMark(provider = null, size = 30.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            chatTitle,
+            modifier = Modifier.weight(1f),
+            color = Ink,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontSize = 15.sp
+        )
+    }
+}
+
+@Composable
+private fun ChatModelSelector(
+    provider: Provider?,
+    modelName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val providerAccent = providerBrandColor(provider)
+    val label = when {
+        provider == null -> tx("Choose model")
+        modelName.isBlank() || modelName == tx("Choose model") -> "AriAI (${provider.name})"
+        else -> "AriAI ($modelName)"
+    }
+    val shape = RoundedCornerShape(50)
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = AriTint
+        modifier = modifier.widthIn(min = 144.dp, max = 272.dp).heightIn(min = 48.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = tx("Choose model")
+                stateDescription = "${provider?.name ?: tx("No provider")} · $modelName"
+            },
+        shape = shape,
+        color = AriCard,
+        contentColor = Ink,
+        shadowElevation = 3.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, providerAccent.copy(alpha = 0.28f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            AriBinaryBrainMark(size = 22.dp, tint = MaterialTheme.colorScheme.primary)
             Text(
-                text,
-                color = Ink.copy(alpha = 0.75f),
-                fontSize = 12.sp,
+                text = label,
+                modifier = Modifier.widthIn(max = 196.dp),
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 120.dp)
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.width(4.dp))
-            // Small arrow: opens the list with all models of the provider.
             Icon(
                 Icons.Default.KeyboardArrowDown,
-                contentDescription = tx("Open models"),
-                tint = Ink.copy(alpha = 0.5f),
-                modifier = Modifier.size(16.dp)
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun ContextUsageIndicator(
+    tokens: Int,
+    contextWindow: Int,
+    approximate: Boolean,
+    onClick: () -> Unit
+) {
+    val fraction = if (contextWindow > 0) (tokens.toFloat() / contextWindow).coerceIn(0f, 1f) else 0f
+    val percentage = (fraction * 100).toInt()
+    Box(
+        modifier = Modifier.size(48.dp).clip(CircleShape)
+            .semantics(mergeDescendants = true) {
+                contentDescription = tx("Context usage")
+                stateDescription = (if (approximate) "${tx("Approx.")} " else "") + "$percentage%"
+            }
+            .clickable(role = Role.Button, onClick = onClick)
+            .testTag("chat-context-usage"),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            progress = fraction,
+            modifier = Modifier.size(28.dp),
+            strokeWidth = 2.5.dp,
+            color = if (fraction >= 0.9f) AriError else AriAccent,
+            trackColor = AriTint
+        )
+        Text(
+            if (approximate) "~$percentage%" else "$percentage%",
+            color = Ink,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -707,23 +1140,30 @@ private fun CompressedNotice() {
 /** Shows a sent photo inside the bubble, read from its stored file or from the in-memory bytes. */
 @Composable
 private fun AttachmentThumb(attachment: Attachment) {
-    val bitmap = remember(attachment.uri, attachment.base64Data) {
-        runCatching {
-            val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
-            val uri = attachment.uri
-            if (uri != null && java.io.File(uri).exists()) {
-                android.graphics.BitmapFactory.decodeFile(uri, options)
-            } else {
-                attachment.base64Data?.let {
-                    val bytes = android.util.Base64.decode(it, android.util.Base64.DEFAULT)
-                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+    val bitmap by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = attachment.uri,
+        key2 = attachment.base64Data
+    ) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+                val uri = attachment.uri
+                if (uri != null && java.io.File(uri).exists()) {
+                    android.graphics.BitmapFactory.decodeFile(uri, options)
+                } else {
+                    attachment.base64Data?.let {
+                        val bytes = android.util.Base64.decode(it, android.util.Base64.DEFAULT)
+                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                    }
                 }
-            }
-        }.getOrNull()?.asImageBitmap()
+            }.getOrNull()?.asImageBitmap()
+        }
     }
-    if (bitmap != null) {
+    val currentBitmap = bitmap
+    if (currentBitmap != null) {
         androidx.compose.foundation.Image(
-            bitmap = bitmap,
+            bitmap = currentBitmap,
             contentDescription = attachment.name,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier.size(180.dp).clip(RoundedCornerShape(14.dp))
@@ -764,11 +1204,29 @@ private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: In
 }
 
 @Composable
+private fun WaitingStatus(label: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(start = 4.dp)) {
+        Surface(shape = RoundedCornerShape(18.dp), color = AriTint) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Accent)
+                Spacer(Modifier.width(9.dp))
+                Text(label, color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+@Composable
 private fun AssistantBlock(
     text: String,
     fontSize: Int,
     streaming: Boolean = false,
     imagePath: String? = null,
+    isError: Boolean = false,
+    retryable: Boolean = false,
     onCopy: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null,
     onBranch: (() -> Unit)? = null,
@@ -776,7 +1234,10 @@ private fun AssistantBlock(
     onEdit: (() -> Unit)? = null,
     onSave: (() -> Unit)? = null
 ) {
-    Column(modifier = Modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = Modifier.fillMaxWidth().then(if (streaming) Modifier else Modifier.animateContentSize()),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         if (imagePath != null) {
             when {
                 isVideoPath(imagePath) -> VideoCard(imagePath)
@@ -794,9 +1255,7 @@ private fun AssistantBlock(
             }
         }
         imageUrls.forEach { RemoteImage(it) }
-        if (streaming) {
-            TypingDots()
-        } else if (imagePath != null && !isVideoPath(imagePath) && !isAudioPath(imagePath)) {
+        if (imagePath != null && !isVideoPath(imagePath) && !isAudioPath(imagePath)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onEdit?.invoke() }) {
                     Text(tx("Edit"), color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
@@ -805,12 +1264,29 @@ private fun AssistantBlock(
                     Text(tx("Save"), color = Ink.copy(alpha = 0.7f), fontSize = 13.sp)
                 }
             }
+        } else if (onCopy != null && isError) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ActionIcon(Icons.Default.ContentCopy, tx("Copy"), onCopy)
+                if (retryable && onRetry != null) {
+                    TextButton(
+                        onClick = onRetry,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(tx("Retry"), fontSize = 13.sp)
+                    }
+                }
+            }
         } else if (onCopy != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ActionIcon(Icons.Default.ContentCopy, tx("Copy"), onCopy)
                 ActionIcon(Icons.Default.Share, tx("Share"), onShare ?: {})
                 ActionIcon(Icons.Default.CallSplit, tx("Branch"), onBranch ?: {})
-                ActionIcon(Icons.Default.Refresh, tx("Retry"), onRetry ?: {})
+                if (retryable && onRetry != null) ActionIcon(Icons.Default.Refresh, tx("Retry"), onRetry)
             }
         }
     }
@@ -853,8 +1329,12 @@ private fun FullImageDialog(bitmap: ImageBitmap, onDismiss: () -> Unit) {
 @Composable
 private fun EditImageDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
+    val dialogShape = paperPopupShape(26.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = paperPopupModifier(dialogShape),
+        shape = dialogShape,
+        containerColor = AriCard,
         title = { Text(tx("Edit image")) },
         text = {
             OutlinedTextField(
@@ -876,20 +1356,41 @@ private fun EditImageDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) 
 
 @Composable
 private fun ActionIcon(icon: ImageVector, description: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(32.dp)) {
+    IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
         Icon(icon, contentDescription = description, tint = Muted, modifier = Modifier.size(16.dp))
     }
 }
 
 @Composable
-private fun IconCircle(icon: ImageVector, description: String, active: Boolean, onClick: () -> Unit) {
+private fun IconCircle(
+    icon: ImageVector,
+    description: String,
+    active: Boolean,
+    stateful: Boolean = false,
+    onClick: () -> Unit
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (active) AriAccentSoft else AriTint,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "composer-action-background"
+    )
+    val iconColor by animateColorAsState(
+        targetValue = if (active) Accent else Ink.copy(alpha = 0.7f),
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "composer-action-foreground"
+    )
     Box(
-        modifier = Modifier.size(36.dp).clip(CircleShape)
-            .background(if (active) Accent.copy(alpha = 0.14f) else AriTint)
-            .clickable(onClick = onClick),
+        modifier = Modifier.size(48.dp).clip(CircleShape)
+            .background(backgroundColor)
+            .animateContentSize(tween(180, easing = FastOutSlowInEasing))
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                if (stateful) stateDescription = if (active) tx("On") else tx("Off")
+            }
+            .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = description, tint = if (active) Accent else Ink.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -912,23 +1413,6 @@ private fun AppearIn(key: String, content: @Composable () -> Unit) {
     }
 }
 
-/** Three pulsing dots shown while the model is generating. */
-@Composable
-private fun TypingDots() {
-    val transition = rememberInfiniteTransition(label = "typing")
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(top = 4.dp)) {
-        repeat(3) { i ->
-            val alpha by transition.animateFloat(
-                initialValue = 0.2f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(600, delayMillis = i * 150), RepeatMode.Reverse),
-                label = "dot$i"
-            )
-            Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Accent.copy(alpha = alpha)))
-        }
-    }
-}
-
 @Composable
 private fun FullScreenMessageEditor(
     text: String,
@@ -939,7 +1423,12 @@ private fun FullScreenMessageEditor(
         onDismissRequest = onCollapse,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = AriCard) {
+        val pageShape = paperPopupShape(28.dp)
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(8.dp).then(paperPopupModifier(pageShape)),
+            shape = pageShape,
+            color = AriCard
+        ) {
             Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Icon(
                     Icons.Default.CloseFullscreen,
@@ -1117,14 +1606,33 @@ private fun extractImageUrls(text: String): List<String> =
 
 private fun stripImageUrls(text: String): String = ImageLinkRegex.replace(text, "").trim()
 
-/** Downloads an image link off the main thread and shows it at full width. */
+private fun decodeRemoteImage(bytes: ByteArray): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    val width = bounds.outWidth
+    val height = bounds.outHeight
+    if (width <= 0 || height <= 0 || width.toLong() * height.toLong() > MAX_REMOTE_IMAGE_PIXELS) return null
+
+    var sampleSize = 1
+    while (width / sampleSize > MAX_REMOTE_IMAGE_SIDE || height / sampleSize > MAX_REMOTE_IMAGE_SIDE) {
+        sampleSize *= 2
+    }
+    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+}
+
+/** Safely downloads a bounded public image off the main thread and shows a downsampled preview. */
 @Composable
 private fun RemoteImage(url: String) {
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = url) {
         value = withContext(Dispatchers.IO) {
-            runCatching {
-                java.net.URL(url).openStream().use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-            }.getOrNull()
+            try {
+                decodeRemoteImage(remoteImageFetcher.fetchImageBytes(url))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
         }
     }
     val shape = RoundedCornerShape(16.dp)

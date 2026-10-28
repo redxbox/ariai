@@ -1,5 +1,6 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.BuildConfig
 import com.ariai.app.util.tx
 
 import com.ariai.app.ui.theme.*
@@ -11,18 +12,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 
 // Simple clean settings - only essential options
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,27 +43,18 @@ fun SimpleSettingsScreen(
     defaultModelName: String = tx("Not chosen"),
     onClearAll: () -> Unit = {},
     onMcpClick: () -> Unit = {},
-    currentTheme: String,
-    currentLanguage: String,
-    dynamicColor: Boolean,
-    onThemeChange: (String) -> Unit,
-    onLanguageChange: (String) -> Unit,
-    onDynamicColorChange: (Boolean) -> Unit,
+    onAboutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-
     Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
         Scaffold(
             containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = AriCard),
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = AriInk)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = AriInk)
                         }
                     },
                     title = { Text(tx("Settings"), fontWeight = FontWeight.SemiBold, color = AriInk) }
@@ -72,19 +68,13 @@ fun SimpleSettingsScreen(
             ) {
                 item {
                     SimpleGroup(title = tx("General")) {
-                        Text(tx("Theme"), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AriInk, modifier = Modifier.padding(bottom = 8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            SimpleChip(label = tx("Light"), selected = currentTheme == "light", onClick = { onThemeChange("light") }, modifier = Modifier.weight(1f))
-                            SimpleChip(label = tx("Dark"), selected = currentTheme == "dark", onClick = { onThemeChange("dark") }, modifier = Modifier.weight(1f))
-                            SimpleChip(label = tx("System"), selected = currentTheme == "system", onClick = { onThemeChange("system") }, modifier = Modifier.weight(1f))
-                        }
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Preferences"), subtitle = tx("Chat options, text size, theme"), onClick = onPreferencesClick)
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Language, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Language"), subtitle = if (currentLanguage == "en") tx("English") else currentLanguage, onClick = {
-                            val newLang = if (currentLanguage == "en") "fa" else "en"
-                            onLanguageChange(newLang)
-                        })
+                        SimpleRow(
+                            icon = Icons.Default.Settings,
+                            tint = AriAccent,
+                            title = tx("Preferences"),
+                            subtitle = tx("Appearance, language and chat settings"),
+                            onClick = onPreferencesClick
+                        )
                     }
                 }
 
@@ -96,8 +86,7 @@ fun SimpleSettingsScreen(
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                         SimpleRow(icon = Icons.Default.Search, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Search service"), subtitle = tx("Web search for answers"), onClick = onSearchServiceClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriAccent, title = tx("MCP servers"), subtitle = tx("Connect local tools"), onClick = onMcpClick)
+                        SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriAccent, title = tx("MCP servers"), subtitle = tx("Preview only; tools are not connected yet"), onClick = onMcpClick)
                     }
                 }
 
@@ -111,9 +100,13 @@ fun SimpleSettingsScreen(
 
                 item {
                     SimpleGroup(title = tx("About")) {
-                        SimpleRow(icon = Icons.Default.Info, tint = com.ariai.app.ui.theme.AriAccent, title = tx("About AriAI"), subtitle = tx("Version 1.0"), onClick = {
-                            scope.launch { snackbarHostState.showSnackbar(tx("AriAI v1.0 - Personal AI")) }
-                        })
+                        SimpleRow(
+                            icon = Icons.Default.Info,
+                            tint = com.ariai.app.ui.theme.AriAccent,
+                            title = tx("About AriAI"),
+                            subtitle = "${tx("Version")} ${BuildConfig.VERSION_NAME}",
+                            onClick = onAboutClick
+                        )
                     }
                 }
 
@@ -136,21 +129,9 @@ fun SimpleGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-fun SimpleChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) AriInk else AriTint,
-        modifier = modifier.clickable(onClick = onClick)
-    ) {
-        Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-            Text(label, color = if (selected) AriCard else AriInk, fontSize = 12.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        }
-    }
-}
-
-@Composable
 fun SimpleRow(icon: ImageVector, title: String, subtitle: String, tint: Color? = null, onClick: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    Row(modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(AriTint), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = tint ?: AriInk.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
         }
@@ -158,6 +139,11 @@ fun SimpleRow(icon: ImageVector, title: String, subtitle: String, tint: Color? =
             Text(title, fontSize = 14.sp, color = AriInk, fontWeight = FontWeight.Medium)
             Text(subtitle, fontSize = 11.sp, color = AriInk.copy(alpha = 0.5f))
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AriInk.copy(alpha = 0.2f), modifier = Modifier.size(18.dp))
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = AriInk.copy(alpha = 0.2f),
+            modifier = Modifier.size(18.dp).scale(scaleX = if (isRtl) -1f else 1f, scaleY = 1f)
+        )
     }
 }

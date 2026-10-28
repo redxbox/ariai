@@ -12,25 +12,29 @@ data class AriPalette(
     val ink: Color,
     val muted: Color,
     val line: Color,
-    val tint: Color
+    val tint: Color,
+    val fold: Color
 )
 
 val LightAriPalette = AriPalette(
-    paper = Color(0xFFF4F5FA),
-    card = Color(0xFFFFFFFF),
-    ink = Color(0xFF111111),
-    muted = Color(0x8A111111),
-    line = Color(0x14000000),
-    tint = Color(0xFFF3F3F3)
+    // Soft lavender paper and near-white cards, sampled from the supplied RikkaHub references.
+    paper = Color(0xFFF7F6FC),
+    card = Color(0xFFFCFBFF),
+    ink = Color(0xFF26262D),
+    muted = Color(0xFF747681),
+    line = Color(0xFFE7E5EE),
+    tint = Color(0xFFEBEAF3),
+    fold = Color(0xFFDAD9E4)
 )
 
 val DarkAriPalette = AriPalette(
-    paper = Color(0xFF000000),
-    card = Color(0xFF161618),
-    ink = Color(0xFFF2F2F2),
-    muted = Color(0x8AF2F2F2),
-    line = Color(0x1FFFFFFF),
-    tint = Color(0xFF242426)
+    paper = Color(0xFF111319),
+    card = Color(0xFF1A1D25),
+    ink = Color(0xFFF2F1F7),
+    muted = Color(0xFFA4A3AE),
+    line = Color(0xFF343642),
+    tint = Color(0xFF272A34),
+    fold = Color(0xFF3B3D49)
 )
 
 val LocalAriPalette = staticCompositionLocalOf { LightAriPalette }
@@ -41,4 +45,5 @@ val AriCard: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.curre
 val AriInk: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.ink
 val AriMuted: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.muted
 val AriLine: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.line
+val AriFold: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.fold
 val AriTint: Color @Composable @ReadOnlyComposable get() = LocalAriPalette.current.tint

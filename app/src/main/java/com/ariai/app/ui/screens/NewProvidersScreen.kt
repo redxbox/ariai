@@ -4,10 +4,12 @@ import com.ariai.app.util.tx
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import com.ariai.app.ui.components.GlassCard
 import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,11 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -32,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.providerFromJson
+import com.ariai.app.ui.components.ProviderBrandMark
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val DisabledTint: Color @Composable @ReadOnlyComposable get() = AriTint
@@ -101,7 +106,7 @@ fun NewProvidersScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AriPaper),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
                 title = {},
                 actions = {
                     IconButton(onClick = onAddProvider) { Icon(Icons.Default.Add, contentDescription = tx("Add provider"), tint = Ink) }
@@ -143,14 +148,14 @@ fun NewProvidersScreen(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text(tx("Search providers"), color = Ink.copy(alpha = 0.45f)) },
-                    trailingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ink.copy(alpha = 0.5f)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriAccent) },
                     singleLine = true,
                     shape = RoundedCornerShape(50),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Ink.copy(alpha = 0.35f),
-                        unfocusedBorderColor = Ink.copy(alpha = 0.2f),
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent
+                        focusedBorderColor = AriAccent.copy(alpha = 0.45f),
+                        unfocusedBorderColor = AriLine.copy(alpha = 0.7f),
+                        focusedContainerColor = AriCard,
+                        unfocusedContainerColor = AriCard
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -184,14 +189,14 @@ fun NewProvidersScreen(
             val onList = visible.filter { it.enabled }
             val offList = visible.filter { !it.enabled }
             if (onList.isNotEmpty()) {
-                item { SectionTitle(tx("Active")) }
-                itemsIndexed(onList, key = { i, p -> "on_${p.id}_$i" }) { _, provider ->
+                item(key = "providers:active") { SectionTitle(tx("Active")) }
+                itemsIndexed(onList, key = { _, p -> "provider:${p.id}" }) { _, provider ->
                     ProviderCard(provider = provider, onClick = { onEditProvider(provider) }, onToggle = { onToggleProvider(provider) })
                 }
             }
             if (offList.isNotEmpty()) {
-                item { SectionTitle(tx("Turned off")) }
-                itemsIndexed(offList, key = { i, p -> "off_${p.id}_$i" }) { _, provider ->
+                item(key = "providers:turned-off") { SectionTitle(tx("Turned off")) }
+                itemsIndexed(offList, key = { _, p -> "provider:${p.id}" }) { _, provider ->
                     ProviderCard(provider = provider, onClick = { onEditProvider(provider) }, onToggle = { onToggleProvider(provider) })
                 }
             }
@@ -212,41 +217,39 @@ private fun SectionTitle(text: String) {
 }
 
 /**
- * One provider per row: a solid monogram, the host, a live status line and the switch.
- * Black and white with the single accent used only for the "on" state.
+ * Rounded provider card with a distinct brand mark, compact metadata chips, and a stable enable switch.
  */
 @Composable
 private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -> Unit) {
     val host = remember(provider.baseUrl) {
         provider.baseUrl.trim().removePrefix("https://").removePrefix("http://").substringBefore('/')
     }
-    val shape = RoundedCornerShape(18.dp)
+    val statusBackground = if (provider.enabled) AriTagGreenBg else AriTint
+    val statusForeground = if (provider.enabled) AriTagGreenFg else AriMuted
+    val shape = RoundedCornerShape(24.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth().clip(shape).clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(tween(220, easing = FastOutSlowInEasing))
+            .clip(shape)
+            .clickable(onClick = onClick)
+            .testTag("provider-card-${provider.id}"),
         shape = shape,
         color = AriCard,
         tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        border = BorderStroke(0.5.dp, AriLine)
+        shadowElevation = 1.dp,
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f))
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(14.dp))
-                    .background(if (provider.enabled) AriInk else AriTint),
-                contentAlignment = Alignment.Center
+            ProviderBrandMark(provider = provider, size = 48.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Text(
-                    provider.name.firstOrNull()?.uppercase() ?: "P",
-                    color = if (provider.enabled) AriPaper else AriMuted,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     provider.name,
                     fontWeight = FontWeight.SemiBold,
@@ -262,32 +265,30 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(
-                        modifier = Modifier.size(7.dp).clip(CircleShape)
-                            .background(if (provider.enabled) AriAccent else AriLine)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    MiniChip(
+                        text = if (provider.models.isEmpty()) tx("No models") else "${provider.models.size} ${tx("models")}",
+                        bg = AriTagBlueBg,
+                        fg = AriTagBlueFg
                     )
-                    Text(
-                        if (provider.enabled) tx("Active") else tx("Turned off"),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (provider.enabled) AriAccent else AriMuted
-                    )
-                    Text("·", fontSize = 12.sp, color = AriMuted)
-                    Text(
-                        if (provider.models.isEmpty()) tx("No models") else "${provider.models.size} ${tx("models")}",
-                        fontSize = 12.sp,
-                        color = AriMuted
+                    MiniChip(
+                        text = if (provider.enabled) tx("Active") else tx("Turned off"),
+                        bg = statusBackground,
+                        fg = statusForeground
                     )
                 }
             }
             Switch(
+                modifier = Modifier.testTag("provider-toggle-${provider.id}"),
                 checked = provider.enabled,
                 onCheckedChange = { onToggle() },
                 colors = SwitchDefaults.colors(
-                    checkedTrackColor = AriInk,
-                    checkedThumbColor = AriPaper,
-                    checkedBorderColor = AriInk,
+                    checkedTrackColor = AriAccentGreen.copy(alpha = 0.42f),
+                    checkedThumbColor = AriAccentGreen,
+                    checkedBorderColor = AriAccentGreen,
                     uncheckedTrackColor = AriTint,
                     uncheckedThumbColor = AriMuted,
                     uncheckedBorderColor = AriLine
@@ -312,10 +313,13 @@ private fun MiniChip(text: String, bg: Color, fg: Color, onClick: (() -> Unit)? 
 private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
     val parsed = remember(text) { if (text.isBlank()) null else providerFromJson(text) }
+    val dialogShape = paperPopupShape(28.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
+        modifier = paperPopupModifier(dialogShape),
+        shape = dialogShape,
         containerColor = AriCard,
+        tonalElevation = 8.dp,
         title = { Text(tx("Import provider"), fontWeight = FontWeight.SemiBold, color = Ink) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -355,7 +359,11 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
         ProviderType.OLLAMA to tx("Models that run on your own computer"),
         ProviderType.OPENAI_COMPATIBLE to tx("Any OpenAI-compatible API")
     )
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = AriPaper) {
+    val sheetShape = paperSheetShape(28.dp)
+    PaperBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = sheetShape,
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -364,7 +372,10 @@ private fun RecommendedProvidersSheet(onPick: (ProviderType) -> Unit, onDismiss:
             providerPresets.forEach { preset ->
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = AriCard,
+                    color = AriPaper,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 1.dp,
+                    border = BorderStroke(0.5.dp, AriLine),
                     modifier = Modifier.fillMaxWidth().clickable { onPick(preset.type) }
                 ) {
                     Row(
