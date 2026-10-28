@@ -24,6 +24,7 @@ class PreferencesManager(
         val DEFAULT_PROVIDER_ID = stringPreferencesKey("default_provider_id")
         val DEFAULT_MODEL_ID = stringPreferencesKey("default_model_id")
         val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
+        val SEARCH_PROVIDER_BRAVE_DEFAULT_MIGRATED = booleanPreferencesKey("search_provider_brave_default_migrated")
         val SEARCH_API_KEY = stringPreferencesKey("search_api_key")
         val TAVILY_API_KEY = stringPreferencesKey("tavily_api_key")
         val BRAVE_API_KEY = stringPreferencesKey("brave_api_key")
@@ -120,6 +121,18 @@ class PreferencesManager(
         val normalized = provider.trim().lowercase()
         if (normalized in setOf("bing", "brave")) {
             dataStore.edit { it[SEARCH_PROVIDER] = normalized }
+        }
+    }
+
+    /** Moves the old implicit Bing default to Brave once, while preserving future explicit choices. */
+    suspend fun migrateLocalSearchDefaultToBrave() {
+        dataStore.edit { prefs ->
+            if (prefs[SEARCH_PROVIDER_BRAVE_DEFAULT_MIGRATED] != true) {
+                if (prefs[SEARCH_PROVIDER].isNullOrBlank()) {
+                    prefs[SEARCH_PROVIDER] = "brave"
+                }
+                prefs[SEARCH_PROVIDER_BRAVE_DEFAULT_MIGRATED] = true
+            }
         }
     }
 

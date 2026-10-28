@@ -77,7 +77,7 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Agent
 import com.ariai.app.data.models.AgentTool
 import com.ariai.app.data.models.Provider
-import com.ariai.app.ui.theme.AriAccentGreen
+import com.ariai.app.ui.theme.AriAccent
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
@@ -143,7 +143,7 @@ fun AgentStudioScreen(
                     onClick = { editingAgent = newAgentDraft() },
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriAccentGreen, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -230,7 +230,7 @@ private fun AgentCard(agent: Agent, onStart: () -> Unit, onEdit: () -> Unit) {
                     onClick = onStart,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(13.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriAccentGreen, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(6.dp))
@@ -418,7 +418,7 @@ private fun AgentEditorSheet(
                     },
                     enabled = name.isNotBlank() && prompt.isNotBlank(),
                     modifier = Modifier.weight(1.3f).testTag("agent-save"),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriAccentGreen, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(5.dp))
@@ -469,7 +469,7 @@ private fun AgentToolSwitch(label: String, description: String, checked: Boolean
             checked = checked,
             onCheckedChange = onChange,
             enabled = enabled,
-            colors = SwitchDefaults.colors(checkedTrackColor = AriAccentGreen)
+            colors = SwitchDefaults.colors(checkedTrackColor = AriAccent)
         )
     }
 }

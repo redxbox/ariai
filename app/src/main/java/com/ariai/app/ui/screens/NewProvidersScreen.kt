@@ -11,6 +11,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -224,8 +225,8 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
     val host = remember(provider.baseUrl) {
         provider.baseUrl.trim().removePrefix("https://").removePrefix("http://").substringBefore('/')
     }
-    val statusBackground = if (provider.enabled) AriTagGreenBg else AriTint
-    val statusForeground = if (provider.enabled) AriTagGreenFg else AriMuted
+    val statusBackground = if (provider.enabled) AriAccentSoft else AriTint
+    val statusForeground = if (provider.enabled) AriAccent else AriMuted
     val shape = RoundedCornerShape(24.dp)
     Surface(
         modifier = Modifier
@@ -286,9 +287,9 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
                 checked = provider.enabled,
                 onCheckedChange = { onToggle() },
                 colors = SwitchDefaults.colors(
-                    checkedTrackColor = AriAccentGreen.copy(alpha = 0.42f),
-                    checkedThumbColor = AriAccentGreen,
-                    checkedBorderColor = AriAccentGreen,
+                    checkedTrackColor = AriAccent.copy(alpha = 0.42f),
+                    checkedThumbColor = AriAccent,
+                    checkedBorderColor = AriAccent,
                     uncheckedTrackColor = AriTint,
                     uncheckedThumbColor = AriMuted,
                     uncheckedBorderColor = AriLine
@@ -331,12 +332,33 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    minLines = 4,
+                    label = { Text(tx("Provider JSON")) },
+                    placeholder = {
+                        Text(
+                            "{\n  \"name\": \"My provider\",\n  \"type\": \"OPENAI_COMPATIBLE\",\n  \"baseUrl\": \"https://api.example.com/v1\",\n  \"apiKey\": \"YOUR_API_KEY\"\n}",
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            color = AriMuted.copy(alpha = 0.78f)
+                        )
+                    },
+                    minLines = 5,
                     maxLines = 8,
                     isError = text.isNotBlank() && parsed == null,
                     supportingText = { if (text.isNotBlank() && parsed == null) Text(tx("Not a valid provider JSON")) },
+                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start, textDirection = TextDirection.Ltr),
                     shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Ink,
+                        unfocusedTextColor = Ink,
+                        cursorColor = AriAccent,
+                        focusedBorderColor = AriAccent,
+                        unfocusedBorderColor = AriAccent.copy(alpha = 0.48f),
+                        errorBorderColor = AriError,
+                        focusedContainerColor = AriPaper,
+                        unfocusedContainerColor = AriPaper,
+                        errorContainerColor = AriPaper
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("provider-import-json")
                 )
             }
         },

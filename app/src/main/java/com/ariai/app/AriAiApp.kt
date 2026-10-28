@@ -17,9 +17,10 @@ class AriAiApp : Application() {
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             repository.migrateProviderKeysToEncrypted()
             try {
+                preferencesManager.migrateLocalSearchDefaultToBrave()
                 preferencesManager.migrateSearchKeysToEncrypted()
             } catch (e: Exception) {
-                com.ariai.app.util.AppLog.warn(e, "search key migration")
+                com.ariai.app.util.AppLog.warn(e, "search preferences migration")
             }
         }
     }

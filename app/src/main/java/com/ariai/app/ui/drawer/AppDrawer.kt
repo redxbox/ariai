@@ -250,7 +250,7 @@ fun ColumnScope.AppDrawerContent(
                     color = Ink.copy(alpha = 0.5f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
-            Box(Modifier.size(7.dp).clip(CircleShape).background(if (activeProvider?.enabled == true) Color(0xFF37865B) else Ink.copy(alpha = 0.2f)))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(if (activeProvider?.enabled == true) AriAccent else Ink.copy(alpha = 0.2f)))
         }
     }
 

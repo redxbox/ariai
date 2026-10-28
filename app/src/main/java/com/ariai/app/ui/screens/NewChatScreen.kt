@@ -272,7 +272,7 @@ fun NewChatScreen(
         else -> tx("Tap to choose a model")
     }
     val setupActionLabel = when {
-        providers.isEmpty() -> tx("Add provider")
+        providers.isEmpty() -> null
         currentProvider == null || currentProvider.models.isEmpty() -> tx("Manage providers")
         !selectedModelReady -> tx("Choose model")
         else -> null
@@ -869,17 +869,17 @@ fun NewChatScreen(
                         if (!compactWelcome && setupActionLabel != null) {
                             Button(
                                 onClick = {
-                                    when {
-                                        providers.isEmpty() -> onAddProvider()
-                                        currentProvider == null || currentProvider.models.isEmpty() -> onManageProviders()
-                                        else -> showModelSheet = true
+                                    if (currentProvider == null || currentProvider.models.isEmpty()) {
+                                        onManageProviders()
+                                    } else {
+                                        showModelSheet = true
                                     }
                                 },
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
                             ) {
                                 Icon(
-                                    if (providers.isEmpty()) Icons.Default.Add else Icons.Default.Tune,
+                                    Icons.Default.Tune,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )

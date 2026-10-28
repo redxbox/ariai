@@ -131,11 +131,6 @@ fun ProviderListScreen(
                             }
                             Text(tx("No providers yet"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(tx("Add your first AI provider to start chatting"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Button(onClick = onAddProvider, shape = RoundedCornerShape(12.dp)) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(tx("Add Provider"))
-                            }
                         }
                     }
                 }
@@ -881,9 +876,9 @@ private fun ProviderActionBar(
                 enabled = !checkingConnection && !fetching,
                 modifier = Modifier.weight(1f).height(58.dp).testTag("provider-test-connection"),
                 shape = RoundedCornerShape(22.dp),
-                color = AriAccentGreenSoft.copy(alpha = 0.86f),
-                contentColor = AriAccentGreen,
-                border = BorderStroke(1.dp, AriAccentGreen.copy(alpha = 0.25f)),
+                color = AriAccentSoft.copy(alpha = 0.86f),
+                contentColor = AriAccent,
+                border = BorderStroke(1.dp, AriAccent.copy(alpha = 0.25f)),
                 shadowElevation = 5.dp,
                 tonalElevation = 0.dp
             ) {
@@ -896,7 +891,7 @@ private fun ProviderActionBar(
                         CircularProgressIndicator(
                             modifier = Modifier.size(19.dp),
                             strokeWidth = 2.dp,
-                            color = AriAccentGreen
+                            color = AriAccent
                         )
                     } else {
                         Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -1074,8 +1069,8 @@ private fun ModelRow(model: AIModel, color: Color, onRemove: () -> Unit) {
             Text(model.displayName, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(model.id, fontSize = 11.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val tags = buildList {
-                if (model.supportsVision) add(Triple(tx("Vision"), AriTagBlueBg, AriTagBlueFg))
-                if (model.supportsFunctionCalling) add(Triple(tx("Tools"), AriTagGreenBg, AriTagGreenFg))
+                if (model.supportsVision) add(Triple(tx("Vision"), AriAccentSoft, AriAccent))
+                if (model.supportsFunctionCalling) add(Triple(tx("Tools"), AriAccentSoft, AriAccent))
                 if (model.supportsImageGen) add(Triple(tx("Image"), AriTagAmberBg, AriTagAmberFg))
                 if ("google_search" in model.builtInTools) add(Triple(tx("Search"), AriTagAmberBg, AriTagAmberFg))
                 if ("url_context" in model.builtInTools) add(Triple("URL", AriTagAmberBg, AriTagAmberFg))

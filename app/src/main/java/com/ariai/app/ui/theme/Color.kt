@@ -10,19 +10,19 @@ val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
-// RikkaHub-inspired slate blue and soft green accents, tuned for calm contrast on lavender paper.
-val AriPrimary = Color(0xFF4D6090)
-val AriPrimaryLight = Color(0xFFBAC7E3)
-val AriPrimaryDark = Color(0xFF394F7D)
+// Slate-blue accents sampled from the supplied reference: #324472 on #D9E2FF.
+val AriPrimary = Color(0xFF324472)
+val AriPrimaryLight = Color(0xFFD9E2FF)
+val AriPrimaryDark = Color(0xFF324472)
 
-val AriSecondary = Color(0xFF568A65)
-val AriSecondaryLight = Color(0xFFA7DDAF)
-val AriSecondaryDark = Color(0xFF3C704B)
+val AriSecondary = Color(0xFF324472)
+val AriSecondaryLight = Color(0xFFD9E2FF)
+val AriSecondaryDark = Color(0xFF324472)
 
-val AriAccent = Color(0xFF4D6090)
-val AriAccentLight = Color(0xFFBAC7E3)
-val AriAccentDark = Color(0xFF394F7D)
-val AriAccentSoft = Color(0xFFE2E8FC)
+val AriAccent = Color(0xFF324472)
+val AriAccentLight = Color(0xFFD9E2FF)
+val AriAccentDark = Color(0xFF324472)
+val AriAccentSoft = Color(0xFFD9E2FF)
 val AriAccentGreen = Color(0xFF568A65)
 val AriAccentGreenSoft = Color(0xFFE3F1E5)
 

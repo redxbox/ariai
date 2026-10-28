@@ -270,7 +270,7 @@ fun SearchSheet(
         nativeSearchProviderOptions(providers, selectedProviderId, selectedModelId)
     }
     var localProvider by remember(searchProvider, searchKeys) {
-        mutableStateOf(resolveSearchProviderKey(searchKeys, searchProvider) ?: "bing")
+        mutableStateOf(resolveSearchProviderKey(searchKeys, searchProvider) ?: "brave")
     }
     PaperBottomSheet(
         onDismissRequest = onDismiss,
@@ -423,8 +423,10 @@ private fun LocalSearchProviderPicker(
     onSaveKey: (String, String) -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    var settingsExpanded by remember { mutableStateOf(false) }
     val braveKey = searchKeys["brave"].orEmpty()
+    var settingsExpanded by remember(selectedProvider, braveKey) {
+        mutableStateOf(selectedProvider == "brave" && braveKey.isBlank())
+    }
     var braveKeyDraft by remember(braveKey) { mutableStateOf(braveKey) }
     var showKey by remember { mutableStateOf(false) }
     val isBrave = selectedProvider == "brave"
@@ -493,7 +495,7 @@ private fun LocalSearchProviderPicker(
                             .then(paperPopupModifier(menuShape, 8.dp))
                             .testTag("search-provider-menu")
                     ) {
-                        listOf("bing", "brave").forEach { provider ->
+                        listOf("brave", "bing").forEach { provider ->
                             val isSelected = provider == selectedProvider
                             DropdownMenuItem(
                                 text = { Text(tx(if (provider == "bing") "Bing" else "Brave"), fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },

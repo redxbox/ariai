@@ -10,16 +10,14 @@ enum class SearchProviderType {
     CUSTOM
 }
 
-/** Local providers exposed in chat; Bing is keyless, while Brave uses its saved API key. */
+/** Local providers exposed in chat; Brave is the default, while Bing remains a keyless option. */
 val LOCAL_SEARCH_PROVIDER_PRIORITY = listOf("brave", "bing")
 
-/** Keeps an explicit choice while its key is being configured; defaults to keyed Brave, then keyless Bing. */
+/** Preserves a valid explicit choice; a fresh install defaults to Brave even before its key is added. */
 fun resolveSearchProviderKey(searchKeys: Map<String, String>, preferredProvider: String?): String? {
     val preferred = preferredProvider?.trim()?.lowercase()
         ?.takeIf { it in LOCAL_SEARCH_PROVIDER_PRIORITY }
-    return preferred ?: LOCAL_SEARCH_PROVIDER_PRIORITY.firstOrNull {
-        it == "bing" || !searchKeys[it].isNullOrBlank()
-    }
+    return preferred ?: LOCAL_SEARCH_PROVIDER_PRIORITY.firstOrNull()
 }
 
 fun searchProviderTypeForKey(provider: String): SearchProviderType? = when (provider.trim().lowercase()) {

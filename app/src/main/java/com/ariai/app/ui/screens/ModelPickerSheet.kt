@@ -445,8 +445,8 @@ private fun ModelRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (model.supportsVision) CapabilityTag(tx("Vision"), AriTagGreenBg, AriTagGreenFg)
-                    if (model.supportsFunctionCalling) CapabilityTag(tx("Tools"), AriTagBlueBg, AriTagBlueFg)
+                    if (model.supportsVision) CapabilityTag(tx("Vision"), AriAccentSoft, AriAccent)
+                    if (model.supportsFunctionCalling) CapabilityTag(tx("Tools"), AriAccentSoft, AriAccent)
                     if (model.supportsImageGen) CapabilityTag(tx("Image"), AriTagAmberBg, AriTagAmberFg)
                     if (usageCount > 0) CapabilityTag("${usageCount}×", AriAccentSoft, AriAccentDark)
                 }

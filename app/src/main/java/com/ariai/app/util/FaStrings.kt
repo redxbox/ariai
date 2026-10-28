@@ -262,6 +262,7 @@ internal val faStrings: Map<String, String> = mapOf(
         "OpenAI compatible" to "سازگار با OpenAI",
         "OpenAI, Gemini, Claude and more" to "OpenAI، Gemini، Claude و بیشتر",
         "Paste a provider as JSON with name, type, baseUrl and apiKey." to "ارائه‌دهنده را با نام، نوع، baseUrl و apiKey به صورت JSON بچسبانید.",
+        "Provider JSON" to "JSON ارائه‌دهنده",
         "Personal Workspace" to "فضای کاری شخصی",
         "Photo" to "عکس",
         "Photos" to "عکس‌ها",

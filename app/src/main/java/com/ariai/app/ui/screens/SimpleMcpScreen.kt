@@ -34,7 +34,7 @@ import com.ariai.app.data.models.McpServerItem
 import com.ariai.app.data.models.McpTransport
 import com.ariai.app.data.models.isValidMcpServerUrl
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccentGreen
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 
 @OptIn(ExperimentalMaterial3Api::class)

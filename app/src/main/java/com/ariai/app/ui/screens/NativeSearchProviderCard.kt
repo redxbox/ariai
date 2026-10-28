@@ -29,9 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -43,6 +43,7 @@ import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.ui.components.ProviderBrandMark
 import com.ariai.app.ui.theme.AriAccent
+import com.ariai.app.ui.theme.AriAccentSoft
 import com.ariai.app.ui.theme.AriAnthropic
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriGemini
@@ -118,11 +119,11 @@ internal fun NativeSearchProviderCard(
         option.provider?.id == selectedProviderId && option.model.id == selectedModelId
     val brandColor = if (option.type == ProviderType.GEMINI) AriGemini else AriAnthropic
     val selectedChatCard = chatSheetStyle && isSelected
-    val cardTextColor = if (selectedChatCard) Color.White else AriInk
-    val cardSubtitleColor = if (selectedChatCard) Color.White.copy(alpha = 0.82f) else AriMuted
-    val cardShape = RoundedCornerShape(if (chatSheetStyle) 20.dp else 16.dp)
+    val cardTextColor = AriInk
+    val cardSubtitleColor = AriMuted
+    val cardShape = RoundedCornerShape(if (chatSheetStyle) 22.dp else 16.dp)
     val cardColor = when {
-        selectedChatCard -> AriAccent
+        selectedChatCard -> AriAccentSoft
         isSelected -> brandColor.copy(alpha = 0.12f)
         chatSheetStyle -> AriPaper
         else -> AriTint
@@ -162,13 +163,15 @@ internal fun NativeSearchProviderCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(
-                    horizontal = if (chatSheetStyle) 16.dp else 13.dp,
-                    vertical = if (chatSheetStyle) 14.dp else 11.dp
+                    start = if (chatSheetStyle) 10.dp else 13.dp,
+                    end = if (chatSheetStyle) 4.dp else 13.dp,
+                    top = if (chatSheetStyle) 5.dp else 11.dp,
+                    bottom = if (chatSheetStyle) 5.dp else 11.dp
                 ),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(if (chatSheetStyle) 13.dp else 11.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (chatSheetStyle) 10.dp else 11.dp)
             ) {
-                val markSize = if (chatSheetStyle) 42.dp else 38.dp
+                val markSize = 38.dp
                 if (option.provider != null) {
                     ProviderBrandMark(provider = option.provider, size = markSize)
                 } else {
@@ -177,41 +180,43 @@ internal fun NativeSearchProviderCard(
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         tx(option.title),
-                        fontSize = if (chatSheetStyle) 15.sp else 14.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = cardTextColor,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         when {
                             option.isReady -> "${option.model?.displayName.orEmpty()} · ${tx("Uses this AI provider API key")}"
                             option.hasUsableKey -> tx("Add a text model to enable web search")
                             option.provider != null && !option.provider.enabled -> tx("Provider is turned off; configure it here")
-                            else -> tx("Add the provider API key to enable native search")
+                            else -> tx("API key required")
                         },
-                        fontSize = if (chatSheetStyle) 12.sp else 11.sp,
+                        fontSize = 11.sp,
                         color = cardSubtitleColor,
-                        maxLines = 2
+                        maxLines = if (chatSheetStyle) 1 else 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 if (isSelected) {
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = tx("Selected"),
-                        tint = if (selectedChatCard) Color.White else brandColor,
+                        tint = if (chatSheetStyle) AriAccent else brandColor,
                         modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = { editing = !editing; saveError = null },
-                    modifier = Modifier.size(if (chatSheetStyle) 44.dp else 40.dp)
+                    modifier = Modifier.size(if (chatSheetStyle) 48.dp else 40.dp)
                         .testTag("native-search-settings-${option.type.name.lowercase()}")
                 ) {
                     Icon(
                         Icons.Default.Settings,
                         contentDescription = tx(if (option.type == ProviderType.GEMINI) "Configure Gemini web search" else "Configure Anthropic web search"),
-                        tint = if (selectedChatCard) Color.White else if (editing) brandColor else AriMuted,
-                        modifier = Modifier.size(if (chatSheetStyle) 22.dp else 20.dp)
+                        tint = if (selectedChatCard || (editing && chatSheetStyle)) AriAccent else if (editing) brandColor else AriMuted,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -220,9 +225,9 @@ internal fun NativeSearchProviderCard(
         if (editing) {
             Surface(
                 modifier = Modifier.fillMaxWidth().testTag("native-search-editor-${option.type.name.lowercase()}"),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(if (chatSheetStyle) 19.dp else 16.dp),
                 color = AriCard,
-                border = BorderStroke(1.dp, brandColor.copy(alpha = 0.20f)),
+                border = BorderStroke(1.dp, (if (chatSheetStyle) AriAccent else brandColor).copy(alpha = 0.20f)),
                 tonalElevation = 0.dp
             ) {
                 Column(

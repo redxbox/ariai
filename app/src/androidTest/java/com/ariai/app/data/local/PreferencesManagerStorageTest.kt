@@ -22,6 +22,45 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class PreferencesManagerStorageTest {
     @Test
+    fun implicitSearchDefaultMigratesToBraveOnlyOnceAndPreservesLaterChoice() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val file = File(context.cacheDir, "prefs-search-default-${UUID.randomUUID()}.preferences_pb")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val store = PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
+        val preferences = PreferencesManager(context, store)
+
+        try {
+            preferences.migrateLocalSearchDefaultToBrave()
+            assertEquals("brave", preferences.searchProviderFlow.first())
+
+            preferences.setSearchProvider("bing")
+            preferences.migrateLocalSearchDefaultToBrave()
+            assertEquals("bing", preferences.searchProviderFlow.first())
+        } finally {
+            scope.cancel()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun explicitLegacyBingChoiceIsPreservedDuringDefaultMigration() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val file = File(context.cacheDir, "prefs-search-explicit-${UUID.randomUUID()}.preferences_pb")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val store = PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
+        val preferences = PreferencesManager(context, store)
+
+        try {
+            preferences.setSearchProvider("bing")
+            preferences.migrateLocalSearchDefaultToBrave()
+            assertEquals("bing", preferences.searchProviderFlow.first())
+        } finally {
+            scope.cancel()
+            file.delete()
+        }
+    }
+
+    @Test
     fun searchKeysAreEncryptedAndMcpServerSettingsPersist() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val file = File(context.cacheDir, "prefs-test-${UUID.randomUUID()}.preferences_pb")
@@ -37,8 +76,8 @@ class PreferencesManagerStorageTest {
             assertFalse(encrypted.contains(searchKey))
             assertEquals(searchKey, preferences.searchKeysFlow.first()["tavily"])
             assertEquals("tavily", preferences.searchProviderFlow.first())
-            preferences.setSearchProvider("serper")
-            assertEquals("serper", preferences.searchProviderFlow.first())
+            preferences.setSearchProvider("brave")
+            assertEquals("brave", preferences.searchProviderFlow.first())
 
             val server = McpServerItem(
                 id = "persisted-mcp-server",
