@@ -24,6 +24,7 @@ import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.models.WorkspaceFile
 import com.ariai.app.ui.screens.AgentStudioScreen
+import com.ariai.app.ui.screens.AttachmentSheet
 import com.ariai.app.ui.screens.QuickParametersSheet
 import com.ariai.app.ui.screens.SearchServiceScreen
 import com.ariai.app.ui.screens.SearchSheet
@@ -183,6 +184,38 @@ class FeatureScreensUiTest {
         compose.onNodeWithText("Start chat").assertIsDisplayed().performClick()
         assertEquals(savedAgent?.id, startedAgent?.id)
         assertEquals(savedAgent?.systemPrompt, startedAgent?.systemPrompt)
+    }
+
+    @Test
+    fun attachmentSheetShowsStorageCarouselAndLabeledCreateActions() {
+        val events = mutableListOf<String>()
+        compose.setContent {
+            AriAiTheme(darkTheme = false, dynamicColor = false) {
+                AttachmentSheet(
+                    onPhoto = { events += "photos" },
+                    onVideoFile = { events += "videos" },
+                    onCamera = { events += "camera" },
+                    onFile = { events += "files" },
+                    onCompress = { events += "compress" },
+                    onExtensions = { events += "extensions" },
+                    onImage = { events += "create-images" },
+                    onVideo = { events += "create-videos" },
+                    onAudio = { events += "create-music" },
+                    onDismiss = { events += "dismiss" }
+                )
+            }
+        }
+
+        compose.onNodeWithTag("attachment-source-photos").assertIsDisplayed()
+        compose.onNodeWithTag("attachment-source-videos").assertIsDisplayed()
+        compose.onNodeWithTag("attachment-source-files").assertIsDisplayed()
+        compose.onNodeWithTag("attachment-action-create-images").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Create images").assertIsDisplayed()
+        compose.onNodeWithTag("attachment-action-create-videos").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Create videos").assertIsDisplayed()
+        compose.onNodeWithTag("attachment-action-create-music").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Create music").performClick()
+        assertEquals(listOf("dismiss", "create-music"), events)
     }
 
     @Test

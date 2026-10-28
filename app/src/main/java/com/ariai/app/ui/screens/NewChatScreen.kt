@@ -469,13 +469,18 @@ fun NewChatScreen(
         AttachmentSheet(
             onPhoto = {
                 launchPickerAfterSheetCloses {
-                    mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                    mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+            },
+            onVideoFile = {
+                launchPickerAfterSheetCloses {
+                    mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
                 }
             },
             onCamera = { launchPickerAfterSheetCloses { cameraPicker.launch(null) } },
             onFile = {
                 launchPickerAfterSheetCloses {
-                    filePicker.launch(arrayOf("text/*", "application/json", "image/*"))
+                    filePicker.launch(arrayOf("text/*", "application/json", "image/*", "video/*"))
                 }
             },
             onCompress = { onCompressHistory { showNote(it) } },

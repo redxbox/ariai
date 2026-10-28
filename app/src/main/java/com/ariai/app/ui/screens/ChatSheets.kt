@@ -8,6 +8,7 @@ import com.ariai.app.ui.theme.*
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -45,13 +46,13 @@ import kotlin.math.roundToInt
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private val Tile: Color @Composable @ReadOnlyComposable get() = AriAccentSoft
 
-/** Actions offered by the "+" button above the chat input. */
+/** Source shortcuts and generation actions shown by the chat composer’s plus button. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AttachmentSheet(
     onPhoto: () -> Unit,
+    onVideoFile: () -> Unit,
     onCamera: () -> Unit,
     onFile: () -> Unit,
     onCompress: () -> Unit,
@@ -63,123 +64,133 @@ fun AttachmentSheet(
 ) {
     PaperBottomSheet(
         onDismissRequest = onDismiss,
-        shape = paperSheetShape(30.dp),
+        shape = paperSheetShape(40.dp),
         showOutline = false
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 390.dp)
+                .heightIn(min = 520.dp, max = 700.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(15.dp)).background(AriAccentSoft),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Accent, modifier = Modifier.size(22.dp))
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(tx("Add to message"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-                    Text(tx("Choose what to add or create."), fontSize = 12.sp, color = Ink.copy(alpha = 0.58f))
-                }
+                AttachmentSourceTile(
+                    icon = Icons.Outlined.Image,
+                    label = tx("Photos"),
+                    tag = "attachment-source-photos"
+                ) { onDismiss(); onPhoto() }
+                AttachmentSourceTile(
+                    icon = Icons.Outlined.Movie,
+                    label = tx("Videos"),
+                    tag = "attachment-source-videos"
+                ) { onDismiss(); onVideoFile() }
+                AttachmentSourceTile(
+                    icon = Icons.Outlined.Description,
+                    label = tx("Files"),
+                    tag = "attachment-source-files"
+                ) { onDismiss(); onFile() }
+                AttachmentSourceTile(
+                    icon = Icons.Outlined.CameraAlt,
+                    label = tx("Camera"),
+                    tag = "attachment-source-camera"
+                ) { onDismiss(); onCamera() }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                CompactSheetTile(Icons.Outlined.Image, tx("Photo"), Modifier.weight(1f), tileHeight = 70.dp) { onDismiss(); onPhoto() }
-                CompactSheetTile(Icons.Outlined.CameraAlt, tx("Camera"), Modifier.weight(1f), tileHeight = 70.dp) { onDismiss(); onCamera() }
-                CompactSheetTile(Icons.Outlined.Description, tx("Text file"), Modifier.weight(1f), tileHeight = 70.dp) { onDismiss(); onFile() }
-            }
-            Text(
-                tx("Generate"),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Ink.copy(alpha = 0.55f),
-                modifier = Modifier.padding(start = 3.dp, top = 1.dp)
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                CompactSheetTile(Icons.Outlined.Image, tx("Image"), Modifier.weight(1f), tileHeight = 60.dp, tileColor = AriTint) { onDismiss(); onImage() }
-                CompactSheetTile(Icons.Outlined.Movie, tx("Video"), Modifier.weight(1f), tileHeight = 60.dp, tileColor = AriTint) { onDismiss(); onVideo() }
-                CompactSheetTile(Icons.Outlined.MusicNote, tx("Audio"), Modifier.weight(1f), tileHeight = 60.dp, tileColor = AriTint) { onDismiss(); onAudio() }
-            }
-            Text(
-                tx("Conversation"),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Ink.copy(alpha = 0.55f),
-                modifier = Modifier.padding(start = 3.dp, top = 1.dp)
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                CompactSheetAction(Icons.Outlined.Archive, tx("Compress history"), Modifier.weight(1f)) { onDismiss(); onCompress() }
-                CompactSheetAction(Icons.Outlined.Extension, tx("Extensions"), Modifier.weight(1f)) { onDismiss(); onExtensions() }
+
+            Spacer(Modifier.height(20.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                AttachmentActionRow(
+                    icon = Icons.Outlined.Image,
+                    title = tx("Create images"),
+                    subtitle = tx("Visualise and edit"),
+                    tag = "attachment-action-create-images"
+                ) { onDismiss(); onImage() }
+                AttachmentActionRow(
+                    icon = Icons.Outlined.Movie,
+                    title = tx("Create videos"),
+                    subtitle = tx("Bring ideas to life"),
+                    tag = "attachment-action-create-videos"
+                ) { onDismiss(); onVideo() }
+                AttachmentActionRow(
+                    icon = Icons.Outlined.MusicNote,
+                    title = tx("Create music"),
+                    subtitle = tx("Make audio tracks"),
+                    tag = "attachment-action-create-music"
+                ) { onDismiss(); onAudio() }
+                AttachmentActionRow(
+                    icon = Icons.Outlined.Archive,
+                    title = tx("Compress history"),
+                    subtitle = tx("Summarize older messages to save context"),
+                    tag = "attachment-action-compress-history"
+                ) { onDismiss(); onCompress() }
+                AttachmentActionRow(
+                    icon = Icons.Outlined.Extension,
+                    title = tx("Extensions"),
+                    subtitle = tx("MCP preview; tool calls are not active yet"),
+                    tag = "attachment-action-extensions"
+                ) { onDismiss(); onExtensions() }
             }
         }
     }
 }
 
 @Composable
-private fun CompactSheetTile(
+private fun AttachmentSourceTile(
     icon: ImageVector,
     label: String,
-    modifier: Modifier,
-    tileHeight: androidx.compose.ui.unit.Dp,
-    tileColor: Color = Tile,
+    tag: String,
     onClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(tileHeight),
-        shape = RoundedCornerShape(20.dp),
-        color = tileColor,
+        modifier = Modifier.width(100.dp).height(112.dp).testTag(tag),
+        shape = RoundedCornerShape(40.dp),
+        color = Ink.copy(alpha = 0.055f),
         tonalElevation = 0.dp
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 7.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically)
+            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)
         ) {
-            Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(21.dp))
-            Text(
-                label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = Ink,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
+            Icon(icon, contentDescription = null, tint = Ink, modifier = Modifier.size(27.dp))
+            Text(label, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Ink, maxLines = 1)
         }
     }
 }
 
 @Composable
-private fun CompactSheetAction(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(46.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = AriPaper,
-        tonalElevation = 0.dp
+private fun AttachmentActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    tag: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .testTag(tag)
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
-        ) {
-            Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(18.dp))
-            Text(
-                label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = Ink,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
+        Icon(icon, contentDescription = null, tint = Ink, modifier = Modifier.size(27.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = Ink, maxLines = 1)
+            Text(subtitle, fontSize = 14.sp, color = AriMuted, maxLines = 1)
         }
     }
 }
