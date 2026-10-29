@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -134,150 +135,156 @@ internal fun ModelPickerWorkspace(
         emptyList()
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
-        SideEffect { dialogWindow?.setDimAmount(0.08f) }
-        Box(
-            modifier = Modifier.fillMaxSize().clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onDismiss
-            )
+    // Keep the dialog aligned with the opener: Android dialog windows can briefly inherit the
+    // device direction before Compose applies the app direction, causing a visible RTL/LTR flip.
+    val currentLayoutDirection = LocalLayoutDirection.current
+    val pickerLayoutDirection = remember { currentLayoutDirection }
+    CompositionLocalProvider(LocalLayoutDirection provides pickerLayoutDirection) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            BoxWithConstraints(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.TopCenter
+            val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+            SideEffect { dialogWindow?.setDimAmount(0.08f) }
+            Box(
+                modifier = Modifier.fillMaxSize().clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                )
             ) {
-                val isWide = maxWidth >= 720.dp
-                val panelTop = (maxHeight * 0.16f).coerceIn(48.dp, 228.dp)
-                val providerPanelOffset = (maxHeight * 0.04f).coerceIn(16.dp, 32.dp)
-                val compactPanelHeight = minOf(
-                    maxHeight * 0.60f,
-                    900.dp,
-                    (maxHeight - panelTop - 64.dp).coerceAtLeast(180.dp)
-                )
-                val wideProviderHeight = minOf(
-                    maxHeight * 0.45f,
-                    900.dp,
-                    (maxHeight - panelTop - 64.dp).coerceAtLeast(180.dp)
-                )
-                val wideModelHeight = minOf(
-                    maxHeight * 0.52f,
-                    900.dp,
-                    (maxHeight - panelTop - providerPanelOffset - 64.dp).coerceAtLeast(180.dp)
-                )
-                val compactPanelModifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = panelTop)
-                    .fillMaxWidth(0.88f)
-                    .height(compactPanelHeight)
-                val wideRowModifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = panelTop + providerPanelOffset)
-                    .fillMaxWidth(0.92f)
-                    .height(wideModelHeight)
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    val isWide = maxWidth >= 720.dp
+                    val panelTop = (maxHeight * 0.16f).coerceIn(48.dp, 228.dp)
+                    val providerPanelOffset = (maxHeight * 0.04f).coerceIn(16.dp, 32.dp)
+                    val compactPanelHeight = minOf(
+                        maxHeight * 0.60f,
+                        900.dp,
+                        (maxHeight - panelTop - 64.dp).coerceAtLeast(180.dp)
+                    )
+                    val wideProviderHeight = minOf(
+                        maxHeight * 0.45f,
+                        900.dp,
+                        (maxHeight - panelTop - 64.dp).coerceAtLeast(180.dp)
+                    )
+                    val wideModelHeight = minOf(
+                        maxHeight * 0.52f,
+                        900.dp,
+                        (maxHeight - panelTop - providerPanelOffset - 64.dp).coerceAtLeast(180.dp)
+                    )
+                    val compactPanelModifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = panelTop)
+                        .fillMaxWidth(0.88f)
+                        .height(compactPanelHeight)
+                    val wideRowModifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = panelTop + providerPanelOffset)
+                        .fillMaxWidth(0.92f)
+                        .height(wideModelHeight)
 
-                if (isWide) {
-                    Row(
-                        modifier = wideRowModifier,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ProviderPickerPane(
-                            providers = enabledProviders,
-                            selectedProviderId = providerFilter,
-                            totalModelCount = totalModelCount,
-                            onSelectProvider = { providerId ->
-                                requestedProviderFilter = providerId
-                                query = ""
-                                openGroupPopupKey = null
-                            },
-                            onManageProviders = { onDismiss(); onManageProviders() },
-                            modifier = Modifier.weight(0.51f).height(wideProviderHeight)
-                                .offset(y = -providerPanelOffset)
-                        )
-                        ModelDetailsPane(
-                            modifier = Modifier.weight(0.49f).fillMaxHeight(),
-                            compact = false,
-                            provider = selectedProvider,
-                            isAllModels = providerFilter == null,
-                            totalModelCount = totalModelCount,
-                            query = query,
-                            onQueryChange = { query = it; openGroupPopupKey = null },
-                            groups = groups,
-                            favorites = favorites,
-                            favoriteEntries = allFavoriteEntries,
-                            favoritesExpanded = favoritesExpanded,
-                            onFavoritesExpandedChange = { favoritesExpanded = it },
-                            selectedProviderId = selectedProviderId,
-                            selectedModelId = selectedModelId,
-                            openGroupPopupKey = openGroupPopupKey,
-                            onOpenGroupPopupChange = { openGroupPopupKey = it },
-                            expandedGroups = expandedGroups,
-                            onExpandedGroupsChange = { expandedGroups = it },
-                            onSelectProvider = { providerId ->
-                                requestedProviderFilter = providerId
-                                query = ""
-                                openGroupPopupKey = null
-                            },
-                            onToggleFavorite = onToggleFavorite,
-                            onSelectModel = { providerId, modelId -> onSelect(providerId, modelId); onDismiss() },
-                            onAddProvider = { onDismiss(); onAddProvider() },
-                            onManageProviders = { onDismiss(); onManageProviders() },
-                            onCheckProvider = onCheckProvider,
-                            onDismiss = onDismiss
-                        )
-                    }
-                } else {
-                    Column(
-                        modifier = compactPanelModifier,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        CompactProviderRail(
-                            providers = enabledProviders,
-                            selectedProviderId = providerFilter,
-                            totalModelCount = totalModelCount,
-                            onSelectProvider = { providerId ->
-                                requestedProviderFilter = providerId
-                                query = ""
-                                openGroupPopupKey = null
-                            },
-                            onManageProviders = { onDismiss(); onManageProviders() },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        ModelDetailsPane(
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            compact = true,
-                            provider = selectedProvider,
-                            isAllModels = providerFilter == null,
-                            totalModelCount = totalModelCount,
-                            query = query,
-                            onQueryChange = { query = it; openGroupPopupKey = null },
-                            groups = groups,
-                            favorites = favorites,
-                            favoriteEntries = allFavoriteEntries,
-                            favoritesExpanded = favoritesExpanded,
-                            onFavoritesExpandedChange = { favoritesExpanded = it },
-                            selectedProviderId = selectedProviderId,
-                            selectedModelId = selectedModelId,
-                            openGroupPopupKey = openGroupPopupKey,
-                            onOpenGroupPopupChange = { openGroupPopupKey = it },
-                            expandedGroups = expandedGroups,
-                            onExpandedGroupsChange = { expandedGroups = it },
-                            onSelectProvider = { providerId ->
-                                requestedProviderFilter = providerId
-                                query = ""
-                                openGroupPopupKey = null
-                            },
-                            onToggleFavorite = onToggleFavorite,
-                            onSelectModel = { providerId, modelId -> onSelect(providerId, modelId); onDismiss() },
-                            onAddProvider = { onDismiss(); onAddProvider() },
-                            onManageProviders = { onDismiss(); onManageProviders() },
-                            onCheckProvider = onCheckProvider,
-                            onDismiss = onDismiss
-                        )
+                    if (isWide) {
+                        Row(
+                            modifier = wideRowModifier,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ProviderPickerPane(
+                                providers = enabledProviders,
+                                selectedProviderId = providerFilter,
+                                totalModelCount = totalModelCount,
+                                onSelectProvider = { providerId ->
+                                    requestedProviderFilter = providerId
+                                    query = ""
+                                    openGroupPopupKey = null
+                                },
+                                onManageProviders = { onDismiss(); onManageProviders() },
+                                modifier = Modifier.weight(0.51f).height(wideProviderHeight)
+                                    .offset(y = -providerPanelOffset)
+                            )
+                            ModelDetailsPane(
+                                modifier = Modifier.weight(0.49f).fillMaxHeight(),
+                                compact = false,
+                                provider = selectedProvider,
+                                isAllModels = providerFilter == null,
+                                totalModelCount = totalModelCount,
+                                query = query,
+                                onQueryChange = { query = it; openGroupPopupKey = null },
+                                groups = groups,
+                                favorites = favorites,
+                                favoriteEntries = allFavoriteEntries,
+                                favoritesExpanded = favoritesExpanded,
+                                onFavoritesExpandedChange = { favoritesExpanded = it },
+                                selectedProviderId = selectedProviderId,
+                                selectedModelId = selectedModelId,
+                                openGroupPopupKey = openGroupPopupKey,
+                                onOpenGroupPopupChange = { openGroupPopupKey = it },
+                                expandedGroups = expandedGroups,
+                                onExpandedGroupsChange = { expandedGroups = it },
+                                onSelectProvider = { providerId ->
+                                    requestedProviderFilter = providerId
+                                    query = ""
+                                    openGroupPopupKey = null
+                                },
+                                onToggleFavorite = onToggleFavorite,
+                                onSelectModel = { providerId, modelId -> onSelect(providerId, modelId); onDismiss() },
+                                onAddProvider = { onDismiss(); onAddProvider() },
+                                onManageProviders = { onDismiss(); onManageProviders() },
+                                onCheckProvider = onCheckProvider,
+                                onDismiss = onDismiss
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = compactPanelModifier,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            CompactProviderRail(
+                                providers = enabledProviders,
+                                selectedProviderId = providerFilter,
+                                totalModelCount = totalModelCount,
+                                onSelectProvider = { providerId ->
+                                    requestedProviderFilter = providerId
+                                    query = ""
+                                    openGroupPopupKey = null
+                                },
+                                onManageProviders = { onDismiss(); onManageProviders() },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            ModelDetailsPane(
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                compact = true,
+                                provider = selectedProvider,
+                                isAllModels = providerFilter == null,
+                                totalModelCount = totalModelCount,
+                                query = query,
+                                onQueryChange = { query = it; openGroupPopupKey = null },
+                                groups = groups,
+                                favorites = favorites,
+                                favoriteEntries = allFavoriteEntries,
+                                favoritesExpanded = favoritesExpanded,
+                                onFavoritesExpandedChange = { favoritesExpanded = it },
+                                selectedProviderId = selectedProviderId,
+                                selectedModelId = selectedModelId,
+                                openGroupPopupKey = openGroupPopupKey,
+                                onOpenGroupPopupChange = { openGroupPopupKey = it },
+                                expandedGroups = expandedGroups,
+                                onExpandedGroupsChange = { expandedGroups = it },
+                                onSelectProvider = { providerId ->
+                                    requestedProviderFilter = providerId
+                                    query = ""
+                                    openGroupPopupKey = null
+                                },
+                                onToggleFavorite = onToggleFavorite,
+                                onSelectModel = { providerId, modelId -> onSelect(providerId, modelId); onDismiss() },
+                                onAddProvider = { onDismiss(); onAddProvider() },
+                                onManageProviders = { onDismiss(); onManageProviders() },
+                                onCheckProvider = onCheckProvider,
+                                onDismiss = onDismiss
+                            )
+                        }
                     }
                 }
             }

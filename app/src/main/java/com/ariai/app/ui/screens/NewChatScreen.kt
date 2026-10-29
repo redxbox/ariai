@@ -34,6 +34,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -794,20 +798,40 @@ fun NewChatScreen(
                             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconCircle(Icons.Default.Add, tx("Add to message"), active = false) { showAttachments = true }
-                            Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Search, tx("Web search"), active = searchMode != SearchMode.OFF, stateful = true) {
+                            ComposerActionButton(Icons.Default.Add, tx("Add to message"), active = false) {
+                                showAttachments = true
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            ComposerActionButton(
+                                Icons.Default.Search,
+                                tx("Web search"),
+                                active = searchMode != SearchMode.OFF,
+                                stateful = true
+                            ) {
                                 showSearch = true
                             }
-                            Spacer(Modifier.width(6.dp))
-                            IconCircle(Icons.Default.Mic, tx("Voice input"), active = listening, stateful = true) {
+                            Spacer(Modifier.width(4.dp))
+                            ComposerActionButton(
+                                icon = if (listening) Icons.Default.Stop else Icons.Default.Mic,
+                                description = if (listening) tx("Stop listening") else tx("Voice input"),
+                                active = listening,
+                                stateful = true,
+                                activeStateDescription = tx("Listening…")
+                            ) {
                                 when {
-                                    listening -> recognizer?.stopListening()
+                                    listening -> {
+                                        recognizer?.stopListening()
+                                        listening = false
+                                    }
                                     androidx.core.content.ContextCompat.checkSelfPermission(
                                         context, android.Manifest.permission.RECORD_AUDIO
                                     ) == android.content.pm.PackageManager.PERMISSION_GRANTED -> startListening()
                                     else -> micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
                                 }
+                            }
+                            if (listening) {
+                                Spacer(Modifier.width(6.dp))
+                                ListeningIndicator()
                             }
                             Spacer(Modifier.weight(1f))
                         }
@@ -1354,15 +1378,16 @@ private fun ActionIcon(icon: ImageVector, description: String, onClick: () -> Un
 }
 
 @Composable
-private fun IconCircle(
+private fun ComposerActionButton(
     icon: ImageVector,
     description: String,
     active: Boolean,
     stateful: Boolean = false,
+    activeStateDescription: String? = null,
     onClick: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (active) AriAccentSoft else AriTint,
+        targetValue = if (active) AriAccentSoft else Color.Transparent,
         animationSpec = tween(180, easing = FastOutSlowInEasing),
         label = "composer-action-background"
     )
@@ -1372,17 +1397,54 @@ private fun IconCircle(
         label = "composer-action-foreground"
     )
     Box(
-        modifier = Modifier.size(48.dp).clip(CircleShape)
+        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
             .background(backgroundColor)
-            .animateContentSize(tween(180, easing = FastOutSlowInEasing))
             .semantics(mergeDescendants = true) {
                 contentDescription = description
-                if (stateful) stateDescription = if (active) tx("On") else tx("Off")
+                if (stateful) {
+                    stateDescription = if (active) activeStateDescription ?: tx("On") else tx("Off")
+                }
             }
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun ListeningIndicator() {
+    val transition = rememberInfiniteTransition(label = "voice-listening-indicator")
+    val dotAlpha by transition.animateFloat(
+        initialValue = 0.38f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(650, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "voice-listening-pulse"
+    )
+    val shape = RoundedCornerShape(11.dp)
+    Row(
+        modifier = Modifier.clip(shape)
+            .background(AriAccentSoft.copy(alpha = 0.78f))
+            .border(1.dp, AriAccent.copy(alpha = 0.14f), shape)
+            .padding(horizontal = 9.dp, vertical = 7.dp)
+            .testTag("voice-listening-indicator"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(7.dp).clip(CircleShape)
+                .background(AriAccent.copy(alpha = dotAlpha))
+        )
+        Text(
+            text = tx("Listening…"),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = AriAccent,
+            maxLines = 1
+        )
     }
 }
 
