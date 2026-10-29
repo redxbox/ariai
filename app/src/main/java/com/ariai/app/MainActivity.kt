@@ -352,6 +352,14 @@ fun AppRoot(viewModel: AppViewModel) {
                         providers = providers,
                         onAddProvider = { navController.navigate("add_provider") },
                         onAddPreset = { navController.navigate("add_provider?preset=${it.name}") },
+                        fetchModels = { viewModel.fetchModels(it) },
+                        onSaveProvider = { provider, onSaved ->
+                            viewModel.saveProviderAndReturn(provider) { savedProvider ->
+                                if (savedProvider != null) activateNativeSearch(savedProvider)
+                                else scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                                onSaved(savedProvider)
+                            }
+                        },
                         onImportProvider = { provider ->
                             viewModel.saveProviderAndReturn(provider) { savedProvider ->
                                 if (savedProvider == null) {

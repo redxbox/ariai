@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.providerFromJson
@@ -78,11 +79,27 @@ fun NewProvidersScreen(
     onEditProvider: (Provider) -> Unit,
     onImportProvider: (Provider) -> Unit,
     onBack: () -> Unit,
-    onToggleProvider: (Provider) -> Unit = {}
+    onToggleProvider: (Provider) -> Unit = {},
+    fetchModels: (suspend (Provider) -> List<AIModel>)? = null,
+    onSaveProvider: ((Provider, (Provider?) -> Unit) -> Unit)? = null
 ) {
     var query by remember { mutableStateOf("") }
     var showImport by remember { mutableStateOf(false) }
     var showRecommended by remember { mutableStateOf(false) }
+    var showAddProvider by remember { mutableStateOf(false) }
+    var addProviderPreset by remember { mutableStateOf<ProviderType?>(null) }
+    val fetchModelsForAdd = fetchModels
+    val saveProviderForAdd = onSaveProvider
+    fun openAddProvider(preset: ProviderType? = null) {
+        if (fetchModelsForAdd != null && saveProviderForAdd != null) {
+            addProviderPreset = preset
+            showAddProvider = true
+        } else if (preset != null) {
+            onAddPreset(preset)
+        } else {
+            onAddProvider()
+        }
+    }
     val visible = providers.filter {
         query.isBlank() ||
             it.name.contains(query, ignoreCase = true) ||
@@ -97,7 +114,7 @@ fun NewProvidersScreen(
     }
     if (showRecommended) {
         RecommendedProvidersSheet(
-            onPick = { showRecommended = false; onAddPreset(it) },
+            onPick = { showRecommended = false; openAddProvider(it) },
             onDismiss = { showRecommended = false }
         )
     }
@@ -110,7 +127,7 @@ fun NewProvidersScreen(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
                 title = {},
                 actions = {
-                    IconButton(onClick = onAddProvider) { Icon(Icons.Default.Add, contentDescription = tx("Add provider"), tint = Ink) }
+                    IconButton(onClick = { openAddProvider() }) { Icon(Icons.Default.Add, contentDescription = tx("Add provider"), tint = Ink) }
                     IconButton(onClick = { showImport = true }) { Icon(Icons.Default.FileOpen, contentDescription = tx("Import provider"), tint = Ink) }
                     IconButton(onClick = { showRecommended = true }) { Icon(Icons.Default.AutoAwesome, contentDescription = tx("Recommended providers"), tint = Ink) }
                 }
@@ -200,6 +217,39 @@ fun NewProvidersScreen(
                 itemsIndexed(offList, key = { _, p -> "provider:${p.id}" }) { _, provider ->
                     ProviderCard(provider = provider, onClick = { onEditProvider(provider) }, onToggle = { onToggleProvider(provider) })
                 }
+            }
+        }
+    }
+
+    if (showAddProvider && fetchModelsForAdd != null && saveProviderForAdd != null) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showAddProvider = false
+                addProviderPreset = null
+            },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = AriPaper,
+            contentColor = AriInk
+        ) {
+            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.90f)) {
+                AddProviderScreen(
+                    presetType = addProviderPreset,
+                    fetchModels = fetchModelsForAdd,
+                    onSave = { provider ->
+                        saveProviderForAdd(provider) { savedProvider ->
+                            if (savedProvider != null) {
+                                showAddProvider = false
+                                addProviderPreset = null
+                            }
+                        }
+                    },
+                    onBack = {
+                        showAddProvider = false
+                        addProviderPreset = null
+                    },
+                    existingProviderNames = providers.map { it.name }.toSet(),
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
