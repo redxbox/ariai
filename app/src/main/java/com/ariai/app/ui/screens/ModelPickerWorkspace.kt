@@ -85,7 +85,7 @@ internal fun ModelPickerWorkspace(
         mutableStateOf(selectedProviderId?.takeIf { id -> providers.any { it.id == id && it.enabled } })
     }
     var favoritesExpanded by remember { mutableStateOf(false) }
-    var groupOpenOverrides by remember(requestedProviderFilter) { mutableStateOf(emptyMap<String, Boolean>()) }
+    var openGroupPopupKey by remember(requestedProviderFilter) { mutableStateOf<String?>(null) }
     var expandedGroups by remember(requestedProviderFilter) { mutableStateOf(emptySet<String>()) }
 
     val enabledProviders = providers.filter { it.enabled }
@@ -153,7 +153,7 @@ internal fun ModelPickerWorkspace(
                 val panelTop = (maxHeight * 0.16f).coerceIn(48.dp, 228.dp)
                 val providerPanelOffset = (maxHeight * 0.04f).coerceIn(16.dp, 32.dp)
                 val compactPanelHeight = minOf(
-                    maxHeight * 0.46f,
+                    maxHeight * 0.52f,
                     900.dp,
                     (maxHeight - panelTop - 64.dp).coerceAtLeast(180.dp)
                 )
@@ -170,7 +170,7 @@ internal fun ModelPickerWorkspace(
                 val compactPanelModifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset(y = panelTop)
-                    .fillMaxWidth(0.92f)
+                    .fillMaxWidth(0.88f)
                     .height(compactPanelHeight)
                 val wideRowModifier = Modifier
                     .align(Alignment.TopCenter)
@@ -190,6 +190,7 @@ internal fun ModelPickerWorkspace(
                             onSelectProvider = { providerId ->
                                 requestedProviderFilter = providerId
                                 query = ""
+                                openGroupPopupKey = null
                             },
                             onManageProviders = { onDismiss(); onManageProviders() },
                             modifier = Modifier.weight(0.51f).height(wideProviderHeight)
@@ -201,7 +202,7 @@ internal fun ModelPickerWorkspace(
                             isAllModels = providerFilter == null,
                             totalModelCount = totalModelCount,
                             query = query,
-                            onQueryChange = { query = it },
+                            onQueryChange = { query = it; openGroupPopupKey = null },
                             groups = groups,
                             favorites = favorites,
                             favoriteEntries = allFavoriteEntries,
@@ -209,13 +210,14 @@ internal fun ModelPickerWorkspace(
                             onFavoritesExpandedChange = { favoritesExpanded = it },
                             selectedProviderId = selectedProviderId,
                             selectedModelId = selectedModelId,
-                            groupOpenOverrides = groupOpenOverrides,
-                            onGroupOpenChange = { key, open -> groupOpenOverrides = groupOpenOverrides + (key to open) },
+                            openGroupPopupKey = openGroupPopupKey,
+                            onOpenGroupPopupChange = { openGroupPopupKey = it },
                             expandedGroups = expandedGroups,
                             onExpandedGroupsChange = { expandedGroups = it },
                             onSelectProvider = { providerId ->
                                 requestedProviderFilter = providerId
                                 query = ""
+                                openGroupPopupKey = null
                             },
                             onToggleFavorite = onToggleFavorite,
                             onSelectModel = { providerId, modelId -> onSelect(providerId, modelId); onDismiss() },
@@ -237,6 +239,7 @@ internal fun ModelPickerWorkspace(
                             onSelectProvider = { providerId ->
                                 requestedProviderFilter = providerId
                                 query = ""
+                                openGroupPopupKey = null
                             },
                             onManageProviders = { onDismiss(); onManageProviders() },
                             modifier = Modifier.fillMaxWidth()
@@ -247,7 +250,7 @@ internal fun ModelPickerWorkspace(
                             isAllModels = providerFilter == null,
                             totalModelCount = totalModelCount,
                             query = query,
-                            onQueryChange = { query = it },
+                            onQueryChange = { query = it; openGroupPopupKey = null },
                             groups = groups,
                             favorites = favorites,
                             favoriteEntries = allFavoriteEntries,
@@ -255,13 +258,14 @@ internal fun ModelPickerWorkspace(
                             onFavoritesExpandedChange = { favoritesExpanded = it },
                             selectedProviderId = selectedProviderId,
                             selectedModelId = selectedModelId,
-                            groupOpenOverrides = groupOpenOverrides,
-                            onGroupOpenChange = { key, open -> groupOpenOverrides = groupOpenOverrides + (key to open) },
+                            openGroupPopupKey = openGroupPopupKey,
+                            onOpenGroupPopupChange = { openGroupPopupKey = it },
                             expandedGroups = expandedGroups,
                             onExpandedGroupsChange = { expandedGroups = it },
                             onSelectProvider = { providerId ->
                                 requestedProviderFilter = providerId
                                 query = ""
+                                openGroupPopupKey = null
                             },
                             onToggleFavorite = onToggleFavorite,
                             onSelectModel = { providerId, modelId -> onSelect(providerId, modelId); onDismiss() },
@@ -423,8 +427,8 @@ private fun ModelDetailsPane(
     onFavoritesExpandedChange: (Boolean) -> Unit,
     selectedProviderId: String?,
     selectedModelId: String?,
-    groupOpenOverrides: Map<String, Boolean>,
-    onGroupOpenChange: (String, Boolean) -> Unit,
+    openGroupPopupKey: String?,
+    onOpenGroupPopupChange: (String?) -> Unit,
     expandedGroups: Set<String>,
     onExpandedGroupsChange: (Set<String>) -> Unit,
     onSelectProvider: (String?) -> Unit,
@@ -602,9 +606,10 @@ private fun ModelDetailsPane(
                 }
 
                 groups.forEach { group ->
-                    val isOpen = query.isNotBlank() || (groupOpenOverrides[group.key] ?: false)
+                    val isSearching = query.isNotBlank()
+                    val isPopupOpen = !isSearching && openGroupPopupKey == group.key
                     val previewLimit = if (group.key == OTHER_MODELS_KEY) 3 else 5
-                    val showAll = query.isNotBlank() || expandedGroups.contains(group.key)
+                    val showAll = isSearching || expandedGroups.contains(group.key)
                     val visibleEntries = if (showAll) group.entries else group.entries.take(previewLimit)
                     val expandTag = if (group.key == OTHER_MODELS_KEY && !isAllModels && provider != null) {
                         "model-picker-expand-${provider.id}"
@@ -612,16 +617,65 @@ private fun ModelDetailsPane(
                         "model-picker-expand-${group.key}"
                     }
                     item(key = "group:${group.key}") {
-                        PickerGroupHeader(
-                            title = group.title,
-                            count = group.entries.size,
-                            mark = PickerGroupMark.BRAND(group.title),
-                            expanded = isOpen,
-                            onClick = { onGroupOpenChange(group.key, !isOpen) },
-                            testTag = "model-picker-group-${group.key}"
-                        )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            PickerGroupHeader(
+                                title = group.title,
+                                count = group.entries.size,
+                                mark = PickerGroupMark.BRAND(group.title),
+                                expanded = isSearching || isPopupOpen,
+                                onClick = {
+                                    if (!isSearching) {
+                                        onOpenGroupPopupChange(if (isPopupOpen) null else group.key)
+                                    }
+                                },
+                                testTag = "model-picker-group-${group.key}"
+                            )
+                            val popupShape = RoundedCornerShape(20.dp)
+                            DropdownMenu(
+                                expanded = isPopupOpen,
+                                onDismissRequest = {
+                                    if (openGroupPopupKey == group.key) onOpenGroupPopupChange(null)
+                                },
+                                offset = androidx.compose.ui.unit.DpOffset(0.dp, 7.dp),
+                                modifier = Modifier.widthIn(max = 340.dp)
+                                    .background(AriCard, popupShape)
+                                    .then(paperPopupModifier(popupShape))
+                                    .testTag("model-picker-group-popup-${group.key}")
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    visibleEntries.forEachIndexed { index, entry ->
+                                        PickerModelRow(
+                                            entry = entry,
+                                            selected = isSelectedModel(entry.provider.id, entry.model.id, selectedProviderId, selectedModelId),
+                                            favorite = favorites.contains(favoriteKey(entry.provider.id, entry.model.id)),
+                                            onSelect = { onSelectModel(entry.provider.id, entry.model.id) },
+                                            onToggleFavorite = { onToggleFavorite(entry.provider.id, entry.model.id) }
+                                        )
+                                        if (index < visibleEntries.lastIndex) Spacer(Modifier.height(4.dp))
+                                    }
+                                    if (!isSearching && group.entries.size > previewLimit) {
+                                        Spacer(Modifier.height(4.dp))
+                                        ExpandPickerModelsButton(
+                                            expanded = showAll,
+                                            count = group.entries.size,
+                                            tag = expandTag,
+                                            onClick = {
+                                                val nextExpandedGroups = if (showAll) {
+                                                    expandedGroups - group.key
+                                                } else {
+                                                    expandedGroups + group.key
+                                                }
+                                                onExpandedGroupsChange(nextExpandedGroups)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
-                    if (isOpen) {
+                    if (isSearching) {
                         items(visibleEntries, key = { "model:${it.provider.id}:${it.model.id}" }) { entry ->
                             PickerModelRow(
                                 entry = entry,
@@ -630,23 +684,6 @@ private fun ModelDetailsPane(
                                 onSelect = { onSelectModel(entry.provider.id, entry.model.id) },
                                 onToggleFavorite = { onToggleFavorite(entry.provider.id, entry.model.id) }
                             )
-                        }
-                        if (query.isBlank() && group.entries.size > previewLimit) {
-                            item(key = "expand:${group.key}") {
-                                ExpandPickerModelsButton(
-                                    expanded = showAll,
-                                    count = group.entries.size,
-                                    tag = expandTag,
-                                    onClick = {
-                                        val nextExpandedGroups = if (showAll) {
-                                            expandedGroups - group.key
-                                        } else {
-                                            expandedGroups + group.key
-                                        }
-                                        onExpandedGroupsChange(nextExpandedGroups)
-                                    }
-                                )
-                            }
                         }
                     }
                 }

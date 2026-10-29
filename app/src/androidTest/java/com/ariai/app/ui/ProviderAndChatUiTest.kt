@@ -10,7 +10,6 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -357,7 +356,9 @@ class ProviderAndChatUiTest {
         assertDisplayed("ChatGPT group starts collapsed") { chatGptGroup.assertIsDisplayed() }
         assertTrue(compose.onAllNodesWithText("GPT-5.5 Pro").fetchSemanticsNodes().isEmpty())
         clickWithLabel("open ChatGPT group") { chatGptGroup.performClick() }
-        assertDisplayed("ChatGPT model after expanding the group") {
+        val chatGptPopup = compose.onNodeWithTag("model-picker-group-popup-chatgpt")
+        assertDisplayed("ChatGPT models open in a floating popup") { chatGptPopup.assertIsDisplayed() }
+        assertDisplayed("ChatGPT model inside the floating popup") {
             compose.onNodeWithText("GPT-5.5 Pro").assertIsDisplayed()
         }
         clickWithLabel("collapse ChatGPT group") { chatGptGroup.performClick() }
@@ -366,25 +367,25 @@ class ProviderAndChatUiTest {
         assertDisplayed("model group is initially collapsed") { modelGroup.assertIsDisplayed() }
         assertTrue(compose.onAllNodesWithText("Most used one").fetchSemanticsNodes().isEmpty())
         clickWithLabel("open model group") { modelGroup.performClick() }
+        val modelPopup = compose.onNodeWithTag("model-picker-group-popup-other-models")
+        assertDisplayed("models open in a floating popup") { modelPopup.assertIsDisplayed() }
         val firstPopular = compose.onNodeWithText("Most used one")
         val secondPopular = compose.onNodeWithText("Most used two")
         val thirdPopular = compose.onNodeWithText("Most used three")
         assertDisplayed("most-used model one") { firstPopular.assertIsDisplayed() }
         assertDisplayed("most-used model two") { secondPopular.assertIsDisplayed() }
         assertDisplayed("most-used model three") { thirdPopular.assertIsDisplayed() }
-        val firstPopularTop = firstPopular.fetchSemanticsNode().boundsInRoot.top
-        val secondPopularTop = secondPopular.fetchSemanticsNode().boundsInRoot.top
-        val thirdPopularTop = thirdPopular.fetchSemanticsNode().boundsInRoot.top
-        assertTrue(firstPopularTop < secondPopularTop && secondPopularTop < thirdPopularTop)
+        val popupBounds = modelPopup.fetchSemanticsNode().boundsInRoot
+        val firstPopularBounds = firstPopular.fetchSemanticsNode().boundsInRoot
+        val secondPopularBounds = secondPopular.fetchSemanticsNode().boundsInRoot
+        val thirdPopularBounds = thirdPopular.fetchSemanticsNode().boundsInRoot
+        assertTrue(firstPopularBounds.top < secondPopularBounds.top && secondPopularBounds.top < thirdPopularBounds.top)
+        assertTrue(firstPopularBounds.top >= popupBounds.top && thirdPopularBounds.bottom <= popupBounds.bottom)
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
         assertTrue(compose.onAllNodesWithText("Alternative model").fetchSemanticsNodes().isEmpty())
-        compose.onNodeWithTag("model-picker-model-list")
-            .performScrollToNode(hasTestTag("model-picker-expand-${provider.id}"))
         clickWithLabel("show-all models button") {
             compose.onNodeWithTag("model-picker-expand-${provider.id}").performClick()
         }
-        compose.onNodeWithTag("model-picker-model-list")
-            .performScrollToNode(hasText("Long tail model"))
         assertDisplayed("expanded long-tail model") { compose.onNodeWithText("Long tail model").assertIsDisplayed() }
         clickWithLabel("alternate provider filter") {
             compose.onNodeWithTag("provider-filter-${alternateProvider.id}").performClick()
@@ -393,8 +394,12 @@ class ProviderAndChatUiTest {
         val alternateModelGroup = compose.onNodeWithTag("model-picker-group-other-models")
         assertDisplayed("alternate provider group") { alternateModelGroup.assertIsDisplayed() }
         clickWithLabel("open alternate provider group") { alternateModelGroup.performClick() }
+        assertDisplayed("alternate provider group opens a floating popup") {
+            compose.onNodeWithTag("model-picker-group-popup-other-models").assertIsDisplayed()
+        }
         assertDisplayed("alternate provider model") { compose.onNodeWithText("Alternative model").assertIsDisplayed() }
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
+        clickWithLabel("close alternate provider model popup") { alternateModelGroup.performClick() }
 
         clickWithLabel("model picker overflow menu") {
             compose.onNodeWithTag("model-picker-overflow").performClick()
