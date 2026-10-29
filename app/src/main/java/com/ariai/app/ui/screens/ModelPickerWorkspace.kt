@@ -153,7 +153,7 @@ internal fun ModelPickerWorkspace(
                 val panelTop = (maxHeight * 0.16f).coerceIn(48.dp, 228.dp)
                 val providerPanelOffset = (maxHeight * 0.04f).coerceIn(16.dp, 32.dp)
                 val compactPanelHeight = minOf(
-                    maxHeight * 0.52f,
+                    maxHeight * 0.60f,
                     900.dp,
                     (maxHeight - panelTop - 64.dp).coerceAtLeast(180.dp)
                 )
@@ -369,11 +369,11 @@ private fun CompactProviderRail(
     modifier: Modifier = Modifier
 ) {
     PickerPanelSurface(
-        modifier = modifier.heightIn(min = 56.dp).testTag("model-picker-provider-dock"),
-        shape = RoundedCornerShape(20.dp)
+        modifier = modifier.heightIn(min = 52.dp).testTag("model-picker-provider-dock"),
+        shape = RoundedCornerShape(18.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             LazyRow(
@@ -448,7 +448,7 @@ private fun ModelDetailsPane(
     PickerPanelSurface(modifier = modifier.testTag("model-picker-details-pane")) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -458,11 +458,11 @@ private fun ModelDetailsPane(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = AriInk)
                 }
-                ProviderBadge(provider = provider, isAllModels = isAllModels, selected = true, size = 40.dp)
+                ProviderBadge(provider = provider, isAllModels = isAllModels, selected = true, size = 36.dp)
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         if (isAllModels) tx("All models") else provider?.name.orEmpty(),
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AriInk,
                         maxLines = 1,
@@ -470,7 +470,7 @@ private fun ModelDetailsPane(
                     )
                     Text(
                         modelCountLabel(displayedModelCount),
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         color = AriMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -542,9 +542,10 @@ private fun ModelDetailsPane(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
-                placeholder = { Text(tx("Search models") + "…", color = AriMuted.copy(alpha = 0.75f)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriInk) },
-                shape = RoundedCornerShape(50.dp),
+                placeholder = { Text(tx("Search models") + "…", fontSize = 14.sp, color = AriMuted.copy(alpha = 0.75f)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriInk, modifier = Modifier.size(20.dp)) },
+                textStyle = MaterialTheme.typography.bodyMedium,
+                shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = AriInk,
                     unfocusedTextColor = AriInk,
@@ -554,7 +555,7 @@ private fun ModelDetailsPane(
                     focusedContainerColor = AriTint.copy(alpha = 0.62f),
                     unfocusedContainerColor = AriTint.copy(alpha = 0.62f)
                 ),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 52.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 48.dp)
                     .testTag("model-picker-search")
             )
 
@@ -630,7 +631,7 @@ private fun ModelDetailsPane(
                                 },
                                 testTag = "model-picker-group-${group.key}"
                             )
-                            val popupShape = RoundedCornerShape(20.dp)
+                            val popupShape = RoundedCornerShape(16.dp)
                             DropdownMenu(
                                 expanded = isPopupOpen,
                                 onDismissRequest = {
@@ -643,7 +644,7 @@ private fun ModelDetailsPane(
                                     .testTag("model-picker-group-popup-${group.key}")
                             ) {
                                 Column(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp)
                                 ) {
                                     visibleEntries.forEachIndexed { index, entry ->
                                         PickerModelRow(
@@ -695,7 +696,7 @@ private fun ModelDetailsPane(
 @Composable
 private fun PickerPanelSurface(
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape = RoundedCornerShape(24.dp),
+    shape: RoundedCornerShape = RoundedCornerShape(20.dp),
     content: @Composable () -> Unit
 ) {
     Surface(
@@ -703,8 +704,8 @@ private fun PickerPanelSurface(
         shape = shape,
         color = AriCard.copy(alpha = 0.98f),
         contentColor = AriInk,
-        shadowElevation = 7.dp,
-        border = BorderStroke(1.dp, AriLine.copy(alpha = 0.82f)),
+        shadowElevation = 4.dp,
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.82f)),
         tonalElevation = 0.dp
     ) {
         content()
@@ -772,17 +773,17 @@ private fun ProviderCompactItem(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) AriAccentSoft.copy(alpha = 0.8f) else AriTint.copy(alpha = 0.45f),
-        border = BorderStroke(1.dp, if (selected) AriAccent.copy(alpha = 0.2f) else AriLine.copy(alpha = 0.55f)),
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) AriAccentSoft.copy(alpha = 0.72f) else AriTint.copy(alpha = 0.38f),
+        border = BorderStroke(0.75.dp, if (selected) AriAccent.copy(alpha = 0.2f) else AriLine.copy(alpha = 0.5f)),
         modifier = Modifier.heightIn(min = 48.dp).testTag(tag)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            ProviderBadge(provider = provider, isAllModels = provider == null, selected = selected, size = 30.dp)
+            ProviderBadge(provider = provider, isAllModels = provider == null, selected = selected, size = 26.dp)
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(label, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                     color = if (selected) AriAccent else AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -903,37 +904,38 @@ private fun PickerGroupHeader(
     onClick: () -> Unit,
     testTag: String = ""
 ) {
+    val headerTag = testTag.ifBlank { "model-group-${title.lowercase().replace(' ', '-')}" }
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = AriTint.copy(alpha = 0.56f),
+        shape = RoundedCornerShape(16.dp),
+        color = AriTint.copy(alpha = 0.42f),
         tonalElevation = 0.dp,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).testTag(testTag.ifBlank { "model-group-${title.lowercase().replace(' ', '-')}" })
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag(headerTag)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             when (mark) {
                 PickerGroupMark.FAVORITES -> Surface(
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(30.dp),
                     shape = CircleShape,
                     color = AriAccentSoft
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Favorite, contentDescription = null, tint = AriAccent, modifier = Modifier.size(17.dp))
+                        Icon(Icons.Default.Favorite, contentDescription = null, tint = AriAccent, modifier = Modifier.size(15.dp))
                     }
                 }
                 is PickerGroupMark.BRAND -> ProviderBrandMark(
                     type = providerTypeForFamily(mark.name),
                     name = mark.name,
-                    size = 36.dp
+                    size = 30.dp
                 )
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(modelCountLabel(count), fontSize = 10.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(modifier = Modifier.widthIn(max = 220.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(modelCountLabel(count), fontSize = 9.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(
                 when {
@@ -942,7 +944,7 @@ private fun PickerGroupHeader(
                 },
                 contentDescription = if (expanded) tx("Show less") else tx("Show all models"),
                 tint = AriInk,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp).testTag("$headerTag-expand-arrow")
             )
         }
     }
@@ -967,7 +969,7 @@ private fun PickerModelRow(
         label = "picker-model-selection"
     )
     Surface(
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(14.dp),
         color = selectedColor,
         border = BorderStroke(0.75.dp, if (selected) AriAccent.copy(alpha = 0.20f) else AriLine.copy(alpha = 0.5f)),
         tonalElevation = 0.dp,
@@ -977,11 +979,11 @@ private fun PickerModelRow(
             .testTag("model-row-${entry.provider.id}-${entry.model.id}")
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).padding(start = 10.dp, end = 4.dp, top = 5.dp, bottom = 5.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(start = 9.dp, end = 3.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            ModelCubeGlyph(modifier = Modifier.size(24.dp), tint = AriInk)
+            ModelCubeGlyph(modifier = Modifier.size(22.dp), tint = AriInk)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -1059,19 +1061,19 @@ private fun ExpandPickerModelsButton(
 ) {
     TextButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).testTag(tag),
-        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp).testTag(tag),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.textButtonColors(contentColor = AriAccent)
     ) {
         Icon(
             if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
             contentDescription = null,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(16.dp)
         )
-        Spacer(Modifier.width(5.dp))
+        Spacer(Modifier.width(4.dp))
         Text(
             if (expanded) tx("Show fewer models") else "${tx("Show all models")} ($count)",
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold
         )
     }

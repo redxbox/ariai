@@ -354,6 +354,15 @@ class ProviderAndChatUiTest {
         }
         val chatGptGroup = compose.onNodeWithTag("model-picker-group-chatgpt")
         assertDisplayed("ChatGPT group starts collapsed") { chatGptGroup.assertIsDisplayed() }
+        val chatGptHeaderBounds = chatGptGroup.fetchSemanticsNode().boundsInRoot
+        val chatGptArrowBounds = compose.onNodeWithTag(
+            "model-picker-group-chatgpt-expand-arrow",
+            useUnmergedTree = true
+        ).fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expand arrow should sit beside the group label rather than at the far edge",
+            chatGptArrowBounds.left < chatGptHeaderBounds.left + chatGptHeaderBounds.width * 0.65f
+        )
         assertTrue(compose.onAllNodesWithText("GPT-5.5 Pro").fetchSemanticsNodes().isEmpty())
         clickWithLabel("open ChatGPT group") { chatGptGroup.performClick() }
         val chatGptPopup = compose.onNodeWithTag("model-picker-group-popup-chatgpt")
