@@ -10,19 +10,19 @@ val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
-// Slate-blue accents sampled from the supplied reference: #324472 on #D9E2FF.
+// Icy-blue surfaces pair with deep AriAI navy for clear contrast: #324472 on #DCEBFF.
 val AriPrimary = Color(0xFF324472)
-val AriPrimaryLight = Color(0xFFD9E2FF)
+val AriPrimaryLight = Color(0xFFDCEBFF)
 val AriPrimaryDark = Color(0xFF324472)
 
 val AriSecondary = Color(0xFF324472)
-val AriSecondaryLight = Color(0xFFD9E2FF)
+val AriSecondaryLight = Color(0xFFDCEBFF)
 val AriSecondaryDark = Color(0xFF324472)
 
 val AriAccent = Color(0xFF324472)
-val AriAccentLight = Color(0xFFD9E2FF)
+val AriAccentLight = Color(0xFFDCEBFF)
 val AriAccentDark = Color(0xFF324472)
-val AriAccentSoft = Color(0xFFD9E2FF)
+val AriAccentSoft = Color(0xFFDCEBFF)
 val AriAccentGreen = Color(0xFF568A65)
 val AriAccentGreenSoft = Color(0xFFE3F1E5)
 

@@ -269,12 +269,6 @@ fun NewChatScreen(
         currentProvider?.models?.isEmpty() == true -> tx("No models available. Manage providers to fetch models.")
         else -> tx("Tap to choose a model")
     }
-    val setupActionLabel = when {
-        providers.isEmpty() -> null
-        currentProvider == null || currentProvider.models.isEmpty() -> tx("Manage providers")
-        !selectedModelReady -> tx("Choose model")
-        else -> null
-    }
     val selectedModelLabel = selectedModelCapabilities?.displayName
         ?: selectedModel?.substringAfterLast('/')
         ?: tx("Choose model")
@@ -726,6 +720,11 @@ fun NewChatScreen(
                             }
                         }
                         val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && selectedModelReady && !isStreaming && !isSending
+                        val sendButtonColor by animateColorAsState(
+                            targetValue = if (canSend) AriAccentSoft else AriAccentSoft.copy(alpha = 0.58f),
+                            animationSpec = tween(200, easing = FastOutSlowInEasing),
+                            label = "chat-send-background"
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                             verticalAlignment = Alignment.Bottom,
@@ -760,9 +759,9 @@ fun NewChatScreen(
                                     onClick = { onStopGeneration() },
                                     modifier = Modifier.size(48.dp).testTag("chat-send-button"),
                                     shape = CircleShape,
-                                    color = AriAccentDark,
-                                    contentColor = Color.White,
-                                    shadowElevation = 3.dp,
+                                    color = AriAccentSoft,
+                                    contentColor = AriAccent,
+                                    shadowElevation = 2.dp,
                                     tonalElevation = 0.dp
                                 ) {
                                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -775,16 +774,16 @@ fun NewChatScreen(
                                     enabled = canSend,
                                     modifier = Modifier.size(48.dp).testTag("chat-send-button"),
                                     shape = CircleShape,
-                                    color = if (canSend) AriAccent else AriAccent.copy(alpha = 0.56f),
-                                    contentColor = Color.White,
-                                    shadowElevation = if (canSend) 4.dp else 1.dp,
+                                    color = sendButtonColor,
+                                    contentColor = AriAccent,
+                                    shadowElevation = if (canSend) 2.dp else 1.dp,
                                     tonalElevation = 0.dp
                                 ) {
                                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                         Icon(
                                             Icons.Default.ArrowUpward,
                                             contentDescription = tx("Send"),
-                                            tint = Color.White.copy(alpha = 0.94f),
+                                            tint = AriAccent,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -864,25 +863,21 @@ fun NewChatScreen(
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center
                         )
-                        if (!compactWelcome && setupActionLabel != null) {
+                        if (!compactWelcome && providers.isNotEmpty() &&
+                            (currentProvider == null || currentProvider.models.isEmpty())
+                        ) {
                             Button(
-                                onClick = {
-                                    if (currentProvider == null || currentProvider.models.isEmpty()) {
-                                        onManageProviders()
-                                    } else {
-                                        showModelSheet = true
-                                    }
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
+                                onClick = onManageProviders,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = AriAccentSoft,
+                                    contentColor = AriAccent
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp, pressedElevation = 0.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.Tune,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(setupActionLabel, fontWeight = FontWeight.SemiBold)
+                                Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(7.dp))
+                                Text(tx("Manage providers"), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                             }
                         }
                     } else if (!compactWelcome) {
@@ -1020,7 +1015,8 @@ private fun ChatModelSelector(
     val shape = RoundedCornerShape(50)
     Surface(
         onClick = onClick,
-        modifier = modifier.widthIn(min = 160.dp, max = 272.dp).heightIn(min = 56.dp)
+        modifier = modifier.widthIn(min = 152.dp, max = 260.dp).heightIn(min = 52.dp)
+            .animateContentSize(tween(190, easing = FastOutSlowInEasing))
             .semantics(mergeDescendants = true) {
                 contentDescription = tx("Choose model")
                 stateDescription = "${provider?.name ?: tx("No provider")} · $modelName"
@@ -1028,21 +1024,21 @@ private fun ChatModelSelector(
         shape = shape,
         color = AriCard,
         contentColor = Ink,
-        shadowElevation = 5.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, AriAccentSoft.copy(alpha = 0.9f))
+        shadowElevation = 3.dp,
+        border = androidx.compose.foundation.BorderStroke(0.75.dp, AriAccentSoft.copy(alpha = 0.9f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ModelPickerGridBadge(size = 40.dp)
+            ModelPickerGridBadge(size = 36.dp)
             Text(
                 text = label,
-                modifier = Modifier.widthIn(max = 186.dp),
+                modifier = Modifier.widthIn(max = 180.dp),
                 color = AriAccent,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1050,7 +1046,7 @@ private fun ChatModelSelector(
                 Icons.Default.KeyboardArrowDown,
                 contentDescription = null,
                 tint = AriAccent,
-                modifier = Modifier.size(21.dp)
+                modifier = Modifier.size(19.dp)
             )
         }
     }

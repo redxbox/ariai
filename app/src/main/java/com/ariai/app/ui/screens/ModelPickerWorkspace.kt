@@ -3,6 +3,7 @@ package com.ariai.app.ui.screens
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -23,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -63,8 +65,8 @@ private data class PickerModelGroup(
 )
 
 /**
- * Responsive model chooser. Wide layouts use the two-panel provider/model view from the reference;
- * narrow phones keep the same hierarchy but turn the provider panel into a horizontal selector.
+ * Responsive model chooser. Wide layouts use the two-panel provider/model view; narrow phones use
+ * a compact provider rail and a two-column grid of floating model-family menus.
  */
 @Composable
 internal fun ModelPickerWorkspace(
@@ -198,6 +200,7 @@ internal fun ModelPickerWorkspace(
                         )
                         ModelDetailsPane(
                             modifier = Modifier.weight(0.49f).fillMaxHeight(),
+                            compact = false,
                             provider = selectedProvider,
                             isAllModels = providerFilter == null,
                             totalModelCount = totalModelCount,
@@ -246,6 +249,7 @@ internal fun ModelPickerWorkspace(
                         )
                         ModelDetailsPane(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
+                            compact = true,
                             provider = selectedProvider,
                             isAllModels = providerFilter == null,
                             totalModelCount = totalModelCount,
@@ -289,7 +293,7 @@ internal fun ModelPickerGridBadge(
     Surface(
         modifier = modifier.size(size),
         shape = RoundedCornerShape(size * 0.30f),
-        color = AriAccent,
+        color = AriAccentSoft,
         tonalElevation = 0.dp
     ) {
         Column(
@@ -305,7 +309,7 @@ internal fun ModelPickerGridBadge(
                         Box(
                             modifier = Modifier.weight(1f).fillMaxHeight()
                                 .clip(RoundedCornerShape(size * 0.08f))
-                                .background(Color.White)
+                                .background(AriAccent)
                         )
                     }
                 }
@@ -415,6 +419,7 @@ private fun CompactProviderRail(
 @Composable
 private fun ModelDetailsPane(
     modifier: Modifier = Modifier,
+    compact: Boolean,
     provider: Provider?,
     isAllModels: Boolean,
     totalModelCount: Int,
@@ -606,87 +611,149 @@ private fun ModelDetailsPane(
                     }
                 }
 
-                groups.forEach { group ->
-                    val isSearching = query.isNotBlank()
-                    val isPopupOpen = !isSearching && openGroupPopupKey == group.key
-                    val previewLimit = if (group.key == OTHER_MODELS_KEY) 3 else 5
-                    val showAll = isSearching || expandedGroups.contains(group.key)
-                    val visibleEntries = if (showAll) group.entries else group.entries.take(previewLimit)
-                    val expandTag = if (group.key == OTHER_MODELS_KEY && !isAllModels && provider != null) {
-                        "model-picker-expand-${provider.id}"
-                    } else {
-                        "model-picker-expand-${group.key}"
-                    }
-                    item(key = "group:${group.key}") {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            PickerGroupHeader(
-                                title = group.title,
-                                count = group.entries.size,
-                                mark = PickerGroupMark.BRAND(group.title),
-                                expanded = isSearching || isPopupOpen,
-                                onClick = {
-                                    if (!isSearching) {
-                                        onOpenGroupPopupChange(if (isPopupOpen) null else group.key)
-                                    }
-                                },
-                                testTag = "model-picker-group-${group.key}"
-                            )
-                            val popupShape = RoundedCornerShape(16.dp)
-                            DropdownMenu(
-                                expanded = isPopupOpen,
-                                onDismissRequest = {
-                                    if (openGroupPopupKey == group.key) onOpenGroupPopupChange(null)
-                                },
-                                offset = androidx.compose.ui.unit.DpOffset(0.dp, 7.dp),
-                                modifier = Modifier.widthIn(max = 340.dp)
-                                    .background(AriCard, popupShape)
-                                    .then(paperPopupModifier(popupShape))
-                                    .testTag("model-picker-group-popup-${group.key}")
+                val searchActive = query.isNotBlank()
+                if (compact && !searchActive) {
+                    groups.chunked(2).forEachIndexed { rowIndex, rowGroups ->
+                        item(key = "group-grid-row:$rowIndex") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp)
-                                ) {
-                                    visibleEntries.forEachIndexed { index, entry ->
-                                        PickerModelRow(
-                                            entry = entry,
-                                            selected = isSelectedModel(entry.provider.id, entry.model.id, selectedProviderId, selectedModelId),
-                                            favorite = favorites.contains(favoriteKey(entry.provider.id, entry.model.id)),
-                                            onSelect = { onSelectModel(entry.provider.id, entry.model.id) },
-                                            onToggleFavorite = { onToggleFavorite(entry.provider.id, entry.model.id) }
-                                        )
-                                        if (index < visibleEntries.lastIndex) Spacer(Modifier.height(4.dp))
-                                    }
-                                    if (!isSearching && group.entries.size > previewLimit) {
-                                        Spacer(Modifier.height(4.dp))
-                                        ExpandPickerModelsButton(
-                                            expanded = showAll,
-                                            count = group.entries.size,
-                                            tag = expandTag,
-                                            onClick = {
-                                                val nextExpandedGroups = if (showAll) {
-                                                    expandedGroups - group.key
-                                                } else {
-                                                    expandedGroups + group.key
-                                                }
-                                                onExpandedGroupsChange(nextExpandedGroups)
-                                            }
-                                        )
-                                    }
+                                rowGroups.forEach { group ->
+                                    PickerModelGroupCard(
+                                        modifier = Modifier.weight(1f),
+                                        group = group,
+                                        provider = provider,
+                                        isAllModels = isAllModels,
+                                        isSearching = false,
+                                        favorites = favorites,
+                                        selectedProviderId = selectedProviderId,
+                                        selectedModelId = selectedModelId,
+                                        openGroupPopupKey = openGroupPopupKey,
+                                        expandedGroups = expandedGroups,
+                                        onOpenGroupPopupChange = onOpenGroupPopupChange,
+                                        onExpandedGroupsChange = onExpandedGroupsChange,
+                                        onToggleFavorite = onToggleFavorite,
+                                        onSelectModel = onSelectModel
+                                    )
                                 }
+                                if (rowGroups.size == 1) Spacer(Modifier.weight(1f))
                             }
                         }
                     }
-                    if (isSearching) {
-                        items(visibleEntries, key = { "model:${it.provider.id}:${it.model.id}" }) { entry ->
-                            PickerModelRow(
-                                entry = entry,
-                                selected = isSelectedModel(entry.provider.id, entry.model.id, selectedProviderId, selectedModelId),
-                                favorite = favorites.contains(favoriteKey(entry.provider.id, entry.model.id)),
-                                onSelect = { onSelectModel(entry.provider.id, entry.model.id) },
-                                onToggleFavorite = { onToggleFavorite(entry.provider.id, entry.model.id) }
+                } else {
+                    groups.forEach { group ->
+                        item(key = "group:${group.key}") {
+                            PickerModelGroupCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                group = group,
+                                provider = provider,
+                                isAllModels = isAllModels,
+                                isSearching = searchActive,
+                                favorites = favorites,
+                                selectedProviderId = selectedProviderId,
+                                selectedModelId = selectedModelId,
+                                openGroupPopupKey = openGroupPopupKey,
+                                expandedGroups = expandedGroups,
+                                onOpenGroupPopupChange = onOpenGroupPopupChange,
+                                onExpandedGroupsChange = onExpandedGroupsChange,
+                                onToggleFavorite = onToggleFavorite,
+                                onSelectModel = onSelectModel
                             )
                         }
+                        if (searchActive) {
+                            items(group.entries, key = { "model:${it.provider.id}:${it.model.id}" }) { entry ->
+                                PickerModelRow(
+                                    entry = entry,
+                                    selected = isSelectedModel(entry.provider.id, entry.model.id, selectedProviderId, selectedModelId),
+                                    favorite = favorites.contains(favoriteKey(entry.provider.id, entry.model.id)),
+                                    onSelect = { onSelectModel(entry.provider.id, entry.model.id) },
+                                    onToggleFavorite = { onToggleFavorite(entry.provider.id, entry.model.id) }
+                                )
+                            }
+                        }
                     }
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun PickerModelGroupCard(
+    modifier: Modifier = Modifier,
+    group: PickerModelGroup,
+    provider: Provider?,
+    isAllModels: Boolean,
+    isSearching: Boolean,
+    favorites: Set<String>,
+    selectedProviderId: String?,
+    selectedModelId: String?,
+    openGroupPopupKey: String?,
+    expandedGroups: Set<String>,
+    onOpenGroupPopupChange: (String?) -> Unit,
+    onExpandedGroupsChange: (Set<String>) -> Unit,
+    onToggleFavorite: (providerId: String, modelId: String) -> Unit,
+    onSelectModel: (providerId: String, modelId: String) -> Unit
+) {
+    val isPopupOpen = !isSearching && openGroupPopupKey == group.key
+    val previewLimit = if (group.key == OTHER_MODELS_KEY) 3 else 5
+    val showAll = isSearching || expandedGroups.contains(group.key)
+    val visibleEntries = if (showAll) group.entries else group.entries.take(previewLimit)
+    val expandTag = if (group.key == OTHER_MODELS_KEY && !isAllModels && provider != null) {
+        "model-picker-expand-${provider.id}"
+    } else {
+        "model-picker-expand-${group.key}"
+    }
+
+    Box(modifier = modifier) {
+        PickerGroupHeader(
+            title = group.title,
+            count = group.entries.size,
+            mark = PickerGroupMark.BRAND(group.title),
+            expanded = isSearching || isPopupOpen,
+            onClick = {
+                if (!isSearching) onOpenGroupPopupChange(if (isPopupOpen) null else group.key)
+            },
+            testTag = "model-picker-group-${group.key}"
+        )
+        val popupShape = RoundedCornerShape(16.dp)
+        DropdownMenu(
+            expanded = isPopupOpen,
+            onDismissRequest = {
+                if (openGroupPopupKey == group.key) onOpenGroupPopupChange(null)
+            },
+            offset = androidx.compose.ui.unit.DpOffset(0.dp, 7.dp),
+            modifier = Modifier.widthIn(min = 220.dp, max = 340.dp)
+                .background(AriCard, popupShape)
+                .then(paperPopupModifier(popupShape))
+                .testTag("model-picker-group-popup-${group.key}")
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp)) {
+                visibleEntries.forEachIndexed { index, entry ->
+                    PickerModelRow(
+                        entry = entry,
+                        selected = isSelectedModel(entry.provider.id, entry.model.id, selectedProviderId, selectedModelId),
+                        favorite = favorites.contains(favoriteKey(entry.provider.id, entry.model.id)),
+                        onSelect = { onSelectModel(entry.provider.id, entry.model.id) },
+                        onToggleFavorite = { onToggleFavorite(entry.provider.id, entry.model.id) }
+                    )
+                    if (index < visibleEntries.lastIndex) Spacer(Modifier.height(4.dp))
+                }
+                if (!isSearching && group.entries.size > previewLimit) {
+                    Spacer(Modifier.height(4.dp))
+                    ExpandPickerModelsButton(
+                        expanded = showAll,
+                        count = group.entries.size,
+                        tag = expandTag,
+                        onClick = {
+                            val nextExpandedGroups = if (showAll) expandedGroups - group.key
+                            else expandedGroups + group.key
+                            onExpandedGroupsChange(nextExpandedGroups)
+                        }
+                    )
                 }
             }
         }
@@ -771,11 +838,21 @@ private fun ProviderCompactItem(
     tag: String,
     onClick: () -> Unit
 ) {
+    val chipColor by animateColorAsState(
+        targetValue = if (selected) AriAccentSoft.copy(alpha = 0.72f) else AriTint.copy(alpha = 0.38f),
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "provider-filter-surface"
+    )
+    val chipBorder by animateColorAsState(
+        targetValue = if (selected) AriAccent.copy(alpha = 0.2f) else AriLine.copy(alpha = 0.5f),
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "provider-filter-border"
+    )
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) AriAccentSoft.copy(alpha = 0.72f) else AriTint.copy(alpha = 0.38f),
-        border = BorderStroke(0.75.dp, if (selected) AriAccent.copy(alpha = 0.2f) else AriLine.copy(alpha = 0.5f)),
+        color = chipColor,
+        border = BorderStroke(0.75.dp, chipBorder),
         modifier = Modifier.heightIn(min = 48.dp).testTag(tag)
     ) {
         Row(
@@ -905,46 +982,61 @@ private fun PickerGroupHeader(
     testTag: String = ""
 ) {
     val headerTag = testTag.ifBlank { "model-group-${title.lowercase().replace(' ', '-')}" }
+    val headerColor by animateColorAsState(
+        targetValue = if (expanded) AriAccentSoft.copy(alpha = 0.72f) else AriTint.copy(alpha = 0.34f),
+        animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing),
+        label = "model-group-surface"
+    )
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "model-group-chevron"
+    )
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = AriTint.copy(alpha = 0.42f),
+        shape = RoundedCornerShape(14.dp),
+        color = headerColor,
         tonalElevation = 0.dp,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag(headerTag)
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(headerTag)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             when (mark) {
                 PickerGroupMark.FAVORITES -> Surface(
-                    modifier = Modifier.size(30.dp),
+                    modifier = Modifier.size(26.dp),
                     shape = CircleShape,
                     color = AriAccentSoft
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Favorite, contentDescription = null, tint = AriAccent, modifier = Modifier.size(15.dp))
+                        Icon(Icons.Default.Favorite, contentDescription = null, tint = AriAccent, modifier = Modifier.size(14.dp))
                     }
                 }
                 is PickerGroupMark.BRAND -> ProviderBrandMark(
                     type = providerTypeForFamily(mark.name),
                     name = mark.name,
-                    size = 30.dp
+                    size = 26.dp
                 )
             }
             Column(modifier = Modifier.widthIn(max = 220.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    title,
+                    modifier = Modifier.testTag("$headerTag-title"),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AriInk,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(modelCountLabel(count), fontSize = 9.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(
-                when {
-                    expanded -> Icons.Default.KeyboardArrowUp
-                    else -> Icons.Default.KeyboardArrowRight
-                },
+                Icons.Default.KeyboardArrowRight,
                 contentDescription = if (expanded) tx("Show less") else tx("Show all models"),
                 tint = AriInk,
-                modifier = Modifier.size(20.dp).testTag("$headerTag-expand-arrow")
+                modifier = Modifier.size(18.dp).rotate(arrowRotation).testTag("$headerTag-expand-arrow")
             )
         }
     }

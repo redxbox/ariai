@@ -86,6 +86,54 @@ class ProviderAndChatUiTest {
     }
 
     @Test
+    fun emptyWelcomeDoesNotDuplicateTheTopModelSelector() {
+        val provider = Provider(
+            id = "provider-empty-model-selector-test",
+            name = "Model selector test provider",
+            type = ProviderType.OPENAI_COMPATIBLE,
+            baseUrl = "https://api.example.test/v1",
+            apiKey = "test-key",
+            models = listOf(AIModel("selector-model", "Selector model", "provider-empty-model-selector-test"))
+        )
+        val chat = Chat(
+            id = "chat-empty-model-selector-test",
+            title = "New chat",
+            providerId = provider.id,
+            modelId = ""
+        )
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                NewChatScreen(
+                    chat = chat,
+                    messages = emptyList(),
+                    isStreaming = false,
+                    currentStreamingContent = "",
+                    selectedModel = null,
+                    selectedProviderId = provider.id,
+                    providers = listOf(provider),
+                    onSendMessage = { _, _, _, _, _ -> false },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
+                    onCheckProvider = { ConnectionResult.Ok(0) }
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        assertDisplayed("top model selector remains available") {
+            compose.onNodeWithText("Choose model").assertIsDisplayed()
+        }
+        assertEquals(
+            "The welcome screen should not repeat the top Choose model action",
+            1,
+            compose.onAllNodesWithText("Choose model").fetchSemanticsNodes().size
+        )
+    }
+
+    @Test
     fun providerCanBeDisabledAndChatCanBeOpenedWithoutNetwork() {
         val provider = mutableStateOf(
             Provider(
@@ -355,13 +403,27 @@ class ProviderAndChatUiTest {
         val chatGptGroup = compose.onNodeWithTag("model-picker-group-chatgpt")
         assertDisplayed("ChatGPT group starts collapsed") { chatGptGroup.assertIsDisplayed() }
         val chatGptHeaderBounds = chatGptGroup.fetchSemanticsNode().boundsInRoot
+        val chatGptTitleBounds = compose.onNodeWithTag(
+            "model-picker-group-chatgpt-title",
+            useUnmergedTree = true
+        ).fetchSemanticsNode().boundsInRoot
         val chatGptArrowBounds = compose.onNodeWithTag(
             "model-picker-group-chatgpt-expand-arrow",
             useUnmergedTree = true
         ).fetchSemanticsNode().boundsInRoot
+        val otherGroupBounds = compose.onNodeWithTag("model-picker-group-other-models")
+            .fetchSemanticsNode().boundsInRoot
+        val detailsBounds = compose.onNodeWithTag("model-picker-details-pane", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val arrowGap = chatGptArrowBounds.left - chatGptTitleBounds.right
         assertTrue(
             "Expand arrow should sit beside the group label rather than at the far edge",
-            chatGptArrowBounds.left < chatGptHeaderBounds.left + chatGptHeaderBounds.width * 0.65f
+            arrowGap in 0f..(chatGptHeaderBounds.width * 0.18f)
+        )
+        assertTrue(
+            "Compact model groups should use both columns instead of leaving a blank half-row",
+            chatGptHeaderBounds.width < detailsBounds.width * 0.65f &&
+                kotlin.math.abs(chatGptHeaderBounds.top - otherGroupBounds.top) < chatGptHeaderBounds.height * 0.15f
         )
         assertTrue(compose.onAllNodesWithText("GPT-5.5 Pro").fetchSemanticsNodes().isEmpty())
         clickWithLabel("open ChatGPT group") { chatGptGroup.performClick() }
