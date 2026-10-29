@@ -190,11 +190,37 @@ fun NewChatScreen(
             override fun onPartialResults(partialResults: android.os.Bundle?) {}
             override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
         })
-        engine.startListening(
-            android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, if (UiLang.code == "fa") "fa-IR" else "en-US")
-        )
+        val preferredSpeechLanguage = if (
+            UiLang.code == "fa" || java.util.Locale.getDefault().language == "fa"
+        ) {
+            "fa-IR"
+        } else {
+            "en-US"
+        }
+        val recognitionIntent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, preferredSpeechLanguage)
+
+            // The UI can be English while the spoken language is Persian. Let Android 14+ switch
+            // between both supported languages instead of forcing the recognizer to transcribe English.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val voiceLanguages = arrayListOf("fa-IR", "en-US")
+                putExtra(android.speech.RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
+                putStringArrayListExtra(
+                    android.speech.RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES,
+                    voiceLanguages
+                )
+                putExtra(
+                    android.speech.RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH,
+                    android.speech.RecognizerIntent.LANGUAGE_SWITCH_BALANCED
+                )
+                putStringArrayListExtra(
+                    android.speech.RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES,
+                    voiceLanguages
+                )
+            }
+        }
+        engine.startListening(recognitionIntent)
         listening = true
     }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
