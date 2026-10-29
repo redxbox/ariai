@@ -302,7 +302,8 @@ class ProviderAndChatUiTest {
                 AIModel("popular-three", "Most used three", "provider-model-picker-test"),
                 AIModel("popular-one", "Most used one", "provider-model-picker-test"),
                 AIModel("popular-two", "Most used two", "provider-model-picker-test"),
-                AIModel("long-tail", "Long tail model", "provider-model-picker-test")
+                AIModel("long-tail", "Long tail model", "provider-model-picker-test"),
+                AIModel("gpt-5.5-pro", "GPT-5.5 Pro", "provider-model-picker-test")
             )
         )
         val alternateProvider = Provider(
@@ -326,7 +327,8 @@ class ProviderAndChatUiTest {
                     modelUsageCounts = mapOf(
                         (provider.id to "popular-one") to 12,
                         (provider.id to "popular-two") to 8,
-                        (provider.id to "popular-three") to 4
+                        (provider.id to "popular-three") to 4,
+                        (provider.id to "gpt-5.5-pro") to 15
                     ),
                     onToggleFavorite = { _, _ -> },
                     onSelect = { _, _ -> },
@@ -342,8 +344,8 @@ class ProviderAndChatUiTest {
         assertDisplayed("provider dock") {
             compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
         }
-        compose.onNodeWithTag("provider-filter-all").assertTextContains("5 models")
-        compose.onNodeWithTag("model-picker-selected-count").assertTextEquals("4 models")
+        compose.onNodeWithTag("provider-filter-all").assertTextContains("6 models")
+        compose.onNodeWithTag("model-picker-selected-count").assertTextEquals("5 models")
         if (compose.onAllNodesWithTag("model-picker-provider-rail").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithTag("model-picker-provider-rail")
                 .performScrollToNode(hasTestTag("provider-filter-${alternateProvider.id}"))
@@ -351,6 +353,19 @@ class ProviderAndChatUiTest {
         assertDisplayed("alternate provider chip") {
             compose.onNodeWithTag("provider-filter-${alternateProvider.id}").assertIsDisplayed()
         }
+        val chatGptGroup = compose.onNodeWithTag("model-picker-group-chatgpt")
+        assertDisplayed("ChatGPT group starts collapsed") { chatGptGroup.assertIsDisplayed() }
+        assertTrue(compose.onAllNodesWithText("GPT-5.5 Pro").fetchSemanticsNodes().isEmpty())
+        clickWithLabel("open ChatGPT group") { chatGptGroup.performClick() }
+        assertDisplayed("ChatGPT model after expanding the group") {
+            compose.onNodeWithText("GPT-5.5 Pro").assertIsDisplayed()
+        }
+        clickWithLabel("collapse ChatGPT group") { chatGptGroup.performClick() }
+
+        val modelGroup = compose.onNodeWithTag("model-picker-group-other-models")
+        assertDisplayed("model group is initially collapsed") { modelGroup.assertIsDisplayed() }
+        assertTrue(compose.onAllNodesWithText("Most used one").fetchSemanticsNodes().isEmpty())
+        clickWithLabel("open model group") { modelGroup.performClick() }
         val firstPopular = compose.onNodeWithText("Most used one")
         val secondPopular = compose.onNodeWithText("Most used two")
         val thirdPopular = compose.onNodeWithText("Most used three")
@@ -363,6 +378,8 @@ class ProviderAndChatUiTest {
         assertTrue(firstPopularTop < secondPopularTop && secondPopularTop < thirdPopularTop)
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
         assertTrue(compose.onAllNodesWithText("Alternative model").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithTag("model-picker-model-list")
+            .performScrollToNode(hasTestTag("model-picker-expand-${provider.id}"))
         clickWithLabel("show-all models button") {
             compose.onNodeWithTag("model-picker-expand-${provider.id}").performClick()
         }
@@ -373,6 +390,9 @@ class ProviderAndChatUiTest {
             compose.onNodeWithTag("provider-filter-${alternateProvider.id}").performClick()
         }
         compose.waitForIdle()
+        val alternateModelGroup = compose.onNodeWithTag("model-picker-group-other-models")
+        assertDisplayed("alternate provider group") { alternateModelGroup.assertIsDisplayed() }
+        clickWithLabel("open alternate provider group") { alternateModelGroup.performClick() }
         assertDisplayed("alternate provider model") { compose.onNodeWithText("Alternative model").assertIsDisplayed() }
         assertTrue(compose.onAllNodesWithText("Long tail model").fetchSemanticsNodes().isEmpty())
 

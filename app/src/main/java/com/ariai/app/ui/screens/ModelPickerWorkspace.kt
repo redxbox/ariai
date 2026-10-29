@@ -119,10 +119,6 @@ internal fun ModelPickerWorkspace(
                 .thenBy { modelFamilyOrder(it.key) }
                 .thenBy { it.title }
         )
-    val selectedFamilyKey = matchingEntries.firstOrNull {
-        isSelectedModel(it.provider.id, it.model.id, selectedProviderId, selectedModelId)
-    }?.let { modelFamilyKey(it.model) }
-    val defaultExpandedGroup = selectedFamilyKey ?: groups.firstOrNull()?.key
     val allFavoriteEntries = if (providerFilter == null) {
         rankedEntries(enabledProviders).filter {
             favorites.contains(favoriteKey(it.provider.id, it.model.id)) &&
@@ -157,7 +153,7 @@ internal fun ModelPickerWorkspace(
                 val panelTop = (maxHeight * 0.16f).coerceIn(48.dp, 228.dp)
                 val providerPanelOffset = (maxHeight * 0.04f).coerceIn(16.dp, 32.dp)
                 val compactPanelHeight = minOf(
-                    maxHeight * 0.58f,
+                    maxHeight * 0.46f,
                     900.dp,
                     (maxHeight - panelTop - 64.dp).coerceAtLeast(180.dp)
                 )
@@ -174,7 +170,7 @@ internal fun ModelPickerWorkspace(
                 val compactPanelModifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset(y = panelTop)
-                    .fillMaxWidth(0.96f)
+                    .fillMaxWidth(0.92f)
                     .height(compactPanelHeight)
                 val wideRowModifier = Modifier
                     .align(Alignment.TopCenter)
@@ -213,7 +209,6 @@ internal fun ModelPickerWorkspace(
                             onFavoritesExpandedChange = { favoritesExpanded = it },
                             selectedProviderId = selectedProviderId,
                             selectedModelId = selectedModelId,
-                            defaultExpandedGroup = defaultExpandedGroup,
                             groupOpenOverrides = groupOpenOverrides,
                             onGroupOpenChange = { key, open -> groupOpenOverrides = groupOpenOverrides + (key to open) },
                             expandedGroups = expandedGroups,
@@ -260,7 +255,6 @@ internal fun ModelPickerWorkspace(
                             onFavoritesExpandedChange = { favoritesExpanded = it },
                             selectedProviderId = selectedProviderId,
                             selectedModelId = selectedModelId,
-                            defaultExpandedGroup = defaultExpandedGroup,
                             groupOpenOverrides = groupOpenOverrides,
                             onGroupOpenChange = { key, open -> groupOpenOverrides = groupOpenOverrides + (key to open) },
                             expandedGroups = expandedGroups,
@@ -371,17 +365,17 @@ private fun CompactProviderRail(
     modifier: Modifier = Modifier
 ) {
     PickerPanelSurface(
-        modifier = modifier.heightIn(min = 64.dp).testTag("model-picker-provider-dock"),
+        modifier = modifier.heightIn(min = 56.dp).testTag("model-picker-provider-dock"),
         shape = RoundedCornerShape(20.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             LazyRow(
                 modifier = Modifier.weight(1f).testTag("model-picker-provider-rail"),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
             ) {
                 item(key = "provider-filter:all") {
                     ProviderCompactItem(
@@ -429,7 +423,6 @@ private fun ModelDetailsPane(
     onFavoritesExpandedChange: (Boolean) -> Unit,
     selectedProviderId: String?,
     selectedModelId: String?,
-    defaultExpandedGroup: String?,
     groupOpenOverrides: Map<String, Boolean>,
     onGroupOpenChange: (String, Boolean) -> Unit,
     expandedGroups: Set<String>,
@@ -451,7 +444,7 @@ private fun ModelDetailsPane(
     PickerPanelSurface(modifier = modifier.testTag("model-picker-details-pane")) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp, vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -461,7 +454,7 @@ private fun ModelDetailsPane(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = AriInk)
                 }
-                ProviderBadge(provider = provider, isAllModels = isAllModels, selected = true, size = 44.dp)
+                ProviderBadge(provider = provider, isAllModels = isAllModels, selected = true, size = 40.dp)
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         if (isAllModels) tx("All models") else provider?.name.orEmpty(),
@@ -567,8 +560,8 @@ private fun ModelDetailsPane(
 
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth().testTag("model-picker-model-list"),
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
+                contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 if (isAllModels && favoriteEntries.isNotEmpty()) {
                     item(key = "group:favorites") {
@@ -609,8 +602,7 @@ private fun ModelDetailsPane(
                 }
 
                 groups.forEach { group ->
-                    val defaultOpen = group.key == defaultExpandedGroup
-                    val isOpen = query.isNotBlank() || (groupOpenOverrides[group.key] ?: defaultOpen)
+                    val isOpen = query.isNotBlank() || (groupOpenOverrides[group.key] ?: false)
                     val previewLimit = if (group.key == OTHER_MODELS_KEY) 3 else 5
                     val showAll = query.isNotBlank() || expandedGroups.contains(group.key)
                     val visibleEntries = if (showAll) group.entries else group.entries.take(previewLimit)
@@ -746,16 +738,16 @@ private fun ProviderCompactItem(
         shape = RoundedCornerShape(16.dp),
         color = if (selected) AriAccentSoft.copy(alpha = 0.8f) else AriTint.copy(alpha = 0.45f),
         border = BorderStroke(1.dp, if (selected) AriAccent.copy(alpha = 0.2f) else AriLine.copy(alpha = 0.55f)),
-        modifier = Modifier.heightIn(min = 50.dp).testTag(tag)
+        modifier = Modifier.heightIn(min = 48.dp).testTag(tag)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            ProviderBadge(provider = provider, isAllModels = provider == null, selected = selected, size = 34.dp)
+            ProviderBadge(provider = provider, isAllModels = provider == null, selected = selected, size = 30.dp)
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                Text(label, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                     color = if (selected) AriAccent else AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     modelCountLabel(modelCount),
@@ -879,27 +871,27 @@ private fun PickerGroupHeader(
         shape = RoundedCornerShape(18.dp),
         color = AriTint.copy(alpha = 0.56f),
         tonalElevation = 0.dp,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).testTag(testTag.ifBlank { "model-group-${title.lowercase().replace(' ', '-')}" })
+        modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).testTag(testTag.ifBlank { "model-group-${title.lowercase().replace(' ', '-')}" })
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             when (mark) {
                 PickerGroupMark.FAVORITES -> Surface(
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(36.dp),
                     shape = CircleShape,
                     color = AriAccentSoft
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Favorite, contentDescription = null, tint = AriAccent, modifier = Modifier.size(19.dp))
+                        Icon(Icons.Default.Favorite, contentDescription = null, tint = AriAccent, modifier = Modifier.size(17.dp))
                     }
                 }
                 is PickerGroupMark.BRAND -> ProviderBrandMark(
                     type = providerTypeForFamily(mark.name),
                     name = mark.name,
-                    size = 40.dp
+                    size = 36.dp
                 )
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -948,11 +940,11 @@ private fun PickerModelRow(
             .testTag("model-row-${entry.provider.id}-${entry.model.id}")
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 62.dp).padding(start = 11.dp, end = 4.dp, top = 7.dp, bottom = 7.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).padding(start = 10.dp, end = 4.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            ModelCubeGlyph(modifier = Modifier.size(28.dp), tint = AriInk)
+            ModelCubeGlyph(modifier = Modifier.size(24.dp), tint = AriInk)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
