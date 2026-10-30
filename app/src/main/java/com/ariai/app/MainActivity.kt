@@ -234,6 +234,11 @@ fun AppRoot(viewModel: AppViewModel) {
                         providers = providers,
                         onAddProvider = { navController.navigate("add_provider") },
                         onAddPreset = { navController.navigate("add_provider?preset=${it.name}") },
+                        fetchModels = { viewModel.fetchModels(it) },
+                        onSaveProvider = { provider, onSaved ->
+                            viewModel.saveProvider(provider)
+                            onSaved(provider)
+                        },
                         onImportProvider = { viewModel.saveProvider(it) },
                         onEditProvider = { navController.navigate("edit_provider/${it.id}") },
                         onBack = { navController.popBackStack() },
