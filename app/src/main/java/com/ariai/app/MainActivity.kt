@@ -351,7 +351,10 @@ fun AppRoot(viewModel: AppViewModel) {
                     NewProvidersScreen(
                         providers = providers,
                         onAddProvider = { navController.navigate("add_provider") },
-                        onAddPreset = { navController.navigate("add_provider?preset=${it.name}") },
+                        onAddPreset = { navController.navigate("add_provider?preset=${it.name}&presetLabelKey=") },
+                        onAddProviderPreset = { type, labelKey ->
+                            navController.navigate("add_provider?preset=${type.name}&presetLabelKey=$labelKey")
+                        },
                         fetchModels = { viewModel.fetchModels(it) },
                         onSaveProvider = { provider, onSaved ->
                             viewModel.saveProviderAndReturn(provider) { savedProvider ->
@@ -380,12 +383,16 @@ fun AppRoot(viewModel: AppViewModel) {
                 }
 
                 composable(
-                    "add_provider?preset={preset}",
-                    arguments = listOf(navArgument("preset") { type = NavType.StringType; defaultValue = "" })
+                    "add_provider?preset={preset}&presetLabelKey={presetLabelKey}",
+                    arguments = listOf(
+                        navArgument("preset") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("presetLabelKey") { type = NavType.StringType; defaultValue = "" }
+                    )
                 ) { entry ->
                     AddProviderScreen(
                         presetType = entry.arguments?.getString("preset")
                             ?.let { runCatching { com.ariai.app.data.models.ProviderType.valueOf(it) }.getOrNull() },
+                        presetLabelKey = entry.arguments?.getString("presetLabelKey")?.ifBlank { null },
                         existingProviderNames = providers.map { it.name }.toSet(),
                         fetchModels = { viewModel.fetchModels(it) },
                         onSave = { provider ->

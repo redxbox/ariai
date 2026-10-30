@@ -23,5 +23,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-The Anthropic and Ollama brand icon path data is adapted from Simple Icons,
-which is released under CC0 1.0 Universal.
+The Anthropic, DeepSeek, Ollama, and OpenRouter brand icon path data is adapted
+from Simple Icons, which is released under CC0 1.0 Universal.

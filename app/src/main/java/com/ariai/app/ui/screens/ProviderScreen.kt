@@ -4,9 +4,14 @@ import com.ariai.app.util.tx
 
 import com.ariai.app.ui.theme.*
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -298,8 +303,19 @@ internal val providerPresets = listOf(
     ProviderPreset("Gemini", ProviderType.GEMINI, "https://generativelanguage.googleapis.com/v1beta", AriGemini),
     ProviderPreset("Anthropic", ProviderType.ANTHROPIC, "https://api.anthropic.com/v1", AriAnthropic),
     ProviderPreset("Ollama", ProviderType.OLLAMA, "http://localhost:11434/v1", AriOllama),
+    ProviderPreset("DeepSeek", ProviderType.OPENAI_COMPATIBLE, "https://api.deepseek.com", Color(0xFF5786FE)),
+    ProviderPreset("OpenRouter", ProviderType.OPENAI_COMPATIBLE, "https://openrouter.ai/api/v1", Color(0xFF94A3B8)),
     ProviderPreset("Custom", ProviderType.OPENAI_COMPATIBLE, "", AriCustom)
 )
+
+private fun defaultProviderPresetForType(type: ProviderType): ProviderPreset? = when (type) {
+    ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> providerPresets.firstOrNull { it.labelKey == "Custom" }
+    else -> providerPresets.firstOrNull { it.type == type }
+}
+
+private fun providerPresetFor(provider: Provider): ProviderPreset? =
+    providerPresets.firstOrNull { it.labelKey.equals(provider.name.trim(), ignoreCase = true) }
+        ?: defaultProviderPresetForType(provider.type)
 
 /**
  * Add or edit an AI provider. Brand presets fill in the endpoint and type,
@@ -310,6 +326,7 @@ internal val providerPresets = listOf(
 fun AddProviderScreen(
     initialProvider: Provider? = null,
     presetType: ProviderType? = null,
+    presetLabelKey: String? = null,
     fetchModels: suspend (Provider) -> List<AIModel>,
     onSave: (Provider) -> Unit,
     onBack: () -> Unit,
@@ -319,28 +336,37 @@ fun AddProviderScreen(
     modifier: Modifier = Modifier
 ) {
     val isEdit = initialProvider != null
-    fun defaultNameFor(type: ProviderType?): String {
-        val preset = providerPresets.firstOrNull { it.type == type } ?: return ""
-        val label = tx(preset.label)
-        return if (preset.type == ProviderType.OPENAI_COMPATIBLE) {
-            nextUniqueProviderName(label, existingProviderNames)
+    val initialPreset = initialProvider?.let(::providerPresetFor)
+        ?: presetLabelKey?.let { key -> providerPresets.firstOrNull { it.labelKey == key } }
+        ?: presetType?.let(::defaultProviderPresetForType)
+    val canChangeProvider = presetLabelKey == null
+    fun defaultNameFor(preset: ProviderPreset?): String {
+        if (preset == null) return ""
+        return if (preset.labelKey == "Custom") {
+            nextUniqueProviderName(preset.label, existingProviderNames)
         } else {
-            label
+            preset.label
         }
     }
-    var name by remember(initialProvider?.id, presetType, existingProviderNames) {
-        mutableStateOf(initialProvider?.name ?: defaultNameFor(presetType))
+    var name by remember(initialProvider?.id, presetLabelKey, presetType, existingProviderNames) {
+        mutableStateOf(initialProvider?.name ?: defaultNameFor(initialPreset))
     }
     // Preset names follow the selected provider until the user supplies a custom name.
-    var nameManuallyEdited by remember(initialProvider?.id, presetType) {
-        mutableStateOf(initialProvider != null && initialProvider.name != defaultNameFor(initialProvider.type))
+    var nameManuallyEdited by remember(initialProvider?.id, presetLabelKey, presetType) {
+        mutableStateOf(initialProvider != null && initialProvider.name != defaultNameFor(initialPreset))
     }
-    var baseUrl by remember(initialProvider?.id, presetType) {
-        mutableStateOf(initialProvider?.baseUrl ?: providerPresets.firstOrNull { it.type == presetType }?.baseUrl ?: "https://api.openai.com/v1")
+    var baseUrl by remember(initialProvider?.id, presetLabelKey, presetType) {
+        mutableStateOf(initialProvider?.baseUrl ?: initialPreset?.baseUrl ?: "https://api.openai.com/v1")
     }
-    var apiKey by remember(initialProvider?.id, presetType) { mutableStateOf(initialProvider?.apiKey ?: "") }
-    var selectedType by remember(initialProvider?.id, presetType) {
-        mutableStateOf(initialProvider?.type ?: presetType ?: ProviderType.OPENAI)
+    var apiKey by remember { mutableStateOf(initialProvider?.apiKey ?: "") }
+    var selectedType by remember(initialProvider?.id, presetLabelKey, presetType) {
+        mutableStateOf(initialProvider?.type ?: initialPreset?.type ?: presetType ?: ProviderType.OPENAI)
+    }
+    var selectedPresetKey by remember(initialProvider?.id, presetLabelKey, presetType) {
+        mutableStateOf(initialPreset?.labelKey)
+    }
+    var providerPickerExpanded by remember(initialProvider?.id, presetLabelKey, presetType) {
+        mutableStateOf(initialProvider != null || presetLabelKey == null)
     }
     var reveal by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
@@ -552,51 +578,120 @@ fun AddProviderScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (tab == 0) {
-            // Keep provider presets crisp and recognizable on AriAI's paper palette.
-            item { SectionLabel(tx("Provider")) }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    providerPresets.forEach { preset ->
-                        val selected = selectedType == preset.type
-                        // Keep selected cards saturated and stable; darken the brand tint slightly for white-label contrast.
-                        val selectedColor = preset.color.copy(
-                            red = preset.color.red * 0.82f,
-                            green = preset.color.green * 0.82f,
-                            blue = preset.color.blue * 0.82f
-                        )
-                        val optionBackground = if (selected) selectedColor else AriCard.copy(alpha = 0.9f)
-                        val optionBorder = if (selected) Color.White.copy(alpha = 0.72f) else AriLine.copy(alpha = 0.9f)
-                        Surface(
-                            modifier = Modifier.weight(1f).height(88.dp)
-                                .selectable(selected = selected, role = Role.RadioButton) {
-                                    selectedType = preset.type
-                                    baseUrl = preset.baseUrl
-                                    if (!nameManuallyEdited || name.isBlank()) {
-                                        name = defaultNameFor(preset.type)
-                                        nameManuallyEdited = false
+                Column(
+                    modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AnimatedVisibility(
+                        visible = canChangeProvider && providerPickerExpanded,
+                        enter = fadeIn(tween(180, easing = FastOutSlowInEasing)) +
+                            expandVertically(tween(240, easing = FastOutSlowInEasing), expandFrom = Alignment.Top),
+                        exit = fadeOut(tween(120)) +
+                            shrinkVertically(tween(180, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                SectionLabel(tx("Provider"))
+                                Spacer(Modifier.weight(1f))
+                                if (selectedPresetKey != null) {
+                                    IconButton(
+                                        modifier = Modifier.size(32.dp).testTag("provider-preset-collapse"),
+                                        onClick = { providerPickerExpanded = false }
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ExpandLess,
+                                            contentDescription = tx("Collapse provider list"),
+                                            tint = AriMuted,
+                                            modifier = Modifier.size(19.dp)
+                                        )
                                     }
                                 }
-                                .testTag("provider-preset-${preset.type.name.lowercase()}"),
-                            shape = RoundedCornerShape(20.dp),
-                            color = optionBackground,
-                            border = BorderStroke(if (selected) 1.2.dp else 0.75.dp, optionBorder),
-                            shadowElevation = 0.dp,
+                            }
+                            providerPresets.chunked(4).forEach { rowPresets ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowPresets.forEach { preset ->
+                                        val selected = selectedPresetKey == preset.labelKey
+                                        val presetTag = if (preset.labelKey == "Custom") "openai_compatible" else preset.labelKey.lowercase()
+                                        Surface(
+                                            modifier = Modifier.weight(1f).height(74.dp)
+                                                .selectable(selected = selected, role = Role.RadioButton) {
+                                                    selectedPresetKey = preset.labelKey
+                                                    selectedType = preset.type
+                                                    baseUrl = preset.baseUrl
+                                                    if (!nameManuallyEdited || name.isBlank()) {
+                                                        name = defaultNameFor(preset)
+                                                        nameManuallyEdited = false
+                                                    }
+                                                }
+                                                .testTag("provider-preset-$presetTag"),
+                                            shape = RoundedCornerShape(16.dp),
+                                            color = if (selected) preset.color.copy(alpha = 0.11f) else AriCard,
+                                            border = BorderStroke(
+                                                if (selected) 1.1.dp else 0.75.dp,
+                                                if (selected) preset.color.copy(alpha = 0.72f) else AriLine.copy(alpha = 0.9f)
+                                            ),
+                                            shadowElevation = 0.dp,
+                                            tonalElevation = 0.dp
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.fillMaxSize().padding(vertical = 5.dp, horizontal = 3.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                ProviderBrandMark(type = preset.type, name = preset.label, size = 31.dp)
+                                                Text(
+                                                    preset.label,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                                    color = AriInk.copy(alpha = 0.92f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
+                                    repeat(4 - rowPresets.size) { Spacer(Modifier.weight(1f)) }
+                                }
+                            }
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = canChangeProvider && !providerPickerExpanded,
+                        enter = fadeIn(tween(160)) + expandVertically(tween(220), expandFrom = Alignment.Top),
+                        exit = fadeOut(tween(100)) + shrinkVertically(tween(160), shrinkTowards = Alignment.Top)
+                    ) {
+                        val chosenPreset = providerPresets.firstOrNull { it.labelKey == selectedPresetKey }
+                        val summaryName = name.ifBlank { chosenPreset?.label ?: providerTypeLabel(selectedType) }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().testTag("provider-preset-summary"),
+                            shape = RoundedCornerShape(17.dp),
+                            color = AriCard,
+                            border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
                             tonalElevation = 0.dp
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize().padding(vertical = 9.dp, horizontal = 3.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
                             ) {
-                                ProviderBrandMark(type = preset.type, name = preset.label, size = 40.dp)
+                                ProviderBrandMark(type = selectedType, name = summaryName, size = 31.dp)
                                 Text(
-                                    preset.label,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (selected) Color.White else AriInk.copy(alpha = 0.92f),
+                                    summaryName,
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AriInk,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                TextButton(
+                                    modifier = Modifier.testTag("provider-preset-change"),
+                                    onClick = { providerPickerExpanded = true }
+                                ) { Text(tx("Change"), color = AriAccent, fontSize = 12.sp) }
                             }
                         }
                     }

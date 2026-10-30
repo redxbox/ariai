@@ -98,6 +98,8 @@ private fun ProviderBrandMarkContent(
                 ProviderMarkKind.GEMINI -> GeminiSparkleMark(size * 0.70f)
                 ProviderMarkKind.GOOGLE -> BrandVectorMark(R.drawable.brand_google_g, size * 0.76f)
                 ProviderMarkKind.ANTHROPIC -> BrandVectorMark(R.drawable.brand_anthropic, size * 0.80f)
+                ProviderMarkKind.DEEPSEEK -> BrandVectorMark(R.drawable.brand_deepseek, size * 0.76f)
+                ProviderMarkKind.OPENROUTER -> BrandVectorMark(R.drawable.brand_openrouter, size * 0.76f)
                 ProviderMarkKind.OLLAMA -> BrandVectorMark(R.drawable.brand_ollama, size * 0.80f)
                 ProviderMarkKind.CUSTOM -> SpectrumSparkle(size * 0.70f)
                 ProviderMarkKind.INITIAL -> Text(
@@ -154,6 +156,8 @@ private enum class ProviderMarkKind {
     GEMINI,
     GOOGLE,
     ANTHROPIC,
+    DEEPSEEK,
+    OPENROUTER,
     OLLAMA,
     CUSTOM,
     INITIAL,
@@ -170,6 +174,8 @@ private fun providerMarkKind(type: ProviderType?, name: String?): ProviderMarkKi
         ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> {
             val normalizedName = name.orEmpty().trim().lowercase()
             when {
+                "deepseek" in normalizedName -> ProviderMarkKind.DEEPSEEK
+                "openrouter" in normalizedName -> ProviderMarkKind.OPENROUTER
                 "openai" in normalizedName -> ProviderMarkKind.OPENAI
                 "gemini" in normalizedName -> ProviderMarkKind.GEMINI
                 "google" in normalizedName -> ProviderMarkKind.GOOGLE
@@ -289,6 +295,8 @@ fun providerBrandColor(provider: Provider?): Color = providerBrandColor(provider
 
 private fun providerBrandColor(type: ProviderType?, name: String?): Color = when {
     type == null -> AriAccent
+    name?.contains("deepseek", ignoreCase = true) == true -> Color(0xFF5786FE)
+    name?.contains("openrouter", ignoreCase = true) == true -> Color(0xFF94A3B8)
     type == ProviderType.OPENAI || name?.contains("openai", ignoreCase = true) == true -> AriOpenAI
     type == ProviderType.GEMINI || name?.contains("gemini", ignoreCase = true) == true -> AriGemini
     type == ProviderType.ANTHROPIC || name?.contains("anthropic", ignoreCase = true) == true -> AriAnthropic

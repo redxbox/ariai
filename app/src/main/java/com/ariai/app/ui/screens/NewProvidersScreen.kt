@@ -14,9 +14,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
+import com.ariai.app.ui.components.ProviderBrandMark
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.text.style.TextAlign
@@ -61,13 +68,17 @@ fun providerTypeLabel(type: ProviderType): String = when (type) {
     ProviderType.CUSTOM -> tx("Custom")
 }
 
-/** Each provider type has its own brand colour. */
-fun providerBrandColor(type: ProviderType): Color = when (type) {
-    ProviderType.OPENAI -> AriOpenAI
-    ProviderType.GEMINI -> AriGemini
-    ProviderType.ANTHROPIC -> AriAnthropic
-    ProviderType.OLLAMA -> AriOllama
-    ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> AriCustom
+/** Each provider has a matching brand tint where a known brand can be identified. */
+fun providerBrandColor(type: ProviderType, name: String? = null): Color = when {
+    name?.contains("deepseek", ignoreCase = true) == true -> Color(0xFF5786FE)
+    name?.contains("openrouter", ignoreCase = true) == true -> Color(0xFF94A3B8)
+    else -> when (type) {
+        ProviderType.OPENAI -> AriOpenAI
+        ProviderType.GEMINI -> AriGemini
+        ProviderType.ANTHROPIC -> AriAnthropic
+        ProviderType.OLLAMA -> AriOllama
+        ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> AriCustom
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,20 +92,21 @@ fun NewProvidersScreen(
     onBack: () -> Unit,
     onToggleProvider: (Provider) -> Unit = {},
     fetchModels: (suspend (Provider) -> List<AIModel>)? = null,
-    onSaveProvider: ((Provider, (Provider?) -> Unit) -> Unit)? = null
+    onSaveProvider: ((Provider, (Provider?) -> Unit) -> Unit)? = null,
+    onAddProviderPreset: ((ProviderType, String) -> Unit)? = null
 ) {
     var query by remember { mutableStateOf("") }
     var showImport by remember { mutableStateOf(false) }
     var showAddProvider by remember { mutableStateOf(false) }
-    var addProviderPreset by remember { mutableStateOf<ProviderType?>(null) }
+    var addProviderPreset by remember { mutableStateOf<ProviderPreset?>(null) }
     val fetchModelsForAdd = fetchModels
     val saveProviderForAdd = onSaveProvider
-    fun openAddProvider(preset: ProviderType? = null) {
+    fun openAddProvider(preset: ProviderPreset? = null) {
         if (fetchModelsForAdd != null && saveProviderForAdd != null) {
             addProviderPreset = preset
             showAddProvider = true
         } else if (preset != null) {
-            onAddPreset(preset)
+            onAddProviderPreset?.invoke(preset.type, preset.labelKey) ?: onAddPreset(preset.type)
         } else {
             onAddProvider()
         }
@@ -109,7 +121,11 @@ fun NewProvidersScreen(
         query.isBlank() ||
             preset.label.contains(query, ignoreCase = true) ||
             providerTypeLabel(preset.type).contains(query, ignoreCase = true) ||
-            providerPresetDescription(preset.type).contains(query, ignoreCase = true)
+            providerPresetDescription(preset).contains(query, ignoreCase = true)
+    }
+    var displayedPresets by remember { mutableStateOf(visiblePresets) }
+    LaunchedEffect(visiblePresets) {
+        if (visiblePresets.isNotEmpty()) displayedPresets = visiblePresets
     }
     val activeProviders = visible.filter { it.enabled }
     val disabledProviders = visible.filter { !it.enabled }
@@ -176,19 +192,29 @@ fun NewProvidersScreen(
                 )
             }
 
-            if (visiblePresets.isNotEmpty()) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(tx("Quick connect"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-                        Text(tx("OpenAI, Gemini, Claude and more"), fontSize = 12.sp, color = AriMuted)
+            item(key = "provider-quick-connect") {
+                AnimatedVisibility(
+                    visible = visiblePresets.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                    enter = fadeIn(tween(180, easing = FastOutSlowInEasing)) +
+                        expandVertically(tween(240, easing = FastOutSlowInEasing), expandFrom = Alignment.Top),
+                    exit = fadeOut(tween(120)) +
+                        shrinkVertically(tween(180, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(tx("Quick connect"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                            Text(tx("OpenAI, DeepSeek, OpenRouter and more"), fontSize = 12.sp, color = AriMuted)
+                        }
+                        ProviderCatalogGrid(
+                            presets = displayedPresets,
+                            providers = providers,
+                            onSelect = { openAddProvider(it) }
+                        )
                     }
-                }
-                item {
-                    ProviderCatalogList(
-                        presets = visiblePresets,
-                        providers = providers,
-                        onSelect = { openAddProvider(it) }
-                    )
                 }
             }
 
@@ -236,7 +262,8 @@ fun NewProvidersScreen(
         ) {
             Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.90f)) {
                 AddProviderScreen(
-                    presetType = addProviderPreset,
+                    presetType = addProviderPreset?.type,
+                    presetLabelKey = addProviderPreset?.labelKey,
                     fetchModels = fetchModelsForAdd,
                     onSave = { provider ->
                         saveProviderForAdd(provider) { savedProvider ->
@@ -258,12 +285,16 @@ fun NewProvidersScreen(
     }
 }
 
-private fun providerPresetDescription(type: ProviderType): String = when (type) {
-    ProviderType.OPENAI -> tx("GPT-4o and o-series models")
-    ProviderType.GEMINI -> tx("Gemini models, with Search and URL tools")
-    ProviderType.ANTHROPIC -> tx("Claude models")
-    ProviderType.OLLAMA -> tx("Models that run on your own computer")
-    ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> tx("Any OpenAI-compatible API")
+private fun providerPresetDescription(preset: ProviderPreset): String = when (preset.labelKey) {
+    "DeepSeek" -> tx("DeepSeek chat and reasoning models")
+    "OpenRouter" -> tx("One API for models from many providers")
+    else -> when (preset.type) {
+        ProviderType.OPENAI -> tx("GPT-4o and o-series models")
+        ProviderType.GEMINI -> tx("Gemini models, with Search and URL tools")
+        ProviderType.ANTHROPIC -> tx("Claude models")
+        ProviderType.OLLAMA -> tx("Models that run on your own computer")
+        ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> tx("Any OpenAI-compatible API")
+    }
 }
 
 @Composable
@@ -284,102 +315,87 @@ private fun ProviderSummaryStrip(providers: List<Provider>) {
 }
 
 @Composable
-private fun ProviderBadge(type: ProviderType, size: androidx.compose.ui.unit.Dp) {
-    val letter = when (type) {
-        ProviderType.OPENAI -> "O"
-        ProviderType.GEMINI -> "G"
-        ProviderType.ANTHROPIC -> "A"
-        ProviderType.OLLAMA -> "O"
-        ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> "C"
-    }
-    Box(
-        modifier = Modifier.size(size).clip(CircleShape)
-            .background(providerBrandColor(type).copy(alpha = 0.12f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(letter, fontSize = (size.value * 0.48f).sp, fontWeight = FontWeight.Bold, color = providerBrandColor(type))
-    }
-}
-
-@Composable
-private fun ProviderCatalogList(
+private fun ProviderCatalogGrid(
     presets: List<ProviderPreset>,
     providers: List<Provider>,
-    onSelect: (ProviderType) -> Unit
+    onSelect: (ProviderPreset) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        presets.forEach { preset ->
-            ProviderCatalogRow(
-                preset = preset,
-                configuredCount = providers.count { it.type == preset.type },
-                onClick = { onSelect(preset.type) }
-            )
+    Column(
+        modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        presets.chunked(4).forEachIndexed { rowIndex, rowPresets ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowPresets.forEachIndexed { columnIndex, preset ->
+                    AnimatedVisibility(
+                        visible = true,
+                        modifier = Modifier.weight(1f),
+                        enter = fadeIn(tween(180, delayMillis = rowIndex * 45 + columnIndex * 28)) +
+                            scaleIn(
+                                initialScale = 0.90f,
+                                animationSpec = tween(240, easing = FastOutSlowInEasing)
+                            ),
+                        exit = fadeOut(tween(120))
+                    ) {
+                        ProviderCatalogTile(
+                            preset = preset,
+                            configured = providers.any {
+                                it.name.equals(preset.labelKey, ignoreCase = true)
+                            },
+                            onClick = { onSelect(preset) }
+                        )
+                    }
+                }
+                repeat(4 - rowPresets.size) { Spacer(Modifier.weight(1f)) }
+            }
         }
     }
 }
 
 @Composable
-private fun ProviderCatalogRow(
+private fun ProviderCatalogTile(
     preset: ProviderPreset,
-    configuredCount: Int,
+    configured: Boolean,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(17.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth()
-            .clickable(onClick = onClick)
-            .testTag("provider-catalog-${preset.type.name.lowercase()}"),
-        shape = shape,
-        color = AriCard,
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(78.dp)
+            .animateContentSize(tween(180, easing = FastOutSlowInEasing))
+            .testTag("provider-catalog-${preset.labelKey.lowercase()}"),
+        shape = RoundedCornerShape(18.dp),
+        color = if (configured) preset.color.copy(alpha = 0.07f) else AriCard,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f))
+        border = BorderStroke(
+            0.8.dp,
+            if (configured) preset.color.copy(alpha = 0.36f) else AriLine.copy(alpha = 0.8f)
+        )
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier.size(42.dp).clip(CircleShape)
-                    .background(providerBrandColor(preset.type).copy(alpha = 0.10f)),
-                contentAlignment = Alignment.Center
-            ) {
-                ProviderBadge(type = preset.type, size = 30.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (configured) {
+                Box(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(6.dp)
+                        .clip(CircleShape).background(preset.color)
+                )
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        preset.label,
-                        modifier = Modifier.weight(1f),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Ink,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (configuredCount > 0) {
-                        Text(
-                            "$configuredCount ${tx("configured")}",
-                            fontSize = 10.sp,
-                            color = AriAccent,
-                            maxLines = 1
-                        )
-                    }
-                }
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                ProviderBrandMark(type = preset.type, name = preset.label, size = 32.dp)
                 Text(
-                    providerPresetDescription(preset.type),
-                    fontSize = 11.sp,
-                    color = AriMuted,
+                    preset.label,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-            Box(
-                modifier = Modifier.size(30.dp).clip(CircleShape).background(AriAccent.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Add, contentDescription = tx("Add provider"), tint = AriAccent, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -452,10 +468,10 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
         ) {
             Box(
                 modifier = Modifier.size(40.dp).clip(CircleShape)
-                    .background(providerBrandColor(provider.type).copy(alpha = 0.10f)),
+                    .background(providerBrandColor(provider.type, provider.name).copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
-                ProviderBadge(type = provider.type, size = 29.dp)
+                ProviderBrandMark(provider = provider, size = 30.dp)
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -608,12 +624,12 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
                     Row(
                         modifier = Modifier.fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(AriAccent.copy(alpha = 0.10f))
+                            .background(providerBrandColor(scannedProvider!!.type, scannedProvider!!.name).copy(alpha = 0.10f))
                             .padding(horizontal = 11.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
-                        ProviderBadge(type = scannedProvider!!.type, size = 28.dp)
+                        ProviderBrandMark(provider = scannedProvider!!, size = 29.dp)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(scannedProvider!!.name, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Ink, maxLines = 1)
                             Text(providerTypeLabel(scannedProvider!!.type), fontSize = 10.sp, color = AriMuted, maxLines = 1)
