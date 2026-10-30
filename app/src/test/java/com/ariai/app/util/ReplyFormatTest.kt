@@ -1,5 +1,6 @@
 package com.ariai.app.util
 
+import androidx.compose.ui.text.font.FontWeight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,6 +17,15 @@ class ReplyFormatTest {
     }
 
     @Test
+    fun blankLinesSplitParagraphBlocksButKeepListLinesTogether() {
+        val parts = splitReply("First paragraph.\ncontinued.\n\n- one\n- two\n\nFinal paragraph.")
+        assertEquals(3, parts.size)
+        assertEquals("First paragraph.\ncontinued.\n", (parts[0] as ReplyPart.Text).raw)
+        assertEquals("- one\n- two\n", (parts[1] as ReplyPart.Text).raw)
+        assertEquals("Final paragraph.\n", (parts[2] as ReplyPart.Text).raw)
+    }
+
+    @Test
     fun unclosedFenceKeepsRestAsCode() {
         val parts = splitReply("```python\nprint(1)\nprint(2)")
         assertEquals(1, parts.size)
@@ -25,6 +35,29 @@ class ReplyFormatTest {
     @Test
     fun boldMarkersAreRemoved() {
         assertEquals("bold text", formatReply("**bold text**").text)
+    }
+
+    @Test
+    fun literalAsterisksArePreservedOutsideMarkdownEmphasis() {
+        assertEquals("Multiply 2 * 3 = 6; use * as a wildcard.", formatReply("Multiply 2 * 3 = 6; use * as a wildcard.").text)
+        assertEquals("2*3*4", formatReply("2*3*4").text)
+        assertEquals("foo_bar_baz", formatReply("foo_bar_baz").text)
+        assertEquals("The symbol is *.", formatReply("The symbol is `*`.").text)
+        assertEquals("Keep ** as code.", formatReply("Keep `**` as code.").text)
+    }
+
+    @Test
+    fun singleAsteriskEmphasisRemainsStyledWithoutLeakingMarkers() {
+        assertEquals("italic", formatReply("*italic*").text)
+    }
+
+    @Test
+    fun headingsAreStyledAndSeparatedFromParagraphs() {
+        val formatted = formatReply("## Summary\nA short answer.\n\n### Details\nMore context.", 15f)
+        assertEquals("Summary\nA short answer.\n\nDetails\nMore context.", formatted.text)
+        val heading = formatted.spanStyles.first { it.start == 0 && it.end == "Summary".length }
+        assertEquals(FontWeight.Bold, heading.item.fontWeight)
+        assertEquals(16.95f, heading.item.fontSize.value, 0.01f)
     }
 
     @Test
@@ -51,7 +84,8 @@ class ReplyFormatTest {
     }
 
     @Test
-    fun bulletsBecomeDots() {
-        assertEquals("•  one\n•  two", formatReply("- one\n- two").text)
+    fun bulletsAndNumberedListsAreNormalized() {
+        assertEquals("•  one\n•  two", formatReply("- one\n* two").text)
+        assertEquals("1.  first\n2.  second", formatReply("1) first\n2. second").text)
     }
 }

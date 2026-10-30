@@ -1,16 +1,13 @@
-name: Emulator smoke test
+name: Android emulator walkthrough and provider test
 
 on:
-  push:
-    paths:
-      - ".github/workflows/emulator-smoke.yml"
-      - ".github/scripts/**"
   workflow_dispatch:
 
 jobs:
   smoke:
+    name: Run app walkthrough or isolated live provider test
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 
@@ -33,6 +30,73 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run app on emulator
+        timeout-minutes: 33
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # Only expose the API key when a push commit message contains [live-api-test]; ordinary runs get no key.
+          ARIAI_LIVE_API_TEST: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[live-api-test]') }}
+          ARIAI_TEST_API_KEY: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[live-api-test]') && secrets.ARIAI_TEST_API_KEY || '' }}
+          # User-supplied OpenAI-compatible endpoint for the isolated live model-review run.
+          ARIAI_TEST_BASE_URL: https://radoxai.com/v1
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            timeout --signal=TERM --kill-after=15s 28m bash .github/scripts/smoke.sh
+
+      - name: Report walkthrough failures as annotations
+        if: failure()
+        run: |
+          set +e
+          if [ -f smoke-out/walkthrough.log ]; then
+            (grep -E "FAILED|Failure|AssertionError|expected:|but was:|FATAL EXCEPTION|ANR in|not visible:|not found:|::error" smoke-out/walkthrough.log || true) | tail -40 | while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
+              echo "::error title=Walkthrough failure::$safe"
+            done
+          fi
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-output
+          path: smoke-out/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  provider-chat-ui:
+    name: Deterministic provider and chat UI test
+    needs: smoke
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Build debug APK and test APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run provider and chat UI tests
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -41,12 +105,31 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: bash .github/scripts/smoke.sh
+          script: |
+            bash -o pipefail -c './gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace 2>&1 | tee instrumentation.log'
 
-      - name: Upload screenshots and logs
+      - name: Report UI test failures as annotations
+        if: failure()
+        run: |
+          set +e
+          if [ -f instrumentation.log ]; then
+            (grep -E "^e: |^w: |error:|FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|FATAL EXCEPTION|ANR in|ProviderAndChatUiTest\\.kt:" instrumentation.log || true) | tail -40 | while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
+              echo "::error title=Provider/chat UI test failure::$safe"
+            done
+            tail -n 30 instrumentation.log | while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
+              echo "::notice title=Provider/chat UI log tail::$safe"
+            done
+          fi
+
+      - name: Upload UI test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-output
-          path: smoke-out/
+          name: provider-chat-ui-test-results
+          path: |
+            instrumentation.log
+            app/build/reports/androidTests/connected/
+          if-no-files-found: ignore
           retention-days: 7

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import com.ariai.app.data.models.ReasoningLevel
@@ -24,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriInk
+private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Surface0: Color @Composable @ReadOnlyComposable get() = AriPaper
 @Composable
@@ -61,6 +62,10 @@ fun PreferencesScreen(
     onReasoningChange: (ReasoningLevel) -> Unit,
     fontSize: Int,
     onFontSizeChange: (Int) -> Unit,
+    streamResponse: Boolean,
+    onStreamResponseChange: (Boolean) -> Unit,
+    currentLanguage: String,
+    onLanguageChange: (String) -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -68,7 +73,7 @@ fun PreferencesScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Surface0),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
                 title = { Text(tx("Preferences"), fontWeight = FontWeight.SemiBold, color = Ink) }
             )
         }
@@ -87,12 +92,45 @@ fun PreferencesScreen(
                             FilterChip(selected = theme == key, onClick = { onThemeChange(key) }, label = { Text(label) }, modifier = Modifier.weight(1f))
                         }
                     }
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
+                        SwitchRow(
+                            title = tx("Dynamic colors"),
+                            subtitle = tx("Use colors from your wallpaper while keeping AriAI's paper surfaces."),
+                            checked = dynamicColor,
+                            onChange = onDynamicColorChange
+                        )
+                    }
+                }
+            }
+
+            item { SectionTitle(tx("Language")) }
+            item {
+                SettingCard {
+                    Text(tx("Choose the app language."), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        listOf("en" to tx("English"), "fa" to tx("Persian")).forEach { (code, label) ->
+                            FilterChip(
+                                selected = currentLanguage == code,
+                                onClick = { onLanguageChange(code) },
+                                label = { Text(label) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
             }
 
             item { SectionTitle(tx("Chat")) }
             item {
                 SettingCard {
+                    SwitchRow(
+                        title = tx("Stream replies"),
+                        subtitle = tx("Show text as the model generates it"),
+                        checked = streamResponse,
+                        onChange = onStreamResponseChange
+                    )
+                    HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
                     Text(tx("Default thinking depth"), fontWeight = FontWeight.Medium, color = Ink)
                     Text(tx("Used for new messages. You can change it per message in the chat."), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
@@ -115,14 +153,6 @@ fun PreferencesScreen(
                     Text(tx("Preview: the quick brown fox jumps over the lazy dog."), fontSize = fontSize.sp, color = Ink.copy(alpha = 0.7f))
                 }
             }
-
-            item { SectionTitle(tx("Language")) }
-            item {
-                SettingCard {
-                    Text(tx("English"), fontWeight = FontWeight.Medium, color = Ink)
-                    Text(tx("AriAI currently ships in English only."), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
-                }
-            }
         }
     }
 }
@@ -131,6 +161,7 @@ fun PreferencesScreen(
 @Composable
 fun DefaultModelScreen(
     providers: List<Provider>,
+    defaultProviderId: String?,
     defaultModelId: String?,
     onSelect: (providerId: String, modelId: String) -> Unit,
     onAddProvider: () -> Unit,
@@ -147,7 +178,7 @@ fun DefaultModelScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Surface0),
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = Ink) } },
                 title = { Text(tx("Default model"), fontWeight = FontWeight.SemiBold, color = Ink) }
             )
         }
@@ -182,8 +213,8 @@ fun DefaultModelScreen(
                 item(key = "h_${provider.id}") {
                     Text(provider.name, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Ink.copy(alpha = 0.5f), modifier = Modifier.padding(top = 10.dp, start = 6.dp))
                 }
-                itemsIndexed(models, key = { i, m -> "${provider.id}_${m.id}_$i" }) { _, model ->
-                    val selected = model.id == defaultModelId
+                itemsIndexed(models, key = { _, m -> "model:${provider.id}:${m.id}" }) { _, model ->
+                    val selected = isSelectedModel(provider.id, model.id, defaultProviderId, defaultModelId)
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = if (selected) Accent.copy(alpha = 0.10f) else AriCard,

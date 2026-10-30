@@ -53,10 +53,10 @@ data class ProviderEntity(
     val customHeaders: String,
     val customBody: String?,
     val createdAt: Long,
-    @ColumnInfo(defaultValue = "[]") val modelsJson: String = "[]"
+    @ColumnInfo(defaultValue = "'[]'") val modelsJson: String = "[]"
 )
 
-@Entity(tableName = "chats")
+@Entity(tableName = "chats", indices = [Index(value = ["updatedAt"], name = "index_chats_updatedAt")])
 data class ChatEntity(
     @PrimaryKey val id: String,
     val title: String,
@@ -66,12 +66,15 @@ data class ChatEntity(
     val modelId: String?,
     val agentId: String?,
     val systemPrompt: String?,
+    @ColumnInfo(defaultValue = "0.7") val temperature: Float = 0.7f,
+    @ColumnInfo(defaultValue = "1.0") val topP: Float = 1.0f,
+    val folder: String? = null,
     val isPinned: Boolean,
     val isArchived: Boolean,
     val memoryEnabled: Boolean
 )
 
-@Entity(tableName = "messages")
+@Entity(tableName = "messages", indices = [Index(value = ["chatId", "timestamp"], name = "index_messages_chatId_timestamp")])
 data class MessageEntity(
     @PrimaryKey val id: String,
     val chatId: String,
@@ -85,7 +88,10 @@ data class MessageEntity(
     val branchChildren: String,
     val reasoning: String?,
     val imagePath: String? = null,
-    @ColumnInfo(defaultValue = "[]") val attachmentsJson: String = "[]"
+    @ColumnInfo(defaultValue = "'[]'") val attachmentsJson: String = "[]",
+    @ColumnInfo(defaultValue = "0") val promptTokens: Int = 0,
+    @ColumnInfo(defaultValue = "0") val completionTokens: Int = 0,
+    @ColumnInfo(defaultValue = "0") val totalTokens: Int = 0
 )
 
 @Entity(tableName = "agents")
@@ -99,6 +105,9 @@ data class AgentEntity(
     val providerId: String?,
     val temperature: Float,
     val topP: Float,
+    @ColumnInfo(defaultValue = "'[]'") val toolsJson: String = "[]",
+    @ColumnInfo(defaultValue = "'{}'") val promptVariablesJson: String = "{}",
+    @ColumnInfo(defaultValue = "'[]'") val examplesJson: String = "[]",
     val isBuiltIn: Boolean,
     val createdAt: Long
 )
@@ -107,6 +116,9 @@ data class AgentEntity(
 interface ProviderDao {
     @Query("SELECT * FROM providers ORDER BY createdAt DESC")
     fun getAllProviders(): Flow<List<ProviderEntity>>
+
+    @Query("SELECT * FROM providers ORDER BY createdAt DESC")
+    suspend fun getAllProvidersSync(): List<ProviderEntity>
 
     @Query("SELECT * FROM providers WHERE id = :id")
     suspend fun getProviderById(id: String): ProviderEntity?
@@ -132,6 +144,10 @@ interface ChatDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChat(chat: ChatEntity)
 
+    /** Inserts a recovery row only if no other operation has already created this chat. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertChatIfAbsent(chat: ChatEntity): Long
+
     @Delete
     suspend fun deleteChat(chat: ChatEntity)
 
@@ -146,6 +162,12 @@ interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp ASC")
     suspend fun getMessagesForChatSync(chatId: String): List<MessageEntity>
+
+    @Query("SELECT * FROM messages WHERE id = :id")
+    suspend fun getMessageById(id: String): MessageEntity?
+
+    @Query("SELECT * FROM messages")
+    suspend fun getAllMessagesSync(): List<MessageEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity)
@@ -171,7 +193,7 @@ interface AgentDao {
 
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
-    version = 4,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

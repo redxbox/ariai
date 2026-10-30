@@ -8,13 +8,20 @@ import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.remote.AIClient
 import com.ariai.app.data.remote.SearchClient
 import com.ariai.app.data.repository.ChatRepository
+import com.ariai.app.data.repository.WorkspaceRepository
 
 class AriAiApp : Application() {
     override fun onCreate() {
         super.onCreate()
         com.ariai.app.data.local.ImageStore.init(filesDir)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            try { preferencesManager.migrateSearchKeysToPlain() } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e, "search key migration") }
+            repository.migrateProviderKeysToEncrypted()
+            try {
+                preferencesManager.migrateLocalSearchDefaultToBrave()
+                preferencesManager.migrateSearchKeysToEncrypted()
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "search preferences migration")
+            }
         }
     }
 
@@ -24,7 +31,15 @@ class AriAiApp : Application() {
             AppDatabase::class.java,
             "ariai_db"
         )
-            .addMigrations(com.ariai.app.data.local.MIGRATION_1_2, com.ariai.app.data.local.MIGRATION_2_3, com.ariai.app.data.local.MIGRATION_3_4)
+            .addMigrations(
+                com.ariai.app.data.local.MIGRATION_1_2,
+                com.ariai.app.data.local.MIGRATION_2_3,
+                com.ariai.app.data.local.MIGRATION_3_4,
+                com.ariai.app.data.local.MIGRATION_4_5,
+                com.ariai.app.data.local.MIGRATION_5_6,
+                com.ariai.app.data.local.MIGRATION_6_7,
+                com.ariai.app.data.local.MIGRATION_7_8
+            )
             .build()
     }
 
@@ -37,5 +52,9 @@ class AriAiApp : Application() {
 
     val repository by lazy {
         ChatRepository(database, aiClient, searchClient)
+    }
+
+    val workspaceRepository by lazy {
+        WorkspaceRepository(filesDir)
     }
 }

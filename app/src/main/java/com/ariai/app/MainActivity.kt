@@ -13,6 +13,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.*
@@ -32,6 +33,8 @@ import com.ariai.app.ui.drawer.AppDrawerContent
 import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
 import com.ariai.app.util.LocalStrings
+import com.ariai.app.data.models.Provider
+import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.util.UiLang
 import com.ariai.app.util.getStringsForLanguage
@@ -43,11 +46,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val app = application as AriAiApp
-            val viewModelFactory = AppViewModelFactory(app.repository, app.preferencesManager)
+            val viewModelFactory = AppViewModelFactory(app.repository, app.preferencesManager, app.workspaceRepository)
             val viewModel: AppViewModel = viewModel(factory = viewModelFactory)
 
             val language by viewModel.language.collectAsState()
             val theme by viewModel.theme.collectAsState()
+            val dynamicColor by viewModel.dynamicColor.collectAsState()
             val strings = getStringsForLanguage(language)
 
             val isDarkTheme = when (theme) {
@@ -60,7 +64,7 @@ class MainActivity : ComponentActivity() {
             val direction = if (language == "fa" || language == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 CompositionLocalProvider(LocalStrings provides strings) {
-                    AriAiTheme(darkTheme = isDarkTheme) {
+                    AriAiTheme(darkTheme = isDarkTheme, dynamicColor = dynamicColor) {
                         AppRoot(viewModel = viewModel)
                     }
                 }
@@ -80,6 +84,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: startRoute
     val snackbarHostState = remember { SnackbarHostState() }
+    var showAbout by remember { mutableStateOf(false) }
 
     val providers by viewModel.providers.collectAsState()
     val chats by viewModel.chats.collectAsState()
@@ -87,21 +92,44 @@ fun AppRoot(viewModel: AppViewModel) {
     val chatModes by viewModel.chatModes.collectAsState()
     val messages by viewModel.messages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
+    val isSending by viewModel.isSending.collectAsState()
     val streamingContent by viewModel.streamingContent.collectAsState()
+    val generatedMediaBytes by viewModel.generatedMediaBytes.collectAsState()
     val language by viewModel.language.collectAsState()
     val theme by viewModel.theme.collectAsState()
-    val searchKeys by viewModel.searchKeys.collectAsState()
+    val dynamicColor by viewModel.dynamicColor.collectAsState()
+    val agents by viewModel.agents.collectAsState()
+    val workspaceFiles by viewModel.workspaceFiles.collectAsState()
+    val mcpServers by viewModel.mcpServers.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
-    val mcpServers = remember { mutableStateListOf<McpServerItem>() }
     val defaultProviderId by viewModel.defaultProviderId.collectAsState()
     val defaultModelId by viewModel.defaultModelId.collectAsState()
     val reasoningLevel by viewModel.reasoningLevel.collectAsState()
+    val streamResponse by viewModel.streamResponse.collectAsState()
     val searchModeState by viewModel.searchMode.collectAsState()
+    val searchProviderState by viewModel.searchProvider.collectAsState()
+    val searchKeys by viewModel.searchKeys.collectAsState()
     val favoriteModels by viewModel.favoriteModels.collectAsState()
     val fontSize by viewModel.fontSize.collectAsState()
+    val modelUsageCounts = remember(chats, modelOverrides) {
+        chats.mapNotNull { savedChat ->
+            val override = modelOverrides[savedChat.id]
+            val providerId = override?.first ?: savedChat.providerId
+            val modelId = override?.second ?: savedChat.modelId
+            if (providerId != null && modelId != null) providerId to modelId else null
+        }.groupingBy { it }.eachCount()
+    }
     val defaultModelName = providers.firstOrNull { it.id == defaultProviderId }?.let { p ->
         p.models.firstOrNull { it.id == defaultModelId }?.let { "${it.displayName} · ${p.name}" }
     } ?: tx("Not chosen")
+    val activeChatForDrawer = chats.firstOrNull { it.id == currentChatId }
+    val drawerProviderId = activeChatForDrawer?.let { modelOverrides[it.id]?.first ?: it.providerId } ?: defaultProviderId
+    val drawerModelId = activeChatForDrawer?.let { modelOverrides[it.id]?.second ?: it.modelId } ?: defaultModelId
+    val drawerProvider = providers.firstOrNull { it.id == drawerProviderId && it.enabled }
+    val drawerModelName = drawerProvider?.models?.firstOrNull { it.id == drawerModelId }?.displayName
+    val searchModelReady = defaultProviderId != null && defaultModelId != null && providers.any { provider ->
+        provider.id == defaultProviderId && provider.enabled && provider.models.any { it.id == defaultModelId }
+    }
 
     fun go(route: String) {
         scope.launch { drawerState.close() }
@@ -109,6 +137,17 @@ fun AppRoot(viewModel: AppViewModel) {
     }
 
     fun openChat(chatId: String) {
+        if (chatId.isBlank()) {
+            com.ariai.app.util.AppLog.warn(
+                IllegalArgumentException("Refusing to navigate to a chat with a blank ID"),
+                "open chat"
+            )
+            scope.launch {
+                drawerState.close()
+                snackbarHostState.showSnackbar(tx("This saved chat cannot be opened because its ID is missing."))
+            }
+            return
+        }
         scope.launch { drawerState.close() }
         viewModel.loadChat(chatId)
         navController.navigate("chat/$chatId") { launchSingleTop = true }
@@ -120,6 +159,18 @@ fun AppRoot(viewModel: AppViewModel) {
         navController.navigate("chat/$id") { launchSingleTop = true }
     }
 
+    fun deleteChatFromUi(chatId: String) {
+        val deletingActiveChat = currentChatId == chatId
+        viewModel.deleteChat(chatId)
+        if (deletingActiveChat) {
+            scope.launch { drawerState.close() }
+            navController.navigate("chats") {
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
     fun newImageChat() {
         scope.launch { drawerState.close() }
         val (providerId, modelId) = viewModel.firstImageModel() ?: (null to null)
@@ -128,28 +179,43 @@ fun AppRoot(viewModel: AppViewModel) {
         navController.navigate("chat/$id") { launchSingleTop = true }
     }
 
+    fun activateNativeSearch(provider: Provider) {
+        if (provider.type != ProviderType.GEMINI && provider.type != ProviderType.ANTHROPIC) return
+        if (!provider.enabled || provider.apiKey.isBlank() || provider.apiKeyNeedsReentry) return
+        val textModel = provider.models.firstOrNull { it.outputsText && it.id.isNotBlank() } ?: return
+        currentChatId?.let { viewModel.updateChatProvider(it, provider.id, textModel.id) }
+            ?: viewModel.setDefaultSelection(provider.id, textModel.id)
+        viewModel.setSearchMode(SearchMode.MODEL)
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = true,
+        scrimColor = Color.Black.copy(alpha = 0.34f),
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = AriPaper,
+                drawerShape = RoundedCornerShape(topEnd = 30.dp, bottomEnd = 30.dp),
+                drawerContainerColor = AriCard,
                 drawerContentColor = AriInk,
-                modifier = Modifier.width(312.dp)
+                drawerTonalElevation = 0.dp,
+                modifier = Modifier.fillMaxWidth(0.88f).widthIn(max = 360.dp)
             ) {
                 AppDrawerContent(
                     chats = chats,
                     currentChatId = currentChatId,
                     currentRoute = currentRoute,
+                    activeProvider = drawerProvider,
+                    activeModelName = drawerModelName,
                     onNewChat = { newChat() },
                     onChatClick = { openChat(it.id) },
                     onPinChat = { viewModel.pinChat(it) },
-                    onDeleteChat = { viewModel.deleteChat(it.id) },
+                    onDeleteChat = { deleteChatFromUi(it.id) },
+                    onSetChatFolder = { chat, folder -> viewModel.setChatFolder(chat.id, folder) },
                     onNavigate = { go(it) },
                     onAbout = {
                         scope.launch {
                             drawerState.close()
-                            snackbarHostState.showSnackbar(tx("AriAI v1.0 - Personal AI"))
+                            showAbout = true
                         }
                     }
                 )
@@ -181,8 +247,36 @@ fun AppRoot(viewModel: AppViewModel) {
                         chats = chats,
                         onChatClick = { openChat(it.id) },
                         onNewChat = { newChat() },
-                        onDeleteChat = { viewModel.deleteChat(it.id) },
+                        onDeleteChat = { deleteChatFromUi(it.id) },
                         onPinChat = { viewModel.pinChat(it) }
+                    )
+                }
+
+                composable("agents") {
+                    AgentStudioScreen(
+                        agents = agents,
+                        providers = providers,
+                        onBack = { navController.popBackStack() },
+                        onSaveAgent = { viewModel.saveAgent(it) },
+                        onDeleteAgent = { viewModel.deleteAgent(it) },
+                        onStartAgent = { agent ->
+                            scope.launch { drawerState.close() }
+                            val id = viewModel.createNewChat(agentId = agent.id)
+                            navController.navigate("chat/$id") { launchSingleTop = true }
+                        }
+                    )
+                }
+
+                composable("workspace") {
+                    WorkspaceScreen(
+                        files = workspaceFiles,
+                        onBack = { navController.popBackStack() },
+                        onCreateFile = { name, content, onResult -> viewModel.createWorkspaceFile(name, content, onResult) },
+                        onSaveFile = { name, content, onResult -> viewModel.saveWorkspaceFile(name, content, onResult) },
+                        onDeleteFile = { name, onResult -> viewModel.deleteWorkspaceFile(name, onResult) },
+                        onGenerateFile = { name, prompt, existingContent, onResult ->
+                            viewModel.generateWorkspaceFile(name, prompt, existingContent, onResult)
+                        }
                     )
                 }
 
@@ -195,21 +289,37 @@ fun AppRoot(viewModel: AppViewModel) {
                     LaunchedEffect(chatId) { viewModel.loadChat(chatId) }
                     NewChatScreen(
                         chat = currentChat,
+                        screenChatId = chatId,
                         messages = messages,
                         isStreaming = isStreaming,
+                        isSending = isSending,
                         currentStreamingContent = streamingContent,
                         selectedModel = modelOverrides[chatId]?.second ?: currentChat?.modelId,
+                        selectedProviderId = modelOverrides[chatId]?.first ?: currentChat?.providerId,
                         providers = providers,
                         reasoning = reasoningLevel,
                         searchMode = searchModeState,
+                        searchProvider = searchProviderState,
+                        searchKeys = searchKeys,
                         favorites = favoriteModels,
-                        localSearchConfigured = searchKeys.values.any { it.isNotBlank() },
-                        onSendMessage = { text, files, level, mode -> viewModel.sendMessage(text, files, level, mode) },
+                        modelUsageCounts = modelUsageCounts,
+                        onSendMessage = { text, files, level, mode, onSaved ->
+                            viewModel.sendMessage(text, files, level, mode, onSaved)
+                        },
                         onStopGeneration = { viewModel.stopGeneration() },
+                        onChatScreenDisposed = { viewModel.onChatScreenDisposed(it) },
                         onBack = { newChat() },
                         onRenameChat = { viewModel.renameChat(chatId, it) },
-                        onBranchMessage = { viewModel.branchMessage(it) },
-                        onRegenerate = { viewModel.regenerateMessage(it) },
+                        onBranchMessage = {
+                            val branchId = viewModel.branchMessage(it)
+                            navController.navigate("chat/$branchId") { launchSingleTop = true }
+                        },
+                        onRegenerate = { message ->
+                            val retryChatId = viewModel.regenerateMessage(message, reasoningLevel, searchModeState)
+                            if (retryChatId != null && retryChatId != chatId) {
+                                navController.navigate("chat/$retryChatId") { launchSingleTop = true }
+                            }
+                        },
                         onCopyMessage = { },
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },
@@ -217,15 +327,23 @@ fun AppRoot(viewModel: AppViewModel) {
                         onToggleFavorite = { pid, mid -> viewModel.toggleFavoriteModel(pid, mid) },
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         onSearchModeChange = { viewModel.setSearchMode(it) },
+                        onSearchProviderChange = { viewModel.setSearchProvider(it) },
+                        onSaveSearchKey = { provider, key -> viewModel.setSearchKey(provider, key) },
                         onCompressHistory = { done -> viewModel.compressHistory(done) },
                         onNewImageChat = { newImageChat() },
                         chatMode = chatModes[chatId] ?: ChatMode.TEXT,
                         onChatModeChange = { viewModel.setChatMode(chatId, it) },
                         onOpenExtensions = { navController.navigate("mcp") },
-                        onOpenSearchSettings = { navController.navigate("search_service") },
                         fontSize = fontSize,
                         onAddProvider = { navController.navigate("add_provider") },
-                        onCheckProvider = { provider -> com.ariai.app.data.remote.checkConnection(provider) { viewModel.fetchModels(it) } }
+                        onManageProviders = { navController.navigate("providers") },
+                        onSaveNativeSearchProvider = { provider, onSaved ->
+                            viewModel.saveProviderAndReturn(provider, onSaved)
+                        },
+                        onCheckProvider = { provider -> com.ariai.app.data.remote.checkConnection(provider) { viewModel.fetchModels(it) } },
+                        onUpdateChatOptions = { temperature, topP, systemPrompt ->
+                            viewModel.updateChatOptions(chatId, temperature, topP, systemPrompt)
+                        }
                     )
                 }
 
@@ -236,13 +354,28 @@ fun AppRoot(viewModel: AppViewModel) {
                         onAddPreset = { navController.navigate("add_provider?preset=${it.name}") },
                         fetchModels = { viewModel.fetchModels(it) },
                         onSaveProvider = { provider, onSaved ->
-                            viewModel.saveProvider(provider)
-                            onSaved(provider)
+                            viewModel.saveProviderAndReturn(provider) { savedProvider ->
+                                if (savedProvider != null) activateNativeSearch(savedProvider)
+                                else scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                                onSaved(savedProvider)
+                            }
                         },
-                        onImportProvider = { viewModel.saveProvider(it) },
+                        onImportProvider = { provider ->
+                            viewModel.saveProviderAndReturn(provider) { savedProvider ->
+                                if (savedProvider == null) {
+                                    scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                                } else {
+                                    activateNativeSearch(savedProvider)
+                                }
+                            }
+                        },
                         onEditProvider = { navController.navigate("edit_provider/${it.id}") },
                         onBack = { navController.popBackStack() },
-                        onToggleProvider = { viewModel.saveProvider(it.copy(enabled = !it.enabled)) }
+                        onToggleProvider = { provider ->
+                            viewModel.saveProvider(provider.copy(enabled = !provider.enabled)) { saved ->
+                                if (!saved) scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                            }
+                        }
                     )
                 }
 
@@ -253,8 +386,18 @@ fun AppRoot(viewModel: AppViewModel) {
                     AddProviderScreen(
                         presetType = entry.arguments?.getString("preset")
                             ?.let { runCatching { com.ariai.app.data.models.ProviderType.valueOf(it) }.getOrNull() },
+                        existingProviderNames = providers.map { it.name }.toSet(),
                         fetchModels = { viewModel.fetchModels(it) },
-                        onSave = { viewModel.saveProvider(it); navController.popBackStack() },
+                        onSave = { provider ->
+                            viewModel.saveProviderAndReturn(provider) { savedProvider ->
+                                if (savedProvider != null) {
+                                    activateNativeSearch(savedProvider)
+                                    navController.popBackStack()
+                                } else {
+                                    scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                                }
+                            }
+                        },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -266,8 +409,18 @@ fun AppRoot(viewModel: AppViewModel) {
                     val providerId = entry.arguments?.getString("providerId") ?: ""
                     AddProviderScreen(
                         initialProvider = providers.find { it.id == providerId },
+                        existingProviderNames = providers.map { it.name }.toSet(),
                         fetchModels = { viewModel.fetchModels(it) },
-                        onSave = { viewModel.saveProvider(it); navController.popBackStack() },
+                        onSave = { provider ->
+                            viewModel.saveProviderAndReturn(provider) { savedProvider ->
+                                if (savedProvider != null) {
+                                    activateNativeSearch(savedProvider)
+                                    navController.popBackStack()
+                                } else {
+                                    scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+                                }
+                            }
+                        },
                         onBack = { navController.popBackStack() },
                         onDelete = { id -> viewModel.deleteProvider(id); navController.popBackStack() }
                     )
@@ -281,15 +434,10 @@ fun AppRoot(viewModel: AppViewModel) {
                         onStorageClick = { navController.navigate("storage") },
                         onMcpClick = { navController.navigate("mcp") },
                         onClearAll = { navController.navigate("storage") },
-                        currentTheme = theme,
-                        currentLanguage = language,
-                        dynamicColor = false,
-                        onDynamicColorChange = {},
-                        onThemeChange = { viewModel.setTheme(it) },
-                        onLanguageChange = { viewModel.setLanguage(it) },
                         onDefaultModelClick = { navController.navigate("default_model") },
                         onPreferencesClick = { navController.navigate("preferences") },
-                        defaultModelName = defaultModelName
+                        defaultModelName = defaultModelName,
+                        onAboutClick = { showAbout = true }
                     )
                 }
 
@@ -297,12 +445,16 @@ fun AppRoot(viewModel: AppViewModel) {
                     PreferencesScreen(
                         theme = theme,
                         onThemeChange = { viewModel.setTheme(it) },
-                        dynamicColor = false,
-                        onDynamicColorChange = {},
+                        dynamicColor = dynamicColor,
+                        onDynamicColorChange = { viewModel.setDynamicColor(it) },
                         reasoning = reasoningLevel,
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         fontSize = fontSize,
                         onFontSizeChange = { viewModel.setFontSize(it) },
+                        streamResponse = streamResponse,
+                        onStreamResponseChange = { viewModel.setStreamResponse(it) },
+                        currentLanguage = language,
+                        onLanguageChange = { viewModel.setLanguage(it) },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -310,6 +462,7 @@ fun AppRoot(viewModel: AppViewModel) {
                 composable("default_model") {
                     DefaultModelScreen(
                         providers = providers,
+                        defaultProviderId = defaultProviderId,
                         defaultModelId = defaultModelId,
                         onSelect = { pid, mid -> viewModel.setDefaultSelection(pid, mid) },
                         onAddProvider = { navController.navigate("add_provider") },
@@ -319,8 +472,18 @@ fun AppRoot(viewModel: AppViewModel) {
 
                 composable("search_service") {
                     SearchServiceScreen(
-                        searchKeys = searchKeys,
-                        onSaveKey = { name, key -> viewModel.setSearchKey(name, key) },
+                        providers = providers,
+                        searchMode = searchModeState,
+                        selectedProviderId = drawerProviderId,
+                        selectedModelId = drawerModelId,
+                        onModeChange = { viewModel.setSearchMode(it) },
+                        onSelectModel = { providerId, modelId ->
+                            currentChatId?.let { viewModel.updateChatProvider(it, providerId, modelId) }
+                                ?: viewModel.setDefaultSelection(providerId, modelId)
+                        },
+                        onSaveProvider = { provider, onSaved ->
+                            viewModel.saveProviderAndReturn(provider, onSaved)
+                        },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -329,14 +492,24 @@ fun AppRoot(viewModel: AppViewModel) {
                     StorageScreen(
                         chats = chats,
                         onClearAll = {
-                            chats.forEach { viewModel.deleteChat(it.id) }
-                            scope.launch { snackbarHostState.showSnackbar(tx("All chats deleted")) }
+                            val ids = chats.map { it.id }
+                            val deletingActiveChat = currentChatId != null && currentChatId in ids
+                            viewModel.deleteChats(ids) {
+                                if (deletingActiveChat) {
+                                    navController.navigate("chats") {
+                                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+                                scope.launch { snackbarHostState.showSnackbar(tx("All chats deleted")) }
+                            }
                         },
                         onBack = { navController.popBackStack() },
-                        generatedBytes = com.ariai.app.data.local.ImageStore.generatedBytes(),
+                        generatedBytes = generatedMediaBytes,
                         onClearGenerated = {
-                            com.ariai.app.data.local.ImageStore.clearGenerated()
-                            scope.launch { snackbarHostState.showSnackbar(tx("Generated files deleted")) }
+                            viewModel.clearGeneratedMedia {
+                                scope.launch { snackbarHostState.showSnackbar(tx("Generated files deleted")) }
+                            }
                         }
                     )
                 }
@@ -344,12 +517,9 @@ fun AppRoot(viewModel: AppViewModel) {
                 composable("mcp") {
                     SimpleMcpScreen(
                         servers = mcpServers,
-                        onToggle = { id ->
-                            val i = mcpServers.indexOfFirst { it.id == id }
-                            if (i >= 0) mcpServers[i] = mcpServers[i].copy(enabled = !mcpServers[i].enabled)
-                        },
-                        onAdd = { mcpServers.add(it) },
-                        onRemove = { id -> mcpServers.removeAll { it.id == id } },
+                        onToggle = viewModel::toggleMcpServer,
+                        onAdd = viewModel::addMcpServer,
+                        onRemove = viewModel::removeMcpServer,
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -357,6 +527,9 @@ fun AppRoot(viewModel: AppViewModel) {
                 composable("search") {
                     SimpleSearchScreen(
                         onBack = { navController.popBackStack() },
+                        canSearch = searchModelReady,
+                        onConfigureModel = { navController.navigate("default_model") },
+                        onConfigureSearch = { navController.navigate("search_service") },
                         onSearch = { query ->
                             val id = viewModel.createNewChat()
                             navController.navigate("chat/$id")
@@ -367,16 +540,32 @@ fun AppRoot(viewModel: AppViewModel) {
             }
         }
     }
+
+    if (showAbout) {
+        val aboutShape = paperPopupShape(26.dp)
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            modifier = paperPopupModifier(aboutShape),
+            shape = aboutShape,
+            containerColor = AriCard,
+            title = { Text(tx("About AriAI"), color = AriInk, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) },
+            text = { Text("${tx("Version")} ${BuildConfig.VERSION_NAME}", color = AriMuted) },
+            confirmButton = {
+                TextButton(onClick = { showAbout = false }) { Text(tx("Close")) }
+            }
+        )
+    }
 }
 
 class AppViewModelFactory(
     private val repository: com.ariai.app.data.repository.ChatRepository,
-    private val prefs: com.ariai.app.data.local.PreferencesManager
+    private val prefs: com.ariai.app.data.local.PreferencesManager,
+    private val workspaceRepository: com.ariai.app.data.repository.WorkspaceRepository
 ) : androidx.lifecycle.ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AppViewModel::class.java)) {
-            return AppViewModel(repository, prefs) as T
+            return AppViewModel(repository, prefs, workspaceRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
