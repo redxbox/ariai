@@ -607,7 +607,9 @@ tap "Open menu"
 tap "About"
 expect_text "About AriAI"
 expect_text "Version"
+expect_text "Close"
 shot 25-drawer-about
+tap "Close"
 
 tap "Open menu"
 tap "Search conversations"
