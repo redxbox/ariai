@@ -330,7 +330,20 @@ class ProviderAndChatUiTest {
 
     @Test
     fun welcomeSuggestionsStayAboveTheComposerSendButton() {
-        val chat = Chat(id = "chat-welcome-layout-test", title = "New chat", modelId = "mock-model")
+        val provider = Provider(
+            id = "provider-welcome-layout-test",
+            name = "Welcome layout provider",
+            type = ProviderType.OPENAI_COMPATIBLE,
+            baseUrl = "https://api.example.test/v1",
+            apiKey = "test-key",
+            models = listOf(AIModel("mock-model", "Mock model", "provider-welcome-layout-test"))
+        )
+        val chat = Chat(
+            id = "chat-welcome-layout-test",
+            title = "New chat",
+            providerId = provider.id,
+            modelId = "mock-model"
+        )
 
         compose.setContent {
             AriAiTheme(darkTheme = false) {
@@ -340,6 +353,8 @@ class ProviderAndChatUiTest {
                     isStreaming = false,
                     currentStreamingContent = "",
                     selectedModel = "mock-model",
+                    selectedProviderId = provider.id,
+                    providers = listOf(provider),
                     onSendMessage = { _, _, _, _, _ -> false },
                     onBack = {},
                     onBranchMessage = {},
