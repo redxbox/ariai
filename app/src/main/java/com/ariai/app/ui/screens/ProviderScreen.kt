@@ -4,14 +4,9 @@ import com.ariai.app.util.tx
 
 import com.ariai.app.ui.theme.*
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -22,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Brush
@@ -339,7 +332,6 @@ fun AddProviderScreen(
     val initialPreset = initialProvider?.let(::providerPresetFor)
         ?: presetLabelKey?.let { key -> providerPresets.firstOrNull { it.labelKey == key } }
         ?: presetType?.let(::defaultProviderPresetForType)
-    val canChangeProvider = presetLabelKey == null
     fun defaultNameFor(preset: ProviderPreset?): String {
         if (preset == null) return ""
         return if (preset.labelKey == "Custom") {
@@ -351,22 +343,12 @@ fun AddProviderScreen(
     var name by remember(initialProvider?.id, presetLabelKey, presetType, existingProviderNames) {
         mutableStateOf(initialProvider?.name ?: defaultNameFor(initialPreset))
     }
-    // Preset names follow the selected provider until the user supplies a custom name.
-    var nameManuallyEdited by remember(initialProvider?.id, presetLabelKey, presetType) {
-        mutableStateOf(initialProvider != null && initialProvider.name != defaultNameFor(initialPreset))
-    }
     var baseUrl by remember(initialProvider?.id, presetLabelKey, presetType) {
         mutableStateOf(initialProvider?.baseUrl ?: initialPreset?.baseUrl ?: "https://api.openai.com/v1")
     }
     var apiKey by remember { mutableStateOf(initialProvider?.apiKey ?: "") }
     var selectedType by remember(initialProvider?.id, presetLabelKey, presetType) {
         mutableStateOf(initialProvider?.type ?: initialPreset?.type ?: presetType ?: ProviderType.OPENAI)
-    }
-    var selectedPresetKey by remember(initialProvider?.id, presetLabelKey, presetType) {
-        mutableStateOf(initialPreset?.labelKey)
-    }
-    var providerPickerExpanded by remember(initialProvider?.id, presetLabelKey, presetType) {
-        mutableStateOf(initialProvider != null || presetLabelKey == null)
     }
     var reveal by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
@@ -578,126 +560,6 @@ fun AddProviderScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (tab == 0) {
-            item {
-                Column(
-                    modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    AnimatedVisibility(
-                        visible = canChangeProvider && providerPickerExpanded,
-                        enter = fadeIn(tween(180, easing = FastOutSlowInEasing)) +
-                            expandVertically(tween(240, easing = FastOutSlowInEasing), expandFrom = Alignment.Top),
-                        exit = fadeOut(tween(120)) +
-                            shrinkVertically(tween(180, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top)
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                SectionLabel(tx("Provider"))
-                                Spacer(Modifier.weight(1f))
-                                if (selectedPresetKey != null) {
-                                    IconButton(
-                                        modifier = Modifier.size(32.dp).testTag("provider-preset-collapse"),
-                                        onClick = { providerPickerExpanded = false }
-                                    ) {
-                                        Icon(
-                                            Icons.Default.ExpandLess,
-                                            contentDescription = tx("Collapse provider list"),
-                                            tint = AriMuted,
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-                                }
-                            }
-                            providerPresets.chunked(4).forEach { rowPresets ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    rowPresets.forEach { preset ->
-                                        val selected = selectedPresetKey == preset.labelKey
-                                        val presetTag = if (preset.labelKey == "Custom") "openai_compatible" else preset.labelKey.lowercase()
-                                        Surface(
-                                            modifier = Modifier.weight(1f).height(74.dp)
-                                                .selectable(selected = selected, role = Role.RadioButton) {
-                                                    selectedPresetKey = preset.labelKey
-                                                    selectedType = preset.type
-                                                    baseUrl = preset.baseUrl
-                                                    if (!nameManuallyEdited || name.isBlank()) {
-                                                        name = defaultNameFor(preset)
-                                                        nameManuallyEdited = false
-                                                    }
-                                                }
-                                                .testTag("provider-preset-$presetTag"),
-                                            shape = RoundedCornerShape(16.dp),
-                                            color = if (selected) preset.color.copy(alpha = 0.11f) else AriCard,
-                                            border = BorderStroke(
-                                                if (selected) 1.1.dp else 0.75.dp,
-                                                if (selected) preset.color.copy(alpha = 0.72f) else AriLine.copy(alpha = 0.9f)
-                                            ),
-                                            shadowElevation = 0.dp,
-                                            tonalElevation = 0.dp
-                                        ) {
-                                            Column(
-                                                modifier = Modifier.fillMaxSize().padding(vertical = 5.dp, horizontal = 3.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.spacedBy(3.dp)
-                                            ) {
-                                                ProviderBrandMark(type = preset.type, name = preset.label, size = 31.dp)
-                                                Text(
-                                                    preset.label,
-                                                    fontSize = 9.sp,
-                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                                    color = AriInk.copy(alpha = 0.92f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        }
-                                    }
-                                    repeat(4 - rowPresets.size) { Spacer(Modifier.weight(1f)) }
-                                }
-                            }
-                        }
-                    }
-                    AnimatedVisibility(
-                        visible = canChangeProvider && !providerPickerExpanded,
-                        enter = fadeIn(tween(160)) + expandVertically(tween(220), expandFrom = Alignment.Top),
-                        exit = fadeOut(tween(100)) + shrinkVertically(tween(160), shrinkTowards = Alignment.Top)
-                    ) {
-                        val chosenPreset = providerPresets.firstOrNull { it.labelKey == selectedPresetKey }
-                        val summaryName = name.ifBlank { chosenPreset?.label ?: providerTypeLabel(selectedType) }
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().testTag("provider-preset-summary"),
-                            shape = RoundedCornerShape(17.dp),
-                            color = AriCard,
-                            border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
-                            tonalElevation = 0.dp
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(9.dp)
-                            ) {
-                                ProviderBrandMark(type = selectedType, name = summaryName, size = 31.dp)
-                                Text(
-                                    summaryName,
-                                    modifier = Modifier.weight(1f),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = AriInk,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                TextButton(
-                                    modifier = Modifier.testTag("provider-preset-change"),
-                                    onClick = { providerPickerExpanded = true }
-                                ) { Text(tx("Change"), color = AriAccent, fontSize = 12.sp) }
-                            }
-                        }
-                    }
-                }
-            }
-
             // Connection
             item {
                 Surface(
@@ -710,10 +572,7 @@ fun AddProviderScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = name,
-                            onValueChange = {
-                                name = it
-                                nameManuallyEdited = true
-                            },
+                            onValueChange = { name = it },
                             label = { Text(tx("Name")) },
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),

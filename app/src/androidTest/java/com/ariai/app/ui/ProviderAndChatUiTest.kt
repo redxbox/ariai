@@ -220,28 +220,14 @@ class ProviderAndChatUiTest {
         val rootBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("provider actions should stay clear of the screen edge", actionBar.bottom < rootBottom)
         assertTrue("Save and Test should be full-size, balanced actions", saveAction.width > actionBar.width * 0.35f && testAction.width > actionBar.width * 0.35f)
-        val presetTags = listOf("openai", "gemini", "anthropic", "ollama", "openai_compatible")
-        val presetHeights = presetTags.map { providerTag ->
-            val preset = compose.onNodeWithTag("provider-preset-$providerTag")
-            assertDisplayed("$providerTag branded provider preset") { preset.assertIsDisplayed() }
-            preset.fetchSemanticsNode().boundsInRoot.height
-        }
-        val presetHeight = presetHeights.first()
+        val presetTags = listOf("openai", "gemini", "anthropic", "ollama", "deepseek", "openrouter", "openai_compatible")
         assertTrue(
-            "Provider tiles should keep a crisp, fixed height instead of resizing with selection: $presetHeights",
-            presetHeights.all { kotlin.math.abs(it - presetHeight) < 1f }
+            "The provider chooser should stay on Quick connect instead of repeating in the form",
+            presetTags.all { providerTag ->
+                compose.onAllNodesWithTag("provider-preset-$providerTag").fetchSemanticsNodes().isEmpty()
+            }
         )
-        compose.onNodeWithTag("provider-preset-openai").assertIsSelected()
-        clickWithLabel("Gemini provider preset") {
-            compose.onNodeWithTag("provider-preset-gemini").performClick()
-        }
-        compose.onNodeWithTag("provider-preset-gemini").assertIsSelected()
-        assertDisplayed("Gemini base URL after preset selection") {
-            compose.onNodeWithText("https://generativelanguage.googleapis.com/v1beta").assertIsDisplayed()
-        }
-        clickWithLabel("OpenAI provider preset") {
-            compose.onNodeWithTag("provider-preset-openai").performClick()
-        }
+        compose.onNodeWithText("https://api.openai.com/v1").assertIsDisplayed()
 
         compose.onNodeWithTag("provider-test-connection").assertIsDisplayed().performClick()
         compose.waitUntil(timeoutMillis = 5_000) {

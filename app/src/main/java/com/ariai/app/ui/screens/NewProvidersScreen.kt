@@ -45,6 +45,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -121,7 +125,8 @@ fun NewProvidersScreen(
         query.isBlank() ||
             preset.label.contains(query, ignoreCase = true) ||
             providerTypeLabel(preset.type).contains(query, ignoreCase = true) ||
-            providerPresetDescription(preset).contains(query, ignoreCase = true)
+            providerPresetDescription(preset).contains(query, ignoreCase = true) ||
+            providerPresetSearchTerms(preset).contains(query, ignoreCase = true)
     }
     var displayedPresets by remember { mutableStateOf(visiblePresets) }
     LaunchedEffect(visiblePresets) {
@@ -207,11 +212,10 @@ fun NewProvidersScreen(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(tx("Quick connect"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-                            Text(tx("OpenAI, DeepSeek, OpenRouter and more"), fontSize = 12.sp, color = AriMuted)
+                            Text(tx("Connect to popular AI providers in seconds"), fontSize = 12.sp, color = AriMuted)
                         }
                         ProviderCatalogGrid(
                             presets = displayedPresets,
-                            providers = providers,
                             onSelect = { openAddProvider(it) }
                         )
                     }
@@ -286,15 +290,23 @@ fun NewProvidersScreen(
 }
 
 private fun providerPresetDescription(preset: ProviderPreset): String = when (preset.labelKey) {
+    "OpenAI" -> tx("GPT models")
+    "Gemini" -> tx("Google models")
+    "Anthropic" -> tx("Claude models")
+    "Ollama" -> tx("Local models")
+    "DeepSeek" -> tx("DeepSeek models")
+    "OpenRouter" -> tx("Multiple providers")
+    else -> tx("Connect to any OpenAI-compatible API")
+}
+
+private fun providerPresetSearchTerms(preset: ProviderPreset): String = when (preset.labelKey) {
+    "OpenAI" -> tx("GPT-4o and o-series models")
+    "Gemini" -> tx("Gemini models, with Search and URL tools")
+    "Anthropic" -> tx("Claude models")
+    "Ollama" -> tx("Models that run on your own computer")
     "DeepSeek" -> tx("DeepSeek chat and reasoning models")
     "OpenRouter" -> tx("One API for models from many providers")
-    else -> when (preset.type) {
-        ProviderType.OPENAI -> tx("GPT-4o and o-series models")
-        ProviderType.GEMINI -> tx("Gemini models, with Search and URL tools")
-        ProviderType.ANTHROPIC -> tx("Claude models")
-        ProviderType.OLLAMA -> tx("Models that run on your own computer")
-        ProviderType.OPENAI_COMPATIBLE, ProviderType.CUSTOM -> tx("Any OpenAI-compatible API")
-    }
+    else -> tx("Any OpenAI-compatible API")
 }
 
 @Composable
@@ -317,14 +329,15 @@ private fun ProviderSummaryStrip(providers: List<Provider>) {
 @Composable
 private fun ProviderCatalogGrid(
     presets: List<ProviderPreset>,
-    providers: List<Provider>,
     onSelect: (ProviderPreset) -> Unit
 ) {
+    val popularPresets = presets.filterNot { it.labelKey == "Custom" }
+    val customPreset = presets.firstOrNull { it.labelKey == "Custom" }
     Column(
         modifier = Modifier.fillMaxWidth().animateContentSize(tween(220, easing = FastOutSlowInEasing)),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        presets.chunked(4).forEachIndexed { rowIndex, rowPresets ->
+        popularPresets.chunked(2).forEachIndexed { rowIndex, rowPresets ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -335,21 +348,26 @@ private fun ProviderCatalogGrid(
                         modifier = Modifier.weight(1f),
                         enter = fadeIn(tween(180, delayMillis = rowIndex * 45 + columnIndex * 28)) +
                             scaleIn(
-                                initialScale = 0.90f,
-                                animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                initialScale = 0.96f,
+                                animationSpec = tween(220, easing = FastOutSlowInEasing)
                             ),
                         exit = fadeOut(tween(120))
                     ) {
-                        ProviderCatalogTile(
-                            preset = preset,
-                            configured = providers.any {
-                                it.name.equals(preset.labelKey, ignoreCase = true)
-                            },
-                            onClick = { onSelect(preset) }
-                        )
+                        ProviderCatalogTile(preset = preset, onClick = { onSelect(preset) })
                     }
                 }
-                repeat(4 - rowPresets.size) { Spacer(Modifier.weight(1f)) }
+                if (rowPresets.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        customPreset?.let { preset ->
+            AnimatedVisibility(
+                visible = true,
+                modifier = Modifier.fillMaxWidth(),
+                enter = fadeIn(tween(180, delayMillis = popularPresets.chunked(2).size * 45 + 60)) +
+                    scaleIn(initialScale = 0.96f, animationSpec = tween(220, easing = FastOutSlowInEasing)),
+                exit = fadeOut(tween(120))
+            ) {
+                ProviderCatalogTile(preset = preset, onClick = { onSelect(preset) })
             }
         }
     }
@@ -358,45 +376,77 @@ private fun ProviderCatalogGrid(
 @Composable
 private fun ProviderCatalogTile(
     preset: ProviderPreset,
-    configured: Boolean,
     onClick: () -> Unit
 ) {
+    val isCustom = preset.labelKey == "Custom"
+    val tileModifier = Modifier.fillMaxWidth()
+        .height(if (isCustom) 66.dp else 64.dp)
+        .animateContentSize(tween(180, easing = FastOutSlowInEasing))
+        .then(
+            if (isCustom) Modifier.drawWithContent {
+                drawContent()
+                drawRoundRect(
+                    color = AriLine.copy(alpha = 0.9f),
+                    cornerRadius = CornerRadius(18.dp.toPx()),
+                    style = Stroke(
+                        width = 1.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))
+                    )
+                )
+            } else Modifier
+        )
+        .testTag("provider-catalog-${preset.labelKey.lowercase()}")
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(78.dp)
-            .animateContentSize(tween(180, easing = FastOutSlowInEasing))
-            .testTag("provider-catalog-${preset.labelKey.lowercase()}"),
+        modifier = tileModifier,
         shape = RoundedCornerShape(18.dp),
-        color = if (configured) preset.color.copy(alpha = 0.07f) else AriCard,
+        color = AriCard,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        border = BorderStroke(
-            0.8.dp,
-            if (configured) preset.color.copy(alpha = 0.36f) else AriLine.copy(alpha = 0.8f)
-        )
+        border = if (isCustom) null else BorderStroke(0.8.dp, AriLine.copy(alpha = 0.8f))
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (configured) {
-                Box(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(6.dp)
-                        .clip(CircleShape).background(preset.color)
-                )
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = if (isCustom) 13.dp else 9.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(42.dp).clip(CircleShape)
+                    .background(if (isCustom) AriAccent.copy(alpha = 0.10f) else preset.color.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isCustom) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = AriAccent, modifier = Modifier.size(25.dp))
+                } else {
+                    ProviderBrandMark(type = preset.type, name = preset.label, size = 34.dp)
+                }
             }
             Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                ProviderBrandMark(type = preset.type, name = preset.label, size = 32.dp)
                 Text(
                     preset.label,
-                    fontSize = 10.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Text(
+                    providerPresetDescription(preset),
+                    fontSize = 10.sp,
+                    color = AriMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = AriMuted,
+                modifier = Modifier.size(19.dp)
+            )
         }
     }
 }
