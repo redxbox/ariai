@@ -322,6 +322,10 @@ class ProviderAndChatUiTest {
 
         compose.onNodeWithTag("chat-composer").performClick().performTextInput("سلام")
         compose.onNodeWithTag("chat-composer").assertTextEquals("سلام")
+
+        compose.onNodeWithTag("chat-thinking-chip", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Thinking depth").assertIsDisplayed()
+        compose.onNodeWithText("Not every model supports this", substring = true).assertIsDisplayed()
     }
 
     @Test

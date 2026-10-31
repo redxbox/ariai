@@ -281,7 +281,7 @@ shot 02-model-picker
 back
 end_step
 
-step "Providerless chat state, thinking controls, and rename dialog"
+step "Providerless chat state and rename dialog"
 tap "Message AriAI"
 type_text "EmulatorSmokeTestWithoutProvider"
 hide_keyboard
@@ -289,11 +289,6 @@ expect_text "Add your first AI provider to start chatting"
 expect_text "EmulatorSmokeTestWithoutProvider"
 expect_absent_text "No provider configured"
 shot 02a-providerless-chat
-tap "Off"
-expect_text "Thinking depth"
-expect_text "Not every model supports this"
-shot 03-thinking-sheet
-back
 tap "More"
 tap "Rename chat"
 expect_text "Save"
