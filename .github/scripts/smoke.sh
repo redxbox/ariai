@@ -175,10 +175,44 @@ dismiss_external_picker() {
     sleep 2
   done
 
-  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-  echo "::error title=External picker return::Could not keep AriAI foreground after the platform picker; expected '${return_label}', foreground: ${activity:0:400}."
-  capture_failure "$return_label"
-  return 1
+  echo "::warning title=External picker recovery::The platform picker reclaimed the foreground after three recovery attempts; restarting AriAI's task."
+  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+  adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
+  adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
+  sleep 1
+  if ! adb shell am start -W --activity-new-task --activity-clear-task -n "$PKG/.MainActivity" \
+    | tee -a "$OUT/return-from-external-picker.txt"; then
+    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+    echo "::error title=External picker return::Could not restart AriAI after the platform picker; expected '${return_label}', foreground: ${activity:0:400}."
+    capture_failure "$return_label"
+    return 1
+  fi
+
+  stable_main=0
+  for poll in 1 2 3 4 5 6 7 8 9 10; do
+    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+    if [[ "$activity" == *"$PKG/.MainActivity"* ]]; then
+      stable_main=$((stable_main + 1))
+      if (( stable_main >= 4 )); then break; fi
+    else
+      stable_main=0
+    fi
+    sleep 1
+  done
+  if (( stable_main < 4 )); then
+    echo "::error title=External picker return::AriAI did not regain stable foreground after a clean task restart; foreground: ${activity:0:400}."
+    capture_failure "$return_label"
+    return 1
+  fi
+
+  if [[ "$return_label" == "Import provider" ]]; then
+    wait_for_text "Choose model" 30
+    tap "Open menu"
+    tap "Providers"
+    wait_for_text "Quick connect" 20
+    tap "Import provider"
+    wait_for_text "Paste a provider as JSON" 20
+  fi
 }
 
 return_to_chat_after_external() {
