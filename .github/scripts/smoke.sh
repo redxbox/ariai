@@ -139,9 +139,15 @@ dismiss_external_picker() {
   local activity
   activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
   if [[ "$activity" == *PhotoPickerActivity* ]]; then
-    echo "::warning title=Photo Picker recovery::Android Back left PhotoPickerActivity foregrounded; closing the platform picker to return a cancelled result."
+    echo "::warning title=Photo Picker recovery::Android Back left PhotoPickerActivity foregrounded; closing the platform picker and restoring AriAI."
     adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
     sleep 2
+    # On API 34 the system picker can remain at the top of AriAI's task after force-stop.
+    # CLEAR_TOP removes that external activity and returns to the existing chat instead of
+    # accidentally tapping inside the picker on the next smoke step.
+    adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
+      | tee "$OUT/return-from-photo-picker.txt"
+    sleep 1
   fi
 }
 
