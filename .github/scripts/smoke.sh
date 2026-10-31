@@ -286,7 +286,7 @@ tap "Message AriAI"
 type_text "EmulatorSmokeTestWithoutProvider"
 hide_keyboard
 tap "Send"
-expect_text "No provider configured"
+wait_for_text "No provider configured" 15
 shot 02a-send-without-provider
 tap "Off"
 expect_text "Thinking depth"
@@ -455,7 +455,7 @@ tap "Describe what to build or change"
 type_text "Create a small static HTML page"
 hide_keyboard
 tap "Generate"
-expect_text "No provider configured"
+wait_for_text "No provider configured" 15
 shot 25-workspace-generate-without-provider
 expect_text "Cancel"
 tap "Cancel"
