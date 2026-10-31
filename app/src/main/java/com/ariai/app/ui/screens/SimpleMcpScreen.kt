@@ -63,7 +63,9 @@ fun SimpleMcpScreen(
                 containerColor = Accent,
                 contentColor = AriCard,
                 shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.testTag("mcp-add-server"),
+                modifier = Modifier.testTag("mcp-add-server").semantics {
+                    contentDescription = tx("Add server")
+                },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text(tx("Add server"), fontWeight = FontWeight.SemiBold) }
             )
