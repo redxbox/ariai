@@ -134,43 +134,51 @@ dismiss_external_picker() {
   local return_label="${1:-Choose model}"
   local activity
   local attempt
+  local poll
+  local stable_main
   # Prefer the picker's own Cancel button, then fall back to Back. Check the resumed
-  # activity rather than the accessibility tree: a background AriAI tree can look ready
-  # while PhotoPickerActivity still owns the foreground.
+  # activity over several seconds: the system picker can briefly expose AriAI during
+  # its return animation, then reclaim the foreground before the next smoke tap.
   if python3 .github/scripts/ui_tap.py --exact "Cancel" >/dev/null 2>&1; then
     echo "::notice title=External picker cancellation::Tapped Cancel in the platform picker."
   else
     back
   fi
 
-  for attempt in 1 2 3; do
-    sleep 1
-    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-    if [[ "$activity" == *"$PKG/.MainActivity"* ]]; then
-      sleep 1
+  for attempt in 1 2 3 4; do
+    stable_main=0
+    for poll in 1 2 3 4 5; do
       activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
       if [[ "$activity" == *"$PKG/.MainActivity"* ]]; then
-        echo "::notice title=External picker return::AriAI is foreground; expected screen: ${return_label}."
-        return 0
+        stable_main=$((stable_main + 1))
+        if (( stable_main >= 4 )); then
+          echo "::notice title=External picker return::AriAI stayed foreground; expected screen: ${return_label}."
+          return 0
+        fi
+      else
+        stable_main=0
       fi
-    fi
+      sleep 1
+    done
 
+    if (( attempt == 4 )); then
+      break
+    fi
     echo "::warning title=External picker recovery::Attempt ${attempt}/3; foreground is ${activity:0:300}. Restoring AriAI."
     adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
     adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
     sleep 1
-    adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
-      | tee -a "$OUT/return-from-external-picker.txt"
+    if ! adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
+      | tee -a "$OUT/return-from-external-picker.txt"; then
+      echo "::warning title=External picker recovery::AriAI relaunch command failed on attempt ${attempt}."
+    fi
     sleep 2
   done
 
   activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-  if [[ "$activity" != *"$PKG/.MainActivity"* ]]; then
-    echo "::error title=External picker return::Could not restore AriAI after the platform picker; expected '${return_label}', foreground: ${activity:0:400}."
-    capture_failure "$return_label"
-    return 1
-  fi
-  echo "::notice title=External picker return::AriAI is foreground after ${attempt} recovery attempts; expected screen: ${return_label}."
+  echo "::error title=External picker return::Could not keep AriAI foreground after the platform picker; expected '${return_label}', foreground: ${activity:0:400}."
+  capture_failure "$return_label"
+  return 1
 }
 
 return_to_chat_after_external() {
