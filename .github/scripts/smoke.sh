@@ -131,13 +131,8 @@ back() {
 }
 
 dismiss_external_picker() {
-  local label
-  for label in Cancel Close; do
-    if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1; then
-      tap "$label"
-      return 0
-    fi
-  done
+  # The platform pickers expose Cancel as visible text on some releases, but tapping it can
+  # leave the picker activity foregrounded. Back consistently returns to AriAI or its import sheet.
   back
 }
 
