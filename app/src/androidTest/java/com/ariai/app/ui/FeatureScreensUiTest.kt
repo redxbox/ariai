@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
@@ -45,11 +46,19 @@ class FeatureScreensUiTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private inline fun assertVisible(description: String, assertion: () -> Unit) {
+    private inline fun assertVisible(
+        description: String,
+        diagnostics: () -> String = { "" },
+        assertion: () -> Unit
+    ) {
         try {
             assertion()
         } catch (error: AssertionError) {
-            throw AssertionError("$description should be visible: ${error.message}", error)
+            val details = runCatching(diagnostics).getOrNull()?.takeIf { it.isNotBlank() }
+            throw AssertionError(
+                "$description should be visible: ${error.message}${details?.let { "; $it" }.orEmpty()}",
+                error
+            )
         }
     }
 
@@ -388,8 +397,13 @@ class FeatureScreensUiTest {
 
         compose.onNodeWithText("MCP support is a preview: server URLs are not contacted and tools are not yet used in chats.")
             .assertExists()
-        assertVisible("Add server action") {
-            compose.onNodeWithText("Add server").assertIsDisplayed().performClick()
+        val addServerAction = compose.onNodeWithTag("mcp-add-server")
+        assertVisible("Add server action", diagnostics = {
+            val targetBounds = runCatching { addServerAction.fetchSemanticsNode().boundsInRoot }.getOrNull()
+            val rootBounds = runCatching { compose.onRoot().fetchSemanticsNode().boundsInRoot }.getOrNull()
+            "target=$targetBounds root=$rootBounds"
+        }) {
+            addServerAction.assertIsDisplayed().performClick()
         }
         compose.waitForIdle()
         assertVisible("MCP server name field") {

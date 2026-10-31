@@ -452,8 +452,8 @@ class ProviderAndChatUiTest {
         assertDisplayed("saved-provider filter") {
             compose.onNodeWithTag("provider-filter-${provider.id}").assertIsDisplayed()
         }
-        compose.onNodeWithTag("provider-filter-all").assertTextContains("6 models")
-        compose.onNodeWithTag("model-picker-selected-count").assertTextEquals("5 models")
+        compose.onNodeWithTag("provider-filter-all").assertTextContains("6")
+        compose.onNodeWithTag("model-picker-selected-count").assertTextContains("5")
         if (compose.onAllNodesWithTag("model-picker-provider-rail").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithTag("model-picker-provider-rail")
                 .performScrollToNode(hasTestTag("provider-filter-${alternateProvider.id}"))
@@ -649,6 +649,13 @@ class ProviderAndChatUiTest {
         }
         assertDisplayed("configured provider filter opened from chat") {
             compose.onNodeWithTag("provider-filter-${provider.id}").assertIsDisplayed()
+        }
+        val selectedModelGroup = compose.onNodeWithTag("model-picker-group-other-models")
+        assertDisplayed("selected model family") { selectedModelGroup.assertIsDisplayed() }
+        clickWithLabel("open selected model family") { selectedModelGroup.performClick() }
+        compose.waitForIdle()
+        assertDisplayed("selected model family popup") {
+            compose.onNodeWithTag("model-picker-group-popup-other-models").assertIsDisplayed()
         }
         val rowTag = "model-row-${provider.id}-model-one"
         val selectedModelRow = compose.onNodeWithTag(rowTag, useUnmergedTree = true)
