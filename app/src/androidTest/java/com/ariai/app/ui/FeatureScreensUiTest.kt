@@ -380,7 +380,7 @@ class FeatureScreensUiTest {
 
         compose.onNodeWithText("MCP support is a preview: server URLs are not contacted and tools are not yet used in chats.")
             .assertExists()
-        compose.onNodeWithContentDescription("Add server").performClick()
+        compose.onNodeWithText("Add server").assertIsDisplayed().performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("mcp-server-name").performScrollTo().assertIsDisplayed().performTextInput("Local MCP")
         compose.onNodeWithTag("mcp-server-url").performScrollTo().assertIsDisplayed().performTextInput("https://")

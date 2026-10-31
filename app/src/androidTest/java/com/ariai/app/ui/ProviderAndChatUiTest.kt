@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -50,7 +51,7 @@ class ProviderAndChatUiTest {
         try {
             assertion()
         } catch (error: AssertionError) {
-            throw AssertionError("$description should be displayed", error)
+            throw AssertionError("$description should be displayed: ${error.message}", error)
         }
     }
 
@@ -58,7 +59,7 @@ class ProviderAndChatUiTest {
         try {
             click()
         } catch (error: Throwable) {
-            throw AssertionError("$description click failed", error)
+            throw AssertionError("$description click failed: ${error.message}", error)
         }
     }
 
@@ -214,7 +215,8 @@ class ProviderAndChatUiTest {
         compose.onNodeWithText("Mock provider").assertExists()
         compose.onNodeWithTag("provider-toggle-${provider.value.id}").assertIsOn().performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Turned off").assertExists()
+        compose.onNodeWithTag("provider-toggle-${provider.value.id}").assertIsOff()
+        assertTrue("provider toggle callback should persist its disabled state", !provider.value.enabled)
 
         screen.value = "chat"
         compose.waitForIdle()
@@ -441,6 +443,7 @@ class ProviderAndChatUiTest {
         compose.waitForIdle()
         compose.onNodeWithTag("chat-model-floater").performClick()
         compose.waitForIdle()
+        compose.onNodeWithTag("model-picker-overflow").assertExists()
 
         assertDisplayed("provider dock") {
             compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
@@ -635,6 +638,7 @@ class ProviderAndChatUiTest {
         compose.waitForIdle()
         clickWithLabel("chat model floater") { modelFloater.performClick() }
         compose.waitForIdle()
+        compose.onNodeWithTag("model-picker-overflow").assertExists()
         assertDisplayed("provider dock opened from chat") {
             compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
         }

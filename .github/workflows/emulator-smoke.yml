@@ -129,7 +129,9 @@ jobs:
           from pathlib import Path
           import xml.etree.ElementTree as ET
 
-          for report in Path("app/build").rglob("TEST-*.xml"):
+          reports = list(Path("app/build").rglob("*.xml"))
+          print(f"::notice title=Android UI report parser::Scanning {len(reports)} XML files for failures.")
+          for report in reports:
               try:
                   root = ET.parse(report).getroot()
               except (ET.ParseError, OSError):
