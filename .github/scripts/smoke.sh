@@ -342,7 +342,7 @@ step "Attachment picker and generation modes"
 tap "Add to message"
 expect_text "Photo"
 expect_text "Camera"
-expect_text "Text file"
+expect_text "Files"
 expect_text "Image"
 expect_text "Video"
 expect_text "Audio"
@@ -359,7 +359,7 @@ shot 13-photo-picker
 dismiss_external_picker
 wait_for_text "Choose model" 20
 tap "Add to message"
-tap "Text file"
+tap "Files"
 sleep 2
 shot 14-document-picker
 tap "ui.xml"
