@@ -748,12 +748,13 @@ tap "Settings"
 expect_text "General"
 shot 42-settings
 
+tap "Preferences"
+expect_text "Appearance"
 tap_scroll "Dark"
 shot 43-settings-dark-theme
 tap_scroll "System"
 shot 44-settings-system-theme
 
-tap_scroll "Preferences"
 expect_text "Stream replies"
 expect_text "Default thinking depth"
 shot 47-preferences
@@ -767,14 +768,16 @@ tap "Medium"
 expect_text "Preview: the quick brown fox"
 back
 
+tap "Preferences"
 expect_text "Language"
-tap "Language"
+tap_scroll "Persian"
 expect_text "زبان"
 shot 45-settings-persian-rtl
 # Toggle back to English so the remaining test selectors are stable.
-tap "زبان"
-expect_text "Settings"
-shot 46-settings-english
+tap_scroll "انگلیسی"
+expect_text "Preferences"
+shot 46-preferences-english
+back
 
 tap_scroll "Default model"
 expect_text "New chats start with this model"
