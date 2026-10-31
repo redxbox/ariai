@@ -651,6 +651,14 @@ for provider in OpenAI Anthropic Ollama Custom Gemini; do
   expect_text "Base URL"
   expect_text "API key"
   if [[ "$provider" == "Gemini" ]]; then
+    # Typing into the form should not leave the fixed actions floating over the editor.
+    tap "API key"
+    expect_absent_text "Save"
+    expect_absent_text "Test"
+    shot 29-gemini-form-with-keyboard
+    hide_keyboard
+    expect_text "Save"
+    expect_text "Test"
     shot 29-add-gemini-provider
     shot 30-provider-presets
   else

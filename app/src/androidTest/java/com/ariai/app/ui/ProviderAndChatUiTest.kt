@@ -226,7 +226,7 @@ class ProviderAndChatUiTest {
     }
 
     @Test
-    fun providerEditorKeepsFloatingActionsReachableAndShowsConnectionDialogResult() {
+    fun providerEditorKeepsCompactActionDockReachableAndShowsConnectionDialogResult() {
         var savedProvider: Provider? = null
         var connectionRequests = 0
 
@@ -255,7 +255,11 @@ class ProviderAndChatUiTest {
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val rootBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("provider actions should stay clear of the screen edge", actionBar.bottom < rootBottom)
-        assertTrue("Save and Test should be full-size, balanced actions", saveAction.width > actionBar.width * 0.35f && testAction.width > actionBar.width * 0.35f)
+        assertTrue(
+            "Save and Test should be compact, equally sized targets inside the dock",
+            saveAction.height == testAction.height && saveAction.height < actionBar.height
+        )
+        assertTrue("Save and Test should remain balanced actions", saveAction.width > actionBar.width * 0.35f && testAction.width > actionBar.width * 0.35f)
         val presetTags = listOf("openai", "gemini", "anthropic", "ollama", "deepseek", "openrouter", "openai_compatible")
         assertTrue(
             "The provider chooser should stay on Quick connect instead of repeating in the form",

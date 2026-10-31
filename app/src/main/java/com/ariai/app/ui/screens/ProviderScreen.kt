@@ -29,6 +29,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -504,6 +505,8 @@ fun AddProviderScreen(
         )
     }
 
+    val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
     Scaffold(
         modifier = modifier.fillMaxSize().background(
             Brush.verticalGradient(
@@ -526,13 +529,17 @@ fun AddProviderScreen(
             )
         },
         bottomBar = {
-            ProviderActionBar(
-                fetching = fetching,
-                checkingConnection = checkingConnection,
-                canSave = canSave && !fetching,
-                onSave = { saveProviderDraft() },
-                onCheckConnection = { if (!checkingConnection && !fetching) runConnectionCheck() }
-            )
+            // Keep the form unobstructed while the keyboard is open. Actions return to the
+            // bottom dock as soon as the user dismisses the IME.
+            if (!isImeVisible) {
+                ProviderActionBar(
+                    fetching = fetching,
+                    checkingConnection = checkingConnection,
+                    canSave = canSave && !fetching,
+                    onSave = { saveProviderDraft() },
+                    onCheckConnection = { if (!checkingConnection && !fetching) runConnectionCheck() }
+                )
+            }
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -784,145 +791,94 @@ private fun ProviderActionBar(
 ) {
     val saveEnabled = canSave && !fetching
     val testEnabled = !checkingConnection && !fetching
-    val saveStart by animateColorAsState(
-        targetValue = if (saveEnabled) Color(0xFF648BFF) else Color(0xFFB3C0DC),
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "provider-save-start"
-    )
-    val saveEnd by animateColorAsState(
-        targetValue = if (saveEnabled) Color(0xFF324472) else Color(0xFF899BC0),
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "provider-save-end"
-    )
-    val saveBrush = remember(saveStart, saveEnd) { Brush.linearGradient(listOf(saveStart, saveEnd)) }
-    val testStart by animateColorAsState(
-        targetValue = if (testEnabled) Color(0xFFFCFDFF) else AriCard,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "provider-test-start"
-    )
-    val testEnd by animateColorAsState(
-        targetValue = if (testEnabled) Color(0xFFDDE7FF) else AriTint,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "provider-test-end"
-    )
-    val testBrush = remember(testStart, testEnd) { Brush.linearGradient(listOf(testStart, testEnd)) }
+    val accent = MaterialTheme.colorScheme.primary
+    val onAccent = MaterialTheme.colorScheme.onPrimary
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
-    Box(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .imePadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag("provider-save-action-bar"),
+        shape = RoundedCornerShape(22.dp),
+        color = AriCard,
+        border = BorderStroke(1.dp, AriLine.copy(alpha = 0.8f)),
+        shadowElevation = 6.dp,
+        tonalElevation = 0.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("provider-save-action-bar")
+                .padding(8.dp)
                 .animateContentSize(tween(180, easing = FastOutSlowInEasing)),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Surface(
+            Button(
                 onClick = onSave,
                 enabled = saveEnabled,
-                modifier = Modifier.weight(1f).height(52.dp).testTag("provider-save"),
-                shape = RoundedCornerShape(18.dp),
-                color = Color.Transparent,
-                contentColor = Color.White,
-                border = BorderStroke(1.dp, if (saveEnabled) Color.White.copy(alpha = 0.28f) else AriLine.copy(alpha = 0.65f)),
-                shadowElevation = if (saveEnabled) 7.dp else 1.dp,
-                tonalElevation = 0.dp
+                modifier = Modifier.weight(1f).height(48.dp).testTag("provider-save"),
+                shape = RoundedCornerShape(15.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accent,
+                    contentColor = onAccent,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor = muted
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 1.dp)
             ) {
-                Box(Modifier.fillMaxSize().background(saveBrush)) {
-                    Spacer(
-                        Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color.Transparent, Color.White.copy(alpha = 0.5f), Color.Transparent)
-                                )
-                            )
+                if (fetching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = onAccent
                     )
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier.size(30.dp).clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.16f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (fetching) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(17.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color.White
-                                )
-                            } else {
-                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(17.dp))
-                            }
-                        }
-                        if (!fetching) {
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                tx("Save"),
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                } else {
+                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        tx("Save"),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
-            Surface(
+            OutlinedButton(
                 onClick = onCheckConnection,
                 enabled = testEnabled,
-                modifier = Modifier.weight(1f).height(52.dp).testTag("provider-test-connection"),
-                shape = RoundedCornerShape(18.dp),
-                color = Color.Transparent,
-                contentColor = AriAccent,
-                border = BorderStroke(1.dp, AriAccent.copy(alpha = if (testEnabled) 0.22f else 0.12f)),
-                shadowElevation = if (testEnabled) 4.dp else 0.dp,
-                tonalElevation = 0.dp
+                modifier = Modifier.weight(1f).height(48.dp).testTag("provider-test-connection"),
+                shape = RoundedCornerShape(15.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = accent,
+                    disabledContentColor = muted
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (testEnabled) accent.copy(alpha = 0.34f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.65f)
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
             ) {
-                Box(Modifier.fillMaxSize().background(testBrush)) {
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier.size(30.dp).clip(CircleShape)
-                                .background(AriAccent.copy(alpha = 0.10f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (checkingConnection) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(17.dp),
-                                    strokeWidth = 2.dp,
-                                    color = AriAccent
-                                )
-                            } else {
-                                Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(17.dp))
-                            }
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            if (checkingConnection) tx("Checking…") else tx("Test"),
-                            color = AriAccent,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                if (checkingConnection) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = accent
+                    )
+                } else {
+                    Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        tx("Test"),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
