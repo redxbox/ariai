@@ -579,6 +579,8 @@ step "Navigation drawer and provider screens"
 tap "Open menu"
 expect_text "Search conversations"
 expect_text "Providers"
+expect_text "Tools"
+tap "Tools"
 expect_text "MCP"
 expect_text "Settings"
 expect_text "About"
@@ -613,6 +615,7 @@ type_text "no-match-arena-smoke"
 hide_keyboard
 expect_text "No matches"
 shot 25-drawer-search-no-matches
+tap "Tools"
 tap "MCP"
 expect_text "Model Context Protocol"
 shot 25-mcp-from-drawer
