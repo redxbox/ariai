@@ -714,6 +714,7 @@ end_step
 
 step "Search-service settings for Gemini and Anthropic"
 tap "Open menu"
+tap "Tools"
 tap "Search"
 expect_text "Search service"
 expect_text "Built-in web search"
