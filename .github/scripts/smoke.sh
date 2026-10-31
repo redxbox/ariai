@@ -298,10 +298,10 @@ end_step
 
 step "Providerless chat state and rename dialog"
 tap "Message AriAI"
-type_text "EmulatorSmokeTestWithoutProvider"
+type_text "AriAISmoke"
 hide_keyboard
 expect_text "Add your first AI provider to start chatting"
-expect_text "EmulatorSmokeTestWithoutProvider"
+expect_text "AriAISmoke"
 expect_absent_text "No provider configured"
 shot 02a-providerless-chat
 tap "More"
