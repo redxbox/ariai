@@ -738,6 +738,7 @@ expect_text "No separate search key is needed"
 shot 40-inline-anthropic-search-settings
 tap "Cancel"
 back
+back
 expect_text "Choose model"
 end_step
 
