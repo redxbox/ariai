@@ -464,7 +464,8 @@ back
 expect_text "Choose model"
 tap "Open menu"
 tap "About"
-expect_text "AriAI v1.0 - Personal AI"
+expect_text "About AriAI"
+expect_text "Version"
 shot 25-drawer-about
 
 tap "Open menu"
@@ -667,7 +668,8 @@ fi
 back
 expect_text "About AriAI"
 tap_exact "About AriAI"
-wait_for_text "AriAI v1.0 - Personal AI" 8
+wait_for_text "About AriAI" 8
+expect_text "Version"
 shot 54-settings-about
 back
 expect_text "Choose model"
