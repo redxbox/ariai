@@ -131,22 +131,18 @@ back() {
 }
 
 dismiss_external_picker() {
+  local return_label="${1:-Choose model}"
   # The platform pickers expose Cancel as visible text on some releases, but tapping it can
-  # leave the picker activity foregrounded. Back is the normal cancellation path; Android 14's
-  # Photo Picker has occasionally ignored it in CI, so terminate only that isolated picker as a
-  # fallback to deliver a cancelled result back to AriAI.
+  # leave the picker activity foregrounded. Back is the normal cancellation path. If the
+  # expected AriAI screen is still not visible, close the isolated system picker and restore
+  # AriAI's existing task with CLEAR_TOP before the next smoke action.
   back
-  local activity
-  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
-  if [[ "$activity" == *PhotoPickerActivity* ]]; then
-    echo "::warning title=Photo Picker recovery::Android Back left PhotoPickerActivity foregrounded; closing the platform picker and restoring AriAI."
+  if ! python3 .github/scripts/ui_tap.py --assert "$return_label" >/dev/null 2>&1; then
+    echo "::warning title=External picker recovery::Android Back did not restore '${return_label}'; closing the system picker and returning to AriAI."
     adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
-    sleep 2
-    # On API 34 the system picker can remain at the top of AriAI's task after force-stop.
-    # CLEAR_TOP removes that external activity and returns to the existing chat instead of
-    # accidentally tapping inside the picker on the next smoke step.
+    sleep 1
     adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
-      | tee "$OUT/return-from-photo-picker.txt"
+      | tee "$OUT/return-from-external-picker.txt"
     sleep 1
   fi
 }
@@ -378,7 +374,7 @@ shot 12-attachment-sheet
 tap_scroll_up "Photo"
 sleep 2
 shot 13-photo-picker
-dismiss_external_picker
+dismiss_external_picker "Choose model"
 wait_for_text "Choose model" 20
 tap "Add to message"
 tap "Files"
@@ -516,7 +512,7 @@ shot 27-import-provider-dialog
 tap "Scan provider QR from gallery"
 sleep 2
 shot 27-provider-qr-gallery-picker
-dismiss_external_picker
+dismiss_external_picker "Import provider"
 expect_text "Import provider"
 tap "Cancel"
 
