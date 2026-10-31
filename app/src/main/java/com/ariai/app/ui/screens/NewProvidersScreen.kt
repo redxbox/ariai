@@ -379,6 +379,7 @@ private fun ProviderCatalogTile(
     onClick: () -> Unit
 ) {
     val isCustom = preset.labelKey == "Custom"
+    val customBorderColor = AriLine.copy(alpha = 0.9f)
     val tileModifier = Modifier.fillMaxWidth()
         .height(if (isCustom) 66.dp else 64.dp)
         .animateContentSize(tween(180, easing = FastOutSlowInEasing))
@@ -386,7 +387,7 @@ private fun ProviderCatalogTile(
             if (isCustom) Modifier.drawWithContent {
                 drawContent()
                 drawRoundRect(
-                    color = AriLine.copy(alpha = 0.9f),
+                    color = customBorderColor,
                     cornerRadius = CornerRadius(18.dp.toPx()),
                     style = Stroke(
                         width = 1.dp.toPx(),
