@@ -137,8 +137,11 @@ dismiss_external_picker() {
   # expected AriAI screen is still not visible, close the isolated system picker and restore
   # AriAI's existing task with CLEAR_TOP before the next smoke action.
   back
-  if ! python3 .github/scripts/ui_tap.py --assert "$return_label" >/dev/null 2>&1; then
-    echo "::warning title=External picker recovery::Android Back did not restore '${return_label}'; closing the system picker and returning to AriAI."
+  local activity
+  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+  if [[ "$activity" == *PhotoPickerActivity* ]] || \
+      ! python3 .github/scripts/ui_tap.py --assert "$return_label" >/dev/null 2>&1; then
+    echo "::warning title=External picker recovery::Android Back did not restore '${return_label}' (foreground: ${activity:0:300}); closing the system picker and returning to AriAI."
     adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
     sleep 1
     adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
