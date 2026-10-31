@@ -132,16 +132,45 @@ back() {
 
 dismiss_external_picker() {
   local return_label="${1:-Choose model}"
-  # System picker windows can leave the underlying AriAI controls in the accessibility tree,
-  # so text matching alone is not a reliable return check. Send Back, cancel the external picker,
-  # and explicitly bring AriAI's existing task to the foreground before continuing.
-  back
-  echo "::notice title=External picker return::Cancelling the platform picker and restoring AriAI; expected screen: ${return_label}."
-  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
-  sleep 1
-  adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
-    | tee "$OUT/return-from-external-picker.txt"
-  sleep 1
+  local activity
+  local attempt
+  # Prefer the picker's own Cancel button, then fall back to Back. Check the resumed
+  # activity rather than the accessibility tree: a background AriAI tree can look ready
+  # while PhotoPickerActivity still owns the foreground.
+  if python3 .github/scripts/ui_tap.py --exact "Cancel" >/dev/null 2>&1; then
+    echo "::notice title=External picker cancellation::Tapped Cancel in the platform picker."
+  else
+    back
+  fi
+
+  for attempt in 1 2 3; do
+    sleep 1
+    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+    if [[ "$activity" == *"$PKG/.MainActivity"* ]]; then
+      sleep 1
+      activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+      if [[ "$activity" == *"$PKG/.MainActivity"* ]]; then
+        echo "::notice title=External picker return::AriAI is foreground; expected screen: ${return_label}."
+        return 0
+      fi
+    fi
+
+    echo "::warning title=External picker recovery::Attempt ${attempt}/3; foreground is ${activity:0:300}. Restoring AriAI."
+    adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+    adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
+    sleep 1
+    adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
+      | tee -a "$OUT/return-from-external-picker.txt"
+    sleep 2
+  done
+
+  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+  if [[ "$activity" != *"$PKG/.MainActivity"* ]]; then
+    echo "::error title=External picker return::Could not restore AriAI after the platform picker; expected '${return_label}', foreground: ${activity:0:400}."
+    capture_failure "$return_label"
+    return 1
+  fi
+  echo "::notice title=External picker return::AriAI is foreground after ${attempt} recovery attempts; expected screen: ${return_label}."
 }
 
 return_to_chat_after_external() {
