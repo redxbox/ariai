@@ -712,10 +712,16 @@ back
 expect_text "Choose model"
 end_step
 
-step "Search-service settings for Gemini and Anthropic"
+step "Search tool and service settings for Gemini and Anthropic"
 tap "Open menu"
 tap "Tools"
 tap "Search"
+expect_text "Ask AriAI with web search"
+expect_text "Choose a chat model before searching."
+expect_text "Configure search"
+shot 39-search-tool
+
+tap "Configure search"
 expect_text "Search service"
 expect_text "Built-in web search"
 expect_text "Google Gemini"
