@@ -334,7 +334,7 @@ expect_text "Provider API key"
 expect_text "API key"
 expect_text "No separate search key is needed"
 shot 10-inline-gemini-search-settings
-tap "Cancel"
+tap_scroll "Cancel"
 back
 end_step
 

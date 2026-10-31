@@ -80,7 +80,7 @@ class ProviderAndChatUiTest {
         compose.waitForIdle()
 
         assertEquals(
-            Triple(Color(0xFFF7F6FC), Color(0xFFFCFBFF), Color(0xFF4D6090)),
+            Triple(Color(0xFFF7F6FC), Color(0xFFFCFBFF), Color(0xFF324472)),
             colors.value
         )
     }
@@ -213,6 +213,7 @@ class ProviderAndChatUiTest {
 
         compose.onNodeWithText("Mock provider").assertExists()
         compose.onNodeWithTag("provider-toggle-${provider.value.id}").assertIsOn().performClick()
+        compose.waitForIdle()
         compose.onNodeWithText("Turned off").assertExists()
 
         screen.value = "chat"

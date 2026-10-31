@@ -116,7 +116,7 @@ jobs:
         run: |
           set +e
           if [ -f instrumentation.log ]; then
-            (grep -E "^e: |^w: |error:|FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|FATAL EXCEPTION|ANR in|ProviderAndChatUiTest\\.kt:" instrumentation.log || true) | tail -40 | while IFS= read -r line; do
+            (grep -E "^e: |^w: |error:|FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|FATAL EXCEPTION|ANR in|ProviderAndChatUiTest\\.kt:|FeatureScreensUiTest\\.kt:" instrumentation.log || true) | tail -40 | while IFS= read -r line; do
               safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
               echo "::error title=Provider/chat UI test failure::$safe"
             done
@@ -125,6 +125,27 @@ jobs:
               echo "::notice title=Provider/chat UI log tail::$safe"
             done
           fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          for report in Path("app/build").rglob("TEST-*.xml"):
+              try:
+                  root = ET.parse(report).getroot()
+              except (ET.ParseError, OSError):
+                  continue
+              for test in root.iter("testcase"):
+                  class_name = test.attrib.get("classname", "unknown")
+                  test_name = test.attrib.get("name", "unknown")
+                  for failure in (*test.findall("failure"), *test.findall("error")):
+                      detail = " ".join(
+                          f"{failure.attrib.get('message', '')} {failure.text or ''}".split()
+                      )[:900]
+                      if detail:
+                          print(
+                              f"::error title=Android UI failure::{class_name}.{test_name}: {detail}"
+                          )
+          PY
 
       - name: Upload UI test report
         if: always()

@@ -19,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ariai.app.data.models.Agent
 import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.McpServerItem
+import com.ariai.app.data.models.McpTransport
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.SearchMode
@@ -386,12 +387,12 @@ class FeatureScreensUiTest {
         compose.onNodeWithTag("mcp-server-save").assertIsNotEnabled()
         compose.onNodeWithTag("mcp-server-url").performTextClearance()
         compose.onNodeWithTag("mcp-server-url").performTextInput("https://mcp.example.test/mcp")
-        compose.onNodeWithText("SSE").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithTag("mcp-server-save").performScrollTo().assertIsDisplayed().performClick()
         compose.waitForIdle()
 
         assertEquals(1, servers.size)
         assertEquals("Local MCP", servers.single().name)
+        assertEquals(McpTransport.STREAMABLE_HTTP, servers.single().transport)
         assertTrue(servers.single().enabled)
         compose.onNodeWithText("Enabled locally · not connected").assertExists()
         compose.onNodeWithTag("mcp-toggle-${servers.single().id}").performClick()
