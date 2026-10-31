@@ -5,6 +5,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -131,6 +132,39 @@ class ProviderAndChatUiTest {
             1,
             compose.onAllNodesWithText("Choose model").fetchSemanticsNodes().size
         )
+    }
+
+    @Test
+    fun sendIsDisabledUntilAProviderAndModelAreReady() {
+        val chat = Chat(id = "providerless-send-test", title = "New chat")
+        var sendCalls = 0
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                NewChatScreen(
+                    chat = chat,
+                    messages = emptyList(),
+                    isStreaming = false,
+                    currentStreamingContent = "",
+                    selectedModel = null,
+                    selectedProviderId = null,
+                    providers = emptyList(),
+                    onSendMessage = { _, _, _, _, _ -> sendCalls++; true },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
+                    onCheckProvider = { ConnectionResult.Ok(0) }
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithText("Add your first AI provider to start chatting").assertIsDisplayed()
+        compose.onNodeWithTag("chat-composer").performTextInput("Draft waits for provider")
+        compose.onNodeWithTag("chat-send-button").assertIsNotEnabled()
+        compose.onNodeWithTag("chat-composer").assertTextEquals("Draft waits for provider")
+        assertEquals("a missing provider must not start a chat request", 0, sendCalls)
     }
 
     @Test
