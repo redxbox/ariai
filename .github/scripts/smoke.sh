@@ -642,19 +642,21 @@ dismiss_external_picker "Import provider"
 expect_text "Import provider"
 tap "Cancel"
 
-# Provider presets are shown directly in Quick connect; selecting one opens the form.
-tap_scroll "Gemini"
-expect_text "Add provider"
-expect_text "Connection"
-shot 29-add-gemini-provider
-
-# Exercise connection presets without saving a provider or transmitting credentials.
+# Exercise each Quick connect preset without saving a provider or transmitting credentials.
+# The selected preset opens a modal form, so return to the list before choosing the next one.
 for provider in OpenAI Anthropic Ollama Custom Gemini; do
-  tap "$provider"
+  tap_scroll "$provider"
+  expect_text "Add provider"
+  expect_text "Connection"
+  expect_text "Base URL"
+  expect_text "API key"
+  if [[ "$provider" == "Gemini" ]]; then
+    shot 29-add-gemini-provider
+    shot 30-provider-presets
+  else
+    tap "Back"
+  fi
 done
-expect_text "Base URL"
-expect_text "API key"
-shot 30-provider-presets
 
 tap "Models"
 expect_text "No models yet"
