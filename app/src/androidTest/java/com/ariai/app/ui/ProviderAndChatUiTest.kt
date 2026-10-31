@@ -33,7 +33,6 @@ import com.ariai.app.data.remote.ConnectionResult
 import com.ariai.app.ui.screens.AddProviderScreen
 import com.ariai.app.ui.screens.ChatListScreen
 import com.ariai.app.ui.screens.NewChatScreen
-import com.ariai.app.ui.screens.ModelPickerSheet
 import com.ariai.app.ui.screens.NewProvidersScreen
 import com.ariai.app.ui.theme.AriAiTheme
 import org.junit.Assert.assertEquals
@@ -403,28 +402,43 @@ class ProviderAndChatUiTest {
         var addCalls = 0
         var manageCalls = 0
 
+        val modelUsageCounts = mapOf(
+            (provider.id to "popular-one") to 12,
+            (provider.id to "popular-two") to 8,
+            (provider.id to "popular-three") to 4,
+            (provider.id to "gpt-5.5-pro") to 15
+        )
+        val chat = Chat(
+            id = "chat-model-picker-test",
+            title = "Model picker test",
+            providerId = provider.id,
+            modelId = "popular-one"
+        )
+
         compose.setContent {
             AriAiTheme(darkTheme = false) {
-                ModelPickerSheet(
-                    providers = listOf(provider, alternateProvider),
+                NewChatScreen(
+                    chat = chat,
+                    messages = emptyList(),
+                    isStreaming = false,
+                    currentStreamingContent = "",
+                    selectedModel = "popular-one",
                     selectedProviderId = provider.id,
-                    selectedModelId = "popular-one",
-                    favorites = emptySet(),
-                    modelUsageCounts = mapOf(
-                        (provider.id to "popular-one") to 12,
-                        (provider.id to "popular-two") to 8,
-                        (provider.id to "popular-three") to 4,
-                        (provider.id to "gpt-5.5-pro") to 15
-                    ),
-                    onToggleFavorite = { _, _ -> },
-                    onSelect = { _, _ -> },
+                    providers = listOf(provider, alternateProvider),
+                    modelUsageCounts = modelUsageCounts,
+                    onSendMessage = { _, _, _, _, _ -> false },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
                     onAddProvider = { addCalls++ },
                     onManageProviders = { manageCalls++ },
-                    onCheckProvider = { ConnectionResult.Ok(0) },
-                    onDismiss = {}
+                    onCheckProvider = { ConnectionResult.Ok(0) }
                 )
             }
         }
+        compose.waitForIdle()
+        compose.onNodeWithTag("chat-model-floater").performClick()
         compose.waitForIdle()
 
         assertDisplayed("provider dock") {
@@ -517,6 +531,9 @@ class ProviderAndChatUiTest {
         val addProviderButton = compose.onNodeWithTag("model-picker-add-menu")
         assertDisplayed("add provider menu action") { addProviderButton.assertIsDisplayed() }
         clickWithLabel("add provider menu action") { addProviderButton.performClick() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("chat-model-floater").performClick()
+        compose.waitForIdle()
 
         clickWithLabel("model picker overflow menu after add") {
             compose.onNodeWithTag("model-picker-overflow").performClick()
