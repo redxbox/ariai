@@ -829,6 +829,7 @@ wait_for_text "About AriAI" 8
 expect_text "Version"
 shot 54-settings-about
 back
+back
 expect_text "Choose model"
 
 # Start a clean conversation after the intentional missing-provider error at the beginning.
