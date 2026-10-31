@@ -248,8 +248,6 @@ fun NewProvidersScreen(
                         )
                     }
                 }
-            } else if (providers.isEmpty() && query.isBlank()) {
-                item { EmptyConnectionsHint() }
             }
         }
     }
@@ -448,21 +446,6 @@ private fun ProviderCatalogTile(
                 tint = AriMuted,
                 modifier = Modifier.size(19.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun EmptyConnectionsHint() {
-    Row(
-        modifier = Modifier.fillMaxWidth().testTag("provider-empty-connections").padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(9.dp)
-    ) {
-        Icon(Icons.Default.AddCircleOutline, contentDescription = null, tint = AriAccent, modifier = Modifier.size(20.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(tx("No providers yet"), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-            Text(tx("Connect a provider to start"), fontSize = 11.sp, color = AriMuted)
         }
     }
 }
