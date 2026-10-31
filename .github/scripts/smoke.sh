@@ -323,8 +323,18 @@ wait_for_text() {
   local launcher_stalls=0
   while (( SECONDS < deadline )); do
     if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1; then
-      echo "VISIBLE after startup wait: $label"
-      return 0
+      # Don't accept a one-frame transition: Android can briefly show AriAI before a
+      # Pixel Launcher ANR dialog covers it again during emulator startup.
+      sleep 1
+      if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1 && \
+        ! python3 .github/scripts/ui_tap.py --assert "Pixel Launcher isn't responding" >/dev/null 2>&1; then
+        sleep 1
+        if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1 && \
+          ! python3 .github/scripts/ui_tap.py --assert "Pixel Launcher isn't responding" >/dev/null 2>&1; then
+          echo "VISIBLE after startup wait: $label"
+          return 0
+        fi
+      fi
     fi
     if python3 .github/scripts/ui_tap.py --assert "Pixel Launcher isn't responding" >/dev/null 2>&1; then
       launcher_stalls=$((launcher_stalls + 1))
@@ -396,6 +406,8 @@ fi
 adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/launch.txt"
 wait_for_text "How can I help you?" 90
 shot 00-app-home
+# The launcher can stall after the app's first frame; verify the home screen again after capture.
+wait_for_text "How can I help you?" 30
 
 step "Chat home and model picker"
 expect_text "How can I help you?"
