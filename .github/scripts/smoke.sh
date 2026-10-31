@@ -76,7 +76,23 @@ expect_absent_text() {
 tap() {
   local label="$1"
   local output
-  if ! output="$(python3 .github/scripts/ui_tap.py "$label" 2>&1)"; then
+  local status=0
+  if output="$(python3 .github/scripts/ui_tap.py "$label" 2>&1)"; then
+    status=0
+  else
+    status=$?
+  fi
+  if (( status != 0 )) && [[ "$label" == "Add to message" && "$output" == *"This app can only access the photos you select"* ]]; then
+    echo "::warning title=External picker recovery::The Photo Picker resurfaced before the attachment sheet; closing the stale activity and retrying."
+    if dismiss_external_picker "Choose model"; then
+      if output="$(python3 .github/scripts/ui_tap.py "$label" 2>&1)"; then
+        status=0
+      else
+        status=$?
+      fi
+    fi
+  fi
+  if (( status != 0 )); then
     echo "$output"
     local detail="${output//$'\n'/ | }"
     echo "::error title=UI target missing::${label}; ${detail:0:1200}"
@@ -130,40 +146,67 @@ back() {
   sleep 1
 }
 
+wait_for_main_activity() {
+  local expected_label="${1:-Choose model}"
+  local stable_required="${2:-8}"
+  local timeout_seconds="${3:-15}"
+  local deadline=$((SECONDS + timeout_seconds))
+  local stable_main=0
+  local other_activity_polls=0
+  local activity
+
+  while (( SECONDS < deadline )); do
+    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+    if [[ "$activity" == *"$PKG/.MainActivity"* ]]; then
+      other_activity_polls=0
+      stable_main=$((stable_main + 1))
+      if (( stable_main >= stable_required )); then
+        if python3 .github/scripts/ui_tap.py --assert "$expected_label" >/dev/null 2>&1; then
+          return 0
+        fi
+        stable_main=0
+      fi
+    else
+      stable_main=0
+      other_activity_polls=$((other_activity_polls + 1))
+      if (( other_activity_polls >= 3 )); then return 1; fi
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+restart_ariai_task() {
+  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+  adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
+  adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
+  sleep 1
+  adb shell am start -W --activity-new-task --activity-clear-task -n "$PKG/.MainActivity" \
+    | tee -a "$OUT/return-from-external-picker.txt"
+}
+
 dismiss_external_picker() {
   local return_label="${1:-Choose model}"
   local activity
   local attempt
-  local poll
-  local stable_main
-  # Prefer the picker's own Cancel button, then fall back to Back. Check the resumed
-  # activity over several seconds: the system picker can briefly expose AriAI during
-  # its return animation, then reclaim the foreground before the next smoke tap.
+  # Prefer the picker's own Cancel button, then fall back to Back. The Photo Picker can
+  # remain in AriAI's task after it visually returns, so stop its activity package before
+  # continuing; otherwise a later external intent can uncover the stale picker screen.
   if python3 .github/scripts/ui_tap.py --exact "Cancel" >/dev/null 2>&1; then
     echo "::notice title=External picker cancellation::Tapped Cancel in the platform picker."
   else
     back
   fi
+  sleep 1
+  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
 
   for attempt in 1 2 3 4; do
-    stable_main=0
-    for poll in 1 2 3 4 5; do
-      activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-      if [[ "$activity" == *"$PKG/.MainActivity"* ]]; then
-        stable_main=$((stable_main + 1))
-        if (( stable_main >= 4 )); then
-          echo "::notice title=External picker return::AriAI stayed foreground; expected screen: ${return_label}."
-          return 0
-        fi
-      else
-        stable_main=0
-      fi
-      sleep 1
-    done
-
-    if (( attempt == 4 )); then
-      break
+    if wait_for_main_activity "$return_label" 8 12; then
+      echo "::notice title=External picker return::AriAI stayed foreground; expected screen: ${return_label}."
+      return 0
     fi
+    if (( attempt == 4 )); then break; fi
+    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
     echo "::warning title=External picker recovery::Attempt ${attempt}/3; foreground is ${activity:0:300}. Restoring AriAI."
     adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
     adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
@@ -175,68 +218,66 @@ dismiss_external_picker() {
     sleep 2
   done
 
-  echo "::warning title=External picker recovery::The platform picker reclaimed the foreground after three recovery attempts; restarting AriAI's task."
-  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
-  adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
-  adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
-  sleep 1
-  if ! adb shell am start -W --activity-new-task --activity-clear-task -n "$PKG/.MainActivity" \
-    | tee -a "$OUT/return-from-external-picker.txt"; then
+  echo "::warning title=External picker recovery::AriAI did not retain foreground after three recovery attempts; restarting its task."
+  if ! restart_ariai_task; then
     activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
     echo "::error title=External picker return::Could not restart AriAI after the platform picker; expected '${return_label}', foreground: ${activity:0:400}."
     capture_failure "$return_label"
     return 1
   fi
 
-  stable_main=0
-  for poll in 1 2 3 4 5 6 7 8 9 10; do
-    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-    if [[ "$activity" == *"$PKG/.MainActivity"* ]]; then
-      stable_main=$((stable_main + 1))
-      if (( stable_main >= 4 )); then break; fi
-    else
-      stable_main=0
-    fi
-    sleep 1
-  done
-  if (( stable_main < 4 )); then
-    echo "::error title=External picker return::AriAI did not regain stable foreground after a clean task restart; foreground: ${activity:0:400}."
-    capture_failure "$return_label"
-    return 1
-  fi
-
   if [[ "$return_label" == "Import provider" ]]; then
-    wait_for_text "Choose model" 30
+    if ! wait_for_main_activity "Choose model" 8 20; then
+      echo "::error title=External picker return::AriAI did not return to chat after restarting for '${return_label}'."
+      capture_failure "$return_label"
+      return 1
+    fi
     tap "Open menu"
     tap "Providers"
     wait_for_text "Quick connect" 20
     tap "Import provider"
     wait_for_text "Paste a provider as JSON" 20
+  elif ! wait_for_main_activity "$return_label" 8 20; then
+    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+    echo "::error title=External picker return::AriAI did not regain stable foreground after a clean task restart; foreground: ${activity:0:400}."
+    capture_failure "$return_label"
+    return 1
   fi
 }
 
 return_to_chat_after_external() {
   local origin="$1"
   local activity
-  if python3 .github/scripts/ui_tap.py --assert "Choose model" >/dev/null 2>&1; then
+  if wait_for_main_activity "Choose model" 8 15; then
     return 0
   fi
 
   activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
-  if [[ "$activity" != *NexusLauncherActivity* ]]; then
+  if [[ "$activity" != *NexusLauncherActivity* && "$activity" != *"$PKG/.MainActivity"* ]]; then
     dismiss_external_picker
-  fi
-  if python3 .github/scripts/ui_tap.py --assert "Choose model" >/dev/null 2>&1; then
-    return 0
+    if wait_for_main_activity "Choose model" 8 15; then
+      return 0
+    fi
   fi
 
   activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
   if [[ "$activity" == *NexusLauncherActivity* ]]; then
     echo "::warning title=External intent return::$origin did not return directly to AriAI; reopening the app to continue the walkthrough. Foreground: ${activity:0:400}"
     adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/relaunch-after-${origin}.txt"
-    wait_for_text "Choose model" 30
   else
-    wait_for_text "Choose model" 20
+    echo "::warning title=External intent return::$origin left AriAI's activity unstable; restarting the app task. Foreground: ${activity:0:400}"
+    if ! restart_ariai_task; then
+      echo "::error title=External intent return::Could not restart AriAI after $origin."
+      capture_failure "$origin"
+      return 1
+    fi
+  fi
+
+  if ! wait_for_main_activity "Choose model" 8 25; then
+    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
+    echo "::error title=External intent return::AriAI did not regain stable foreground after $origin; foreground: ${activity:0:400}."
+    capture_failure "$origin"
+    return 1
   fi
 }
 
