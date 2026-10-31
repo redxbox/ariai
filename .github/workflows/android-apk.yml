@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-debug-apk:
-    name: Build installable debug APK
+    name: Validate app and build installable debug APK
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -27,13 +27,34 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Check Persian translation coverage
+        run: python3 .github/scripts/check_translations.py
+
+      - name: Run JVM unit tests
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:testDebugUnitTest --stacktrace 2>&1 | tee unit-tests.log
+
+      - name: Run release lint
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:lintRelease --stacktrace 2>&1 | tee release-lint.log
+
+      - name: Assemble release variant (R8 and resource shrinking)
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:assembleRelease --stacktrace 2>&1 | tee release-build.log
+
       - name: Assemble debug APK
         run: |
           set -o pipefail
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug --stacktrace 2>&1 | tee build.log
 
-      - name: Report build errors
+      - name: Report debug APK build errors
         if: failure()
         run: |
           if [ -f build.log ]; then
@@ -42,8 +63,6 @@ jobs:
               echo "::error title=Gradle build error::$safe"
             done
             echo "::notice title=Gradle build tail::$(tail -n 30 build.log | tr '\n' ' ' | cut -c1-3000)"
-          else
-            echo '::error title=Gradle build error::No Gradle log was created.'
           fi
 
       - name: Upload APK artifact
@@ -55,14 +74,19 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload diagnostic log
+      - name: Upload validation logs and reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ariai-build-log
-          path: build.log
+          name: ariai-validation-logs
+          path: |
+            build.log
+            unit-tests.log
+            release-lint.log
+            release-build.log
+            app/build/reports/
           if-no-files-found: ignore
-          retention-days: 3
+          retention-days: 7
 
       - name: Add install instructions to run summary
         if: success()

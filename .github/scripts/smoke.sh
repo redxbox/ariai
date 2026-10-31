@@ -479,20 +479,25 @@ shot 25-mcp-from-drawer
 back
 tap "Open menu"
 tap "Providers"
-expect_text "No providers yet"
-expect_text "Tap the star icon for recommended providers"
+expect_text "Providers"
+expect_text "Quick connect"
+expect_text "OpenAI"
+expect_absent_text "No providers yet"
 shot 26-providers-empty
 
 tap "Import provider"
 expect_text "Import provider"
 expect_text "Paste a provider as JSON"
+expect_text "Scan provider QR from gallery"
 shot 27-import-provider-dialog
+tap "Scan provider QR from gallery"
+sleep 2
+shot 27-provider-qr-gallery-picker
+dismiss_external_picker
+expect_text "Import provider"
 tap "Cancel"
 
-tap "Recommended providers"
-expect_text "Recommended providers"
-expect_text "OpenAI"
-shot 28-recommended-providers
+# Provider presets are shown directly in Quick connect; selecting one opens the form.
 tap_scroll "Gemini"
 expect_text "Add provider"
 expect_text "Connection"
@@ -542,7 +547,8 @@ expect_text "Value"
 shot 37-provider-header-editor
 expect_text "Custom body (JSON)"
 back
-expect_text "No providers yet"
+expect_text "Providers"
+expect_absent_text "No providers yet"
 # Also verify the direct + route to the provider editor.
 tap "Add provider"
 expect_text "Add provider"

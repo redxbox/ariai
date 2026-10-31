@@ -6,7 +6,7 @@ AriAi is an Android chat client for connecting to AI providers with your own cre
 
 ## Current features
 
-- **Providers:** OpenAI, Google Gemini, Anthropic, Ollama, and OpenAI-compatible endpoints. Add your own endpoint and credentials; the app does not automatically create a free demo provider.
+- **Providers:** OpenAI, Google Gemini, Anthropic, Ollama, and OpenAI-compatible endpoints. Add your own endpoint and credentials, or import provider settings from JSON/a QR image in the gallery; the app does not automatically create a free demo provider.
 - **Chat:** streaming preference for ordinary tool-free replies, searchable model switching, provider health/latency checks, a context-use gauge using provider-reported token counts when available and a labeled estimate otherwise, conversation folders, branching, retry, per-chat temperature/top-P/system-prompt controls, and Markdown for headings, lists, links, simple tables, and fenced code blocks with basic syntax coloring and line numbers. Tool-routed replies use a non-streaming request path.
 - **Agents:** built-in and custom agents, prompt variables/examples, provider/model binding, temperature/top-P defaults, and opt-in calculator/web-search tools. Settings are stored locally; unsupported tools (MCP, arbitrary code execution, persistent memory, callable image generation) are visibly unavailable.
 - **Workspace:** AI-assisted generation and updating of one text file at a time using the selected text model, small UTF-8 files in private app storage, a static HTML preview with JavaScript and network requests blocked, and a read-only console limited to listing/reading those workspace files.
@@ -50,7 +50,7 @@ The app version is **2.2.1-stable** (`versionCode` 4). The Gradle build uses Kot
 
 - The workspace console is deliberately not a general-purpose terminal: it has no shell, PRoot, package manager, or code execution. The HTML preview is static and does not run JavaScript, remote assets, or app frameworks.
 - MCP configuration is preview-only; server discovery and tool calls are not implemented.
-- PDF/DOCX text extraction, persistent memory controls, QR scanning, and LaTeX/Mermaid rendering are not implemented.
+- PDF/DOCX text extraction, persistent memory controls, camera-based QR scanning, and LaTeX/Mermaid rendering are not implemented. Provider QR import from a gallery image is supported.
 - Provider-specific features may fail or be unavailable when an endpoint does not implement the expected API. Check that provider's documentation and model capabilities.
 - The repository checkout has no top-level project `LICENSE` file. `THIRD_PARTY_LICENSES` contains dependency notices; it does not declare the project's own license.
 
