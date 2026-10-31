@@ -303,7 +303,7 @@ class FeatureScreensUiTest {
         assertEquals("brave", searchProvider.value)
         compose.onNodeWithTag("search-provider-editor").assertIsDisplayed()
         compose.onNodeWithTag("search-provider-key").performTextInput("brave-search-secret")
-        compose.onNodeWithTag("search-provider-save").performClick()
+        compose.onNodeWithTag("search-provider-save").performScrollTo().assertIsDisplayed().performClick()
         assertEquals("brave-search-secret", searchKeys.value["brave"])
         compose.onNodeWithText("API key saved on this device").assertIsDisplayed()
 

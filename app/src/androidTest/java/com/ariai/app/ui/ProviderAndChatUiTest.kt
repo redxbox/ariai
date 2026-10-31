@@ -452,7 +452,7 @@ class ProviderAndChatUiTest {
         assertDisplayed("saved-provider filter") {
             compose.onNodeWithTag("provider-filter-${provider.id}").assertIsDisplayed()
         }
-        compose.onNodeWithTag("provider-filter-all").assertTextContains("6")
+        compose.onNodeWithTag("provider-model-count-all").assertTextContains("6")
         compose.onNodeWithTag("model-picker-selected-count").assertTextContains("5")
         if (compose.onAllNodesWithTag("model-picker-provider-rail").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithTag("model-picker-provider-rail")

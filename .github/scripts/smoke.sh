@@ -132,22 +132,16 @@ back() {
 
 dismiss_external_picker() {
   local return_label="${1:-Choose model}"
-  # The platform pickers expose Cancel as visible text on some releases, but tapping it can
-  # leave the picker activity foregrounded. Back is the normal cancellation path. If the
-  # expected AriAI screen is still not visible, close the isolated system picker and restore
-  # AriAI's existing task with CLEAR_TOP before the next smoke action.
+  # System picker windows can leave the underlying AriAI controls in the accessibility tree,
+  # so text matching alone is not a reliable return check. Send Back, cancel the external picker,
+  # and explicitly bring AriAI's existing task to the foreground before continuing.
   back
-  local activity
-  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-  if [[ "$activity" == *PhotoPickerActivity* ]] || \
-      ! python3 .github/scripts/ui_tap.py --assert "$return_label" >/dev/null 2>&1; then
-    echo "::warning title=External picker recovery::Android Back did not restore '${return_label}' (foreground: ${activity:0:300}); closing the system picker and returning to AriAI."
-    adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
-    sleep 1
-    adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
-      | tee "$OUT/return-from-external-picker.txt"
-    sleep 1
-  fi
+  echo "::notice title=External picker return::Cancelling the platform picker and restoring AriAI; expected screen: ${return_label}."
+  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+  sleep 1
+  adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
+    | tee "$OUT/return-from-external-picker.txt"
+  sleep 1
 }
 
 return_to_chat_after_external() {
