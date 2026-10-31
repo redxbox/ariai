@@ -445,8 +445,12 @@ class ProviderAndChatUiTest {
         compose.waitForIdle()
         compose.onNodeWithTag("model-picker-overflow").assertExists()
 
-        assertDisplayed("provider dock") {
-            compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
+        compose.onNodeWithTag("model-picker-provider-dock", useUnmergedTree = true).assertExists()
+        assertDisplayed("all-models provider filter") {
+            compose.onNodeWithTag("provider-filter-all").assertIsDisplayed()
+        }
+        assertDisplayed("saved-provider filter") {
+            compose.onNodeWithTag("provider-filter-${provider.id}").assertIsDisplayed()
         }
         compose.onNodeWithTag("provider-filter-all").assertTextContains("6 models")
         compose.onNodeWithTag("model-picker-selected-count").assertTextEquals("5 models")
@@ -639,8 +643,12 @@ class ProviderAndChatUiTest {
         clickWithLabel("chat model floater") { modelFloater.performClick() }
         compose.waitForIdle()
         compose.onNodeWithTag("model-picker-overflow").assertExists()
-        assertDisplayed("provider dock opened from chat") {
-            compose.onNodeWithTag("model-picker-provider-dock").assertIsDisplayed()
+        compose.onNodeWithTag("model-picker-provider-dock", useUnmergedTree = true).assertExists()
+        assertDisplayed("all-models provider filter opened from chat") {
+            compose.onNodeWithTag("provider-filter-all").assertIsDisplayed()
+        }
+        assertDisplayed("configured provider filter opened from chat") {
+            compose.onNodeWithTag("provider-filter-${provider.id}").assertIsDisplayed()
         }
         val rowTag = "model-row-${provider.id}-model-one"
         val selectedModelRow = compose.onNodeWithTag(rowTag, useUnmergedTree = true)

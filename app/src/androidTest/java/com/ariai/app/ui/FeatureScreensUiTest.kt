@@ -45,6 +45,14 @@ class FeatureScreensUiTest {
     @get:Rule
     val compose = createComposeRule()
 
+    private inline fun assertVisible(description: String, assertion: () -> Unit) {
+        try {
+            assertion()
+        } catch (error: AssertionError) {
+            throw AssertionError("$description should be visible: ${error.message}", error)
+        }
+    }
+
     @Test
     fun workspaceConsoleTabIsCompactAndCommandsCannotRunShellCode() {
         val files = mutableStateListOf(WorkspaceFile("index.html", "<h1>Local page</h1>", 1L))
@@ -380,14 +388,22 @@ class FeatureScreensUiTest {
 
         compose.onNodeWithText("MCP support is a preview: server URLs are not contacted and tools are not yet used in chats.")
             .assertExists()
-        compose.onNodeWithText("Add server").assertIsDisplayed().performClick()
+        assertVisible("Add server action") {
+            compose.onNodeWithText("Add server").assertIsDisplayed().performClick()
+        }
         compose.waitForIdle()
-        compose.onNodeWithTag("mcp-server-name").performScrollTo().assertIsDisplayed().performTextInput("Local MCP")
-        compose.onNodeWithTag("mcp-server-url").performScrollTo().assertIsDisplayed().performTextInput("https://")
+        assertVisible("MCP server name field") {
+            compose.onNodeWithTag("mcp-server-name").performScrollTo().assertIsDisplayed().performTextInput("Local MCP")
+        }
+        assertVisible("MCP server URL field") {
+            compose.onNodeWithTag("mcp-server-url").performScrollTo().assertIsDisplayed().performTextInput("https://")
+        }
         compose.onNodeWithTag("mcp-server-save").assertIsNotEnabled()
         compose.onNodeWithTag("mcp-server-url").performTextClearance()
         compose.onNodeWithTag("mcp-server-url").performTextInput("https://mcp.example.test/mcp")
-        compose.onNodeWithTag("mcp-server-save").performScrollTo().assertIsDisplayed().performClick()
+        assertVisible("enabled MCP server Save action") {
+            compose.onNodeWithTag("mcp-server-save").performScrollTo().assertIsDisplayed().performClick()
+        }
         compose.waitForIdle()
 
         assertEquals(1, servers.size)

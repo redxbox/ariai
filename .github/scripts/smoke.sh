@@ -132,8 +132,17 @@ back() {
 
 dismiss_external_picker() {
   # The platform pickers expose Cancel as visible text on some releases, but tapping it can
-  # leave the picker activity foregrounded. Back consistently returns to AriAI or its import sheet.
+  # leave the picker activity foregrounded. Back is the normal cancellation path; Android 14's
+  # Photo Picker has occasionally ignored it in CI, so terminate only that isolated picker as a
+  # fallback to deliver a cancelled result back to AriAI.
   back
+  local activity
+  activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
+  if [[ "$activity" == *PhotoPickerActivity* ]]; then
+    echo "::warning title=Photo Picker recovery::Android Back left PhotoPickerActivity foregrounded; closing the platform picker to return a cancelled result."
+    adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+    sleep 2
+  fi
 }
 
 return_to_chat_after_external() {
@@ -200,15 +209,27 @@ wait_for_text() {
   local label="$1"
   local timeout_seconds="${2:-90}"
   local deadline=$((SECONDS + timeout_seconds))
+  local launcher_stalls=0
   while (( SECONDS < deadline )); do
     if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1; then
       echo "VISIBLE after startup wait: $label"
       return 0
     fi
     if python3 .github/scripts/ui_tap.py --assert "Pixel Launcher isn't responding" >/dev/null 2>&1; then
-      echo "::warning title=Emulator startup::Pixel Launcher stalled; asking Android to wait."
-      python3 .github/scripts/ui_tap.py "Wait" >/dev/null 2>&1 || true
-      sleep 5
+      launcher_stalls=$((launcher_stalls + 1))
+      if (( launcher_stalls < 3 )); then
+        echo "::warning title=Emulator startup::Pixel Launcher stalled; asking Android to wait (attempt ${launcher_stalls}/2)."
+        python3 .github/scripts/ui_tap.py "Wait" >/dev/null 2>&1 || true
+      else
+        echo "::warning title=Emulator startup recovery::Pixel Launcher stayed unresponsive; closing its ANR dialog and relaunching AriAI."
+        python3 .github/scripts/ui_tap.py "Close app" >/dev/null 2>&1 || true
+        sleep 3
+        adb shell am force-stop com.google.android.apps.nexuslauncher >/dev/null 2>&1 || true
+        adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
+        adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/relaunch-after-launcher-anr.txt"
+        launcher_stalls=0
+      fi
+      sleep 3
     else
       sleep 2
     fi

@@ -47,7 +47,7 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             timeout --signal=TERM --kill-after=15s 28m bash .github/scripts/smoke.sh
 
@@ -107,7 +107,7 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             bash -o pipefail -c './gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace 2>&1 | tee instrumentation.log'
 

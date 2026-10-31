@@ -144,6 +144,7 @@ private fun AddMcpServerSheet(onSave: (McpServerItem) -> Unit, onDismiss: () -> 
     PaperBottomSheet(
         onDismissRequest = onDismiss,
         shape = sheetShape,
+        skipPartiallyExpanded = true
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().heightIn(max = 720.dp).verticalScroll(rememberScrollState())
