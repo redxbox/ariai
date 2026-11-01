@@ -493,9 +493,7 @@ class AppViewModel(
     private fun activeContext(all: List<ChatMessage>): Pair<String?, List<ChatMessage>> {
         val idx = all.indexOfLast { it.role == MessageRole.SYSTEM }
         val summary = if (idx >= 0) all[idx].content else null
-        val after = all.drop(idx + 1).filter {
-            it.status != MessageStatus.ERROR && (it.content.isNotBlank() || it.attachments.isNotEmpty())
-        }
+        val after = messagesForModelContext(all.drop(idx + 1))
         return summary to after
     }
 
