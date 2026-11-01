@@ -227,6 +227,37 @@ class ProviderAndChatUiTest {
     }
 
     @Test
+    fun providerEditorInBottomSheetMovesUpBelowTheDragHandle() {
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                NewProvidersScreen(
+                    providers = emptyList(),
+                    onAddProvider = {},
+                    onAddPreset = {},
+                    onEditProvider = {},
+                    onImportProvider = {},
+                    onBack = {},
+                    fetchModels = { emptyList() },
+                    onSaveProvider = { provider, complete -> complete(provider) }
+                )
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Add provider").assertIsDisplayed().performClick()
+        compose.waitForIdle()
+
+        val dragHandle = compose.onNodeWithTag("provider-editor-sheet-handle")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val header = compose.onNodeWithTag("provider-edit-header")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val maximumGap = with(compose.density) { 120.dp.toPx() }
+        assertTrue(
+            "provider editor should begin close below the modal drag handle",
+            header.top - dragHandle.bottom <= maximumGap
+        )
+    }
+
+    @Test
     fun providerEditorKeepsCompactActionDockReachableAndShowsConnectionDialogResult() {
         var savedProvider: Provider? = null
         var connectionRequests = 0

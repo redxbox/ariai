@@ -328,6 +328,7 @@ fun AddProviderScreen(
     onCheckProvider: suspend (Provider) -> ConnectionResult = { provider -> checkConnection(provider, fetchModels) },
     onDelete: (String) -> Unit = {},
     existingProviderNames: Set<String> = emptySet(),
+    embeddedInBottomSheet: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val isEdit = initialProvider != null
@@ -507,8 +508,11 @@ fun AddProviderScreen(
     }
 
     val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val topBarInsets = if (embeddedInBottomSheet) WindowInsets(0, 0, 0, 0) else TopAppBarDefaults.windowInsets
+    val scaffoldInsets = if (embeddedInBottomSheet) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets
 
     Scaffold(
+        contentWindowInsets = scaffoldInsets,
         modifier = modifier.fillMaxSize().background(
             Brush.verticalGradient(
                 colors = listOf(AriPaper, AriAccentSoft.copy(alpha = 0.18f), AriPaper)
@@ -517,6 +521,7 @@ fun AddProviderScreen(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                windowInsets = topBarInsets,
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tx("Back"), tint = AriInk) } },
                 title = { Text(if (isEdit) tx("Edit provider") else tx("Add provider"), fontWeight = FontWeight.SemiBold, color = AriInk) },
