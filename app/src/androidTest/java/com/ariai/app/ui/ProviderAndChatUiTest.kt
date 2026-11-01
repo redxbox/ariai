@@ -202,7 +202,7 @@ class ProviderAndChatUiTest {
         compose.onNodeWithTag("chat-composer").assertTextEquals(agent.examples.first())
 
         val touchTarget = compose.onNodeWithTag("chat-send-button").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val visualButton = compose.onNodeWithTag("chat-send-button-visual").assertIsDisplayed()
+        val visualButton = compose.onNodeWithTag("chat-send-button-visual", useUnmergedTree = true).assertIsDisplayed()
             .fetchSemanticsNode().boundsInRoot
         val expectedVisualSize = with(compose.density) { 40.dp.toPx() }
         val minimumTouchSize = with(compose.density) { 48.dp.toPx() }
