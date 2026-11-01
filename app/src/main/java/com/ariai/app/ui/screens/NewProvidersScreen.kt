@@ -186,7 +186,7 @@ fun NewProvidersScreen(
                     placeholder = { Text(tx("Search providers"), color = Ink.copy(alpha = 0.45f)) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriAccent) },
                     singleLine = true,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AriAccent.copy(alpha = 0.45f),
                         unfocusedBorderColor = AriLine.copy(alpha = 0.7f),
@@ -399,7 +399,7 @@ private fun ProviderCatalogTile(
     Surface(
         onClick = onClick,
         modifier = tileModifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(22.dp),
         color = AriCard,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
@@ -482,7 +482,7 @@ private fun ProviderCard(provider: Provider, onClick: () -> Unit, onToggle: () -
     }
     val statusBackground = if (provider.enabled) AriAccent.copy(alpha = 0.12f) else AriTint
     val statusForeground = if (provider.enabled) AriAccent else AriMuted
-    val shape = RoundedCornerShape(17.dp)
+    val shape = RoundedCornerShape(22.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -605,7 +605,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
             }
         }
     }
-    val dialogShape = RoundedCornerShape(28.dp)
+    val dialogShape = RoundedCornerShape(32.dp)
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = dialogShape,
@@ -627,7 +627,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
                     },
                     modifier = Modifier.fillMaxWidth().testTag("provider-import-gallery"),
                     enabled = !isReadingQr,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = AriAccent),
                     contentPadding = PaddingValues(horizontal = 11.dp, vertical = 9.dp)
                 ) {
@@ -658,7 +658,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
                 if (scannedProvider != null) {
                     Row(
                         modifier = Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .background(providerBrandColor(scannedProvider!!.type, scannedProvider!!.name).copy(alpha = 0.10f))
                             .padding(horizontal = 11.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -694,7 +694,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
                     isError = text.isNotBlank() && pastedProvider == null,
                     supportingText = { if (text.isNotBlank() && pastedProvider == null) Text(tx("Not a valid provider JSON")) },
                     textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start, textDirection = TextDirection.Ltr),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Ink,
                         unfocusedTextColor = Ink,

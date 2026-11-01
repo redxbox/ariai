@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape = RoundedCornerShape(20.dp),
+    shape: RoundedCornerShape = RoundedCornerShape(26.dp),
     content: @Composable () -> Unit
 ) {
     Surface(
@@ -38,7 +38,7 @@ fun GlassCard(
                 .padding(1.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(19.dp),
+                shape = RoundedCornerShape(25.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                 modifier = Modifier
             ) {
@@ -57,7 +57,7 @@ fun GlassButton(
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
         tonalElevation = 4.dp
     ) {

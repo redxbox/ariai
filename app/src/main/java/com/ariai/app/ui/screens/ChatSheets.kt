@@ -180,7 +180,7 @@ private fun AttachmentActionRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(22.dp))
             .clickable(onClick = onClick)
             .testTag(tag)
             .padding(horizontal = 14.dp, vertical = 13.dp),
@@ -292,7 +292,7 @@ fun SearchSheet(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Box(
-                    modifier = Modifier.size(42.dp).clip(RoundedCornerShape(16.dp)).background(AriAccentSoft),
+                    modifier = Modifier.size(42.dp).clip(RoundedCornerShape(18.dp)).background(AriAccentSoft),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Public, contentDescription = null, tint = Accent, modifier = Modifier.size(23.dp))
@@ -309,7 +309,7 @@ fun SearchSheet(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(AriTint).padding(4.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(AriTint).padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 SearchModeTab(
@@ -399,7 +399,7 @@ private fun SearchModeTab(
     Surface(
         onClick = onClick,
         modifier = modifier.heightIn(min = 48.dp).testTag(tag),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         color = backgroundColor,
         contentColor = contentColor,
         tonalElevation = 0.dp
@@ -436,7 +436,7 @@ private fun LocalSearchProviderPicker(
         braveKey.isNotBlank() -> tx("API key saved on this device")
         else -> tx("API key required")
     }
-    val menuShape = RoundedCornerShape(18.dp)
+    val menuShape = RoundedCornerShape(22.dp)
 
     Column(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
@@ -444,7 +444,7 @@ private fun LocalSearchProviderPicker(
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth().testTag("search-provider-row"),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(26.dp),
             color = AriPaper,
             tonalElevation = 0.dp
         ) {
@@ -453,7 +453,7 @@ private fun LocalSearchProviderPicker(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(17.dp))
+                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp))
                         .clickable { menuExpanded = true }
                         .padding(horizontal = 4.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -519,7 +519,7 @@ private fun LocalSearchProviderPicker(
         AnimatedVisibility(visible = settingsExpanded) {
             Surface(
                 modifier = Modifier.fillMaxWidth().testTag("search-provider-editor"),
-                shape = RoundedCornerShape(19.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = AriCard,
                 tonalElevation = 0.dp
             ) {
@@ -545,7 +545,7 @@ private fun LocalSearchProviderPicker(
                                     )
                                 }
                             },
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(18.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Accent,
                                 unfocusedBorderColor = Ink.copy(alpha = 0.16f)

@@ -35,7 +35,7 @@ private fun SectionTitle(text: String) {
 
 @Composable
 private fun SettingCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(20.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(24.dp), color = AriCard, shadowElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
@@ -196,7 +196,7 @@ fun DefaultModelScreen(
                     singleLine = true,
                     placeholder = { Text(tx("Search models")) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = AriCard, unfocusedContainerColor = AriCard),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -205,7 +205,7 @@ fun DefaultModelScreen(
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(tx("No models yet"), fontWeight = FontWeight.SemiBold, color = Ink)
-                        Button(onClick = onAddProvider, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text(tx("Add provider")) }
+                        Button(onClick = onAddProvider, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text(tx("Add provider")) }
                     }
                 }
             }
@@ -216,7 +216,7 @@ fun DefaultModelScreen(
                 itemsIndexed(models, key = { _, m -> "model:${provider.id}:${m.id}" }) { _, model ->
                     val selected = isSelectedModel(provider.id, model.id, defaultProviderId, defaultModelId)
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(20.dp),
                         color = if (selected) Accent.copy(alpha = 0.10f) else AriCard,
                         modifier = Modifier.fillMaxWidth().clickable { onSelect(provider.id, model.id) }
                     ) {

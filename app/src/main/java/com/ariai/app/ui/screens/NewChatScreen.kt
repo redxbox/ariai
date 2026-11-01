@@ -716,7 +716,7 @@ fun NewChatScreen(
                 }
 
                 // Keep model selection above the conversation so it never crowds message entry.
-                val composerShape = RoundedCornerShape(26.dp)
+                val composerShape = RoundedCornerShape(32.dp)
                 Surface(
                     shape = composerShape,
                     color = AriCard,
@@ -918,7 +918,7 @@ fun NewChatScreen(
                         ) {
                             Button(
                                 onClick = onManageProviders,
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(20.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = AriAccentSoft,
                                     contentColor = AriAccent
@@ -1139,7 +1139,7 @@ private fun ContextUsageIndicator(
 
 @Composable
 private fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
-    Surface(shape = RoundedCornerShape(14.dp), color = AriCard, shadowElevation = 0.dp) {
+    Surface(shape = RoundedCornerShape(18.dp), color = AriCard, shadowElevation = 0.dp) {
         Row(
             modifier = Modifier.padding(start = 10.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -1208,7 +1208,7 @@ private fun AttachmentThumb(attachment: Attachment) {
             bitmap = currentBitmap,
             contentDescription = attachment.name,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-            modifier = Modifier.size(180.dp).clip(RoundedCornerShape(14.dp))
+            modifier = Modifier.size(180.dp).clip(RoundedCornerShape(18.dp))
         )
     } else {
         Text(attachment.name, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1219,7 +1219,7 @@ private fun AttachmentThumb(attachment: Attachment) {
 private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: Int) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Surface(
-            shape = RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp),
+            shape = RoundedCornerShape(28.dp, 28.dp, 9.dp, 28.dp),
             color = Accent.copy(alpha = 0.11f),
             modifier = Modifier.widthIn(max = 300.dp)
         ) {
@@ -1248,7 +1248,7 @@ private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: In
 @Composable
 private fun WaitingStatus(label: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(start = 4.dp)) {
-        Surface(shape = RoundedCornerShape(18.dp), color = AriTint) {
+        Surface(shape = RoundedCornerShape(22.dp), color = AriTint) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -1349,7 +1349,7 @@ private fun GeneratedImageView(path: String) {
             bitmap = bmp,
             contentDescription = tx("Generated image"),
             contentScale = ContentScale.FillWidth,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { full = true }
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { full = true }
         )
     }
     if (full) bitmap?.let { FullImageDialog(it) { full = false } }
@@ -1423,7 +1423,7 @@ private fun ComposerActionButton(
         label = "composer-action-foreground"
     )
     Box(
-        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(13.dp))
+        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(16.dp))
             .background(backgroundColor)
             .semantics(mergeDescendants = true) {
                 contentDescription = description
@@ -1450,7 +1450,7 @@ private fun ListeningIndicator() {
         ),
         label = "voice-listening-pulse"
     )
-    val shape = RoundedCornerShape(11.dp)
+    val shape = RoundedCornerShape(14.dp)
     Row(
         modifier = Modifier.clip(shape)
             .background(AriAccentSoft.copy(alpha = 0.78f))
@@ -1570,7 +1570,7 @@ private fun ModeChip(mode: ChatMode, onClose: () -> Unit, modifier: Modifier) {
 private fun VideoCard(path: String) {
     val context = LocalContext.current
     var playing by remember { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(16.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(22.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1615,7 +1615,7 @@ private fun AudioCard(path: String) {
             player.release()
         }
     }
-    Surface(shape = RoundedCornerShape(16.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(22.dp), color = AriCard, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1715,7 +1715,7 @@ private fun RemoteImage(url: String) {
             }
         }
     }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(20.dp)
     var full by remember { mutableStateOf(false) }
     bitmap?.let {
         Image(

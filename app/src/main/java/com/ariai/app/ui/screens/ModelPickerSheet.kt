@@ -108,7 +108,7 @@ private fun ExpandModelsButton(
     TextButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(testTag),
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.textButtonColors(contentColor = AriAccent)
     ) {
         Icon(
@@ -128,7 +128,7 @@ private fun ProviderDock(
     onSelect: (String?) -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(26.dp),
         color = AriCard.copy(alpha = 0.88f),
         shadowElevation = 5.dp,
         border = BorderStroke(0.8.dp, AriLine.copy(alpha = 0.85f)),
@@ -185,7 +185,7 @@ private fun ProviderFilterButton(
     tag: String,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(15.dp)
+    val shape = RoundedCornerShape(18.dp)
     val providerColor = providerBrandColor(provider)
     Surface(
         onClick = onClick,
@@ -233,7 +233,7 @@ private fun ModelRow(
         label = "model-row-selection"
     )
     Surface(
-        shape = RoundedCornerShape(19.dp),
+        shape = RoundedCornerShape(24.dp),
         color = rowColor,
         border = BorderStroke(
             0.8.dp,

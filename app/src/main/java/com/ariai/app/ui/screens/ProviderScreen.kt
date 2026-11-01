@@ -588,7 +588,7 @@ fun AddProviderScreen(
                             onValueChange = { name = it },
                             label = { Text(tx("Name")) },
                             singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(18.dp),
                             colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -597,7 +597,7 @@ fun AddProviderScreen(
                             onValueChange = { baseUrl = it },
                             label = { Text(tx("Base URL")) },
                             singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(18.dp),
                             colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -612,7 +612,7 @@ fun AddProviderScreen(
                                     Icon(Icons.Default.Visibility, contentDescription = if (reveal) tx("Hide key") else tx("Show key"), tint = AriInk.copy(alpha = 0.5f))
                                 }
                             },
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(18.dp),
                             colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth().testTag("provider-api-key")
                         )
@@ -673,7 +673,7 @@ fun AddProviderScreen(
                                     maxLines = 6,
                                     isError = !isValidJsonObject(customBody),
                                     supportingText = { if (!isValidJsonObject(customBody)) Text(tx("Must be a JSON object")) },
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(18.dp),
                                     colors = providerFieldColors(),
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -727,7 +727,7 @@ fun AddProviderScreen(
                                 onValueChange = { modelFilter = it },
                                 placeholder = { Text(tx("Filter models")) },
                                 singleLine = true,
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(18.dp),
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
                             )
                         }
@@ -807,7 +807,7 @@ private fun ProviderActionBar(
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("provider-save-action-bar"),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(26.dp),
         color = AriCard,
         border = BorderStroke(1.dp, AriLine.copy(alpha = 0.8f)),
         shadowElevation = 6.dp,
@@ -825,7 +825,7 @@ private fun ProviderActionBar(
                 onClick = onSave,
                 enabled = saveEnabled,
                 modifier = Modifier.weight(1f).height(48.dp).testTag("provider-save"),
-                shape = RoundedCornerShape(15.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = accent,
                     contentColor = onAccent,
@@ -858,7 +858,7 @@ private fun ProviderActionBar(
                 onClick = onCheckConnection,
                 enabled = testEnabled,
                 modifier = Modifier.weight(1f).height(48.dp).testTag("provider-test-connection"),
-                shape = RoundedCornerShape(15.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = accent,
                     disabledContentColor = muted
@@ -1086,7 +1086,7 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
                     onValueChange = { key -> onChange(items.toMutableList().also { it[index] = key to pair.second }) },
                     label = { Text(tx("Header")) },
                     singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.weight(1f)
                 )
                 OutlinedTextField(
@@ -1094,7 +1094,7 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
                     onValueChange = { value -> onChange(items.toMutableList().also { it[index] = pair.first to value }) },
                     label = { Text(tx("Value")) },
                     singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = { onChange(items.toMutableList().also { it.removeAt(index) }) }) {
@@ -1104,7 +1104,7 @@ private fun KeyValueEditor(items: List<Pair<String, String>>, onChange: (List<Pa
         }
         OutlinedButton(
             onClick = { onChange(items + ("" to "")) },
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(18.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1227,7 +1227,7 @@ private fun AddModelSheet(
                 Button(
                     onClick = { submitModel() },
                     enabled = modelId.isNotBlank() && bodyValid,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White),
                     modifier = Modifier.heightIn(min = 48.dp)
                 ) { Text(tx("Add"), fontWeight = FontWeight.SemiBold) }
@@ -1266,7 +1266,7 @@ private fun AddModelSheet(
                             maxLines = 6,
                             isError = !bodyValid,
                             supportingText = { if (!bodyValid) Text(tx("Must be a JSON object")) },
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(18.dp),
                             colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -1274,12 +1274,12 @@ private fun AddModelSheet(
                     else -> {
                         OutlinedTextField(
                             value = modelId, onValueChange = { modelId = it }, label = { Text(tx("Model ID")) },
-                            singleLine = true, shape = RoundedCornerShape(14.dp), colors = providerFieldColors(),
+                            singleLine = true, shape = RoundedCornerShape(18.dp), colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = displayName, onValueChange = { displayName = it }, label = { Text(tx("Display name (optional)")) },
-                            singleLine = true, shape = RoundedCornerShape(14.dp), colors = providerFieldColors(),
+                            singleLine = true, shape = RoundedCornerShape(18.dp), colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(tx("Type"), fontSize = 12.sp, color = AriMuted)
@@ -1357,7 +1357,7 @@ private fun ProviderEditHeader(
     val displayName = name.trim().ifBlank { tx("New provider") }
     val iceBlue = Color(0xFF64C9F3)
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(26.dp),
         color = AriCard,
         shadowElevation = 1.dp,
         border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
@@ -1410,11 +1410,11 @@ private fun SegmentedTabs(labels: List<String>, selected: Int, onSelect: (Int) -
     val activeColor = if (isDark) Color(0xFF17698D) else Color(0xFF64C9F3)
     val activeTextColor = if (isDark) Color(0xFFE9F8FF) else Color(0xFF10364D)
     val inactiveTextColor = if (isDark) Color(0xFFB5C7D2) else Color(0xFF5B7181)
-    val tabShape = RoundedCornerShape(13.dp)
+    val tabShape = RoundedCornerShape(16.dp)
 
     Surface(
         modifier = Modifier.fillMaxWidth().testTag("provider-segmented-tabs"),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(22.dp),
         color = trackColor,
         border = BorderStroke(1.dp, trackBorder),
         tonalElevation = 0.dp
