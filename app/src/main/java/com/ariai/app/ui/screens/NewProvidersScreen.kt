@@ -259,7 +259,6 @@ fun NewProvidersScreen(
                 addProviderPreset = null
             },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            dragHandle = { BottomSheetDefaults.DragHandle(modifier = Modifier.testTag("provider-editor-sheet-handle")) },
             containerColor = AriPaper,
             contentColor = AriInk
         ) {

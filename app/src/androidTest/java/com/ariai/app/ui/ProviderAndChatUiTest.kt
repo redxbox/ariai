@@ -227,7 +227,7 @@ class ProviderAndChatUiTest {
     }
 
     @Test
-    fun providerEditorInBottomSheetMovesUpBelowTheDragHandle() {
+    fun providerEditorInBottomSheetDoesNotStackTopInsets() {
         compose.setContent {
             AriAiTheme(darkTheme = false) {
                 NewProvidersScreen(
@@ -246,14 +246,14 @@ class ProviderAndChatUiTest {
         compose.onNodeWithText("Add provider").assertIsDisplayed().performClick()
         compose.waitForIdle()
 
-        val dragHandle = compose.onNodeWithTag("provider-editor-sheet-handle")
+        val editor = compose.onNodeWithTag("provider-editor-screen")
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val header = compose.onNodeWithTag("provider-edit-header")
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val maximumGap = with(compose.density) { 120.dp.toPx() }
+        val maximumHeaderOffset = with(compose.density) { 82.dp.toPx() }
         assertTrue(
-            "provider editor should begin close below the modal drag handle",
-            header.top - dragHandle.bottom <= maximumGap
+            "provider header should begin directly below the app bar without a duplicated status-bar gap",
+            header.top - editor.top <= maximumHeaderOffset
         )
     }
 

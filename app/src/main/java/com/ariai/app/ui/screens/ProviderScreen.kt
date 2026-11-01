@@ -517,7 +517,7 @@ fun AddProviderScreen(
             Brush.verticalGradient(
                 colors = listOf(AriPaper, AriAccentSoft.copy(alpha = 0.18f), AriPaper)
             )
-        ),
+        ).testTag("provider-editor-screen"),
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
