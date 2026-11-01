@@ -283,6 +283,7 @@ class FeatureScreensUiTest {
                 )
             }
         }
+        compose.waitForIdle()
 
         compose.onNodeWithTag("search-mode-local").assertIsDisplayed()
         compose.onNodeWithTag("search-mode-model").assertIsDisplayed()
@@ -394,6 +395,7 @@ class FeatureScreensUiTest {
                 )
             }
         }
+        compose.waitForIdle()
 
         compose.onNodeWithText("MCP support is a preview: server URLs are not contacted and tools are not yet used in chats.")
             .assertExists()
