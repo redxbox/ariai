@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -245,6 +246,15 @@ class ProviderAndChatUiTest {
             }
         }
         compose.waitForIdle()
+
+        val compactHeader = compose.onNodeWithTag("provider-edit-header")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val compactTabs = compose.onNodeWithTag("provider-segmented-tabs")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val headerHeightLimit = with(compose.density) { 72.dp.toPx() }
+        val tabsHeightLimit = with(compose.density) { 48.dp.toPx() }
+        assertTrue("provider identity card should stay compact", compactHeader.height <= headerHeightLimit)
+        assertTrue("provider tabs should use a compact target height", compactTabs.height <= tabsHeightLimit)
 
         val actionBar = compose.onNodeWithTag("provider-save-action-bar")
             .assertIsDisplayed()

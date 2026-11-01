@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.*
@@ -544,8 +545,8 @@ fun AddProviderScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ProviderEditHeader(
                     name = name,
@@ -1349,31 +1350,32 @@ private fun ProviderEditHeader(
         runCatching { java.net.URI(baseUrl.trim()).host }.getOrNull()?.removePrefix("www.").orEmpty()
     }
     val displayName = name.trim().ifBlank { tx("New provider") }
+    val iceBlue = Color(0xFF64C9F3)
     Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = AriCard.copy(alpha = 0.94f),
+        shape = RoundedCornerShape(20.dp),
+        color = AriCard,
         shadowElevation = 1.dp,
         border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
         modifier = Modifier.fillMaxWidth().testTag("provider-edit-header")
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ProviderBrandMark(type = type, name = displayName, size = 50.dp)
-            Spacer(Modifier.width(14.dp))
+            ProviderBrandMark(type = type, name = displayName, size = 42.dp)
+            Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     displayName,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp,
+                    fontSize = 16.sp,
                     color = AriInk,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     listOf(providerTypeLabel(type), host).filter { it.isNotBlank() }.joinToString(" · "),
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     color = AriMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1384,8 +1386,8 @@ private fun ProviderEditHeader(
                 onCheckedChange = onToggle,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = AriAccent,
-                    checkedBorderColor = AriAccent,
+                    checkedTrackColor = iceBlue,
+                    checkedBorderColor = iceBlue,
                     uncheckedThumbColor = AriMuted,
                     uncheckedTrackColor = AriTint,
                     uncheckedBorderColor = AriLine
@@ -1397,37 +1399,52 @@ private fun ProviderEditHeader(
 
 @Composable
 private fun SegmentedTabs(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(50))
-            .background(AriTint)
-            .padding(4.dp)
-            .animateContentSize(tween(220, easing = FastOutSlowInEasing)),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val trackColor = if (isDark) Color(0xFF1C2933) else Color(0xFFEAF7FD)
+    val trackBorder = if (isDark) Color(0xFF344C5A) else Color(0xFFCBE9F5)
+    val activeColor = if (isDark) Color(0xFF17698D) else Color(0xFF64C9F3)
+    val activeTextColor = if (isDark) Color(0xFFE9F8FF) else Color(0xFF10364D)
+    val inactiveTextColor = if (isDark) Color(0xFFB5C7D2) else Color(0xFF5B7181)
+    val tabShape = RoundedCornerShape(13.dp)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag("provider-segmented-tabs"),
+        shape = RoundedCornerShape(18.dp),
+        color = trackColor,
+        border = BorderStroke(1.dp, trackBorder),
+        tonalElevation = 0.dp
     ) {
-        labels.forEachIndexed { index, label ->
-            val isSelected = index == selected
-            val tabColor by animateColorAsState(
-                targetValue = if (isSelected) AriAccent else Color.Transparent,
-                animationSpec = tween(220, easing = FastOutSlowInEasing),
-                label = "provider-tab-background"
-            )
-            val textColor by animateColorAsState(
-                targetValue = if (isSelected) Color.White else AriInk.copy(alpha = 0.72f),
-                animationSpec = tween(220, easing = FastOutSlowInEasing),
-                label = "provider-tab-foreground"
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(50))
-                    .background(tabColor)
-                    .clickable { onSelect(index) }
-                    .padding(vertical = 11.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(label, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = textColor)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(3.dp)
+                .animateContentSize(tween(220, easing = FastOutSlowInEasing)),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            labels.forEachIndexed { index, label ->
+                val isSelected = index == selected
+                val tabColor by animateColorAsState(
+                    targetValue = if (isSelected) activeColor else Color.Transparent,
+                    animationSpec = tween(180, easing = FastOutSlowInEasing),
+                    label = "provider-tab-background"
+                )
+                val textColor by animateColorAsState(
+                    targetValue = if (isSelected) activeTextColor else inactiveTextColor,
+                    animationSpec = tween(180, easing = FastOutSlowInEasing),
+                    label = "provider-tab-foreground"
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .clip(tabShape)
+                        .background(tabColor)
+                        .clickable { onSelect(index) }
+                        .testTag("provider-tab-$index"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = textColor)
+                }
             }
         }
     }
