@@ -24,6 +24,8 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ariai.app.data.models.AIModel
+import com.ariai.app.data.models.Agent
+import com.ariai.app.data.models.AgentTool
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
@@ -133,6 +135,83 @@ class ProviderAndChatUiTest {
             1,
             compose.onAllNodesWithText("Choose model").fetchSemanticsNodes().size
         )
+    }
+
+    @Test
+    fun selectedAgentIsVisibleOffersItsExamplesAndHeaderActionsWork() {
+        val provider = Provider(
+            id = "provider-agent-chat-test",
+            name = "Agent chat provider",
+            type = ProviderType.OPENAI_COMPATIBLE,
+            baseUrl = "https://api.example.test/v1",
+            apiKey = "test-key",
+            models = listOf(AIModel("agent-model", "Agent model", "provider-agent-chat-test"))
+        )
+        val agent = Agent(
+            id = "research-agent-chat-test",
+            name = "Research companion",
+            description = "A focused assistant for comparing information.",
+            systemPrompt = "Compare claims and explain uncertainty.",
+            avatar = "🔎",
+            providerId = provider.id,
+            modelId = "agent-model",
+            tools = listOf(AgentTool.CALCULATOR, AgentTool.WEB_SEARCH),
+            examples = listOf("Compare these two options", "Summarize the evidence")
+        )
+        val chat = Chat(
+            id = "chat-agent-chat-test",
+            title = "New Chat",
+            providerId = provider.id,
+            modelId = "agent-model",
+            agentId = agent.id
+        )
+        var openAgentsCalls = 0
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                NewChatScreen(
+                    chat = chat,
+                    activeAgent = agent,
+                    messages = emptyList(),
+                    isStreaming = false,
+                    currentStreamingContent = "",
+                    selectedModel = "agent-model",
+                    selectedProviderId = provider.id,
+                    providers = listOf(provider),
+                    onSendMessage = { _, _, _, _, _ -> false },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
+                    onOpenAgents = { openAgentsCalls++ },
+                    onCheckProvider = { ConnectionResult.Ok(0) }
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("chat-title-text").assertTextEquals(agent.name)
+        compose.onNodeWithTag("welcome-agent-name").assertTextEquals(agent.name)
+        compose.onNodeWithTag("welcome-agent-description").assertTextEquals(agent.description)
+        compose.onNodeWithTag("welcome-agent-tools").assertTextEquals("Tools: Calculator · Web search (Off)")
+        compose.onNodeWithText("AriAI (Agent model)", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("chat-agent-button").performClick()
+        assertEquals("the brain/agent badge opens Agents & prompts", 1, openAgentsCalls)
+
+        compose.onNodeWithTag("agent-example-0").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("chat-composer").assertTextEquals(agent.examples.first())
+
+        val touchTarget = compose.onNodeWithTag("chat-send-button").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val visualButton = compose.onNodeWithTag("chat-send-button-visual").assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        val expectedVisualSize = with(compose.density) { 40.dp.toPx() }
+        val minimumTouchSize = with(compose.density) { 48.dp.toPx() }
+        assertTrue("send target should remain at least 48 dp", touchTarget.width >= minimumTouchSize && touchTarget.height >= minimumTouchSize)
+        assertTrue("send artwork should be 40 dp and visibly smaller than its target", kotlin.math.abs(visualButton.width - expectedVisualSize) < 1f)
+        assertTrue("send artwork should remain square", kotlin.math.abs(visualButton.width - visualButton.height) < 1f)
+
+        compose.onNodeWithTag("chat-title-text").performClick()
+        compose.onNodeWithTag("chat-rename-field").assertIsDisplayed()
     }
 
     @Test

@@ -36,6 +36,16 @@ internal fun unwrapGeneratedWorkspaceFile(response: String): String {
     return fenced?.groupValues?.getOrNull(1)?.trimEnd() ?: trimmed
 }
 
+/** Uses a just-created chat while its database flow is still catching up. */
+internal fun chatSnapshotForId(
+    chatId: String?,
+    persistedChats: List<Chat>,
+    pendingChats: Map<String, Chat>
+): Chat? {
+    val id = chatId ?: return null
+    return persistedChats.firstOrNull { it.id == id } ?: pendingChats[id]
+}
+
 private data class ChatOptionOverride(val temperature: Float, val topP: Float, val systemPrompt: String?)
 
 private const val DEFAULT_MOBILE_REPLY_STYLE =
@@ -60,6 +70,7 @@ class AppViewModel(
     private val publicUrlFetcher = PublicUrlFetcher()
     private val githubRepositoryClient = GitHubRepositoryClient()
     private val chatOptionOverrides = ConcurrentHashMap<String, ChatOptionOverride>()
+    private val pendingChatRecords = ConcurrentHashMap<String, Chat>()
 
     // Preferences
     val language = prefs.languageFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "en")
@@ -230,6 +241,12 @@ class AppViewModel(
             runCatching { workspaceRepository.load() }
                 .onFailure { com.ariai.app.util.AppLog.warn(it, "load local workspace") }
         }
+        viewModelScope.launch {
+            chats.collect { persistedChats ->
+                val persistedIds = persistedChats.mapTo(mutableSetOf()) { it.id }
+                pendingChatRecords.keys.removeAll(persistedIds)
+            }
+        }
     }
 
     private val _isGeneratingImage = MutableStateFlow(false)
@@ -363,13 +380,16 @@ class AppViewModel(
             ?: selectedProvider?.models?.firstOrNull()?.id
         val chat = Chat(
             id = id,
-            title = "New Chat",
+            title = selectedAgent?.name?.takeIf { it.isNotBlank() } ?: "New Chat",
             providerId = selectedProvider?.id,
             modelId = selectedModel,
             agentId = agentId,
             temperature = selectedAgent?.temperature ?: 0.7f,
             topP = selectedAgent?.topP ?: 1.0f
         )
+        // Keep the selected agent/model available synchronously; the DB-backed chats flow can lag
+        // navigation, and the first send must not silently fall back to a different provider.
+        pendingChatRecords[id] = chat
         // Set active state synchronously: callers navigate to this id immediately after return.
         cancelActiveChatStreams()
         messagesCollectionJob?.cancel()
@@ -388,10 +408,13 @@ class AppViewModel(
                     )
                 }
                 chatPersistenceGate.complete(id, saveTicket, persisted)
+                if (!persisted) pendingChatRecords.remove(id)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                pendingChatRecords.remove(id)
                 chatPersistenceGate.complete(id, saveTicket, saved = false)
                 throw cancelled
             } catch (error: Exception) {
+                pendingChatRecords.remove(id)
                 com.ariai.app.util.AppLog.warn(error, "create chat")
                 chatPersistenceGate.complete(id, saveTicket, saved = false)
             }
@@ -428,6 +451,7 @@ class AppViewModel(
         viewModelScope.launch {
             uniqueIds.forEach { id ->
                 chatOptionOverrides.remove(id)
+                pendingChatRecords.remove(id)
                 // A first chat save may still be in flight. Delete only after it completes so the
                 // insert cannot race behind the delete and resurrect the chat.
                 chatPersistenceGate.await(id)
@@ -498,7 +522,8 @@ class AppViewModel(
     }
 
     private fun resolveProvider(chatId: String? = null): Provider? = try {
-        val providerId = (chatId?.let { _modelOverrides.value[it]?.first }) ?: getCurrentChat()?.providerId
+        val chat = chatId?.let(::getChatSnapshot) ?: getCurrentChat()
+        val providerId = chatId?.let { _modelOverrides.value[it]?.first } ?: chat?.providerId
         resolveEnabledProvider(providers.value, providerId)
     } catch (e: Exception) {
         null
@@ -1565,9 +1590,14 @@ class AppViewModel(
         }
     }
 
-    private fun getCurrentChat(): Chat? {
-        val id = _currentChatId.value ?: return null
-        val chat = chats.value.find { it.id == id } ?: return null
+    /** Resolves a chat for UI state even before Room has emitted a newly inserted row. */
+    fun getChatSnapshot(chatId: String): Chat? = chatForId(chatId)
+
+    private fun getCurrentChat(): Chat? = chatForId(_currentChatId.value)
+
+    private fun chatForId(chatId: String?): Chat? {
+        val id = chatId ?: return null
+        val chat = chatSnapshotForId(id, chats.value, pendingChatRecords) ?: return null
         val options = chatOptionOverrides[id] ?: return chat
         return chat.copy(
             temperature = options.temperature,

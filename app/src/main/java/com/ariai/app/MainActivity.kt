@@ -285,10 +285,12 @@ fun AppRoot(viewModel: AppViewModel) {
                     arguments = listOf(navArgument("chatId") { type = NavType.StringType })
                 ) { entry ->
                     val chatId = entry.arguments?.getString("chatId") ?: ""
-                    val currentChat = chats.find { it.id == chatId }
+                    val currentChat = chats.firstOrNull { it.id == chatId } ?: viewModel.getChatSnapshot(chatId)
+                    val activeAgent = currentChat?.agentId?.let { id -> agents.firstOrNull { it.id == id } }
                     LaunchedEffect(chatId) { viewModel.loadChat(chatId) }
                     NewChatScreen(
                         chat = currentChat,
+                        activeAgent = activeAgent,
                         screenChatId = chatId,
                         messages = messages,
                         isStreaming = isStreaming,
@@ -322,6 +324,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         },
                         onCopyMessage = { },
                         onOpenDrawer = { scope.launch { drawerState.open() } },
+                        onOpenAgents = { navController.navigate("agents") { launchSingleTop = true } },
                         onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },
                         onEditImage = { message, instruction -> viewModel.editGeneratedImage(message, instruction) },
                         onToggleFavorite = { pid, mid -> viewModel.toggleFavoriteModel(pid, mid) },

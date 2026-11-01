@@ -82,6 +82,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Attachment
 import com.ariai.app.data.models.AttachmentType
+import com.ariai.app.data.models.Agent
+import com.ariai.app.data.models.AgentTool
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
@@ -151,7 +153,9 @@ fun NewChatScreen(
     fontSize: Int = 15,
     modifier: Modifier = Modifier,
     screenChatId: String? = chat?.id,
-    onChatScreenDisposed: (String) -> Unit = {}
+    onChatScreenDisposed: (String) -> Unit = {},
+    activeAgent: Agent? = null,
+    onOpenAgents: () -> Unit = {}
 ) {
     val onChatDisposedState = rememberUpdatedState(onChatScreenDisposed)
     DisposableEffect(screenChatId) {
@@ -242,6 +246,10 @@ fun NewChatScreen(
     }
     var showRename by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
+    val startRenamingChat = {
+        renameText = chat?.title.orEmpty()
+        showRename = true
+    }
     if (showRename) {
         val dialogShape = paperPopupShape(26.dp)
         AlertDialog(
@@ -254,6 +262,7 @@ fun NewChatScreen(
                 OutlinedTextField(
                     value = renameText,
                     onValueChange = { renameText = it },
+                    modifier = Modifier.testTag("chat-rename-field"),
                     singleLine = true,
                     placeholder = { Text(tx("Chat title")) }
                 )
@@ -319,6 +328,28 @@ fun NewChatScreen(
     }
     val imageGenerationAvailable = providers.any { provider ->
         provider.enabled && provider.models.any { it.supportsImageGen }
+    }
+    val agentExamples = activeAgent?.examples.orEmpty()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .take(5)
+    val agentToolsSummary = activeAgent?.tools.orEmpty().mapNotNull { tool ->
+        when (tool) {
+            AgentTool.CALCULATOR -> tx("Calculator") +
+                if (selectedModelCapabilities?.supportsFunctionCalling == false) " (${tx("Off")})" else ""
+            AgentTool.WEB_SEARCH -> tx("Web search") + if (searchMode == SearchMode.OFF) " (${tx("Off")})" else ""
+            AgentTool.IMAGE_GENERATION -> tx("Image mode") + if (chatMode != ChatMode.IMAGE) " (${tx("Off")})" else ""
+            AgentTool.MCP, AgentTool.CODE_EXECUTION, AgentTool.MEMORY -> null
+        }
+    }.distinct()
+    val storedChatTitle = chat?.title?.takeIf { it.isNotBlank() }
+    val isUntitledChat = storedChatTitle == null ||
+        storedChatTitle.equals("New Chat", ignoreCase = true) || storedChatTitle == tx("New chat")
+    val chatHeaderTitle = if (activeAgent != null && isUntitledChat) {
+        activeAgent.name
+    } else {
+        storedChatTitle ?: tx("New chat")
     }
 
     // Follow the newest text only while the user is at the bottom. Once they scroll up, stay where they are.
@@ -572,7 +603,10 @@ fun NewChatScreen(
                     },
                     title = {
                         ChatHeaderTitle(
-                            chatTitle = chat?.title?.takeIf { it.isNotBlank() } ?: tx("New chat")
+                            chatTitle = chatHeaderTitle,
+                            activeAgent = activeAgent,
+                            onTitleClick = startRenamingChat,
+                            onAgentClick = onOpenAgents
                         )
                     },
                     actions = {
@@ -650,8 +684,7 @@ fun NewChatScreen(
                                     leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                                     onClick = {
                                         showTopMenu = false
-                                        renameText = chat?.title ?: ""
-                                        showRename = true
+                                        startRenamingChat()
                                     }
                                 )
                                 DropdownMenuItem(
@@ -765,7 +798,13 @@ fun NewChatScreen(
                             TextField(
                                 value = inputText,
                                 onValueChange = { inputText = it },
-                                placeholder = { Text(tx("Message AriAI"), color = Muted) },
+                                placeholder = {
+                                    Text(
+                                        activeAgent?.name?.takeIf { it.isNotBlank() }?.let { "${tx("Message")} $it" }
+                                            ?: tx("Message AriAI"),
+                                        color = Muted
+                                    )
+                                },
                                 textStyle = LocalTextStyle.current.copy(
                                     textAlign = TextAlign.Start,
                                     textDirection = TextDirection.ContentOrLtr
@@ -784,18 +823,29 @@ fun NewChatScreen(
                                 )
                             )
                             if (isStreaming || isSending) {
-                                // While a request is pending or a reply is coming in, allow cancellation.
+                                // Keep a 48 dp tap target while drawing a smaller, rounded stop control.
                                 Surface(
                                     onClick = { onStopGeneration() },
                                     modifier = Modifier.size(48.dp).testTag("chat-send-button"),
                                     shape = CircleShape,
-                                    color = AriAccentSoft,
+                                    color = Color.Transparent,
                                     contentColor = AriAccent,
-                                    shadowElevation = 2.dp,
+                                    shadowElevation = 0.dp,
                                     tonalElevation = 0.dp
                                 ) {
                                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.Stop, contentDescription = tx("Stop"), modifier = Modifier.size(18.dp))
+                                        Surface(
+                                            modifier = Modifier.size(40.dp).testTag("chat-send-button-visual"),
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = AriAccentSoft,
+                                            contentColor = AriAccent,
+                                            shadowElevation = 1.dp,
+                                            tonalElevation = 0.dp
+                                        ) {
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.Stop, contentDescription = tx("Stop"), modifier = Modifier.size(18.dp))
+                                            }
+                                        }
                                     }
                                 }
                             } else {
@@ -804,18 +854,29 @@ fun NewChatScreen(
                                     enabled = canSend,
                                     modifier = Modifier.size(48.dp).testTag("chat-send-button"),
                                     shape = CircleShape,
-                                    color = sendButtonColor,
+                                    color = Color.Transparent,
                                     contentColor = AriAccent,
-                                    shadowElevation = if (canSend) 2.dp else 1.dp,
+                                    shadowElevation = 0.dp,
                                     tonalElevation = 0.dp
                                 ) {
                                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            Icons.Default.ArrowUpward,
-                                            contentDescription = tx("Send"),
-                                            tint = AriAccent,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                        Surface(
+                                            modifier = Modifier.size(40.dp).testTag("chat-send-button-visual"),
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = sendButtonColor,
+                                            contentColor = AriAccent,
+                                            shadowElevation = if (canSend) 2.dp else 1.dp,
+                                            tonalElevation = 0.dp
+                                        ) {
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    Icons.Default.ArrowUpward,
+                                                    contentDescription = tx("Send"),
+                                                    tint = AriAccent,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -885,15 +946,23 @@ fun NewChatScreen(
                             .background(AriAccentSoft),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = AriAccentDark,
-                            modifier = Modifier.size(if (compactWelcome) 18.dp else 22.dp)
-                        )
+                        if (activeAgent == null) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = AriAccentDark,
+                                modifier = Modifier.size(if (compactWelcome) 18.dp else 22.dp)
+                            )
+                        } else {
+                            Text(
+                                activeAgent.avatar,
+                                fontSize = if (compactWelcome) 18.sp else 22.sp
+                            )
+                        }
                     }
                     Text(
-                        "AriAI",
+                        activeAgent?.name ?: "AriAI",
+                        modifier = if (activeAgent != null) Modifier.testTag("welcome-agent-name") else Modifier,
                         color = Muted,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 10.sp,
@@ -906,6 +975,29 @@ fun NewChatScreen(
                         fontSize = if (compactWelcome) 17.sp else 19.sp,
                         textAlign = TextAlign.Center
                     )
+                    activeAgent?.description?.takeIf { it.isNotBlank() }?.let { description ->
+                        Text(
+                            description,
+                            modifier = Modifier.fillMaxWidth().testTag("welcome-agent-description"),
+                            color = Muted,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (agentToolsSummary.isNotEmpty()) {
+                        Text(
+                            "${tx("Tools")}: ${agentToolsSummary.joinToString(" · ")}",
+                            modifier = Modifier.fillMaxWidth().testTag("welcome-agent-tools"),
+                            color = AriAccent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     if (!selectedModelReady) {
                         Text(
                             modelSetupMessage,
@@ -942,29 +1034,51 @@ fun NewChatScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
-                            item(key = "suggestion:brainstorm") {
-                                AssistChip(
-                                    onClick = { inputText = tx("Help me brainstorm a few ideas.") },
-                                    label = { Text(tx("Brainstorm")) },
-                                    leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = AriCard,
-                                        labelColor = Ink,
-                                        leadingIconContentColor = AriAccent
+                            if (agentExamples.isNotEmpty()) {
+                                agentExamples.forEachIndexed { index, example ->
+                                    item(key = "agent-example:$index") {
+                                        AssistChip(
+                                            onClick = { inputText = example },
+                                            modifier = Modifier.testTag("agent-example-$index"),
+                                            label = {
+                                                Text(example, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            },
+                                            colors = AssistChipDefaults.assistChipColors(
+                                                containerColor = AriCard,
+                                                labelColor = Ink,
+                                                leadingIconContentColor = AriAccent
+                                            )
+                                        )
+                                    }
+                                }
+                            } else {
+                                item(key = "suggestion:brainstorm") {
+                                    AssistChip(
+                                        onClick = { inputText = tx("Help me brainstorm a few ideas.") },
+                                        label = { Text(tx("Brainstorm")) },
+                                        leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            containerColor = AriCard,
+                                            labelColor = Ink,
+                                            leadingIconContentColor = AriAccent
+                                        )
                                     )
-                                )
-                            }
-                            item(key = "suggestion:summarize") {
-                                AssistChip(
-                                    onClick = { inputText = tx("Summarize this for me.") },
-                                    label = { Text(tx("Summarize")) },
-                                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = AriCard,
-                                        labelColor = Ink,
-                                        leadingIconContentColor = AriAccent
+                                }
+                                item(key = "suggestion:summarize") {
+                                    AssistChip(
+                                        onClick = { inputText = tx("Summarize this for me.") },
+                                        label = { Text(tx("Summarize")) },
+                                        leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            containerColor = AriCard,
+                                            labelColor = Ink,
+                                            leadingIconContentColor = AriAccent
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }
@@ -1032,16 +1146,51 @@ fun NewChatScreen(
 }
 
 @Composable
-private fun ChatHeaderTitle(chatTitle: String) {
+private fun ChatHeaderTitle(
+    chatTitle: String,
+    activeAgent: Agent?,
+    onTitleClick: () -> Unit,
+    onAgentClick: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth().testTag("chat-title-header").padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProviderBrandMark(provider = null, size = 30.dp)
-        Spacer(Modifier.width(8.dp))
+        Surface(
+            onClick = onAgentClick,
+            modifier = Modifier.size(48.dp)
+                .testTag("chat-agent-button")
+                .semantics(mergeDescendants = true) {
+                    contentDescription = tx("Agents & prompts")
+                },
+            shape = CircleShape,
+            color = Color.Transparent,
+            contentColor = Ink,
+            shadowElevation = 0.dp,
+            tonalElevation = 0.dp
+        ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (activeAgent == null) {
+                    ProviderBrandMark(provider = null, size = 30.dp)
+                } else {
+                    Box(
+                        modifier = Modifier.size(30.dp).clip(CircleShape).background(AriAccentSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(activeAgent.avatar, fontSize = 17.sp)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.width(6.dp))
         Text(
             chatTitle,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f)
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(role = Role.Button) { onTitleClick() }
+                .semantics { stateDescription = tx("Rename chat") }
+                .testTag("chat-title-text")
+                .padding(vertical = 5.dp),
             color = Ink,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
