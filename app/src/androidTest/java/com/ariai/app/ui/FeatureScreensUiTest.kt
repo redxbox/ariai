@@ -201,7 +201,7 @@ class FeatureScreensUiTest {
         compose.onNodeWithTag("agent-name").performScrollTo().assertIsDisplayed().performTextInput("Prompt QA")
         compose.onNodeWithTag("agent-system-prompt").performScrollTo().assertIsDisplayed()
             .performTextInput("Check facts, then answer clearly.")
-        compose.onNodeWithTag("agent-save").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithTag("agent-save").assertIsDisplayed().performClick()
         compose.waitForIdle()
 
         assertNotNull(savedAgent)

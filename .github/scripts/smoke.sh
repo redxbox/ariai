@@ -560,10 +560,9 @@ expect_text "Add MCP server"
 shot 20-mcp-add-form
 tap "Name"
 type_text "ArenaSmokeServer"
-hide_keyboard
+# Keep focus inside the form: Back can dismiss this sheet even when the emulator IME is slow.
 tap "Server URL"
 type_text "https://example.org/mcp"
-hide_keyboard
 tap "SSE"
 shot 21-mcp-sse-selected
 tap "Save"
