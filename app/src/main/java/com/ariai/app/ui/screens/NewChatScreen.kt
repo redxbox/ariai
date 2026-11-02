@@ -166,6 +166,8 @@ fun NewChatScreen(
     var inputText by remember { mutableStateOf("") }
     // Voice input with the device's built-in speech recognizer. Spoken text is added to the input box.
     var listening by remember { mutableStateOf(false) }
+    var showVoiceDisclosure by remember { mutableStateOf(false) }
+    var voiceDisclosureAccepted by remember { mutableStateOf(false) }
     val voiceContext = LocalContext.current
     val recognizer = remember {
         if (android.speech.SpeechRecognizer.isRecognitionAvailable(voiceContext)) {
@@ -229,6 +231,33 @@ fun NewChatScreen(
     }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startListening()
+    }
+    val requestVoiceInput = {
+        if (!voiceDisclosureAccepted) {
+            showVoiceDisclosure = true
+        } else if (
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                voiceContext, android.Manifest.permission.RECORD_AUDIO
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            startListening()
+        } else {
+            micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    if (showVoiceDisclosure) {
+        VoiceInputDisclosureDialog(
+            onDismiss = { showVoiceDisclosure = false },
+            onContinue = {
+                showVoiceDisclosure = false
+                voiceDisclosureAccepted = true
+                if (
+                    androidx.core.content.ContextCompat.checkSelfPermission(
+                        voiceContext, android.Manifest.permission.RECORD_AUDIO
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) startListening() else micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+        )
     }
     var pending by remember { mutableStateOf<List<Attachment>>(emptyList()) }
     var showModelSheet by remember { mutableStateOf(false) }
@@ -911,10 +940,7 @@ fun NewChatScreen(
                                         recognizer?.stopListening()
                                         listening = false
                                     }
-                                    androidx.core.content.ContextCompat.checkSelfPermission(
-                                        context, android.Manifest.permission.RECORD_AUDIO
-                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED -> startListening()
-                                    else -> micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                    else -> requestVoiceInput()
                                 }
                             }
                             if (listening) {

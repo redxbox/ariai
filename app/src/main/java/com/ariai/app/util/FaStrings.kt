@@ -70,6 +70,8 @@ internal val faStrings: Map<String, String> = mapOf(
         "Copy code" to "کپی کد",
         "Code" to "کد",
         "Voice input" to "ورودی صوتی",
+        "Continue" to "ادامه",
+        "The Android speech-recognition service receives your audio to transcribe it and may process it locally or remotely under its own privacy policy. The transcript is added to your message; it is sent to your AI provider only when you tap Send." to "سرویس تشخیص گفتار اندروید صدای شما را برای تبدیل به متن دریافت می‌کند و ممکن است آن را به‌صورت محلی یا از راه دور، طبق سیاست حریم خصوصی خودش پردازش کند. متن تشخیص‌داده‌شده به پیام شما افزوده می‌شود و فقط وقتی «ارسال» را بزنید به ارائه‌دهندهٔ هوش مصنوعی فرستاده می‌شود.",
         "Listening…" to "در حال گوش دادن…",
         "Stop listening" to "پایان ورودی صوتی",
         "Delete generated files" to "حذف فایل‌های ساخته‌شده",

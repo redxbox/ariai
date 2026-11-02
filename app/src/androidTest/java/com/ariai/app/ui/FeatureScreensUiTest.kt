@@ -34,6 +34,7 @@ import com.ariai.app.ui.screens.SearchServiceScreen
 import com.ariai.app.ui.screens.SearchSheet
 import com.ariai.app.ui.screens.SimpleMcpScreen
 import com.ariai.app.ui.screens.SimpleSettingsScreen
+import com.ariai.app.ui.screens.VoiceInputDisclosureDialog
 import com.ariai.app.ui.screens.WorkspaceScreen
 import com.ariai.app.ui.theme.AriAiTheme
 import org.junit.Assert.assertEquals
@@ -471,5 +472,25 @@ class FeatureScreensUiTest {
 
         compose.onNodeWithText("Privacy policy").performScrollTo().assertIsDisplayed().performClick()
         assertTrue("Privacy policy action should be reachable from Settings", opened)
+    }
+
+    @Test
+    fun voiceInputDisclosureExplainsSpeechServiceAndRequiresConsent() {
+        var accepted = false
+        var dismissed = false
+        compose.setContent {
+            AriAiTheme(darkTheme = false, dynamicColor = false) {
+                VoiceInputDisclosureDialog(
+                    onDismiss = { dismissed = true },
+                    onContinue = { accepted = true }
+                )
+            }
+        }
+
+        compose.onNodeWithText("The Android speech-recognition service receives your audio", substring = true)
+            .assertIsDisplayed()
+        compose.onNodeWithText("Continue").performClick()
+        assertTrue("Voice recognition starts only after disclosure acceptance", accepted)
+        assertFalse("Accepting disclosure does not dismiss through the cancel path", dismissed)
     }
 }
