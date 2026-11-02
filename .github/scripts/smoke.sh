@@ -82,7 +82,8 @@ tap() {
   else
     status=$?
   fi
-  if (( status != 0 )) && [[ "$label" == "Add to message" && "$output" == *"This app can only access the photos you select"* ]]; then
+  if (( status != 0 )) && [[ "$label" == "Add to message" ]] && \
+    [[ "$output" == *"This app can only access the photos you select"* || "$output" == *"No photos yet"* || "$output" == *"Photos | Albums"* ]]; then
     echo "::warning title=External picker recovery::The Photo Picker resurfaced before the attachment sheet; closing the stale activity and retrying."
     if dismiss_external_picker "Choose model"; then
       if output="$(python3 .github/scripts/ui_tap.py "$label" 2>&1)"; then
@@ -146,6 +147,12 @@ back() {
   sleep 1
 }
 
+stop_photo_picker() {
+  # Android 14+ runs the picker in its own package; older images also use the MediaProvider module.
+  adb shell am force-stop com.google.android.photopicker >/dev/null 2>&1 || true
+  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+}
+
 wait_for_main_activity() {
   local expected_label="${1:-Choose model}"
   local stable_required="${2:-8}"
@@ -177,7 +184,7 @@ wait_for_main_activity() {
 }
 
 restart_ariai_task() {
-  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+  stop_photo_picker
   adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
   adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
   sleep 1
@@ -198,7 +205,7 @@ dismiss_external_picker() {
     back
   fi
   sleep 1
-  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+  stop_photo_picker
 
   for attempt in 1 2 3 4; do
     if wait_for_main_activity "$return_label" 8 12; then
@@ -208,7 +215,7 @@ dismiss_external_picker() {
     if (( attempt == 4 )); then break; fi
     activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
     echo "::warning title=External picker recovery::Attempt ${attempt}/3; foreground is ${activity:0:300}. Restoring AriAI."
-    adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+    stop_photo_picker
     adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
     sleep 1
     if ! adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
@@ -566,12 +573,14 @@ back
 expect_text "Choose model"
 end_step
 
-step "Voice input permission surface"
+step "Voice input privacy disclosure"
 tap "Voice input"
-sleep 2
-shot 24-voice-input
-# Dismiss a possible Android permission/recognizer surface without granting microphone access.
-back
+expect_text "The Android speech-recognition service receives your audio"
+expect_text "Continue"
+expect_text "Cancel"
+shot 24-voice-input-disclosure
+# Cancel without granting microphone permission or starting the recognizer.
+tap "Cancel"
 expect_text "Choose model"
 end_step
 
