@@ -679,15 +679,15 @@ tap "Models"
 expect_text "No models yet"
 shot 31-provider-models-empty
 tap_scroll "Add model"
-expect_text "Model ID"
-expect_text "Built-in Tools"
+wait_for_text "Model ID" 10
+wait_for_text "Built-in Tools" 10
 shot 32-add-model-basic
 tap "Model ID"
 type_text "smoke-model"
-hide_keyboard
+# Switching tabs removes the focused field without sending Back, which can dismiss the nested sheet.
 tap "Built-in Tools"
-expect_text "Google Search grounding"
-expect_text "URL context"
+wait_for_text "Google Search grounding" 10
+wait_for_text "URL context" 10
 shot 33-add-model-built-in-tools
 tap "Search"
 tap "URL context"
