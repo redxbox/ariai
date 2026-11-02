@@ -110,6 +110,8 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run provider and chat UI tests
+        id: provider-chat-ui-primary
+        continue-on-error: true
         timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -120,9 +122,37 @@ jobs:
           disable-animations: true
           disable-spellchecker: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          # android-emulator-runner runs each nonempty script line separately; keep the shell block on one line.
-          script: |
-            bash -o pipefail -c '{ echo "Starting connected UI tests at $(date -Is)"; echo "Working directory: $PWD"; adb devices -l || true; ./gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace; } 2>&1 | tee "$GITHUB_WORKSPACE/instrumentation.log"'
+          script: bash .github/scripts/provider-chat-ui-tests.sh
+
+      - name: Check whether the provider UI test script started
+        id: provider-chat-ui-started
+        if: steps.provider-chat-ui-primary.outcome == 'failure'
+        run: |
+          if [ -s instrumentation.log ]; then
+            echo "started=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "started=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Retry UI tests after emulator setup failure
+        if: steps.provider-chat-ui-primary.outcome == 'failure' && steps.provider-chat-ui-started.outputs.started == 'false'
+        timeout-minutes: 20
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          disable-spellchecker: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: bash .github/scripts/provider-chat-ui-tests.sh
+
+      - name: Fail on provider/chat UI test failures
+        if: steps.provider-chat-ui-started.outputs.started == 'true'
+        run: |
+          echo "::error title=Provider/chat UI test failure::The test script started and failed; no emulator setup retry will mask it."
+          exit 1
 
       - name: Report UI test failures as annotations
         if: failure()
