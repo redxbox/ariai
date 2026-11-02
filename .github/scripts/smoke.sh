@@ -567,7 +567,7 @@ tap "SSE"
 shot 21-mcp-sse-selected
 tap "Save"
 expect_text "ArenaSmokeServer"
-expect_text "not connected"
+expect_text "Disabled"
 shot 22-mcp-server-added
 tap "Remove server"
 expect_text "No MCP servers yet"
