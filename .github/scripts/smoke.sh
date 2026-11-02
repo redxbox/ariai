@@ -668,10 +668,9 @@ for provider in OpenAI Anthropic Ollama Custom Gemini; do
     expect_absent_text "Save"
     expect_absent_text "Test"
     shot 29-gemini-form-with-keyboard
-    hide_keyboard
-    expect_text "Save"
-    expect_text "Test"
-    shot 29-add-gemini-provider
+    # Use the visible editor navigation instead of Back-as-IME: Android can deliver that key to the sheet.
+    tap "Back"
+    expect_text "Providers"
     shot 30-provider-presets
   else
     tap "Back"

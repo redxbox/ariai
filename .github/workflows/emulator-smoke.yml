@@ -48,6 +48,7 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
+          disable-spellchecker: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             timeout --signal=TERM --kill-after=15s 28m bash .github/scripts/smoke.sh
@@ -117,6 +118,7 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
+          disable-spellchecker: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             {
