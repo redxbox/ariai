@@ -23,7 +23,9 @@ data class Provider(
     val enabled: Boolean = true,
     val customHeaders: Map<String, String> = emptyMap(),
     val customBody: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** True when encrypted key data exists but Android Keystore could not unlock it. */
+    val apiKeyNeedsReentry: Boolean = false
 ) : Parcelable
 
 @Parcelize
