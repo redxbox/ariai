@@ -101,6 +101,7 @@ class MCPClientTest {
         server.enqueue(MockResponse().setResponseCode(202))
         server.enqueue(MockResponse().setResponseCode(202))
         server.enqueue(MockResponse().setResponseCode(202))
+        server.enqueue(MockResponse().setResponseCode(202))
         server.start()
 
         val secret = "legacy-test-token"
