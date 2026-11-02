@@ -6,8 +6,10 @@ import com.ariai.app.data.models.McpTransport
 import com.ariai.app.data.models.isValidMcpHeaderName
 import com.ariai.app.data.models.isValidMcpServerUrl
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -23,6 +25,7 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
@@ -197,12 +200,17 @@ class MCPClient(
 ) {
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
-        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .readTimeout(requestTimeoutMs.coerceAtLeast(1), TimeUnit.MILLISECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
-        .callTimeout(0, TimeUnit.MILLISECONDS)
+        .callTimeout(requestTimeoutMs.coerceAtLeast(1), TimeUnit.MILLISECONDS)
         .followRedirects(false)
         .followSslRedirects(false)
         .retryOnConnectionFailure(false)
+        .build()
+    // The SSE event stream is intentionally long-lived; only individual JSON-RPC HTTP calls time out.
+    private val eventStreamClient: OkHttpClient = httpClient.newBuilder()
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .callTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
     suspend fun connect(server: McpServerItem): MCPConnection {
@@ -212,7 +220,7 @@ class MCPClient(
 
         val session = when (server.transport) {
             McpTransport.STREAMABLE_HTTP -> StreamableHttpSession(httpClient, server, requestTimeoutMs)
-            McpTransport.SSE -> LegacySseSession(httpClient, server, requestTimeoutMs)
+            McpTransport.SSE -> LegacySseSession(httpClient, eventStreamClient, server, requestTimeoutMs)
         }
         try {
             val initialized = session.request("initialize", JSONObject()
@@ -394,6 +402,7 @@ class MCPClient(
 
     private class LegacySseSession(
         private val client: OkHttpClient,
+        private val eventStreamClient: OkHttpClient,
         private val server: McpServerItem,
         private val timeoutMs: Long
     ) : MCPProtocolSession {
@@ -498,7 +507,7 @@ class MCPClient(
                     }
                 }
             }
-            eventSource = EventSources.createFactory(client).newEventSource(request, listener)
+            eventSource = EventSources.createFactory(eventStreamClient).newEventSource(request, listener)
             return endpointReady.await()
         }
 
@@ -631,8 +640,15 @@ class MCPClient(
         }
 
         suspend fun <T : Any> boundedRequest(timeoutMs: Long, block: suspend () -> T): T {
-            val result = withTimeoutOrNull(timeoutMs.coerceAtLeast(1)) { block() }
-            return result ?: throw IOException("MCP request timed out.")
+            try {
+                val result = withTimeoutOrNull(timeoutMs.coerceAtLeast(1)) {
+                    withContext(Dispatchers.IO) { block() }
+                }
+                return result ?: throw IOException("MCP request timed out.")
+            } catch (timeout: InterruptedIOException) {
+                if (!timeout.message.orEmpty().contains("timeout", ignoreCase = true)) throw timeout
+                throw IOException("MCP request timed out.", timeout)
+            }
         }
 
         fun readSseResponse(input: java.io.InputStream, expectedId: String): String {

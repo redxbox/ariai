@@ -5,6 +5,19 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
 }
 
+val releaseKeystorePath = System.getenv("ARIAI_RELEASE_KEYSTORE_FILE")
+val releaseStorePassword = System.getenv("ARIAI_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = System.getenv("ARIAI_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("ARIAI_RELEASE_KEY_PASSWORD")
+val releaseSigningInputs = listOf(releaseKeystorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+val releaseSigningConfigured = releaseSigningInputs.all { !it.isNullOrBlank() }
+require(releaseSigningConfigured || releaseSigningInputs.all { it.isNullOrBlank() }) {
+    "Release signing requires a keystore path, store password, key alias, and key password together."
+}
+if (releaseSigningConfigured) {
+    require(file(requireNotNull(releaseKeystorePath)).isFile) { "The configured release keystore file does not exist." }
+}
+
 android {
     namespace = "com.ariai.app"
     compileSdk = 36
@@ -22,8 +35,20 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = file(requireNotNull(releaseKeystorePath))
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseSigningConfigured) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

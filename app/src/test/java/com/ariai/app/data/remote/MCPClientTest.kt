@@ -18,10 +18,10 @@ class MCPClientTest {
     @Test
     fun streamableHttpInitializesDiscoversToolsAndCallsWithBearerHeader() = runBlocking {
         val server = MockWebServer()
-        server.enqueue(jsonResponse(initializeResult()).setHeader("Mcp-Session-Id", "session-123"))
+        server.enqueue(jsonResponse(jsonRpcResponse(1, initializeResult())).setHeader("Mcp-Session-Id", "session-123"))
         server.enqueue(MockResponse().setResponseCode(202))
-        server.enqueue(jsonResponse(toolsResult()))
-        server.enqueue(jsonResponse(toolResult("echoed: hello", containsSecret = true)))
+        server.enqueue(jsonResponse(jsonRpcResponse(2, toolsResult())))
+        server.enqueue(jsonResponse(jsonRpcResponse(3, toolResult("echoed: hello", containsSecret = true))))
         server.start()
 
         val secret = "mcp-test-secret"
@@ -75,7 +75,7 @@ class MCPClientTest {
         val server = MockWebServer()
         server.enqueue(sseResponse(jsonRpcResponse(1, initializeResult())))
         server.enqueue(MockResponse().setResponseCode(202))
-        server.enqueue(jsonResponse(toolsResult()))
+        server.enqueue(jsonResponse(jsonRpcResponse(2, toolsResult())))
         server.start()
 
         val connection = MCPClient().connect(serverConfig(server, McpTransport.STREAMABLE_HTTP))

@@ -62,6 +62,10 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 The app version is **2.3.0-stable** (`versionCode` 5). The Gradle build uses Kotlin 1.9.22 and Jetpack Compose.
 
+## Signed release bundle
+
+The **Signed Android App Bundle** GitHub Actions workflow builds and verifies a signed `.aab`, then uploads it with a SHA-256 checksum; it does not publish to Google Play. It runs manually (`workflow_dispatch`) or for an approved `v*` tag. Configure the release keystore secrets as documented in [`.github/RELEASE_SIGNING.md`](.github/RELEASE_SIGNING.md). Never commit the keystore or put secret values in logs or chat.
+
 ## Known limitations
 
 - The workspace console is deliberately not a general-purpose terminal: it has no shell, PRoot, package manager, or code execution. The HTML preview is static and does not run JavaScript, remote assets, or app frameworks.
