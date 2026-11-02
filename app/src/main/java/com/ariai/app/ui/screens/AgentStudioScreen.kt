@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -278,156 +279,168 @@ private fun AgentEditorSheet(
     val userTextStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start, textDirection = TextDirection.ContentOrLtr)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = AriCard, contentColor = AriInk) {
-        Column(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Box(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 760.dp).navigationBarsPadding().imePadding()
         ) {
-            Text(if (agent.isBuiltIn) tx("Customize agent") else tx("Agent configuration"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Text(tx("System instructions"), fontWeight = FontWeight.Medium)
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it.take(48) },
-                textStyle = userTextStyle,
-                label = { Text(tx("Agent name")) },
-                leadingIcon = {
-                    IconButton(
-                        onClick = { avatar = if (avatar == "✦") "✧" else "✦" },
-                        modifier = Modifier.semantics { contentDescription = tx("Change avatar") }
-                    ) {
-                        Text(avatar.ifBlank { "✦" })
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().testTag("agent-name"),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it.take(140) },
-                textStyle = userTextStyle,
-                label = { Text(tx("Description")) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 1,
-                maxLines = 3
-            )
-            OutlinedTextField(
-                value = prompt,
-                onValueChange = { prompt = it.take(12_000) },
-                textStyle = userTextStyle,
-                label = { Text(tx("System prompt")) },
-                placeholder = { Text(tx("Describe the role, style, and boundaries for this agent.")) },
-                modifier = Modifier.fillMaxWidth().testTag("agent-system-prompt"),
-                minLines = 5,
-                maxLines = 10
-            )
-            Text(tx("Variables: {{time}}, {{date}}, {{model_name}} and your custom key=value entries."), color = AriMuted, fontSize = 12.sp)
-            OutlinedTextField(
-                value = variables,
-                onValueChange = { variables = it.take(4_000) },
-                textStyle = userTextStyle,
-                label = { Text(tx("Prompt variables (one key=value per line)")) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                maxLines = 5
-            )
-            OutlinedTextField(
-                value = examples,
-                onValueChange = { examples = it.take(4_000) },
-                textStyle = userTextStyle,
-                label = { Text(tx("Example prompts (one per line)")) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                maxLines = 4
-            )
-
-            Text(tx("Model binding"), fontWeight = FontWeight.Medium)
-            Box {
-                OutlinedButton(onClick = { providerMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(selectedProvider?.name ?: tx("Use default provider"), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                DropdownMenu(expanded = providerMenu, onDismissRequest = { providerMenu = false }) {
-                    DropdownMenuItem(text = { Text(tx("Use default provider")) }, onClick = { providerId = null; modelId = null; providerMenu = false })
-                    enabledProviders.forEach { provider ->
-                        DropdownMenuItem(text = { Text(provider.name) }, onClick = { providerId = provider.id; modelId = null; providerMenu = false })
-                    }
-                }
-            }
-            Box {
-                OutlinedButton(onClick = { modelMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(selectedModel?.second?.displayName ?: tx("Use default model"), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
-                    DropdownMenuItem(text = { Text(tx("Use default model")) }, onClick = { modelId = null; modelMenu = false })
-                    modelChoices.forEach { (provider, model) ->
-                        DropdownMenuItem(
-                            text = { Text("${model.displayName} · ${provider.name}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            onClick = { providerId = provider.id; modelId = model.id; modelMenu = false }
-                        )
-                    }
-                }
-            }
-
-            Text(tx("Generation"), fontWeight = FontWeight.Medium)
-            AgentSlider(tx("Temperature"), temperature, 0f..2f, 19) { temperature = it }
-            AgentSlider(tx("Top-P"), topP, 0f..1f, 19) { topP = it }
-
-            Text(tx("Available tools"), fontWeight = FontWeight.Medium)
-            AgentToolSwitch(tx("Calculator"), tx("Safe arithmetic only; no arbitrary code is executed."), AgentTool.CALCULATOR in selectedTools, true) {
-                selectedTools = selectedTools.toggle(AgentTool.CALCULATOR)
-            }
-            AgentToolSwitch(tx("Web search"), tx("Uses the search service configured in Settings."), AgentTool.WEB_SEARCH in selectedTools, true) {
-                selectedTools = selectedTools.toggle(AgentTool.WEB_SEARCH)
-            }
-            AgentToolSwitch(tx("MCP tools"), tx("Uses enabled MCP servers. Enable only servers you trust."), AgentTool.MCP in selectedTools, true) {
-                selectedTools = selectedTools.toggle(AgentTool.MCP)
-            }
-            HorizontalDivider(color = AriInk.copy(alpha = 0.08f))
-            Text(tx("Not available yet"), color = AriMuted, fontWeight = FontWeight.Medium, fontSize = 12.sp)
-            AgentToolSwitch(tx("Code execution"), tx("Arbitrary terminal execution is not enabled in this app."), AgentTool.CODE_EXECUTION in selectedTools, false) { }
-            AgentToolSwitch(tx("Persistent memory"), tx("Memory controls are not implemented yet."), AgentTool.MEMORY in selectedTools, false) { }
-            AgentToolSwitch(tx("Image generation"), tx("Use Image mode from the chat composer; it is not a callable agent tool."), AgentTool.IMAGE_GENERATION in selectedTools, false) { }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!agent.isBuiltIn) {
-                    TextButton(onClick = { confirmDelete = true }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Delete, contentDescription = null)
-                        Spacer(Modifier.width(4.dp))
-                        Text(tx("Delete"))
-                    }
-                }
-                Button(
-                    onClick = {
-                        val vars = variables.lineSequence().mapNotNull { line ->
-                            val split = line.indexOf('=')
-                            if (split <= 0) null else line.substring(0, split).trim().takeIf { it.isNotBlank() }?.let { key ->
-                                key to line.substring(split + 1).trim()
-                            }
-                        }.toMap()
-                        onSave(
-                            agent.copy(
-                                name = name.trim(),
-                                description = description.trim(),
-                                systemPrompt = prompt.trim(),
-                                avatar = avatar.ifBlank { "✦" }.take(4),
-                                providerId = providerId,
-                                modelId = modelId,
-                                temperature = temperature.coerceIn(0f, 2f),
-                                topP = topP.coerceIn(0f, 1f),
-                                tools = selectedTools.toList(),
-                                promptVariables = vars,
-                                examples = examples.lines().map(String::trim).filter(String::isNotBlank).take(20)
-                            )
-                        )
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp).padding(bottom = 76.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(if (agent.isBuiltIn) tx("Customize agent") else tx("Agent configuration"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(tx("System instructions"), fontWeight = FontWeight.Medium)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(48) },
+                    textStyle = userTextStyle,
+                    label = { Text(tx("Agent name")) },
+                    leadingIcon = {
+                        IconButton(
+                            onClick = { avatar = if (avatar == "✦") "✧" else "✦" },
+                            modifier = Modifier.semantics { contentDescription = tx("Change avatar") }
+                        ) {
+                            Text(avatar.ifBlank { "✦" })
+                        }
                     },
-                    enabled = name.isNotBlank() && prompt.isNotBlank(),
-                    modifier = Modifier.weight(1.3f).testTag("agent-save"),
-                    colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text(tx("Save agent"))
+                    modifier = Modifier.fillMaxWidth().testTag("agent-name"),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it.take(140) },
+                    textStyle = userTextStyle,
+                    label = { Text(tx("Description")) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 1,
+                    maxLines = 3
+                )
+                OutlinedTextField(
+                    value = prompt,
+                    onValueChange = { prompt = it.take(12_000) },
+                    textStyle = userTextStyle,
+                    label = { Text(tx("System prompt")) },
+                    placeholder = { Text(tx("Describe the role, style, and boundaries for this agent.")) },
+                    modifier = Modifier.fillMaxWidth().testTag("agent-system-prompt"),
+                    minLines = 5,
+                    maxLines = 10
+                )
+                Text(tx("Variables: {{time}}, {{date}}, {{model_name}} and your custom key=value entries."), color = AriMuted, fontSize = 12.sp)
+                OutlinedTextField(
+                    value = variables,
+                    onValueChange = { variables = it.take(4_000) },
+                    textStyle = userTextStyle,
+                    label = { Text(tx("Prompt variables (one key=value per line)")) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 5
+                )
+                OutlinedTextField(
+                    value = examples,
+                    onValueChange = { examples = it.take(4_000) },
+                    textStyle = userTextStyle,
+                    label = { Text(tx("Example prompts (one per line)")) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4
+                )
+
+                Text(tx("Model binding"), fontWeight = FontWeight.Medium)
+                Box {
+                    OutlinedButton(onClick = { providerMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(selectedProvider?.name ?: tx("Use default provider"), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    DropdownMenu(expanded = providerMenu, onDismissRequest = { providerMenu = false }) {
+                        DropdownMenuItem(text = { Text(tx("Use default provider")) }, onClick = { providerId = null; modelId = null; providerMenu = false })
+                        enabledProviders.forEach { provider ->
+                            DropdownMenuItem(text = { Text(provider.name) }, onClick = { providerId = provider.id; modelId = null; providerMenu = false })
+                        }
+                    }
                 }
+                Box {
+                    OutlinedButton(onClick = { modelMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(selectedModel?.second?.displayName ?: tx("Use default model"), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
+                        DropdownMenuItem(text = { Text(tx("Use default model")) }, onClick = { modelId = null; modelMenu = false })
+                        modelChoices.forEach { (provider, model) ->
+                            DropdownMenuItem(
+                                text = { Text("${model.displayName} · ${provider.name}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                onClick = { providerId = provider.id; modelId = model.id; modelMenu = false }
+                            )
+                        }
+                    }
+                }
+
+                Text(tx("Generation"), fontWeight = FontWeight.Medium)
+                AgentSlider(tx("Temperature"), temperature, 0f..2f, 19) { temperature = it }
+                AgentSlider(tx("Top-P"), topP, 0f..1f, 19) { topP = it }
+
+                Text(tx("Available tools"), fontWeight = FontWeight.Medium)
+                AgentToolSwitch(tx("Calculator"), tx("Safe arithmetic only; no arbitrary code is executed."), AgentTool.CALCULATOR in selectedTools, true) {
+                    selectedTools = selectedTools.toggle(AgentTool.CALCULATOR)
+                }
+                AgentToolSwitch(tx("Web search"), tx("Uses the search service configured in Settings."), AgentTool.WEB_SEARCH in selectedTools, true) {
+                    selectedTools = selectedTools.toggle(AgentTool.WEB_SEARCH)
+                }
+                AgentToolSwitch(tx("MCP tools"), tx("Uses enabled MCP servers. Enable only servers you trust."), AgentTool.MCP in selectedTools, true) {
+                    selectedTools = selectedTools.toggle(AgentTool.MCP)
+                }
+                HorizontalDivider(color = AriInk.copy(alpha = 0.08f))
+                Text(tx("Not available yet"), color = AriMuted, fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                AgentToolSwitch(tx("Code execution"), tx("Arbitrary terminal execution is not enabled in this app."), AgentTool.CODE_EXECUTION in selectedTools, false) { }
+                AgentToolSwitch(tx("Persistent memory"), tx("Memory controls are not implemented yet."), AgentTool.MEMORY in selectedTools, false) { }
+                AgentToolSwitch(tx("Image generation"), tx("Use Image mode from the chat composer; it is not a callable agent tool."), AgentTool.IMAGE_GENERATION in selectedTools, false) { }
             }
-            Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(AriCard)
+            ) {
+                HorizontalDivider(color = AriInk.copy(alpha = 0.08f))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (!agent.isBuiltIn) {
+                        TextButton(onClick = { confirmDelete = true }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Spacer(Modifier.width(4.dp))
+                            Text(tx("Delete"))
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            val vars = variables.lineSequence().mapNotNull { line ->
+                                val split = line.indexOf('=')
+                                if (split <= 0) null else line.substring(0, split).trim().takeIf { it.isNotBlank() }?.let { key ->
+                                    key to line.substring(split + 1).trim()
+                                }
+                            }.toMap()
+                            onSave(
+                                agent.copy(
+                                    name = name.trim(),
+                                    description = description.trim(),
+                                    systemPrompt = prompt.trim(),
+                                    avatar = avatar.ifBlank { "✦" }.take(4),
+                                    providerId = providerId,
+                                    modelId = modelId,
+                                    temperature = temperature.coerceIn(0f, 2f),
+                                    topP = topP.coerceIn(0f, 1f),
+                                    tools = selectedTools.toList(),
+                                    promptVariables = vars,
+                                    examples = examples.lines().map(String::trim).filter(String::isNotBlank).take(20)
+                                )
+                            )
+                        },
+                        enabled = name.isNotBlank() && prompt.isNotBlank(),
+                        modifier = Modifier.weight(1.3f).testTag("agent-save"),
+                        colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(tx("Save agent"))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
     }
     if (confirmDelete) {

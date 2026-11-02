@@ -289,8 +289,12 @@ return_to_chat_after_external() {
 }
 
 hide_keyboard() {
-  adb shell input keyevent KEYCODE_BACK >/dev/null
-  sleep 0.5
+  local input_method_state
+  input_method_state="$(adb shell dumpsys input_method 2>/dev/null || true)"
+  if grep -Eiq 'mInputShown=true|mIsInputViewShown=true' <<< "$input_method_state"; then
+    adb shell input keyevent KEYCODE_BACK >/dev/null
+    sleep 0.5
+  fi
 }
 
 type_text() {
