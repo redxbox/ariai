@@ -54,16 +54,21 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug --stacktrace 2>&1 | tee build.log
 
-      - name: Report debug APK build errors
+      - name: Report Android validation errors
         if: failure()
         run: |
-          if [ -f build.log ]; then
-            grep -E '^e: |error:|What went wrong|Execution failed|\* What went wrong:' build.log | head -30 | while IFS= read -r line; do
-              safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
-              echo "::error title=Gradle build error::$safe"
-            done
-            echo "::notice title=Gradle build tail::$(tail -n 30 build.log | tr '\n' ' ' | cut -c1-3000)"
-          fi
+          pattern='^e: |error:|What went wrong|Execution failed|FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|Caused by:'
+          for log in unit-tests.log release-lint.log release-build.log build.log; do
+            [ -f "$log" ] || continue
+            if grep -Eq "$pattern" "$log"; then
+              echo "::group::$log diagnostics"
+              grep -E "$pattern" "$log" | tail -40 | while IFS= read -r line; do
+                safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
+                echo "::error title=Gradle validation error::$safe"
+              done
+              echo "::endgroup::"
+            fi
+          done
 
       - name: Upload APK artifact
         if: success()

@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "com.ariai.app"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.ariai.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 4
-        versionName = "2.2.1-stable"
+        targetSdk = 36
+        versionCode = 5
+        versionName = "2.3.0-stable"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

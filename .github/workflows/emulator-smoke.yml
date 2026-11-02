@@ -23,8 +23,9 @@ jobs:
 
       - name: Build debug APK
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace
+          ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee smoke-build.log
 
       - name: Enable KVM
         run: |
@@ -42,7 +43,7 @@ jobs:
           # User-supplied OpenAI-compatible endpoint for the isolated live model-review run.
           ARIAI_TEST_BASE_URL: https://radoxai.com/v1
         with:
-          api-level: 34
+          api-level: 36
           arch: x86_64
           target: google_apis
           profile: pixel_6
@@ -55,6 +56,12 @@ jobs:
         if: failure()
         run: |
           set +e
+          if [ -f smoke-build.log ]; then
+            (grep -E "^e: |error:|What went wrong|Execution failed|FAILED|Caused by:" smoke-build.log || true) | tail -40 | while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
+              echo "::error title=Android build failure::$safe"
+            done
+          fi
           if [ -f smoke-out/walkthrough.log ]; then
             (grep -E "FAILED|Failure|AssertionError|expected:|but was:|FATAL EXCEPTION|ANR in|not visible:|not found:|::error" smoke-out/walkthrough.log || true) | tail -40 | while IFS= read -r line; do
               safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
@@ -67,7 +74,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smoke-output
-          path: smoke-out/
+          path: |
+            smoke-out/
+            smoke-build.log
           if-no-files-found: ignore
           retention-days: 7
 
@@ -89,8 +98,9 @@ jobs:
 
       - name: Build debug APK and test APK
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace
+          ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee provider-build.log
 
       - name: Enable KVM
         run: |
@@ -102,7 +112,7 @@ jobs:
         timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 36
           arch: x86_64
           target: google_apis
           profile: pixel_6
@@ -115,6 +125,12 @@ jobs:
         if: failure()
         run: |
           set +e
+          if [ -f provider-build.log ]; then
+            (grep -E "^e: |error:|What went wrong|Execution failed|FAILED|Caused by:" provider-build.log || true) | tail -40 | while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
+              echo "::error title=Android build failure::$safe"
+            done
+          fi
           if [ -f instrumentation.log ]; then
             (grep -E "^e: |^w: |error:|FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|FATAL EXCEPTION|ANR in|ProviderAndChatUiTest\\.kt:|FeatureScreensUiTest\\.kt:" instrumentation.log || true) | tail -40 | while IFS= read -r line; do
               safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
@@ -156,6 +172,7 @@ jobs:
           name: provider-chat-ui-test-results
           path: |
             instrumentation.log
+            provider-build.log
             app/build/reports/androidTests/connected/
           if-no-files-found: ignore
           retention-days: 7

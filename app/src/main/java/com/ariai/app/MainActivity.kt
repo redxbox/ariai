@@ -2,6 +2,8 @@ package com.ariai.app
 
 import com.ariai.app.ui.theme.*
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,6 +21,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -40,6 +43,8 @@ import com.ariai.app.util.UiLang
 import com.ariai.app.util.getStringsForLanguage
 import com.ariai.app.util.tx
 import kotlinx.coroutines.launch
+
+private const val PRIVACY_POLICY_URL = "https://github.com/redxbox/ariai/blob/main/PRIVACY_POLICY.md"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,6 +86,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val startRoute = remember { "chat/${viewModel.createNewChat()}" }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: startRoute
     val snackbarHostState = remember { SnackbarHostState() }
@@ -448,7 +454,14 @@ fun AppRoot(viewModel: AppViewModel) {
                         onDefaultModelClick = { navController.navigate("default_model") },
                         onPreferencesClick = { navController.navigate("preferences") },
                         defaultModelName = defaultModelName,
-                        onAboutClick = { showAbout = true }
+                        onAboutClick = { showAbout = true },
+                        onPrivacyPolicyClick = {
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL)))
+                            }.onFailure {
+                                scope.launch { snackbarHostState.showSnackbar(tx("Could not open the privacy policy.")) }
+                            }
+                        }
                     )
                 }
 

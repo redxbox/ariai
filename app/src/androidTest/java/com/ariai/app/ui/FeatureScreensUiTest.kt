@@ -33,6 +33,7 @@ import com.ariai.app.ui.screens.QuickParametersSheet
 import com.ariai.app.ui.screens.SearchServiceScreen
 import com.ariai.app.ui.screens.SearchSheet
 import com.ariai.app.ui.screens.SimpleMcpScreen
+import com.ariai.app.ui.screens.SimpleSettingsScreen
 import com.ariai.app.ui.screens.WorkspaceScreen
 import com.ariai.app.ui.theme.AriAiTheme
 import org.junit.Assert.assertEquals
@@ -453,5 +454,22 @@ class FeatureScreensUiTest {
         compose.onNodeWithContentDescription("Remove server").performClick()
         compose.onNodeWithText("No MCP servers yet").assertExists()
         assertNull(servers.firstOrNull())
+    }
+
+    @Test
+    fun settingsExposePrivacyPolicyLink() {
+        var opened = false
+        compose.setContent {
+            AriAiTheme(darkTheme = false, dynamicColor = false) {
+                SimpleSettingsScreen(
+                    onBack = {},
+                    onProvidersClick = {},
+                    onPrivacyPolicyClick = { opened = true }
+                )
+            }
+        }
+
+        compose.onNodeWithText("Privacy policy").performScrollTo().assertIsDisplayed().performClick()
+        assertTrue("Privacy policy action should be reachable from Settings", opened)
     }
 }

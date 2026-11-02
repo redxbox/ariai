@@ -15,6 +15,7 @@ AriAi is an Android chat client for connecting to AI providers with your own cre
 - **Attachments:** scaled images, videos up to 12 MB, and supported plain-text/code files. Video bytes are sent only to compatible Gemini requests; other providers receive a note that the video cannot be viewed. PDF and DOCX extraction are not implemented.
 - **Media:** image, video, or audio generation is available only when a configured provider/model exposes the relevant capability. Provider API support and costs vary. Image editing is not available for Gemini providers.
 - **Appearance and language:** light/dark/system theme, optional Android 12+ dynamic accent colors, and translated UI strings in English and Persian. Some unkeyed descriptions and provider-returned error details remain in English.
+- **Privacy:** data remains on-device unless you invoke a feature that sends it to a configured provider or service. See the [privacy policy](PRIVACY_POLICY.md) and the [Google Play Data Safety worksheet](PLAY_DATA_SAFETY.md).
 
 ## Configure a provider
 
@@ -39,10 +40,16 @@ The app does not provide keys, credits, or a built-in free demo account. Use onl
 
 AriAI currently supports static Bearer/custom-header credentials; browser-based OAuth, local `stdio` processes, MCP resources/prompts, and subscriptions are not implemented. MCP servers can read or change data when their enabled tools are called. Review a server before trusting it; server descriptions and results are untrusted.
 
+## Privacy and Google Play data safety
+
+The current privacy policy is [PRIVACY_POLICY.md](PRIVACY_POLICY.md); the **Settings → About → Privacy policy** row opens its public GitHub page. The [Play Data Safety worksheet](PLAY_DATA_SAFETY.md) records the app's current data flows and questions to verify in Play Console. Review both whenever services, dependencies, or data handling change. Sending prompts, files, search queries, or MCP tool arguments to a configured service is user-initiated but still leaves the device; each recipient's retention practices are its own.
+
 ## Requirements and build
 
 - Android 8.0 (API 26) or later
 - JDK 17
+- Compile SDK 36 and target SDK 36
+- Android Gradle Plugin 8.13.2 / Gradle 8.13
 
 ```bash
 git clone https://github.com/redxbox/ariai.git
@@ -53,7 +60,7 @@ cd ariai
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
-The app version is **2.2.1-stable** (`versionCode` 4). The Gradle build uses Kotlin 1.9.22 and Jetpack Compose.
+The app version is **2.3.0-stable** (`versionCode` 5). The Gradle build uses Kotlin 1.9.22 and Jetpack Compose.
 
 ## Known limitations
 

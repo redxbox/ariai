@@ -44,6 +44,7 @@ fun SimpleSettingsScreen(
     onClearAll: () -> Unit = {},
     onMcpClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
+    onPrivacyPolicyClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize().background(AriPaper)) {
@@ -106,6 +107,14 @@ fun SimpleSettingsScreen(
                             title = tx("About AriAI"),
                             subtitle = "${tx("Version")} ${BuildConfig.VERSION_NAME}",
                             onClick = onAboutClick
+                        )
+                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
+                        SimpleRow(
+                            icon = Icons.Default.Policy,
+                            tint = com.ariai.app.ui.theme.AriAccent,
+                            title = tx("Privacy policy"),
+                            subtitle = tx("How AriAI handles your data"),
+                            onClick = onPrivacyPolicyClick
                         )
                     }
                 }
