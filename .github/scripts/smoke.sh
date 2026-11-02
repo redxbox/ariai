@@ -668,9 +668,7 @@ for provider in OpenAI Anthropic Ollama Custom Gemini; do
     expect_absent_text "Save"
     expect_absent_text "Test"
     shot 29-gemini-form-with-keyboard
-    # Use the visible editor navigation instead of Back-as-IME: Android can deliver that key to the sheet.
-    tap "Back"
-    expect_text "Providers"
+    # Keep the editor open; the Models tab removes the focused connection field without sending Back.
     shot 30-provider-presets
   else
     tap "Back"

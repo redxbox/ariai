@@ -120,13 +120,9 @@ jobs:
           disable-animations: true
           disable-spellchecker: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          # android-emulator-runner runs each nonempty script line separately; keep the shell block on one line.
           script: |
-            {
-              echo "Starting connected UI tests at $(date -Is)"
-              echo "Working directory: $PWD"
-              adb devices -l || true
-            } 2>&1 | tee "$GITHUB_WORKSPACE/instrumentation.log"
-            bash -o pipefail -c './gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace 2>&1 | tee -a "$GITHUB_WORKSPACE/instrumentation.log"'
+            bash -o pipefail -c '{ echo "Starting connected UI tests at $(date -Is)"; echo "Working directory: $PWD"; adb devices -l || true; ./gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace; } 2>&1 | tee "$GITHUB_WORKSPACE/instrumentation.log"'
 
       - name: Report UI test failures as annotations
         if: failure()
@@ -148,13 +144,7 @@ jobs:
               echo "::notice title=Provider/chat UI log tail::$safe"
             done
           else
-            echo "::error title=Provider/chat UI test diagnostics::Emulator step failed before it produced instrumentation.log."
-            if command -v adb >/dev/null 2>&1; then
-              adb devices -l 2>&1 | while IFS= read -r line; do
-                safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
-                echo "::notice title=Emulator state::$safe"
-              done
-            fi
+            echo "::error title=Provider/chat UI test diagnostics::Emulator action did not produce instrumentation.log; its test script did not start."
           fi
           python3 - <<'PY'
           from pathlib import Path
