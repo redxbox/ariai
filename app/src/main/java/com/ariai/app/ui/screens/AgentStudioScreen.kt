@@ -377,9 +377,11 @@ private fun AgentEditorSheet(
             AgentToolSwitch(tx("Web search"), tx("Uses the search service configured in Settings."), AgentTool.WEB_SEARCH in selectedTools, true) {
                 selectedTools = selectedTools.toggle(AgentTool.WEB_SEARCH)
             }
+            AgentToolSwitch(tx("MCP tools"), tx("Uses enabled MCP servers. Enable only servers you trust."), AgentTool.MCP in selectedTools, true) {
+                selectedTools = selectedTools.toggle(AgentTool.MCP)
+            }
             HorizontalDivider(color = AriInk.copy(alpha = 0.08f))
             Text(tx("Not available yet"), color = AriMuted, fontWeight = FontWeight.Medium, fontSize = 12.sp)
-            AgentToolSwitch(tx("MCP tools"), tx("MCP server connections are still a preview."), AgentTool.MCP in selectedTools, false) { }
             AgentToolSwitch(tx("Code execution"), tx("Arbitrary terminal execution is not enabled in this app."), AgentTool.CODE_EXECUTION in selectedTools, false) { }
             AgentToolSwitch(tx("Persistent memory"), tx("Memory controls are not implemented yet."), AgentTool.MEMORY in selectedTools, false) { }
             AgentToolSwitch(tx("Image generation"), tx("Use Image mode from the chat composer; it is not a callable agent tool."), AgentTool.IMAGE_GENERATION in selectedTools, false) { }

@@ -101,6 +101,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val agents by viewModel.agents.collectAsState()
     val workspaceFiles by viewModel.workspaceFiles.collectAsState()
     val mcpServers by viewModel.mcpServers.collectAsState()
+    val mcpServerRuntime by viewModel.mcpServerRuntime.collectAsState()
     val currentChatId by viewModel.currentChatId.collectAsState()
     val defaultProviderId by viewModel.defaultProviderId.collectAsState()
     val defaultModelId by viewModel.defaultModelId.collectAsState()
@@ -530,7 +531,10 @@ fun AppRoot(viewModel: AppViewModel) {
                         onToggle = viewModel::toggleMcpServer,
                         onAdd = viewModel::addMcpServer,
                         onRemove = viewModel::removeMcpServer,
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        runtimeStates = mcpServerRuntime,
+                        onTestConnection = viewModel::testMcpServer,
+                        onToggleTool = viewModel::toggleMcpTool
                     )
                 }
 

@@ -1,6 +1,7 @@
 package com.ariai.app.ui
 
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -26,6 +27,7 @@ import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.models.WorkspaceFile
 import com.ariai.app.ui.screens.AgentStudioScreen
+import com.ariai.app.ui.screens.McpServerRuntimeState
 import com.ariai.app.ui.screens.AttachmentSheet
 import com.ariai.app.ui.screens.QuickParametersSheet
 import com.ariai.app.ui.screens.SearchServiceScreen
@@ -34,6 +36,7 @@ import com.ariai.app.ui.screens.SimpleMcpScreen
 import com.ariai.app.ui.screens.WorkspaceScreen
 import com.ariai.app.ui.theme.AriAiTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -380,6 +383,7 @@ class FeatureScreensUiTest {
     @Test
     fun mcpServerEntryValidatesUrlCanBeSavedToggledAndRemovedLocally() {
         val servers = mutableStateListOf<McpServerItem>()
+        val runtimeStates = mutableStateMapOf<String, McpServerRuntimeState>()
 
         compose.setContent {
             AriAiTheme(darkTheme = false, dynamicColor = false) {
@@ -391,13 +395,25 @@ class FeatureScreensUiTest {
                     },
                     onAdd = { servers.add(it) },
                     onRemove = { id -> servers.removeAll { it.id == id } },
-                    onBack = {}
+                    onBack = {},
+                    runtimeStates = runtimeStates,
+                    onTestConnection = { id ->
+                        runtimeStates[id] = McpServerRuntimeState(toolNames = listOf("echo"), checkedAtMillis = 1L)
+                    },
+                    onToggleTool = { id, toolName ->
+                        val index = servers.indexOfFirst { it.id == id }
+                        if (index >= 0) {
+                            val server = servers[index]
+                            val allowed = if (toolName in server.allowedToolNames) server.allowedToolNames - toolName else server.allowedToolNames + toolName
+                            servers[index] = server.copy(allowedToolNames = allowed)
+                        }
+                    }
                 )
             }
         }
         compose.waitForIdle()
 
-        compose.onNodeWithText("MCP support is a preview: server URLs are not contacted and tools are not yet used in chats.")
+        compose.onNodeWithText("Connect remote MCP servers. Choose specific tools before they can be used in chats.")
             .assertExists()
         val addServerAction = compose.onNodeWithTag("mcp-add-server")
         assertVisible("Add server action", diagnostics = {
@@ -425,10 +441,15 @@ class FeatureScreensUiTest {
         assertEquals(1, servers.size)
         assertEquals("Local MCP", servers.single().name)
         assertEquals(McpTransport.STREAMABLE_HTTP, servers.single().transport)
-        assertTrue(servers.single().enabled)
-        compose.onNodeWithText("Enabled locally · not connected").assertExists()
-        compose.onNodeWithTag("mcp-toggle-${servers.single().id}").performClick()
+        assertFalse(servers.single().enabled)
         compose.onNodeWithText("Disabled").assertExists()
+        compose.onNodeWithTag("mcp-toggle-${servers.single().id}").performClick()
+        compose.onNodeWithText("Enable server").performClick()
+        compose.onNodeWithText("Enabled · not tested").assertExists()
+        assertTrue(servers.single().enabled)
+        compose.onNodeWithContentDescription("Test connection").performClick()
+        compose.onNodeWithTag("mcp-tool-${servers.single().id}-echo").assertExists().performClick()
+        assertTrue("MCP tool must be explicitly allowed", "echo" in servers.single().allowedToolNames)
         compose.onNodeWithContentDescription("Remove server").performClick()
         compose.onNodeWithText("No MCP servers yet").assertExists()
         assertNull(servers.firstOrNull())

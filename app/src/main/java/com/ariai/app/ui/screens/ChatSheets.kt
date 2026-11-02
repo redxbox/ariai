@@ -137,7 +137,7 @@ fun AttachmentSheet(
                 AttachmentActionRow(
                     icon = Icons.Outlined.Extension,
                     title = tx("Extensions"),
-                    subtitle = tx("MCP preview; tool calls are not active yet"),
+                    subtitle = tx("Connect MCP servers, then enable MCP tools for this agent."),
                     tag = "attachment-action-extensions"
                 ) { onDismiss(); onExtensions() }
             }

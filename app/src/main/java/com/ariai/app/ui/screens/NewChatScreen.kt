@@ -340,7 +340,8 @@ fun NewChatScreen(
                 if (selectedModelCapabilities?.supportsFunctionCalling == false) " (${tx("Off")})" else ""
             AgentTool.WEB_SEARCH -> tx("Web search") + if (searchMode == SearchMode.OFF) " (${tx("Off")})" else ""
             AgentTool.IMAGE_GENERATION -> tx("Image mode") + if (chatMode != ChatMode.IMAGE) " (${tx("Off")})" else ""
-            AgentTool.MCP, AgentTool.CODE_EXECUTION, AgentTool.MEMORY -> null
+            AgentTool.MCP -> tx("MCP tools")
+            AgentTool.CODE_EXECUTION, AgentTool.MEMORY -> null
         }
     }.distinct()
     val storedChatTitle = chat?.title?.takeIf { it.isNotBlank() }

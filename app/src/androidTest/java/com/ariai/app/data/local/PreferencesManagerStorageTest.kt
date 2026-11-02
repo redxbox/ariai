@@ -3,6 +3,7 @@ package com.ariai.app.data.local
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.ariai.app.data.models.McpAuthType
 import com.ariai.app.data.models.McpServerItem
 import com.ariai.app.data.models.McpTransport
 import kotlinx.coroutines.CoroutineScope
@@ -79,22 +80,30 @@ class PreferencesManagerStorageTest {
             preferences.setSearchProvider("brave")
             assertEquals("brave", preferences.searchProviderFlow.first())
 
+            val mcpSecret = "mcp-test-secret-never-used-live"
             val server = McpServerItem(
                 id = "persisted-mcp-server",
-                name = "Local preview server",
+                name = "Local test server",
                 url = "http://localhost:8080/mcp",
-                transport = McpTransport.STREAMABLE_HTTP
+                transport = McpTransport.STREAMABLE_HTTP,
+                authType = McpAuthType.BEARER,
+                authSecret = mcpSecret
             )
             preferences.updateMcpServers { it + server }
             assertEquals(listOf(server), preferences.mcpServersFlow.first())
+            val encryptedMcpAuth = store.data.first()[PreferencesManager.MCP_SERVER_AUTH].orEmpty()
+            assertTrue(encryptedMcpAuth.contains("\"ciphertext\":\"enc1:"))
+            assertFalse(encryptedMcpAuth.contains(mcpSecret))
 
             preferences.updateMcpServers { current ->
                 current.map { it.copy(enabled = false) }
             }
             assertFalse(preferences.mcpServersFlow.first().single().enabled)
+            assertEquals(mcpSecret, preferences.mcpServersFlow.first().single().authSecret)
 
             preferences.updateMcpServers { current -> current.filterNot { it.id == server.id } }
             assertTrue(preferences.mcpServersFlow.first().isEmpty())
+            assertTrue(store.data.first()[PreferencesManager.MCP_SERVER_AUTH].isNullOrBlank())
         } finally {
             scope.cancel()
             file.delete()

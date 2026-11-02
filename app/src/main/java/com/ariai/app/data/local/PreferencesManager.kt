@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import com.ariai.app.data.models.McpServerAuthCipherCodec
 import com.ariai.app.data.models.McpServerCodec
 import com.ariai.app.data.models.McpServerItem
 import com.ariai.app.util.KeyVault
@@ -31,6 +32,7 @@ class PreferencesManager(
         val EXA_API_KEY = stringPreferencesKey("exa_api_key")
         val SERPER_API_KEY = stringPreferencesKey("serper_api_key")
         val MCP_SERVERS = stringPreferencesKey("mcp_servers")
+        val MCP_SERVER_AUTH = stringPreferencesKey("mcp_server_auth")
         val STREAM_RESPONSE = booleanPreferencesKey("stream_response")
         val SHOW_REASONING = booleanPreferencesKey("show_reasoning")
         val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
@@ -65,15 +67,37 @@ class PreferencesManager(
         )
     }
     val mcpServersFlow: Flow<List<McpServerItem>> = dataStore.data.map { prefs ->
-        McpServerCodec.decode(prefs[MCP_SERVERS])
+        val servers = McpServerCodec.decode(prefs[MCP_SERVERS])
+        val encryptedSecrets = McpServerAuthCipherCodec.decode(prefs[MCP_SERVER_AUTH])
+        servers.map { server ->
+            val secret = encryptedSecrets[server.id]?.let(KeyVault::decryptOrNull)
+            server.copy(authSecret = secret)
+        }
     }
 
-    /** Atomically persists MCP server metadata for the local configuration preview. */
+    /** Atomically persists MCP metadata and per-server credentials encrypted by Android Keystore. */
     suspend fun updateMcpServers(transform: (List<McpServerItem>) -> List<McpServerItem>) {
         dataStore.edit { prefs ->
-            val current = McpServerCodec.decode(prefs[MCP_SERVERS])
+            val encryptedSecrets = McpServerAuthCipherCodec.decode(prefs[MCP_SERVER_AUTH])
+            val current = McpServerCodec.decode(prefs[MCP_SERVERS]).map { server ->
+                val secret = encryptedSecrets[server.id]?.let(KeyVault::decryptOrNull)
+                server.copy(authSecret = secret)
+            }
             val updated = runCatching { transform(current) }.getOrDefault(current)
             prefs[MCP_SERVERS] = McpServerCodec.encode(updated)
+            val updatedCiphertexts = buildMap {
+                updated.take(50).forEach { server ->
+                    if (server.authType == com.ariai.app.data.models.McpAuthType.NONE) return@forEach
+                    val secret = server.authSecret?.takeIf(String::isNotBlank)
+                    val ciphertext = if (secret != null) KeyVault.encrypt(secret) else encryptedSecrets[server.id]
+                    ciphertext?.let { put(server.id, it) }
+                }
+            }
+            if (updatedCiphertexts.isEmpty()) {
+                prefs.remove(MCP_SERVER_AUTH)
+            } else {
+                prefs[MCP_SERVER_AUTH] = McpServerAuthCipherCodec.encode(updatedCiphertexts)
+            }
         }
     }
 
