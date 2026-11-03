@@ -66,7 +66,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -74,6 +76,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
@@ -381,6 +384,7 @@ fun NewChatScreen(
     } else {
         storedChatTitle ?: tx("New chat")
     }
+    val isFreshEmptyChat = activeAgent == null && isUntitledChat && messages.isEmpty()
 
     // Follow the newest text only while the user is at the bottom. Once they scroll up, stay where they are.
     var followStream by remember { mutableStateOf(true) }
@@ -632,12 +636,14 @@ fun NewChatScreen(
                         }
                     },
                     title = {
-                        ChatHeaderTitle(
-                            chatTitle = chatHeaderTitle,
-                            activeAgent = activeAgent,
-                            onTitleClick = startRenamingChat,
-                            onAgentClick = onOpenAgents
-                        )
+                        if (!isFreshEmptyChat) {
+                            ChatHeaderTitle(
+                                chatTitle = chatHeaderTitle,
+                                activeAgent = activeAgent,
+                                onTitleClick = startRenamingChat,
+                                onAgentClick = onOpenAgents
+                            )
+                        }
                     },
                     actions = {
                         val contextLimit = selectedModelCapabilities?.contextWindow?.takeIf { it > 0 } ?: 0
@@ -967,112 +973,135 @@ fun NewChatScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(if (compactWelcome) 6.dp else 10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier.size(if (compactWelcome) 38.dp else 48.dp)
-                            .clip(CircleShape)
-                            .background(AriAccentSoft),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (activeAgent == null) {
-                            Icon(
-                                Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = AriAccentDark,
-                                modifier = Modifier.size(if (compactWelcome) 18.dp else 22.dp)
+                    if (activeAgent == null) {
+                        Text(
+                            text = "AriAI",
+                            modifier = Modifier.testTag("empty-chat-watermark"),
+                            color = Ink.copy(alpha = 0.16f),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 34.sp,
+                            letterSpacing = 2.sp,
+                            textAlign = TextAlign.Center,
+                            style = TextStyle(
+                                shadow = Shadow(
+                                    color = AriCard.copy(alpha = 0.72f),
+                                    offset = Offset(0f, 1f),
+                                    blurRadius = 0f
+                                )
                             )
-                        } else {
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.size(if (compactWelcome) 38.dp else 48.dp)
+                                .clip(CircleShape)
+                                .background(AriAccentSoft),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
                                 activeAgent.avatar,
                                 fontSize = if (compactWelcome) 18.sp else 22.sp
                             )
                         }
-                    }
-                    Text(
-                        activeAgent?.name ?: "AriAI",
-                        modifier = if (activeAgent != null) Modifier.testTag("welcome-agent-name") else Modifier,
-                        color = Muted,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 10.sp,
-                        letterSpacing = 1.2.sp
-                    )
-                    Text(
-                        tx("How can I help you?"),
-                        color = Ink,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = if (compactWelcome) 17.sp else 19.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    activeAgent?.description?.takeIf { it.isNotBlank() }?.let { description ->
                         Text(
-                            description,
-                            modifier = Modifier.fillMaxWidth().testTag("welcome-agent-description"),
+                            activeAgent.name,
+                            modifier = Modifier.testTag("welcome-agent-name"),
                             color = Muted,
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 10.sp,
+                            letterSpacing = 1.2.sp
                         )
-                    }
-                    if (agentToolsSummary.isNotEmpty()) {
                         Text(
-                            "${tx("Tools")}: ${agentToolsSummary.joinToString(" · ")}",
-                            modifier = Modifier.fillMaxWidth().testTag("welcome-agent-tools"),
-                            color = AriAccent,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (!selectedModelReady) {
-                        Text(
-                            modelSetupMessage,
-                            color = Muted,
-                            fontSize = 13.sp,
+                            tx("How can I help you?"),
+                            color = Ink,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = if (compactWelcome) 17.sp else 19.sp,
                             textAlign = TextAlign.Center
                         )
-                        if (!compactWelcome && providers.isNotEmpty() &&
-                            (currentProvider == null || currentProvider.models.isEmpty())
-                        ) {
-                            Button(
-                                onClick = onManageProviders,
-                                shape = RoundedCornerShape(20.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = AriAccentSoft,
-                                    contentColor = AriAccent
-                                ),
-                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp, pressedElevation = 0.dp)
-                            ) {
-                                Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(17.dp))
-                                Spacer(Modifier.width(7.dp))
-                                Text(tx("Manage providers"), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            }
+                        activeAgent?.description?.takeIf { it.isNotBlank() }?.let { description ->
+                            Text(
+                                description,
+                                modifier = Modifier.fillMaxWidth().testTag("welcome-agent-description"),
+                                color = Muted,
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
-                    } else if (!compactWelcome) {
-                        Text(
-                            tx("Type a message below to start."),
-                            color = Muted,
-                            fontSize = 13.sp,
-                            textAlign = TextAlign.Center
-                        )
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth().testTag("welcome-suggestions"),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) {
-                            if (agentExamples.isNotEmpty()) {
-                                agentExamples.forEachIndexed { index, example ->
-                                    item(key = "agent-example:$index") {
+                        if (agentToolsSummary.isNotEmpty()) {
+                            Text(
+                                "${tx("Tools")}: ${agentToolsSummary.joinToString(" · ")}",
+                                modifier = Modifier.fillMaxWidth().testTag("welcome-agent-tools"),
+                                color = AriAccent,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (!selectedModelReady) {
+                            Text(
+                                modelSetupMessage,
+                                color = Muted,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            if (!compactWelcome && providers.isNotEmpty() &&
+                                (currentProvider == null || currentProvider.models.isEmpty())
+                            ) {
+                                Button(
+                                    onClick = onManageProviders,
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = AriAccentSoft,
+                                        contentColor = AriAccent
+                                    ),
+                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp, pressedElevation = 0.dp)
+                                ) {
+                                    Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(17.dp))
+                                    Spacer(Modifier.width(7.dp))
+                                    Text(tx("Manage providers"), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                }
+                            }
+                        } else if (!compactWelcome) {
+                            Text(
+                                tx("Type a message below to start."),
+                                color = Muted,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth().testTag("welcome-suggestions"),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp)
+                            ) {
+                                if (agentExamples.isNotEmpty()) {
+                                    agentExamples.forEachIndexed { index, example ->
+                                        item(key = "agent-example:$index") {
+                                            AssistChip(
+                                                onClick = { inputText = example },
+                                                modifier = Modifier.testTag("agent-example-$index"),
+                                                label = {
+                                                    Text(example, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                },
+                                                leadingIcon = {
+                                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                },
+                                                colors = AssistChipDefaults.assistChipColors(
+                                                    containerColor = AriCard,
+                                                    labelColor = Ink,
+                                                    leadingIconContentColor = AriAccent
+                                                )
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    item(key = "suggestion:brainstorm") {
                                         AssistChip(
-                                            onClick = { inputText = example },
-                                            modifier = Modifier.testTag("agent-example-$index"),
-                                            label = {
-                                                Text(example, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            },
-                                            leadingIcon = {
-                                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            },
+                                            onClick = { inputText = tx("Help me brainstorm a few ideas.") },
+                                            label = { Text(tx("Brainstorm")) },
+                                            leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                             colors = AssistChipDefaults.assistChipColors(
                                                 containerColor = AriCard,
                                                 labelColor = Ink,
@@ -1080,31 +1109,18 @@ fun NewChatScreen(
                                             )
                                         )
                                     }
-                                }
-                            } else {
-                                item(key = "suggestion:brainstorm") {
-                                    AssistChip(
-                                        onClick = { inputText = tx("Help me brainstorm a few ideas.") },
-                                        label = { Text(tx("Brainstorm")) },
-                                        leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = AriCard,
-                                            labelColor = Ink,
-                                            leadingIconContentColor = AriAccent
+                                    item(key = "suggestion:summarize") {
+                                        AssistChip(
+                                            onClick = { inputText = tx("Summarize this for me.") },
+                                            label = { Text(tx("Summarize")) },
+                                            leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                            colors = AssistChipDefaults.assistChipColors(
+                                                containerColor = AriCard,
+                                                labelColor = Ink,
+                                                leadingIconContentColor = AriAccent
+                                            )
                                         )
-                                    )
-                                }
-                                item(key = "suggestion:summarize") {
-                                    AssistChip(
-                                        onClick = { inputText = tx("Summarize this for me.") },
-                                        label = { Text(tx("Summarize")) },
-                                        leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = AriCard,
-                                            labelColor = Ink,
-                                            leadingIconContentColor = AriAccent
-                                        )
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -1234,45 +1250,41 @@ private fun ChatModelSelector(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val label = when {
-        provider == null || modelName.isBlank() || modelName == tx("Choose model") -> tx("Choose model")
-        else -> "AriAI ($modelName)"
-    }
-    val shape = RoundedCornerShape(50)
+    val hasSelectedModel = provider != null && modelName.isNotBlank() && modelName != tx("Choose model")
+    val label = if (hasSelectedModel) modelName else tx("Choose model")
     Surface(
         onClick = onClick,
-        modifier = modifier.widthIn(min = 152.dp, max = 260.dp).heightIn(min = 52.dp)
+        modifier = modifier.widthIn(max = 244.dp).heightIn(min = 40.dp)
             .animateContentSize(tween(190, easing = FastOutSlowInEasing))
             .semantics(mergeDescendants = true) {
                 contentDescription = tx("Choose model")
                 stateDescription = "${provider?.name ?: tx("No provider")} · $modelName"
             },
-        shape = shape,
-        color = AriCard,
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent,
         contentColor = Ink,
-        shadowElevation = 3.dp,
-        border = androidx.compose.foundation.BorderStroke(0.75.dp, AriAccentSoft.copy(alpha = 0.9f))
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            modifier = Modifier.heightIn(min = 40.dp).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            ModelPickerGridBadge(size = 36.dp)
             Text(
                 text = label,
-                modifier = Modifier.widthIn(max = 180.dp),
-                color = AriAccent,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
+                modifier = Modifier.widthIn(max = 210.dp),
+                color = if (hasSelectedModel) Ink else Muted,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Icon(
                 Icons.Default.KeyboardArrowDown,
                 contentDescription = null,
-                tint = AriAccent,
-                modifier = Modifier.size(19.dp)
+                tint = Muted,
+                modifier = Modifier.size(20.dp)
             )
         }
     }

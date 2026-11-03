@@ -127,11 +127,21 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
-        assertDisplayed("top model selector remains available") {
+        assertDisplayed("compact model selector remains available") {
             compose.onNodeWithText("Choose model").assertIsDisplayed()
         }
+        compose.onNodeWithTag("empty-chat-watermark").assertIsDisplayed()
+        assertTrue("an untitled empty chat should not show a header title or brain badge", listOf(
+            "chat-title-header",
+            "chat-agent-button"
+        ).all { tag -> compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() })
+        assertTrue("welcome copy should be replaced by the watermark", listOf(
+            "New chat",
+            "How can I help you?",
+            "Add your first AI provider to start chatting"
+        ).all { text -> compose.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty() })
         assertEquals(
-            "The welcome screen should not repeat the top Choose model action",
+            "The welcome screen should not repeat the compact Choose model action",
             1,
             compose.onAllNodesWithText("Choose model").fetchSemanticsNodes().size
         )
@@ -194,7 +204,7 @@ class ProviderAndChatUiTest {
         compose.onNodeWithTag("welcome-agent-name").assertTextEquals(agent.name)
         compose.onNodeWithTag("welcome-agent-description").assertTextEquals(agent.description)
         compose.onNodeWithTag("welcome-agent-tools").assertTextEquals("Tools: Calculator · Web search (Off)")
-        compose.onNodeWithText("AriAI (Agent model)", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Agent model", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("chat-agent-button").performClick()
         assertEquals("the brain/agent badge opens Agents & prompts", 1, openAgentsCalls)
 
@@ -240,7 +250,10 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
-        compose.onNodeWithText("Add your first AI provider to start chatting").assertIsDisplayed()
+        compose.onNodeWithTag("empty-chat-watermark").assertIsDisplayed()
+        assertTrue("provider setup copy is omitted from the empty-chat canvas", compose
+            .onAllNodesWithText("Add your first AI provider to start chatting")
+            .fetchSemanticsNodes().isEmpty())
         compose.onNodeWithTag("chat-composer").performTextInput("Draft waits for provider")
         compose.onNodeWithTag("chat-send-button").assertIsNotEnabled()
         compose.onNodeWithTag("chat-composer").assertTextEquals("Draft waits for provider")
@@ -455,7 +468,7 @@ class ProviderAndChatUiTest {
     }
 
     @Test
-    fun welcomeSuggestionsStayAboveTheComposerSendButton() {
+    fun emptyChatWatermarkReplacesWelcomeSuggestions() {
         val provider = Provider(
             id = "provider-welcome-layout-test",
             name = "Welcome layout provider",
@@ -492,13 +505,17 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
-        val suggestions = compose.onNodeWithTag("welcome-suggestions")
+        val watermark = compose.onNodeWithTag("empty-chat-watermark")
             .assertIsDisplayed().fetchSemanticsNode()
         val sendButton = compose.onNodeWithTag("chat-send-button")
             .assertIsDisplayed().fetchSemanticsNode()
         assertTrue(
-            "welcome suggestions must stay clear of the bottom send button",
-            suggestions.boundsInRoot.bottom < sendButton.boundsInRoot.top
+            "the centered watermark stays clear of the bottom send button",
+            watermark.boundsInRoot.bottom < sendButton.boundsInRoot.top
+        )
+        assertTrue(
+            "the default empty chat should not render welcome suggestions",
+            compose.onAllNodesWithTag("welcome-suggestions").fetchSemanticsNodes().isEmpty()
         )
     }
 
@@ -721,11 +738,11 @@ class ProviderAndChatUiTest {
         }
         compose.waitForIdle()
 
-        assertDisplayed("chat title stays in the top bar") {
+        assertDisplayed("a named conversation title stays in the top bar") {
             compose.onNodeWithTag("chat-title-header").assertIsDisplayed()
         }
-        assertDisplayed("selected model name in the compact dropdown") {
-            compose.onNodeWithText("AriAI (Model one)", useUnmergedTree = true).assertIsDisplayed()
+        assertDisplayed("selected model name in the compact text selector") {
+            compose.onNodeWithText("Model one", useUnmergedTree = true).assertIsDisplayed()
         }
         val modelFloater = compose.onNodeWithTag("chat-model-floater")
         val selectorRowBounds = compose.onNodeWithTag("chat-model-selector-container")
@@ -741,7 +758,7 @@ class ProviderAndChatUiTest {
         val selectorCenterY = (modelBounds.top + modelBounds.bottom) / 2f
         val selectorRowCenterY = (selectorRowBounds.top + selectorRowBounds.bottom) / 2f
         assertTrue(
-            "Selector should remain a small centered pill below the top bar: selector=$modelBounds row=$selectorRowBounds root=$screenBounds",
+            "Selector should remain a small centered text control below the top bar: selector=$modelBounds row=$selectorRowBounds root=$screenBounds",
             modelBounds.width < screenBounds.width * 0.72f &&
                 modelBounds.height < screenBounds.height * 0.08f &&
                 kotlin.math.abs(selectorCenterX - rootCenterX) < screenBounds.width * 0.03f &&
