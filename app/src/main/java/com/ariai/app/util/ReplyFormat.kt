@@ -33,7 +33,7 @@ private val linkOrUrl = Regex("""\[([^\]]+)\]\((https?://[^)\s]+)\)|(https?://[^
 private val tableSeparator = Regex("""^\|?[\s:|-]+\|?$""")
 private val ruleLine = Regex("""^(-{3,}|\*{3,}|_{3,})$""")
 private val bulletPrefix = Regex("""^[-*+]\s+""")
-private val numberedPrefix = Regex("""^(\d+)[.)]\s+""")
+private val numberedPrefix = Regex("""^([\p{Nd}]+)[.)]\s+""")
 private val headingPrefix = Regex("""^(#{1,6})\s*(.*)$""")
 private val linkColor = Color(0xFF2563EB)
 private const val URL_TRAILING_PUNCTUATION = ".,;:!?،؛؟…"
@@ -134,7 +134,9 @@ fun formatReply(raw: String, baseFontSizeSp: Float = 15f): AnnotatedString {
         }
         if (line.isEmpty()) continue
         if (pendingBlank) {
-            lines.add(ReplyLine(text = "", isBlank = true))
+            val previousContentLine = lines.lastOrNull { !it.isBlank }
+            val separatesListItems = previousContentLine?.listIndent != null && listIndent != null
+            if (!separatesListItems) lines.add(ReplyLine(text = "", isBlank = true))
             pendingBlank = false
         }
         lines.add(ReplyLine(line, headingLevel, listIndent))

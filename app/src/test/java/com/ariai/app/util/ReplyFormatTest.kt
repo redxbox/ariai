@@ -27,6 +27,19 @@ class ReplyFormatTest {
         val numbered = splitReply("1. first\n\n2. second")
         assertEquals(1, numbered.size)
         assertEquals("1. first\n2. second\n", (numbered.single() as ReplyPart.Text).raw)
+
+        val persianNumbered = splitReply("۱. مورد اول\n\n۲. مورد دوم")
+        assertEquals(1, persianNumbered.size)
+        assertEquals("۱. مورد اول\n۲. مورد دوم\n", (persianNumbered.single() as ReplyPart.Text).raw)
+    }
+
+    @Test
+    fun blankLinesBetweenListItemsDoNotCreateOversizedVerticalGaps() {
+        val formatted = formatReply("1. first\n\n2. second\n\n- third")
+        assertEquals("1.  first\n2.  second\n•  third", formatted.text)
+
+        val persianNumbered = formatReply("۱. مورد اول\n\n۲. مورد دوم")
+        assertEquals("۱.  مورد اول\n۲.  مورد دوم", persianNumbered.text)
     }
 
     @Test
