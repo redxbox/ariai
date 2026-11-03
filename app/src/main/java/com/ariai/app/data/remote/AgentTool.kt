@@ -10,7 +10,17 @@ data class ChatFunctionTool(
     val name: String,
     val description: String,
     val parameters: JSONObject,
+    val progressLabel: String = name,
     val execute: suspend (JSONObject) -> String
+)
+
+enum class ToolExecutionPhase { RUNNING, COMPLETED, FAILED, CANCELLED }
+
+data class ToolExecutionUpdate(
+    val callId: String,
+    val label: String,
+    val phase: ToolExecutionPhase,
+    val elapsedMs: Long = 0L
 )
 
 /** One provider response step. Tool calls are executed by [AgentLoop], never by the model itself. */
@@ -39,6 +49,7 @@ class AgentLoop(
     suspend fun run(
         initialMessages: List<com.ariai.app.data.models.ChatMessage>,
         tools: List<ChatFunctionTool>,
+        onToolProgress: suspend (ToolExecutionUpdate) -> Unit = {},
         requestStep: suspend (List<com.ariai.app.data.models.ChatMessage>, List<ChatFunctionTool>, Boolean) -> AgentStep
     ): String {
         require(tools.map { it.name }.distinct().size == tools.size) { "Tool names must be unique" }
@@ -83,15 +94,26 @@ class AgentLoop(
                     tool == null -> "Tool '${call.name}' is not available in this request."
                     else -> {
                         totalToolCalls++
-                        try {
+                        val progressId = "${call.id.ifBlank { "tool" }}:$totalToolCalls"
+                        val startNanos = System.nanoTime()
+                        reportToolProgress(
+                            onToolProgress,
+                            ToolExecutionUpdate(progressId, tool.progressLabel, ToolExecutionPhase.RUNNING)
+                        )
+                        var phase = ToolExecutionPhase.COMPLETED
+                        val result = try {
                             require(call.arguments.length <= MAX_TOOL_ARGUMENT_CHARS) { "Tool arguments are too large" }
                             val args = call.arguments.takeIf { it.isNotBlank() }?.let { JSONObject(it) } ?: JSONObject()
                             tool.execute(args)
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (error: Exception) {
+                            phase = ToolExecutionPhase.FAILED
                             "Tool '${call.name}' failed: ${error.message?.take(500) ?: error.javaClass.simpleName}"
                         }
+                        val elapsedMs = ((System.nanoTime() - startNanos) / 1_000_000L).coerceAtLeast(0L)
+                        reportToolProgress(onToolProgress, ToolExecutionUpdate(progressId, tool.progressLabel, phase, elapsedMs))
+                        result
                     }
                 }
                 val truncationNotice = "\n[Tool output truncated to fit the response context budget.]"
@@ -117,6 +139,19 @@ class AgentLoop(
         val final = requestStep(history, emptyList(), true)
         if (final.text.isNotBlank() && !isAcknowledgementOnly(final.text)) return final.text
         return acknowledgementFallback(history.lastOrNull { it.role == com.ariai.app.data.models.MessageRole.USER }?.content.orEmpty())
+    }
+
+    private suspend fun reportToolProgress(
+        callback: suspend (ToolExecutionUpdate) -> Unit,
+        update: ToolExecutionUpdate
+    ) {
+        try {
+            callback(update)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Observability must never break an otherwise valid tool call.
+        }
     }
 
     private companion object {

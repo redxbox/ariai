@@ -11,6 +11,51 @@ import org.junit.Test
 
 class AgentLoopTest {
     @Test
+    fun `reports running completion and failure for tool executions`() = runBlocking {
+        val updates = mutableListOf<ToolExecutionUpdate>()
+        val tools = listOf(
+            ChatFunctionTool("search_web", "Search", JSONObject(), progressLabel = "Searching the web") { "found" },
+            ChatFunctionTool("mcp_echo", "MCP", JSONObject(), progressLabel = "Calling MCP") {
+                throw IllegalStateException("server unavailable")
+            }
+        )
+        var requestCount = 0
+        val answer = AgentLoop().run(
+            initialMessages = listOf(ChatMessage(chatId = "chat", role = MessageRole.USER, content = "Search and call MCP")),
+            tools = tools,
+            onToolProgress = { update -> updates += update }
+        ) { history, _, _ ->
+            requestCount++
+            if (requestCount == 1) {
+                AgentStep(
+                    "",
+                    listOf(
+                        ToolCall("search-1", "search_web", "{}"),
+                        ToolCall("mcp-1", "mcp_echo", "{}")
+                    )
+                )
+            } else {
+                assertEquals(2, history.count { it.role == MessageRole.TOOL })
+                AgentStep("The search ran; MCP was unavailable.", emptyList())
+            }
+        }
+
+        assertEquals("The search ran; MCP was unavailable.", answer)
+        assertEquals(
+            listOf(
+                ToolExecutionPhase.RUNNING,
+                ToolExecutionPhase.COMPLETED,
+                ToolExecutionPhase.RUNNING,
+                ToolExecutionPhase.FAILED
+            ),
+            updates.map { it.phase }
+        )
+        assertEquals(listOf("search-1:1", "search-1:1", "mcp-1:2", "mcp-1:2"), updates.map { it.callId })
+        assertEquals("Calling MCP", updates.last().label)
+        assertTrue(updates[1].elapsedMs >= 0L)
+    }
+
+    @Test
     fun `executes tool then returns only final model answer`() = runBlocking {
         var requestCount = 0
         var calculatorInput = ""

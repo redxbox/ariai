@@ -34,6 +34,8 @@ import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.TokenUsage
 import com.ariai.app.data.remote.ConnectionResult
+import com.ariai.app.data.remote.ToolExecutionPhase
+import com.ariai.app.data.remote.ToolExecutionUpdate
 import com.ariai.app.ui.screens.AddProviderScreen
 import com.ariai.app.ui.screens.ChatListScreen
 import com.ariai.app.ui.screens.NewChatScreen
@@ -204,6 +206,42 @@ class ProviderAndChatUiTest {
             .assertIsDisplayed()
             .assertTextContains("Think time", substring = true)
             .assertTextContains("sec", substring = true)
+    }
+
+    @Test
+    fun toolExecutionTimelineShowsCompletedStepsAndTheActiveTool() {
+        val chat = Chat(id = "tool-timeline-test", title = "Tool timeline")
+        val updates = listOf(
+            ToolExecutionUpdate("search-call", "Searching the web", ToolExecutionPhase.COMPLETED, 1_200L),
+            ToolExecutionUpdate("mcp-call", "Calling MCP", ToolExecutionPhase.RUNNING)
+        )
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                NewChatScreen(
+                    chat = chat,
+                    messages = emptyList(),
+                    isStreaming = false,
+                    isSending = true,
+                    currentStreamingContent = "",
+                    toolExecutionUpdates = updates,
+                    selectedModel = null,
+                    providers = emptyList(),
+                    onSendMessage = { _, _, _, _, _ -> false },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
+                    onCheckProvider = { ConnectionResult.Ok(0) }
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("chat-tool-timeline").assertIsDisplayed()
+        compose.onNodeWithText("Searching the web · 1 sec").assertIsDisplayed()
+        compose.onNodeWithTag("chat-generation-status-active")
+            .assertIsDisplayed()
+            .assertTextContains("Calling MCP")
     }
 
     @Test

@@ -25,6 +25,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -81,6 +84,14 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppRoot(viewModel: AppViewModel) {
+    DisposableEffect(viewModel) {
+        val processLifecycle = ProcessLifecycleOwner.get().lifecycle
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) viewModel.onAppBackgrounded()
+        }
+        processLifecycle.addObserver(observer)
+        onDispose { processLifecycle.removeObserver(observer) }
+    }
     val navController = rememberNavController()
     // Opening the app lands directly on a chat, not on a list.
     val startRoute = remember { "chat/${viewModel.createNewChat()}" }
@@ -100,6 +111,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val isStreaming by viewModel.isStreaming.collectAsState()
     val isSending by viewModel.isSending.collectAsState()
     val streamingContent by viewModel.streamingContent.collectAsState()
+    val toolExecutionUpdates by viewModel.toolExecutionUpdates.collectAsState()
     val generatedMediaBytes by viewModel.generatedMediaBytes.collectAsState()
     val language by viewModel.language.collectAsState()
     val theme by viewModel.theme.collectAsState()
@@ -303,6 +315,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         isStreaming = isStreaming,
                         isSending = isSending,
                         currentStreamingContent = streamingContent,
+                        toolExecutionUpdates = toolExecutionUpdates,
                         selectedModel = modelOverrides[chatId]?.second ?: currentChat?.modelId,
                         selectedProviderId = modelOverrides[chatId]?.first ?: currentChat?.providerId,
                         providers = providers,

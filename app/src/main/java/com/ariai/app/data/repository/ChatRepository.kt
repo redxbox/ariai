@@ -4,6 +4,7 @@ import com.ariai.app.data.local.*
 import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.AIClient
 import com.ariai.app.data.remote.SearchClient
+import com.ariai.app.data.remote.ToolExecutionUpdate
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -293,12 +294,17 @@ class ChatRepository(
         maxSteps: Int = 6,
         contextWindow: Int = 8192,
         allowUrlContext: Boolean = true,
-        onUsage: (TokenUsage) -> Unit = {}
+        onUsage: (TokenUsage) -> Unit = {},
+        onToolProgress: (ToolExecutionUpdate) -> Unit = {}
     ): Flow<String> = kotlinx.coroutines.flow.flow {
         val readyMessages = messages.map { m -> m.copy(attachments = m.attachments.map { it.hydrated() }) }
         val toolBudget = ((contextWindow.coerceAtLeast(4096).toLong() * 3L) / 2L).coerceAtMost(20_000L).toInt()
         val loop = com.ariai.app.data.remote.AgentLoop(maxSteps = maxSteps, maxTotalToolChars = toolBudget)
-        val answer = loop.run(readyMessages, tools) { stepMessages, stepTools, recovery ->
+        val answer = loop.run(
+            initialMessages = readyMessages,
+            tools = tools,
+            onToolProgress = { update -> onToolProgress(update) }
+        ) { stepMessages, stepTools, recovery ->
             val stepPrompt = if (recovery) {
                 listOfNotNull(
                     systemPrompt,

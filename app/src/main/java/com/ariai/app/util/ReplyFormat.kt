@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.sp
 /** A reply is a list of normal text paragraphs and code blocks. */
 sealed class ReplyPart {
     data class Text(val raw: String) : ReplyPart()
-    data class Code(val language: String, val code: String) : ReplyPart()
+    data class Code(val language: String, val code: String, val complete: Boolean = true) : ReplyPart()
 }
 
 private data class ReplyLine(
@@ -67,7 +67,7 @@ fun splitReply(raw: String): List<ReplyPart> {
         val trimmed = line.trim()
         if (trimmed.startsWith("```")) {
             if (inCode) {
-                parts.add(ReplyPart.Code(language, code.toString().trimEnd('\n')))
+                parts.add(ReplyPart.Code(language, code.toString().trimEnd('\n'), complete = true))
                 code.clear()
                 inCode = false
             } else {
@@ -89,8 +89,89 @@ fun splitReply(raw: String): List<ReplyPart> {
             lastTextLine = line
         }
     }
-    if (inCode) parts.add(ReplyPart.Code(language, code.toString().trimEnd('\n'))) else flushText()
+    if (inCode) parts.add(ReplyPart.Code(language, code.toString().trimEnd('\n'), complete = false)) else flushText()
     return parts
+}
+
+/** Caches completed Markdown blocks while reparsing only the trailing streaming block. */
+class ReplyBlockCache {
+    private var committedRaw = ""
+    private var committedParts = emptyList<ReplyPart>()
+
+    fun parse(raw: String, streaming: Boolean): List<ReplyPart> {
+        if (!streaming) {
+            reset()
+            return splitReply(raw)
+        }
+        if (!raw.startsWith(committedRaw)) reset()
+
+        val stableBoundary = stableReplyBoundary(raw, committedRaw.length)
+        if (stableBoundary > committedRaw.length) {
+            val addition = raw.substring(committedRaw.length, stableBoundary)
+            committedParts = committedParts + splitReply(addition)
+            committedRaw = raw.substring(0, stableBoundary)
+        }
+        return committedParts + splitReply(raw.substring(committedRaw.length))
+    }
+
+    private fun reset() {
+        committedRaw = ""
+        committedParts = emptyList()
+    }
+
+    private fun stableReplyBoundary(raw: String, startOffset: Int): Int {
+        data class Line(val start: Int, val end: Int, val text: String, val terminated: Boolean)
+        val lines = mutableListOf<Line>()
+        var cursor = startOffset
+        while (cursor < raw.length) {
+            val newline = raw.indexOf('\n', cursor)
+            val end = if (newline >= 0) newline + 1 else raw.length
+            val contentEnd = if (newline >= 0 && newline > cursor && raw[newline - 1] == '\r') newline - 1
+                else if (newline >= 0) newline else raw.length
+            lines += Line(cursor, end, raw.substring(cursor, contentEnd), newline >= 0)
+            cursor = end
+        }
+
+        val nextNonBlankLines = arrayOfNulls<Line>(lines.size)
+        var nextNonBlank: Line? = null
+        for (index in lines.indices.reversed()) {
+            nextNonBlankLines[index] = nextNonBlank
+            if (lines[index].text.isNotBlank()) nextNonBlank = lines[index]
+        }
+
+        var inCode = false
+        var previousNonBlank: String? = null
+        var stableBoundary = startOffset
+        for (index in lines.indices) {
+            val line = lines[index]
+            // The final unterminated line may still grow into a fence or list marker.
+            if (!line.terminated) break
+            val trimmed = line.text.trim()
+            if (trimmed.startsWith("```")) {
+                if (inCode) {
+                    inCode = false
+                    stableBoundary = line.end
+                } else {
+                    // Everything before a complete opening-fence line is now immutable.
+                    stableBoundary = maxOf(stableBoundary, line.start)
+                    inCode = true
+                }
+                previousNonBlank = null
+                continue
+            }
+            if (inCode) continue
+            if (trimmed.isBlank()) {
+                val nextLine = nextNonBlankLines[index]
+                val previous = previousNonBlank
+                if (previous != null && nextLine != null && !(isListItemLine(previous) && isListItemLine(nextLine.text))) {
+                    stableBoundary = maxOf(stableBoundary, nextLine.start)
+                }
+            } else {
+                previousNonBlank = line.text
+            }
+        }
+        return stableBoundary.coerceAtMost(raw.length)
+    }
 }
 
 /**
@@ -186,14 +267,9 @@ private fun AnnotatedString.Builder.appendInline(line: String) {
         // sentence punctuation that follows a bare URL.
         val (url, punctuation) = if (isMarkdownLink) rawUrl to "" else trimUrlPunctuation(rawUrl)
         val domain = domainLabel(url)
-        val markdownLabel = match.groupValues[1].trim()
-        val displayLabel = when {
-            markdownLabel.isBlank() || markdownLabel.startsWith("http://", ignoreCase = true) ||
-                markdownLabel.startsWith("https://", ignoreCase = true) -> domain
-            markdownLabel.equals(domain, ignoreCase = true) -> markdownLabel
-            else -> "$markdownLabel · $domain"
-        }
-        // Keep the complete destination tappable while presenting only its domain, not its path/query.
+        // Markdown labels and bare URLs share the same compact domain-only presentation.
+        // Keep the complete destination tappable while hiding its path and query.
+        val displayLabel = domain
         pushStringAnnotation(tag = "URL", annotation = url)
         withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
             appendBold(displayLabel, inlineCode)

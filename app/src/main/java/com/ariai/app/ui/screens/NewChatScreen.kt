@@ -100,6 +100,8 @@ import com.ariai.app.data.models.ReasoningLevel
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.data.remote.PublicUrlFetcher
 import com.ariai.app.data.remote.ConnectionResult
+import com.ariai.app.data.remote.ToolExecutionPhase
+import com.ariai.app.data.remote.ToolExecutionUpdate
 import com.ariai.app.util.ReadResult
 import com.ariai.app.util.bitmapAttachment
 import com.ariai.app.util.readAttachment
@@ -122,6 +124,7 @@ fun NewChatScreen(
     isStreaming: Boolean,
     isSending: Boolean = false,
     currentStreamingContent: String,
+    toolExecutionUpdates: List<ToolExecutionUpdate> = emptyList(),
     selectedModel: String?,
     selectedProviderId: String? = chat?.providerId,
     providers: List<Provider> = emptyList(),
@@ -352,7 +355,9 @@ fun NewChatScreen(
     val hasStreamingText = currentStreamingContent.isNotBlank()
     val generationActive = isSending || isStreaming
     val showWaitingStatus = generationActive && !hasStreamingText
+    val activeToolUpdate = toolExecutionUpdates.lastOrNull { it.phase == ToolExecutionPhase.RUNNING }
     val waitingStatus = when {
+        activeToolUpdate != null -> tx(activeToolUpdate.label)
         chatMode == ChatMode.IMAGE || selectedModelIsImageOnly -> tx("Preparing image generation")
         chatMode == ChatMode.VIDEO || selectedModelIsVideoOnly -> tx("Preparing video generation")
         chatMode == ChatMode.AUDIO || selectedModelIsAudioOnly -> tx("Preparing audio generation")
@@ -1205,6 +1210,9 @@ fun NewChatScreen(
                             MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }
                             else -> AppearIn(m.id) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (i == messages.lastIndex && toolExecutionUpdates.isNotEmpty()) {
+                                        ToolExecutionTimeline(toolExecutionUpdates)
+                                    }
                                     if (showCompletedTiming && i == messages.lastIndex) {
                                         GenerationStatus(
                                             label = completedStatus,
@@ -1232,6 +1240,7 @@ fun NewChatScreen(
                     if (hasStreamingText) {
                         item(key = "streaming") {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ToolExecutionTimeline(toolExecutionUpdates)
                                 if (generationActive) {
                                     GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
                                 }
@@ -1240,7 +1249,14 @@ fun NewChatScreen(
                         }
                     } else if (showWaitingStatus) {
                         item(key = "waiting-status") {
-                            GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ToolExecutionTimeline(toolExecutionUpdates)
+                                GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
+                            }
+                        }
+                    } else if (toolExecutionUpdates.isNotEmpty() && messages.lastOrNull()?.role != MessageRole.ASSISTANT) {
+                        item(key = "tool-timeline") {
+                            ToolExecutionTimeline(toolExecutionUpdates)
                         }
                     }
                 }
@@ -1496,6 +1512,56 @@ private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: In
 }
 
 @Composable
+private fun ToolExecutionTimeline(updates: List<ToolExecutionUpdate>) {
+    val finished = updates.filter { it.phase != ToolExecutionPhase.RUNNING }
+    if (finished.isEmpty()) return
+    val visible = finished.takeLast(3)
+    Column(
+        modifier = Modifier.padding(start = 8.dp).testTag("chat-tool-timeline"),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        if (finished.size > visible.size) {
+            Text(
+                text = "+${finished.size - visible.size}",
+                color = Muted.copy(alpha = 0.72f),
+                fontSize = 10.sp
+            )
+        }
+        visible.forEach { update ->
+            val label = tx(update.label)
+            val statusText = when (update.phase) {
+                ToolExecutionPhase.COMPLETED -> if (update.elapsedMs >= 1_000L) {
+                    "$label · ${formatGenerationDuration(update.elapsedMs / 1_000L)}"
+                } else label
+                ToolExecutionPhase.FAILED -> "$label · ${tx("Failed")}"
+                ToolExecutionPhase.CANCELLED -> "$label · ${tx("Stopped")}"
+                ToolExecutionPhase.RUNNING -> label
+            }
+            val icon = when (update.phase) {
+                ToolExecutionPhase.COMPLETED -> Icons.Default.Check
+                ToolExecutionPhase.FAILED -> Icons.Default.ErrorOutline
+                ToolExecutionPhase.CANCELLED -> Icons.Default.Stop
+                ToolExecutionPhase.RUNNING -> Icons.Default.MoreHoriz
+            }
+            Row(
+                modifier = Modifier.testTag("chat-tool-execution-step"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(icon, contentDescription = null, tint = Muted.copy(alpha = 0.75f), modifier = Modifier.size(13.dp))
+                Text(
+                    statusText,
+                    color = Muted,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun GenerationStatus(label: String, elapsedSeconds: Long, active: Boolean) {
     val duration = formatGenerationDuration(elapsedSeconds)
     val statusText = if (elapsedSeconds > 0L) "$label · $duration" else label
@@ -1572,7 +1638,7 @@ private fun AssistantBlock(
         if (visibleText.isNotBlank()) {
             // SelectionContainer lets the user select and copy part of the reply.
             SelectionContainer {
-                ReplyContent(visibleText, fontSize.toFloat(), Ink)
+                ReplyContent(visibleText, fontSize.toFloat(), Ink, streaming)
             }
         }
         imageUrls.forEach { RemoteImage(it) }

@@ -12,7 +12,8 @@ object DefaultAgentTools {
         parameters = objectSchema(
             properties = JSONObject().put("expression", stringProperty("Arithmetic expression to evaluate")),
             required = listOf("expression")
-        )
+        ),
+        progressLabel = "Calculating"
     ) { args ->
         SafeCalculator.evaluate(args.optString("expression"))
     }
@@ -23,7 +24,8 @@ object DefaultAgentTools {
         parameters = objectSchema(
             properties = JSONObject().put("query", stringProperty("Focused web search query")),
             required = listOf("query")
-        )
+        ),
+        progressLabel = "Searching the web"
     ) { args ->
         val query = args.optString("query").trim()
         require(query.isNotBlank()) { "Search query is required" }
@@ -51,7 +53,8 @@ object DefaultAgentTools {
             parameters = objectSchema(
                 properties = JSONObject().put("url", stringProperty("One of the exact URLs supplied by the user")),
                 required = listOf("url")
-            )
+            ),
+            progressLabel = "Reading page"
         ) { args ->
             val requested = args.optString("url").trim().trimEnd('.', ',', ';', ')', ']', '،', '؛')
             val uri = runCatching { URI(requested) }.getOrElse { throw IllegalArgumentException("Invalid URL") }
@@ -73,7 +76,8 @@ object DefaultAgentTools {
             parameters = objectSchema(
                 properties = JSONObject().put("path_prefix", stringProperty("Optional repository folder prefix, such as app/src/main")),
                 required = emptyList()
-            )
+            ),
+            progressLabel = "Reading GitHub"
         ) { args -> client.listFiles(repository, args.optString("path_prefix").takeIf { it.isNotBlank() }) },
         ChatFunctionTool(
             name = "github_read_file",
@@ -81,7 +85,8 @@ object DefaultAgentTools {
             parameters = objectSchema(
                 properties = JSONObject().put("path", stringProperty("Repository-relative path returned by github_list_files")),
                 required = listOf("path")
-            )
+            ),
+            progressLabel = "Reading GitHub"
         ) { args ->
             val path = args.optString("path").trim()
             require(path.isNotBlank()) { "Repository file path is required" }

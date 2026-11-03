@@ -28,14 +28,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.ui.theme.AriTint
 import com.ariai.app.util.ReplyPart
+import com.ariai.app.util.ReplyBlockCache
 import com.ariai.app.util.formatReply
-import com.ariai.app.util.splitReply
 import com.ariai.app.util.tx
 
 /** Shows model replies with tappable links and copyable, line-numbered code blocks. */
 @Composable
-fun ReplyContent(text: String, fontSizeSp: Float, color: Color) {
-    val parts = remember(text) { splitReply(text) }
+fun ReplyContent(text: String, fontSizeSp: Float, color: Color, streaming: Boolean = false) {
+    val blockCache = remember { ReplyBlockCache() }
+    val parts = remember(text, streaming) { blockCache.parse(text, streaming) }
     val uriHandler = LocalUriHandler.current
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         parts.forEach { part ->
@@ -59,14 +60,14 @@ fun ReplyContent(text: String, fontSizeSp: Float, color: Color) {
                         )
                     }
                 }
-                is ReplyPart.Code -> CodeBlock(part.language, part.code, color)
+                is ReplyPart.Code -> CodeBlock(part.language, part.code, color, streaming && !part.complete)
             }
         }
     }
 }
 
 @Composable
-private fun CodeBlock(language: String, code: String, color: Color) {
+private fun CodeBlock(language: String, code: String, color: Color, streaming: Boolean) {
     val clipboard = LocalClipboardManager.current
     // A plain Box, not Surface: Surface adds a tonal (beige) overlay in Material 3.
     Box(modifier = Modifier.fillMaxWidth().background(AriTint, RoundedCornerShape(12.dp))) {
@@ -84,7 +85,9 @@ private fun CodeBlock(language: String, code: String, color: Color) {
             }
             val displayCode = code.trimEnd('\n', '\r')
             val lineCount = displayCode.count { it == '\n' } + 1
-            val highlightedCode = remember(displayCode, language, color) { highlightCode(displayCode, language, color) }
+            val highlightedCode = remember(displayCode, language, color, streaming) {
+                if (streaming) AnnotatedString(displayCode) else highlightCode(displayCode, language, color)
+            }
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Text(
                     (1..lineCount).joinToString("\n"),

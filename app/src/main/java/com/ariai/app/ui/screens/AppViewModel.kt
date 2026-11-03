@@ -9,6 +9,8 @@ import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.data.remote.looksLikeVideoModel
 import com.ariai.app.data.remote.ChatFunctionTool
+import com.ariai.app.data.remote.ToolExecutionPhase
+import com.ariai.app.data.remote.ToolExecutionUpdate
 import com.ariai.app.data.remote.DefaultAgentTools
 import com.ariai.app.data.remote.MCPClient
 import com.ariai.app.data.remote.MCPConnection
@@ -174,6 +176,8 @@ class AppViewModel(
     private val _isStreaming = MutableStateFlow(false)
     private val _isSending = MutableStateFlow(false)
     val isSending = _isSending.asStateFlow()
+    private val _toolExecutionUpdates = MutableStateFlow<List<ToolExecutionUpdate>>(emptyList())
+    val toolExecutionUpdates = _toolExecutionUpdates.asStateFlow()
     private var sendPending = false
     private val RECENT_MESSAGES_FOR_MODEL = 20
     private var sendJob: Job? = null
@@ -184,6 +188,7 @@ class AppViewModel(
     private val chatPersistenceGate = ChatPersistenceGate()
 
     private fun launchSendJob(block: suspend (Long) -> Unit) {
+        _toolExecutionUpdates.value = emptyList()
         val generation = ++sendGeneration
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) { block(generation) }
         sendJob = job
@@ -205,6 +210,11 @@ class AppViewModel(
         _isSending.value = false
         _isStreaming.value = false
         _streamingContent.value = ""
+        _toolExecutionUpdates.update { updates ->
+            updates.map { update ->
+                if (update.phase == ToolExecutionPhase.RUNNING) update.copy(phase = ToolExecutionPhase.CANCELLED) else update
+            }
+        }
         job.cancel()
     }
 
@@ -225,6 +235,11 @@ class AppViewModel(
     /** Stops the reply being generated. The text received so far is kept as the reply. */
     fun stopGeneration() {
         if (sendJob != null) cancelActiveSend() else cancelHistoryCompression()
+    }
+
+    /** A backgrounded app stops active network work; the request's cancellation path saves partial text. */
+    fun onAppBackgrounded() {
+        cancelActiveChatStreams()
     }
 
     /** Stop network work and message collection when this chat screen leaves composition. */
@@ -465,6 +480,7 @@ class AppViewModel(
         pendingChatRecords[id] = chat
         // Set active state synchronously: callers navigate to this id immediately after return.
         cancelActiveChatStreams()
+        _toolExecutionUpdates.value = emptyList()
         messagesCollectionJob?.cancel()
         messagesCollectionJob = null
         _currentChatId.value = id
@@ -498,6 +514,7 @@ class AppViewModel(
     fun loadChat(chatId: String) {
         if (_currentChatId.value != chatId) {
             cancelActiveChatStreams()
+            _toolExecutionUpdates.value = emptyList()
             _currentChatId.value = chatId
             _messages.value = emptyList()
         }
@@ -516,6 +533,7 @@ class AppViewModel(
         val uniqueIds = ids.toSet()
         if (_currentChatId.value?.let { it in uniqueIds } == true) {
             cancelActiveChatStreams()
+            _toolExecutionUpdates.value = emptyList()
             messagesCollectionJob?.cancel()
             messagesCollectionJob = null
             _currentChatId.value = null
@@ -756,6 +774,15 @@ class AppViewModel(
 
     private fun setSendStreamingContent(generation: Long, content: String) {
         if (sendGeneration == generation) _streamingContent.value = content
+    }
+
+
+    private fun publishToolExecutionUpdate(chatId: String, generation: Long, update: ToolExecutionUpdate) {
+        if (sendGeneration != generation || _currentChatId.value != chatId) return
+        _toolExecutionUpdates.update { updates ->
+            val index = updates.indexOfFirst { it.callId == update.callId }
+            if (index < 0) updates + update else updates.toMutableList().also { it[index] = update }
+        }
     }
 
     /** Sends an edit request for a generated image; the result is a separate image message. */
@@ -1112,12 +1139,30 @@ class AppViewModel(
                                 _mcpServerRuntime.update { states ->
                                     states + (server.id to McpServerRuntimeState(isConnecting = true))
                                 }
+                                val connectionProgressId = "mcp-connection:${server.id}"
+                                val connectionStartedAt = System.nanoTime()
+                                publishToolExecutionUpdate(
+                                    chatId,
+                                    generation,
+                                    ToolExecutionUpdate(connectionProgressId, "Connecting to MCP", ToolExecutionPhase.RUNNING)
+                                )
                                 try {
                                     val connection = mcpClient.connect(server)
                                     mcpConnectionsForTurn += connection
                                     val discovered = connection.asChatFunctionTools(server.allowedToolNames).take(remainingMcpTools)
                                     tools.addAll(discovered)
                                     remainingMcpTools -= discovered.size
+                                    val connectionElapsedMs = ((System.nanoTime() - connectionStartedAt) / 1_000_000L).coerceAtLeast(0L)
+                                    publishToolExecutionUpdate(
+                                        chatId,
+                                        generation,
+                                        ToolExecutionUpdate(
+                                            connectionProgressId,
+                                            "Connecting to MCP",
+                                            ToolExecutionPhase.COMPLETED,
+                                            connectionElapsedMs
+                                        )
+                                    )
                                     _mcpServerRuntime.update { states ->
                                         states + (server.id to McpServerRuntimeState(
                                             toolNames = connection.tools.map { it.displayName }.take(MAX_MCP_TOOLS_PER_TURN),
@@ -1127,6 +1172,17 @@ class AppViewModel(
                                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                                     throw cancelled
                                 } catch (failure: Exception) {
+                                    val connectionElapsedMs = ((System.nanoTime() - connectionStartedAt) / 1_000_000L).coerceAtLeast(0L)
+                                    publishToolExecutionUpdate(
+                                        chatId,
+                                        generation,
+                                        ToolExecutionUpdate(
+                                            connectionProgressId,
+                                            "Connecting to MCP",
+                                            ToolExecutionPhase.FAILED,
+                                            connectionElapsedMs
+                                        )
+                                    )
                                     _mcpServerRuntime.update { states ->
                                         states + (server.id to McpServerRuntimeState(
                                             error = safeMcpFailure(failure, server.authSecret),
@@ -1201,7 +1257,10 @@ class AppViewModel(
                             nativeSearch = nativeSearch,
                             contextWindow = modelContextWindow,
                             allowUrlContext = userProvidedUrls.isNotEmpty(),
-                            onUsage = recordUsage
+                            onUsage = recordUsage,
+                            onToolProgress = { update ->
+                                publishToolExecutionUpdate(chatId, generation, update)
+                            }
                         )
                     }
                     var lastPublishMs = 0L
@@ -1563,6 +1622,7 @@ class AppViewModel(
         }
 
         cancelActiveChatStreams()
+        _toolExecutionUpdates.value = emptyList()
         messagesCollectionJob?.cancel()
         messagesCollectionJob = null
         _currentChatId.value = newChatId
@@ -1652,6 +1712,7 @@ class AppViewModel(
         )
 
         cancelActiveChatStreams()
+        _toolExecutionUpdates.value = emptyList()
         messagesCollectionJob?.cancel()
         messagesCollectionJob = null
         _currentChatId.value = newChatId

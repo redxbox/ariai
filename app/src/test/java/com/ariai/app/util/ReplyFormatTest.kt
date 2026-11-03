@@ -14,6 +14,7 @@ class ReplyFormatTest {
         val code = parts[1] as ReplyPart.Code
         assertEquals("kotlin", code.language)
         assertEquals("val x = 1", code.code)
+        assertTrue(code.complete)
     }
 
     @Test
@@ -34,6 +35,36 @@ class ReplyFormatTest {
     }
 
     @Test
+    fun streamingReplyCacheKeepsCompletedParagraphsAndFencedBlocksStable() {
+        val cache = ReplyBlockCache()
+        val first = cache.parse("Intro paragraph.\n\nSecond", streaming = true)
+        val second = cache.parse("Intro paragraph.\n\nSecond paragraph.", streaming = true)
+
+        assertEquals("Intro paragraph.\n", (second.first() as ReplyPart.Text).raw)
+        assertEquals(first.first(), second.first())
+        assertEquals("Second paragraph.\n", (second.last() as ReplyPart.Text).raw)
+
+        val withOpenCode = cache.parse("Intro paragraph.\n\nSecond paragraph.\n```kotlin\nval x =", streaming = true)
+        assertTrue(!(withOpenCode.last() as ReplyPart.Code).complete)
+        val withClosedCode = cache.parse("Intro paragraph.\n\nSecond paragraph.\n```kotlin\nval x = 1\n```\n", streaming = true)
+        assertTrue((withClosedCode.last() as ReplyPart.Code).complete)
+
+        val finished = cache.parse("Intro paragraph.\n\nSecond paragraph.\n```kotlin\nval x = 1\n```\n", streaming = false)
+        assertEquals(withClosedCode, finished)
+    }
+
+    @Test
+    fun streamingReplyCacheKeepsConsecutiveListItemsInOneBlock() {
+        val cache = ReplyBlockCache()
+        cache.parse("- one\n\n- two", streaming = true)
+        val parts = cache.parse("- one\n\n- two\n\nParagraph", streaming = true)
+
+        assertEquals(2, parts.size)
+        assertEquals("- one\n- two\n", (parts.first() as ReplyPart.Text).raw)
+        assertEquals("Paragraph\n", (parts.last() as ReplyPart.Text).raw)
+    }
+
+    @Test
     fun blankLinesBetweenListItemsDoNotCreateOversizedVerticalGaps() {
         val formatted = formatReply("1. first\n\n2. second\n\n- third")
         assertEquals("1.  first\n2.  second\n•  third", formatted.text)
@@ -47,6 +78,7 @@ class ReplyFormatTest {
         val parts = splitReply("```python\nprint(1)\nprint(2)")
         assertEquals(1, parts.size)
         assertEquals("print(1)\nprint(2)", (parts[0] as ReplyPart.Code).code)
+        assertTrue(!(parts[0] as ReplyPart.Code).complete)
     }
 
     @Test
@@ -83,9 +115,9 @@ class ReplyFormatTest {
     }
 
     @Test
-    fun markdownLinkShowsReadableLabelAndDomainOnly() {
+    fun markdownLinkShowsDomainOnlyAndKeepsFullClickableDestination() {
         val formatted = formatReply("[Docs](https://a.dev/guide/start?source=app)")
-        assertEquals("Docs · a.dev", formatted.text)
+        assertEquals("a.dev", formatted.text)
         assertEquals("https://a.dev/guide/start?source=app", formatted.getStringAnnotations("URL", 0, formatted.length).single().item)
     }
 
@@ -97,9 +129,9 @@ class ReplyFormatTest {
     }
 
     @Test
-    fun markdownDestinationIsPreservedExactly() {
+    fun markdownTargetIsPreservedExactlyWhileShowingOnlyTheDomain() {
         val formatted = formatReply("[Docs](https://a.dev/guide.)")
-        assertEquals("Docs · a.dev", formatted.text)
+        assertEquals("a.dev", formatted.text)
         assertEquals("https://a.dev/guide.", formatted.getStringAnnotations("URL", 0, formatted.length).single().item)
     }
 
