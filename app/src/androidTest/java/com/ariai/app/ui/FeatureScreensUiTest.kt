@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -146,9 +147,7 @@ class FeatureScreensUiTest {
 
     @Test
     fun quickParametersSystemPromptCanBeSavedAndBottomActionRemainsReachable() {
-        var savedPrompt: String? = null
-        var savedTemperature = -1f
-        var savedTopP = -1f
+        val savedParameters = mutableStateOf<Triple<Float, Float, String?>?>(null)
 
         compose.setContent {
             AriAiTheme(darkTheme = false, dynamicColor = false) {
@@ -157,21 +156,26 @@ class FeatureScreensUiTest {
                     topP = 1f,
                     systemPrompt = null,
                     onSave = { temperature, topP, prompt ->
-                        savedTemperature = temperature
-                        savedTopP = topP
-                        savedPrompt = prompt
+                        savedParameters.value = Triple(temperature, topP, prompt)
                     },
                     onDismiss = {}
                 )
             }
         }
 
-        compose.onNodeWithTag("quick-parameters-prompt").performTextInput("Be concise and cite assumptions.")
+        compose.onNodeWithTag("quick-parameters-prompt")
+            .performTextInput("Be concise and cite assumptions.")
+            .assertTextContains("Be concise and cite assumptions.")
         compose.onNodeWithTag("quick-parameters-save").performScrollTo().assertIsDisplayed().performClick()
+        compose.waitForIdle()
 
-        assertEquals("Be concise and cite assumptions.", savedPrompt)
-        assertEquals(0.7f, savedTemperature, 0.001f)
-        assertEquals(1f, savedTopP, 0.001f)
+        compose.runOnIdle {
+            val saved = savedParameters.value
+            assertNotNull(saved)
+            assertEquals("Be concise and cite assumptions.", saved?.third)
+            assertEquals(0.7f, saved?.first ?: -1f, 0.001f)
+            assertEquals(1f, saved?.second ?: -1f, 0.001f)
+        }
     }
 
     @Test
