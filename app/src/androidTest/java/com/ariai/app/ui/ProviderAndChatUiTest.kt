@@ -638,13 +638,16 @@ class ProviderAndChatUiTest {
 
         val modelGroup = compose.onNodeWithTag("model-picker-group-other-models")
         assertDisplayed("model group is initially collapsed") { modelGroup.assertIsDisplayed() }
-        assertTrue(compose.onAllNodesWithText("Most used one").fetchSemanticsNodes().isEmpty())
+        assertTrue(
+            "popular models should remain hidden until their popup is opened",
+            compose.onAllNodesWithTag("model-picker-group-popup-other-models").fetchSemanticsNodes().isEmpty()
+        )
         clickWithLabel("open model group") { modelGroup.performClick() }
         val modelPopup = compose.onNodeWithTag("model-picker-group-popup-other-models")
         assertDisplayed("models open in a floating popup") { modelPopup.assertIsDisplayed() }
-        val firstPopular = compose.onNodeWithText("Most used one")
-        val secondPopular = compose.onNodeWithText("Most used two")
-        val thirdPopular = compose.onNodeWithText("Most used three")
+        val firstPopular = compose.onNodeWithTag("model-row-${provider.id}-popular-one")
+        val secondPopular = compose.onNodeWithTag("model-row-${provider.id}-popular-two")
+        val thirdPopular = compose.onNodeWithTag("model-row-${provider.id}-popular-three")
         assertDisplayed("most-used model one") { firstPopular.assertIsDisplayed() }
         assertDisplayed("most-used model two") { secondPopular.assertIsDisplayed() }
         assertDisplayed("most-used model three") { thirdPopular.assertIsDisplayed() }

@@ -415,16 +415,16 @@ if [[ "${ARIAI_LIVE_API_TEST:-false}" == "true" ]]; then
 fi
 
 adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/launch.txt"
-wait_for_text "How can I help you?" 90
+wait_for_text "Choose model" 90
 shot 00-app-home
 # The launcher can stall after the app's first frame; verify the home screen again after capture.
-wait_for_text "How can I help you?" 30
+wait_for_text "Choose model" 30
 
 step "Chat home and model picker"
-expect_text "How can I help you?"
+expect_text "AriAI"
 expect_text "Send"
 shot 01-chat-home
-# The compact model dropdown is centered directly below the chat top bar, clear of the composer.
+# The compact, unframed model selector is centered below the chat top bar, clear of the composer.
 tap "Choose model"
 wait_for_text "No models available" 30
 shot 02-model-picker
@@ -435,7 +435,9 @@ step "Providerless chat state and rename dialog"
 tap "Message AriAI"
 type_text "AriAISmoke"
 hide_keyboard
-expect_text "Add your first AI provider to start chatting"
+expect_text "AriAI"
+expect_absent_text "How can I help you?"
+expect_absent_text "Add your first AI provider to start chatting"
 expect_text "AriAISmoke"
 expect_absent_text "No provider configured"
 shot 02a-providerless-chat
@@ -852,7 +854,7 @@ expect_text "Choose model"
 # Start a clean conversation after the intentional missing-provider error at the beginning.
 tap "Open menu"
 tap "New chat"
-expect_text "How can I help you?"
+expect_text "AriAI"
 shot 56-new-chat-from-drawer
 end_step
 
