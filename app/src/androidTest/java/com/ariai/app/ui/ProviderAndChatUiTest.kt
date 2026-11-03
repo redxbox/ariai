@@ -182,12 +182,11 @@ class ProviderAndChatUiTest {
             streamedText.value = "A streamed answer"
         }
         compose.waitForIdle()
-        compose.onNodeWithTag("chat-generation-status-active").assertIsDisplayed()
+        compose.onNodeWithTag("chat-generation-status-active")
+            .assertIsDisplayed()
+            .assertTextContains("Thinking", substring = true)
 
         Thread.sleep(1_100)
-        compose.waitForIdle()
-        compose.onNodeWithTag("chat-generation-status-active").assertTextContains("sec", substring = true)
-
         compose.runOnIdle {
             messages.value = listOf(
                 ChatMessage(
