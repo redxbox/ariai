@@ -37,7 +37,7 @@ import com.ariai.app.util.tx
 fun ReplyContent(text: String, fontSizeSp: Float, color: Color) {
     val parts = remember(text) { splitReply(text) }
     val uriHandler = LocalUriHandler.current
-    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         parts.forEach { part ->
             when (part) {
                 is ReplyPart.Text -> {
@@ -48,7 +48,7 @@ fun ReplyContent(text: String, fontSizeSp: Float, color: Color) {
                             style = TextStyle(
                                 color = color,
                                 fontSize = fontSizeSp.sp,
-                                lineHeight = (fontSizeSp * 1.55f).sp,
+                                lineHeight = (fontSizeSp * 1.42f).sp,
                                 textDirection = TextDirection.Content
                             ),
                             onClick = { offset ->

@@ -14,6 +14,7 @@ import android.content.ClipData
 import android.content.ContentValues
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.ImageBitmap
@@ -23,6 +24,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.NumberFormat
+import java.util.Locale
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -347,17 +350,60 @@ fun NewChatScreen(
     val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
     val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
     val hasStreamingText = currentStreamingContent.isNotBlank()
-    val showWaitingStatus = isSending && !hasStreamingText
+    val generationActive = isSending || isStreaming
+    val showWaitingStatus = generationActive && !hasStreamingText
     val waitingStatus = when {
-        chatMode == ChatMode.IMAGE || selectedModelIsImageOnly ->
-            tx("Preparing image generation…")
-        chatMode == ChatMode.VIDEO || selectedModelIsVideoOnly ->
-            tx("Preparing video generation…")
-        chatMode == ChatMode.AUDIO || selectedModelIsAudioOnly ->
-            tx("Preparing audio generation…")
-        searchMode != SearchMode.OFF -> tx("Searching the web…")
-        else -> tx("Thinking…")
+        chatMode == ChatMode.IMAGE || selectedModelIsImageOnly -> tx("Preparing image generation")
+        chatMode == ChatMode.VIDEO || selectedModelIsVideoOnly -> tx("Preparing video generation")
+        chatMode == ChatMode.AUDIO || selectedModelIsAudioOnly -> tx("Preparing audio generation")
+        searchMode != SearchMode.OFF -> tx("Searching the web")
+        else -> tx("Thinking")
     }
+    val completedStatus = when {
+        chatMode == ChatMode.IMAGE || selectedModelIsImageOnly -> tx("Image ready")
+        chatMode == ChatMode.VIDEO || selectedModelIsVideoOnly -> tx("Video ready")
+        chatMode == ChatMode.AUDIO || selectedModelIsAudioOnly -> tx("Audio ready")
+        searchMode != SearchMode.OFF -> tx("Search finished")
+        else -> tx("Think time")
+    }
+    var generationStartedAtMs by remember { mutableStateOf<Long?>(null) }
+    var elapsedGenerationSeconds by remember { mutableStateOf(0L) }
+    var completedGenerationSeconds by remember { mutableStateOf<Long?>(null) }
+    var timingChatId by remember { mutableStateOf(screenChatId) }
+
+    LaunchedEffect(generationActive) {
+        if (generationActive) {
+            if (generationStartedAtMs == null) {
+                generationStartedAtMs = SystemClock.elapsedRealtime()
+                elapsedGenerationSeconds = 0L
+                completedGenerationSeconds = null
+            }
+        } else {
+            generationStartedAtMs?.let { startedAt ->
+                val duration = ((SystemClock.elapsedRealtime() - startedAt) / 1_000L).coerceAtLeast(1L)
+                elapsedGenerationSeconds = duration
+                completedGenerationSeconds = duration
+                generationStartedAtMs = null
+            }
+        }
+    }
+    LaunchedEffect(generationStartedAtMs) {
+        val startedAt = generationStartedAtMs ?: return@LaunchedEffect
+        while (true) {
+            elapsedGenerationSeconds = ((SystemClock.elapsedRealtime() - startedAt) / 1_000L).coerceAtLeast(0L)
+            delay(1_000L)
+        }
+    }
+    LaunchedEffect(screenChatId) {
+        if (timingChatId != screenChatId && !generationActive) {
+            generationStartedAtMs = null
+            elapsedGenerationSeconds = 0L
+            completedGenerationSeconds = null
+        }
+        timingChatId = screenChatId
+    }
+    val showCompletedTiming = !generationActive && completedGenerationSeconds != null &&
+        messages.lastOrNull()?.let { it.role == MessageRole.ASSISTANT && it.status != MessageStatus.ERROR } == true
     val imageGenerationAvailable = providers.any { provider ->
         provider.enabled && provider.models.any { it.supportsImageGen }
     }
@@ -1158,28 +1204,44 @@ fun NewChatScreen(
                             MessageRole.SYSTEM -> AppearIn(m.id) { CompressedNotice() }
                             MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }
                             else -> AppearIn(m.id) {
-                                AssistantBlock(
-                                    text = m.content,
-                                    fontSize = fontSize,
-                                    imagePath = m.imagePath,
-                                    isError = isError,
-                                    retryable = canRetry && !isStreaming && !isSending,
-                                    onCopy = { copyToClipboard(m.content) },
-                                    onShare = { shareText(m.content) },
-                                    onEdit = { editingImage = m },
-                                    onSave = { m.imagePath?.let { saveImage(it) } },
-                                    onBranch = { onBranchMessage(m) },
-                                    onRetry = { onRegenerate(m) }
-                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (showCompletedTiming && i == messages.lastIndex) {
+                                        GenerationStatus(
+                                            label = completedStatus,
+                                            elapsedSeconds = completedGenerationSeconds ?: 0L,
+                                            active = false
+                                        )
+                                    }
+                                    AssistantBlock(
+                                        text = m.content,
+                                        fontSize = fontSize,
+                                        imagePath = m.imagePath,
+                                        isError = isError,
+                                        retryable = canRetry && !isStreaming && !isSending,
+                                        onCopy = { copyToClipboard(m.content) },
+                                        onShare = { shareText(m.content) },
+                                        onEdit = { editingImage = m },
+                                        onSave = { m.imagePath?.let { saveImage(it) } },
+                                        onBranch = { onBranchMessage(m) },
+                                        onRetry = { onRegenerate(m) }
+                                    )
+                                }
                             }
                         }
                     }
                     if (hasStreamingText) {
                         item(key = "streaming") {
-                            AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (generationActive) {
+                                    GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
+                                }
+                                AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
+                            }
                         }
                     } else if (showWaitingStatus) {
-                        item(key = "waiting-status") { WaitingStatus(waitingStatus) }
+                        item(key = "waiting-status") {
+                            GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
+                        }
                     }
                 }
             }
@@ -1434,18 +1496,47 @@ private fun UserBubble(text: String, attachments: List<Attachment>, fontSize: In
 }
 
 @Composable
-private fun WaitingStatus(label: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(start = 4.dp)) {
-        Surface(shape = RoundedCornerShape(22.dp), color = AriTint) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Accent)
-                Spacer(Modifier.width(9.dp))
-                Text(label, color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+private fun GenerationStatus(label: String, elapsedSeconds: Long, active: Boolean) {
+    val duration = formatGenerationDuration(elapsedSeconds)
+    val statusText = if (elapsedSeconds > 0L) "$label · $duration" else label
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = AriTint,
+        modifier = Modifier.padding(start = 4.dp).widthIn(max = 360.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (active) {
+                CircularProgressIndicator(modifier = Modifier.size(13.dp), strokeWidth = 1.8.dp, color = Accent)
+            } else {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Muted, modifier = Modifier.size(14.dp))
             }
+            Text(
+                statusText,
+                modifier = Modifier.testTag(if (active) "chat-generation-status-active" else "chat-generation-status-complete"),
+                color = Muted,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+    }
+}
+
+private fun formatGenerationDuration(totalSeconds: Long): String {
+    val numbers = NumberFormat.getIntegerInstance(Locale.forLanguageTag(UiLang.code))
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return if (minutes == 0L) {
+        "${numbers.format(totalSeconds)} ${tx("sec")}"
+    } else if (seconds == 0L) {
+        "${numbers.format(minutes)} ${tx("min")}"
+    } else {
+        "${numbers.format(minutes)} ${tx("min")} ${numbers.format(seconds)} ${tx("sec")}"
     }
 }
 

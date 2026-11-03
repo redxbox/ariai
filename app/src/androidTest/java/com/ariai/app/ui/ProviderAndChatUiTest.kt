@@ -148,6 +148,66 @@ class ProviderAndChatUiTest {
     }
 
     @Test
+    fun generationTimerStaysVisibleThroughStreamingAndRemainsAfterCompletion() {
+        val chat = Chat(id = "generation-timer-test", title = "Timer test")
+        val messages = mutableStateOf(emptyList<ChatMessage>())
+        val sending = mutableStateOf(true)
+        val streaming = mutableStateOf(false)
+        val streamedText = mutableStateOf("")
+
+        compose.setContent {
+            AriAiTheme(darkTheme = false) {
+                NewChatScreen(
+                    chat = chat,
+                    messages = messages.value,
+                    isStreaming = streaming.value,
+                    isSending = sending.value,
+                    currentStreamingContent = streamedText.value,
+                    selectedModel = null,
+                    providers = emptyList(),
+                    onSendMessage = { _, _, _, _, _ -> false },
+                    onBack = {},
+                    onBranchMessage = {},
+                    onRegenerate = {},
+                    onCopyMessage = {},
+                    onCheckProvider = { ConnectionResult.Ok(0) }
+                )
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("chat-generation-status-active").assertIsDisplayed()
+
+        compose.runOnIdle {
+            streaming.value = true
+            streamedText.value = "A streamed answer"
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("chat-generation-status-active").assertIsDisplayed()
+
+        Thread.sleep(1_100)
+        compose.waitForIdle()
+        compose.onNodeWithTag("chat-generation-status-active").assertTextContains("sec", substring = true)
+
+        compose.runOnIdle {
+            messages.value = listOf(
+                ChatMessage(
+                    chatId = chat.id,
+                    role = MessageRole.ASSISTANT,
+                    content = "A complete answer"
+                )
+            )
+            streaming.value = false
+            sending.value = false
+            streamedText.value = ""
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("chat-generation-status-complete")
+            .assertIsDisplayed()
+            .assertTextContains("Think time", substring = true)
+            .assertTextContains("sec", substring = true)
+    }
+
+    @Test
     fun selectedAgentIsVisibleOffersItsExamplesAndHeaderActionsWork() {
         val provider = Provider(
             id = "provider-agent-chat-test",

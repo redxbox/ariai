@@ -61,7 +61,7 @@ private const val MAX_MCP_SERVERS_PER_TURN = 4
 private const val MAX_MCP_TOOLS_PER_TURN = 32
 
 private const val DEFAULT_MOBILE_REPLY_STYLE =
-    "Reply in the same language as the user's latest message. For multi-part questions, begin with a short direct answer, then use clear Markdown headings and concise bullets. Use short paragraphs; avoid wide tables on phones unless they improve comparison. Keep simple answers brief and do not invent information."
+    "Reply in the same language as the user's latest message, using fluent, natural phrasing. For multi-part questions, begin with a short direct answer, then use clear Markdown headings and concise bullets. Format for a phone screen: keep paragraphs compact, do not put blank lines between consecutive list items, and use paragraph breaks only between distinct ideas or sections. When citing a web page, use a Markdown link whose visible text is its domain; keep the full address only in the link target, and do not repeat long URL paths inline. Keep simple answers brief, avoid filler, and do not invent information."
 
 /** Prevents a text-only chat model from claiming it is doing unprovided background/tool work. */
 private val CHAT_CAPABILITY_POLICY = """

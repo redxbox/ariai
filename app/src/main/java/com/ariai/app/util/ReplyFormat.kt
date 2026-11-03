@@ -36,19 +36,34 @@ private val bulletPrefix = Regex("""^[-*+]\s+""")
 private val numberedPrefix = Regex("""^(\d+)[.)]\s+""")
 private val headingPrefix = Regex("""^(#{1,6})\s*(.*)$""")
 private val linkColor = Color(0xFF2563EB)
+private const val URL_TRAILING_PUNCTUATION = ".,;:!?،؛؟…"
+
+private fun isListItemLine(line: String): Boolean {
+    val trimmed = line.trimStart()
+    return bulletPrefix.containsMatchIn(trimmed) || numberedPrefix.containsMatchIn(trimmed)
+}
 
 /** Splits a reply into text paragraphs and fenced code blocks. */
 fun splitReply(raw: String): List<ReplyPart> {
     val parts = mutableListOf<ReplyPart>()
     val text = StringBuilder()
     val code = StringBuilder()
+    val sourceLines = raw.lines()
+    val nextNonBlankLine = IntArray(sourceLines.size) { -1 }
+    var nextIndex = -1
+    for (index in sourceLines.indices.reversed()) {
+        if (sourceLines[index].isNotBlank()) nextIndex = index
+        nextNonBlankLine[index] = nextIndex
+    }
+    var lastTextLine = ""
     var inCode = false
     var language = ""
     fun flushText() {
         if (text.isNotBlank()) parts.add(ReplyPart.Text(text.toString()))
         text.clear()
+        lastTextLine = ""
     }
-    for (line in raw.lines()) {
+    for ((index, line) in sourceLines.withIndex()) {
         val trimmed = line.trim()
         if (trimmed.startsWith("```")) {
             if (inCode) {
@@ -63,11 +78,15 @@ fun splitReply(raw: String): List<ReplyPart> {
         } else if (inCode) {
             code.append(line).append('\n')
         } else if (trimmed.isEmpty()) {
-            // Render blank-line-separated paragraphs as separate compact blocks. Keeping blank
-            // lines inside one Text adds a full line-height of vertical whitespace on phones.
-            flushText()
+            val nextLine = nextNonBlankLine[index].takeIf { it > index }?.let(sourceLines::get).orEmpty()
+            if (!(isListItemLine(lastTextLine) && isListItemLine(nextLine))) {
+                // Keep separate list items in one tight block, but split real paragraphs into
+                // compact blocks so a Markdown blank line never becomes a blank text line.
+                flushText()
+            }
         } else {
             text.append(line).append('\n')
+            lastTextLine = line
         }
     }
     if (inCode) parts.add(ReplyPart.Code(language, code.toString().trimEnd('\n'))) else flushText()
@@ -157,20 +176,54 @@ private fun AnnotatedString.Builder.appendInline(line: String) {
         "\uE000${index}\uE001"
     }
     var last = 0
-    for (m in linkOrUrl.findAll(cleaned)) {
-        appendBold(cleaned.substring(last, m.range.first), inlineCode)
-        val url = m.groupValues[2].ifEmpty { m.groupValues[3] }
-        val label = m.groupValues[1].ifEmpty { url }
-        // The whole "label (address)" is tappable and shows the full address, as requested.
+    for (match in linkOrUrl.findAll(cleaned)) {
+        appendBold(cleaned.substring(last, match.range.first), inlineCode)
+        val isMarkdownLink = match.groupValues[2].isNotEmpty()
+        val rawUrl = match.groupValues[2].ifEmpty { match.groupValues[3] }
+        // Punctuation inside Markdown parentheses is part of its explicit target; only detach
+        // sentence punctuation that follows a bare URL.
+        val (url, punctuation) = if (isMarkdownLink) rawUrl to "" else trimUrlPunctuation(rawUrl)
+        val domain = domainLabel(url)
+        val markdownLabel = match.groupValues[1].trim()
+        val displayLabel = when {
+            markdownLabel.isBlank() || markdownLabel.startsWith("http://", ignoreCase = true) ||
+                markdownLabel.startsWith("https://", ignoreCase = true) -> domain
+            markdownLabel.equals(domain, ignoreCase = true) -> markdownLabel
+            else -> "$markdownLabel · $domain"
+        }
+        // Keep the complete destination tappable while presenting only its domain, not its path/query.
         pushStringAnnotation(tag = "URL", annotation = url)
         withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-            appendBold(label, inlineCode)
-            if (label != url) append(" ($url)")
+            appendBold(displayLabel, inlineCode)
         }
         pop()
-        last = m.range.last + 1
+        append(punctuation)
+        last = match.range.last + 1
     }
     appendBold(cleaned.substring(last), inlineCode)
+}
+
+private fun trimUrlPunctuation(value: String): Pair<String, String> {
+    var end = value.length
+    while (end > 0 && URL_TRAILING_PUNCTUATION.contains(value[end - 1])) end--
+    return value.substring(0, end) to value.substring(end)
+}
+
+private fun domainLabel(url: String): String {
+    val uri = runCatching { java.net.URI(url) }.getOrNull()
+    if (uri != null) {
+        val host = uri.host?.lowercase(java.util.Locale.ROOT)?.removePrefix("www.")
+        if (!host.isNullOrBlank()) {
+            val defaultPort = (uri.scheme.equals("https", ignoreCase = true) && uri.port == 443) ||
+                (uri.scheme.equals("http", ignoreCase = true) && uri.port == 80)
+            return host + if (uri.port >= 0 && !defaultPort) ":${uri.port}" else ""
+        }
+    }
+    return url.substringAfter("://", url)
+        .substringBefore('/')
+        .substringBefore('?')
+        .substringBefore('#')
+        .removePrefix("www.")
 }
 
 private fun AnnotatedString.Builder.appendBold(segment: String, inlineCode: List<String>) {

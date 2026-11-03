@@ -17,12 +17,16 @@ class ReplyFormatTest {
     }
 
     @Test
-    fun blankLinesSplitParagraphBlocksButKeepListLinesTogether() {
-        val parts = splitReply("First paragraph.\ncontinued.\n\n- one\n- two\n\nFinal paragraph.")
+    fun blankLinesSplitParagraphBlocksButKeepListItemsTight() {
+        val parts = splitReply("First paragraph.\ncontinued.\n\n- one\n\n- two\n\nFinal paragraph.")
         assertEquals(3, parts.size)
         assertEquals("First paragraph.\ncontinued.\n", (parts[0] as ReplyPart.Text).raw)
         assertEquals("- one\n- two\n", (parts[1] as ReplyPart.Text).raw)
         assertEquals("Final paragraph.\n", (parts[2] as ReplyPart.Text).raw)
+
+        val numbered = splitReply("1. first\n\n2. second")
+        assertEquals(1, numbered.size)
+        assertEquals("1. first\n2. second\n", (numbered.single() as ReplyPart.Text).raw)
     }
 
     @Test
@@ -66,13 +70,29 @@ class ReplyFormatTest {
     }
 
     @Test
-    fun markdownLinkShowsLabelAndFullAddress() {
-        assertEquals("Docs (https://a.dev)", formatReply("[Docs](https://a.dev)").text)
+    fun markdownLinkShowsReadableLabelAndDomainOnly() {
+        val formatted = formatReply("[Docs](https://a.dev/guide/start?source=app)")
+        assertEquals("Docs · a.dev", formatted.text)
+        assertEquals("https://a.dev/guide/start?source=app", formatted.getStringAnnotations("URL", 0, formatted.length).single().item)
     }
 
     @Test
-    fun bareLinkIsKeptAsIs() {
-        assertEquals("Visit https://a.dev now", formatReply("Visit https://a.dev now").text)
+    fun bareLinkShowsDomainAndKeepsFullClickableDestination() {
+        val formatted = formatReply("Visit https://www.github.com/redxbox/ariai. now")
+        assertEquals("Visit github.com. now", formatted.text)
+        assertEquals("https://www.github.com/redxbox/ariai", formatted.getStringAnnotations("URL", 0, formatted.length).single().item)
+    }
+
+    @Test
+    fun markdownDestinationIsPreservedExactly() {
+        val formatted = formatReply("[Docs](https://a.dev/guide.)")
+        assertEquals("Docs · a.dev", formatted.text)
+        assertEquals("https://a.dev/guide.", formatted.getStringAnnotations("URL", 0, formatted.length).single().item)
+    }
+
+    @Test
+    fun explicitDomainLabelIsNotRepeated() {
+        assertEquals("github.com", formatReply("[github.com](https://github.com/redxbox/ariai)").text)
     }
 
     @Test
