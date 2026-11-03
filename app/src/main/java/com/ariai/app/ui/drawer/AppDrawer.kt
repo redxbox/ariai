@@ -26,7 +26,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -95,6 +94,7 @@ fun ColumnScope.AppDrawerContent(
 ) {
     var query by remember { mutableStateOf("") }
     val isToolsRoute = currentRoute == "search" || currentRoute == "mcp"
+    val drawerAccent = MaterialTheme.colorScheme.primary
     var toolsExpanded by remember(currentRoute) { mutableStateOf(isToolsRoute) }
 
     val rows: List<DrawerRow> = remember(chats, query, UiLang.code) {
@@ -137,27 +137,27 @@ fun ColumnScope.AppDrawerContent(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
-            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(15.dp))
-                .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
+            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(15.dp)).background(AriTint),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = drawerAccent, modifier = Modifier.size(21.dp))
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text("AriAI", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp)
             Text(tx("Your AI, your way"), color = AriMuted, fontSize = 11.sp)
         }
-        Box(Modifier.size(8.dp).clip(CircleShape).background(AriAccent))
+        Box(Modifier.size(8.dp).clip(CircleShape).background(AriMuted.copy(alpha = 0.55f)))
     }
 
     Button(
         onClick = onNewChat,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
         shape = RoundedCornerShape(17.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AriAccent, contentColor = Color.White)
+        border = BorderStroke(1.dp, AriLine.copy(alpha = 0.72f)),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = AriTint, contentColor = Ink)
     ) {
-        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(Icons.Default.Add, contentDescription = null, tint = drawerAccent, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(tx("New chat"), fontWeight = FontWeight.SemiBold)
     }
@@ -167,14 +167,14 @@ fun ColumnScope.AppDrawerContent(
         onValueChange = { query = it },
         singleLine = true,
         placeholder = { Text(tx("Search conversations"), color = AriMuted, fontSize = 14.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriAccent, modifier = Modifier.size(18.dp)) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriMuted, modifier = Modifier.size(18.dp)) },
         textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start, textDirection = TextDirection.ContentOrLtr),
         shape = RoundedCornerShape(17.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = AriTint,
             unfocusedContainerColor = AriTint,
-            focusedBorderColor = AriAccent.copy(alpha = 0.6f),
-            unfocusedBorderColor = AriLine
+            focusedBorderColor = AriLine.copy(alpha = 0.78f),
+            unfocusedBorderColor = AriLine.copy(alpha = 0.62f)
         ),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
     )
@@ -235,11 +235,10 @@ fun ColumnScope.AppDrawerContent(
     ) {
         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(36.dp).clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(AriAccentDark, AriAccent))),
+                Modifier.size(36.dp).clip(CircleShape).background(AriFold),
                 contentAlignment = Alignment.Center
             ) {
-                Text("A", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("A", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -250,7 +249,7 @@ fun ColumnScope.AppDrawerContent(
                     color = Ink.copy(alpha = 0.5f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
-            Box(Modifier.size(7.dp).clip(CircleShape).background(if (activeProvider?.enabled == true) AriAccent else Ink.copy(alpha = 0.2f)))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(if (activeProvider?.enabled == true) drawerAccent else Ink.copy(alpha = 0.2f)))
         }
     }
 
@@ -264,7 +263,7 @@ fun ColumnScope.AppDrawerContent(
         FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }
         Row(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(if (isToolsRoute) AriAccentSoft else Color.Transparent)
+                .background(if (isToolsRoute) AriTint else Color.Transparent)
                 .semantics { stateDescription = if (toolsExpanded) tx("Expanded") else tx("Collapsed") }
                 .clickable(role = Role.Button) { toolsExpanded = !toolsExpanded }
                 .heightIn(min = 48.dp)
@@ -275,13 +274,13 @@ fun ColumnScope.AppDrawerContent(
             Icon(
                 Icons.Default.Extension,
                 contentDescription = null,
-                tint = if (isToolsRoute) AriAccent else AriMuted,
+                tint = if (isToolsRoute) MaterialTheme.colorScheme.primary else AriMuted,
                 modifier = Modifier.size(21.dp)
             )
             Text(
                 tx("Tools"),
                 fontSize = 14.sp,
-                color = if (isToolsRoute) AriAccent else Ink,
+                color = Ink,
                 fontWeight = if (isToolsRoute) FontWeight.SemiBold else FontWeight.Normal
             )
             Spacer(Modifier.weight(1f))
@@ -327,7 +326,7 @@ private fun ChatRowItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) AriAccentSoft else Color.Transparent)
+            .background(if (selected) AriTint.copy(alpha = 0.78f) else Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { if (selected) stateDescription = tx("Current chat") }
             .heightIn(min = 48.dp)
@@ -335,8 +334,8 @@ private fun ChatRowItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selected) {
-            // The one coloured element in the drawer: marks the open chat.
-            Box(Modifier.size(6.dp).clip(CircleShape).background(AriAccent))
+            // A small brand-coloured marker keeps the open chat easy to find without a bright row fill.
+            Box(Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
             Spacer(Modifier.width(8.dp))
         }
         if (chat.isPinned) {
@@ -438,7 +437,7 @@ private fun ChatRowItem(
 private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .background(if (selected) AriAccentSoft else Color.Transparent)
+            .background(if (selected) AriTint else Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = 48.dp)
             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -448,13 +447,13 @@ private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, on
         Icon(
             icon,
             contentDescription = null,
-            tint = if (selected) AriAccent else AriMuted,
+            tint = if (selected) MaterialTheme.colorScheme.primary else AriMuted,
             modifier = Modifier.size(21.dp)
         )
         Text(
             label,
             fontSize = 14.sp,
-            color = if (selected) AriAccent else Ink,
+            color = Ink,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
         )
     }

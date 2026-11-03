@@ -35,7 +35,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ariai.app.data.models.*
@@ -797,8 +796,8 @@ private fun ProviderActionBar(
 ) {
     val saveEnabled = canSave && !fetching
     val testEnabled = !checkingConnection && !fetching
-    val accent = MaterialTheme.colorScheme.primary
-    val onAccent = MaterialTheme.colorScheme.onPrimary
+    val graphite = Color(0xFF464850)
+    val brandAccent = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
@@ -809,8 +808,8 @@ private fun ProviderActionBar(
             .testTag("provider-save-action-bar"),
         shape = RoundedCornerShape(26.dp),
         color = AriCard,
-        border = BorderStroke(1.dp, AriLine.copy(alpha = 0.8f)),
-        shadowElevation = 6.dp,
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.62f)),
+        shadowElevation = 4.dp,
         tonalElevation = 0.dp
     ) {
         Row(
@@ -827,8 +826,8 @@ private fun ProviderActionBar(
                 modifier = Modifier.weight(1f).height(48.dp).testTag("provider-save"),
                 shape = RoundedCornerShape(22.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = accent,
-                    contentColor = onAccent,
+                    containerColor = graphite,
+                    contentColor = Color.White,
                     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     disabledContentColor = muted
                 ),
@@ -839,7 +838,7 @@ private fun ProviderActionBar(
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
-                        color = onAccent
+                        color = muted
                     )
                 } else {
                     Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(17.dp))
@@ -860,23 +859,20 @@ private fun ProviderActionBar(
                 modifier = Modifier.weight(1f).height(48.dp).testTag("provider-test-connection"),
                 shape = RoundedCornerShape(22.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = accent,
+                    contentColor = AriInk,
                     disabledContentColor = muted
                 ),
-                border = BorderStroke(
-                    1.dp,
-                    if (testEnabled) accent.copy(alpha = 0.34f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.65f)
-                ),
+                border = BorderStroke(0.85.dp, AriLine.copy(alpha = if (testEnabled) 0.82f else 0.55f)),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
             ) {
                 if (checkingConnection) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
-                        color = accent
+                        color = brandAccent
                     )
                 } else {
-                    Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(17.dp))
+                    Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = brandAccent, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(7.dp))
                     Text(
                         tx("Test"),
@@ -1331,11 +1327,11 @@ private fun FetchModelsRow(fetching: Boolean, canFetch: Boolean, status: String?
 
 @Composable
 private fun providerFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = AriAccent,
+    focusedBorderColor = AriMuted,
     unfocusedBorderColor = AriLine,
-    focusedLabelColor = AriAccent,
+    focusedLabelColor = AriMuted,
     unfocusedLabelColor = AriMuted,
-    cursorColor = AriAccent,
+    cursorColor = MaterialTheme.colorScheme.primary,
     focusedContainerColor = AriCard,
     unfocusedContainerColor = AriCard,
     errorBorderColor = AriError,
@@ -1355,12 +1351,11 @@ private fun ProviderEditHeader(
         runCatching { java.net.URI(baseUrl.trim()).host }.getOrNull()?.removePrefix("www.").orEmpty()
     }
     val displayName = name.trim().ifBlank { tx("New provider") }
-    val iceBlue = Color(0xFF64C9F3)
     Surface(
         shape = RoundedCornerShape(26.dp),
         color = AriCard,
         shadowElevation = 1.dp,
-        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.8f)),
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.65f)),
         modifier = Modifier.fillMaxWidth().testTag("provider-edit-header")
     ) {
         Row(
@@ -1391,8 +1386,8 @@ private fun ProviderEditHeader(
                 onCheckedChange = onToggle,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = iceBlue,
-                    checkedBorderColor = iceBlue,
+                    checkedTrackColor = AriMuted,
+                    checkedBorderColor = AriMuted,
                     uncheckedThumbColor = AriMuted,
                     uncheckedTrackColor = AriTint,
                     uncheckedBorderColor = AriLine
@@ -1404,12 +1399,11 @@ private fun ProviderEditHeader(
 
 @Composable
 private fun SegmentedTabs(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val trackColor = if (isDark) Color(0xFF1C2933) else Color(0xFFEAF7FD)
-    val trackBorder = if (isDark) Color(0xFF344C5A) else Color(0xFFCBE9F5)
-    val activeColor = if (isDark) Color(0xFF17698D) else Color(0xFF64C9F3)
-    val activeTextColor = if (isDark) Color(0xFFE9F8FF) else Color(0xFF10364D)
-    val inactiveTextColor = if (isDark) Color(0xFFB5C7D2) else Color(0xFF5B7181)
+    val trackColor = AriTint.copy(alpha = 0.56f)
+    val trackBorder = AriLine.copy(alpha = 0.62f)
+    val activeColor = AriFold.copy(alpha = 0.78f)
+    val activeTextColor = AriInk
+    val inactiveTextColor = AriMuted
     val tabShape = RoundedCornerShape(16.dp)
 
     Surface(

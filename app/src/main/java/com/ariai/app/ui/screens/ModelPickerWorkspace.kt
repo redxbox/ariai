@@ -417,7 +417,7 @@ private fun CompactProviderRail(
                 onClick = onManageProviders,
                 modifier = Modifier.size(44.dp).testTag("model-picker-manage-providers")
             ) {
-                Icon(Icons.Default.Settings, contentDescription = tx("Manage providers & models"), tint = AriAccent)
+                Icon(Icons.Default.Settings, contentDescription = tx("Manage providers & models"), tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -562,8 +562,8 @@ private fun ModelDetailsPane(
                     focusedTextColor = AriInk,
                     unfocusedTextColor = AriInk,
                     cursorColor = AriAccent,
-                    focusedBorderColor = AriLine,
-                    unfocusedBorderColor = AriLine,
+                    focusedBorderColor = AriLine.copy(alpha = 0.62f),
+                    unfocusedBorderColor = AriLine.copy(alpha = 0.42f),
                     focusedContainerColor = AriTint.copy(alpha = 0.62f),
                     unfocusedContainerColor = AriTint.copy(alpha = 0.62f)
                 ),
@@ -776,10 +776,10 @@ private fun PickerPanelSurface(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = AriCard.copy(alpha = 0.98f),
+        color = AriCard.copy(alpha = 0.94f),
         contentColor = AriInk,
-        shadowElevation = 4.dp,
-        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.82f)),
+        shadowElevation = 8.dp,
+        border = BorderStroke(0.55.dp, AriLine.copy(alpha = 0.48f)),
         tonalElevation = 0.dp
     ) {
         content()
@@ -798,7 +798,7 @@ private fun ProviderListItem(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
-        color = if (selected) AriAccentSoft.copy(alpha = 0.76f) else Color.Transparent,
+        color = if (selected) AriTint.copy(alpha = 0.62f) else Color.Transparent,
         tonalElevation = 0.dp,
         modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).testTag(tag)
     ) {
@@ -813,7 +813,7 @@ private fun ProviderListItem(
                     label,
                     fontSize = 14.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (selected) AriAccent else AriInk,
+                    color = AriInk,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -829,7 +829,7 @@ private fun ProviderListItem(
             Icon(
                 Icons.Default.KeyboardArrowRight,
                 contentDescription = null,
-                tint = if (selected) AriAccent else AriInk.copy(alpha = 0.82f),
+                tint = if (selected) MaterialTheme.colorScheme.primary else AriMuted,
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -846,20 +846,14 @@ private fun ProviderCompactItem(
     onClick: () -> Unit
 ) {
     val chipColor by animateColorAsState(
-        targetValue = if (selected) AriAccentSoft.copy(alpha = 0.72f) else AriTint.copy(alpha = 0.38f),
+        targetValue = if (selected) AriTint.copy(alpha = 0.62f) else Color.Transparent,
         animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
         label = "provider-filter-surface"
-    )
-    val chipBorder by animateColorAsState(
-        targetValue = if (selected) AriAccent.copy(alpha = 0.2f) else AriLine.copy(alpha = 0.5f),
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-        label = "provider-filter-border"
     )
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
         color = chipColor,
-        border = BorderStroke(0.75.dp, chipBorder),
         modifier = Modifier.heightIn(min = 48.dp).testTag(tag)
     ) {
         Row(
@@ -870,7 +864,7 @@ private fun ProviderCompactItem(
             ProviderBadge(provider = provider, isAllModels = provider == null, selected = selected, size = 26.dp)
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(label, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (selected) AriAccent else AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    color = AriInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     modelCountLabel(modelCount),
                     fontSize = 9.sp,
@@ -880,6 +874,10 @@ private fun ProviderCompactItem(
                     modifier = Modifier.testTag(if (provider == null) "provider-model-count-all" else "provider-model-count-${provider.id}")
                 )
             }
+            Box(
+                Modifier.padding(start = 1.dp).size(5.dp).clip(CircleShape)
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            )
         }
     }
 }
@@ -990,7 +988,7 @@ private fun PickerGroupHeader(
 ) {
     val headerTag = testTag.ifBlank { "model-group-${title.lowercase().replace(' ', '-')}" }
     val headerColor by animateColorAsState(
-        targetValue = if (expanded) AriAccentSoft.copy(alpha = 0.72f) else AriTint.copy(alpha = 0.34f),
+        targetValue = if (expanded) AriTint.copy(alpha = 0.68f) else AriTint.copy(alpha = 0.30f),
         animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing),
         label = "model-group-surface"
     )
@@ -1015,10 +1013,10 @@ private fun PickerGroupHeader(
                 PickerGroupMark.FAVORITES -> Surface(
                     modifier = Modifier.size(26.dp),
                     shape = CircleShape,
-                    color = AriAccentSoft
+                    color = AriTint
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Favorite, contentDescription = null, tint = AriAccent, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                     }
                 }
                 is PickerGroupMark.BRAND -> ProviderBrandMark(
@@ -1042,7 +1040,7 @@ private fun PickerGroupHeader(
             Icon(
                 Icons.Default.KeyboardArrowRight,
                 contentDescription = if (expanded) tx("Show less") else tx("Show all models"),
-                tint = AriInk,
+                tint = AriMuted,
                 modifier = Modifier.size(18.dp).rotate(arrowRotation).testTag("$headerTag-expand-arrow")
             )
         }
@@ -1063,14 +1061,14 @@ private fun PickerModelRow(
     onToggleFavorite: () -> Unit
 ) {
     val selectedColor by animateColorAsState(
-        targetValue = if (selected) AriAccentSoft.copy(alpha = 0.76f) else Color.Transparent,
+        targetValue = if (selected) AriTint.copy(alpha = 0.68f) else Color.Transparent,
         animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
         label = "picker-model-selection"
     )
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = selectedColor,
-        border = BorderStroke(0.75.dp, if (selected) AriAccent.copy(alpha = 0.20f) else AriLine.copy(alpha = 0.5f)),
+        border = if (selected) BorderStroke(0.55.dp, AriLine.copy(alpha = 0.48f)) else null,
         tonalElevation = 0.dp,
         modifier = Modifier.fillMaxWidth()
             .animateContentSize(tween(durationMillis = 160, easing = FastOutSlowInEasing))
@@ -1089,13 +1087,13 @@ private fun PickerModelRow(
                         entry.model.displayName.ifBlank { entry.model.id },
                         fontSize = 13.sp,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (selected) AriAccent else AriInk,
+                        color = AriInk,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (selected) {
-                        Surface(shape = RoundedCornerShape(50), color = AriAccentSoft) {
-                            Text(tx("Selected"), fontSize = 9.sp, color = AriAccent, fontWeight = FontWeight.SemiBold,
+                        Surface(shape = RoundedCornerShape(50), color = AriTint) {
+                            Text(tx("Selected"), fontSize = 9.sp, color = AriMuted, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                     }
@@ -1112,7 +1110,7 @@ private fun PickerModelRow(
                 Icon(
                     if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (favorite) tx("Remove from favorites") else tx("Add to favorites"),
-                    tint = if (favorite) AriAccent else AriMuted.copy(alpha = 0.72f),
+                    tint = if (favorite) MaterialTheme.colorScheme.primary else AriMuted.copy(alpha = 0.72f),
                     modifier = Modifier.size(17.dp)
                 )
             }
@@ -1120,7 +1118,10 @@ private fun PickerModelRow(
                 selected = selected,
                 onClick = onSelect,
                 modifier = Modifier.size(40.dp),
-                colors = RadioButtonDefaults.colors(selectedColor = AriAccent, unselectedColor = AriMuted.copy(alpha = 0.48f))
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = MaterialTheme.colorScheme.primary,
+                    unselectedColor = AriMuted.copy(alpha = 0.48f)
+                )
             )
         }
     }
