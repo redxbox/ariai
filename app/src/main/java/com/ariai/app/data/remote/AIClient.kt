@@ -587,7 +587,7 @@ class AIClient {
 
     /** Streams a tool-enabled step for OpenAI-compatible, Anthropic, and Gemini endpoints. */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    fun chatCompletionStepStream(
+    internal fun chatCompletionStepStream(
         provider: Provider,
         messages: List<ChatMessage>,
         modelId: String,
