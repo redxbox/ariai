@@ -39,6 +39,8 @@ jobs:
           ./gradlew --no-daemon :app:testDebugUnitTest --stacktrace 2>&1 | tee unit-tests.log
 
       - name: Run release lint
+        env:
+          LINT_PRINT_STACKTRACE: "true"
         run: |
           set -o pipefail
           ./gradlew --no-daemon :app:lintRelease --stacktrace 2>&1 | tee release-lint.log
@@ -62,7 +64,13 @@ jobs:
             [ -s "$log" ] || continue
             summary=$(grep -E "$pattern" "$log" | tail -15 | tr '\r\n' '  ' | cut -c1-3000 || true)
             final_context=$(tail -35 "$log" | tr '\r\n' '  ' | cut -c1-3000)
-            echo "::error title=Gradle diagnostics::$log | $summary | final log context: $final_context"
+            if [ "$log" = "release-lint.log" ]; then
+              lint_details=$(grep -E 'Message:|Unexpected failure|Lint found an issue|Caused by:|Exception:' "$log" | head -12 | tr '\r\n' '  ' | cut -c1-1400 || true)
+              final_context=$(tail -8 "$log" | tr '\r\n' '  ' | cut -c1-700)
+              echo "::error title=Gradle diagnostics::$log | lint details: $lint_details | $summary | final log context: $final_context"
+            else
+              echo "::error title=Gradle diagnostics::$log | $summary | final log context: $final_context"
+            fi
           done
           python3 - <<'PY'
           from pathlib import Path
