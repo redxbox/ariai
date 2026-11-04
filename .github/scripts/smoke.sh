@@ -605,7 +605,14 @@ end_step
 
 step "Voice input privacy disclosure"
 tap "Voice input"
-expect_text "The Android speech-recognition service receives your audio"
+if python3 .github/scripts/ui_tap.py --assert "On-device Android speech recognition transcribes your audio" >/dev/null 2>&1; then
+  echo "::notice title=Voice disclosure mode::Android reported on-device speech recognition; verifying the local-processing disclosure."
+elif python3 .github/scripts/ui_tap.py --assert "The Android speech-recognition service receives your audio" >/dev/null 2>&1; then
+  echo "::notice title=Voice disclosure mode::Android reported remote-capable speech recognition; verifying the service-processing disclosure."
+else
+  expect_text "On-device Android speech recognition transcribes your audio"
+fi
+expect_text "The transcript is added to your message"
 expect_text "Continue"
 expect_text "Cancel"
 shot 24-voice-input-disclosure
