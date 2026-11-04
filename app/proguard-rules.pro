@@ -18,3 +18,6 @@
 
 # Coil
 -keep class coil.** { *; }
+
+# PdfBox's optional JP2 decoder is not needed for PDF text extraction.
+-dontwarn com.gemalto.jp2.**
