@@ -89,6 +89,71 @@ class MCPClientTest {
     }
 
     @Test
+    fun listsMcpResourcesAndPromptsWithServerCredentialsRedacted() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(jsonResponse(jsonRpcResponse(1, initializeResult())))
+        server.enqueue(MockResponse().setResponseCode(202))
+        server.enqueue(jsonResponse(jsonRpcResponse(2, toolsResult())))
+        server.enqueue(
+            jsonResponse(
+                jsonRpcResponse(
+                    3,
+                    JSONObject().put(
+                        "resources",
+                        JSONArray().put(
+                            JSONObject()
+                                .put("uri", "file:///docs/mcp-test-secret/guide")
+                                .put("name", "Guide mcp-test-secret")
+                                .put("description", "Documentation")
+                                .put("mimeType", "text/plain")
+                        )
+                    )
+                )
+            )
+        )
+        server.enqueue(
+            jsonResponse(
+                jsonRpcResponse(
+                    4,
+                    JSONObject().put(
+                        "prompts",
+                        JSONArray().put(
+                            JSONObject()
+                                .put("name", "summarize")
+                                .put("description", "Summarize selected text")
+                                .put("arguments", JSONArray().put(JSONObject().put("name", "text").put("required", true)))
+                        )
+                    )
+                )
+            )
+        )
+        server.start()
+        val secret = "mcp-test-secret"
+        val connection = MCPClient().connect(
+            serverConfig(server, McpTransport.STREAMABLE_HTTP).copy(
+                authType = McpAuthType.BEARER,
+                authSecret = secret
+            )
+        )
+        try {
+            val resources = connection.listResources()
+            val prompts = connection.listPrompts()
+
+            assertEquals(1, resources.size)
+            assertFalse(resources.single().uri.contains(secret))
+            assertFalse(resources.single().name.contains(secret))
+            assertEquals("summarize", prompts.single().name)
+            assertEquals("text", prompts.single().arguments.single().name)
+            assertTrue(prompts.single().arguments.single().required)
+            assertEquals("resources/list", JSONObject(server.takeRequest().body.readUtf8()).optString("method"))
+            assertEquals("prompts/list", JSONObject(server.takeRequest().body.readUtf8()).optString("method"))
+        } finally {
+            connection.close()
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun legacySseDiscoversEndpointAndRoutesJsonRpcResponses() = runBlocking {
         val server = MockWebServer()
         val events = listOf(

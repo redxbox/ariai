@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 /** Discloses the Android speech-recognition data flow before microphone permission/use. */
 @Composable
 internal fun VoiceInputDisclosureDialog(
+    onDeviceRecognition: Boolean,
     onDismiss: () -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
@@ -27,7 +28,13 @@ internal fun VoiceInputDisclosureDialog(
         title = { Text(tx("Voice input")) },
         text = {
             Text(
-                tx("The Android speech-recognition service receives your audio to transcribe it and may process it locally or remotely under its own privacy policy. The transcript is added to your message; it is sent to your AI provider only when you tap Send.")
+                tx(
+                    if (onDeviceRecognition) {
+                        "On-device Android speech recognition transcribes your audio on this device. The transcript is added to your message; it is sent to your AI provider only when you tap Send."
+                    } else {
+                        "The Android speech-recognition service receives your audio to transcribe it and may process it locally or remotely under its own privacy policy. The transcript is added to your message; it is sent to your AI provider only when you tap Send."
+                    }
+                )
             )
         },
         confirmButton = {

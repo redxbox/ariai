@@ -5,7 +5,7 @@ import com.ariai.app.ui.theme.*
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 
 private const val PRIVACY_POLICY_URL = "https://github.com/redxbox/ariai/blob/main/PRIVACY_POLICY.md"
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -100,6 +100,8 @@ fun AppRoot(viewModel: AppViewModel) {
     val context = LocalContext.current
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: startRoute
+    val isProtectedSettingsRoute = currentRoute == "providers" || currentRoute == "mcp" ||
+        currentRoute.startsWith("add_provider") || currentRoute.startsWith("edit_provider/")
     val snackbarHostState = remember { SnackbarHostState() }
     var showAbout by remember { mutableStateOf(false) }
 
@@ -125,11 +127,64 @@ fun AppRoot(viewModel: AppViewModel) {
     val defaultModelId by viewModel.defaultModelId.collectAsState()
     val reasoningLevel by viewModel.reasoningLevel.collectAsState()
     val streamResponse by viewModel.streamResponse.collectAsState()
+    val biometricLockEnabled by viewModel.biometricLockEnabled.collectAsState()
+    var protectedSettingsAuthenticated by remember { mutableStateOf(false) }
+    var biometricAuthAttempt by remember { mutableIntStateOf(0) }
+    var biometricAuthError by remember { mutableStateOf<String?>(null) }
     val searchModeState by viewModel.searchMode.collectAsState()
     val searchProviderState by viewModel.searchProvider.collectAsState()
     val searchKeys by viewModel.searchKeys.collectAsState()
     val favoriteModels by viewModel.favoriteModels.collectAsState()
     val fontSize by viewModel.fontSize.collectAsState()
+
+    LaunchedEffect(biometricLockEnabled, isProtectedSettingsRoute, biometricAuthAttempt) {
+        when {
+            !biometricLockEnabled -> {
+                protectedSettingsAuthenticated = false
+                biometricAuthError = null
+            }
+            !isProtectedSettingsRoute -> {
+                protectedSettingsAuthenticated = false
+                biometricAuthError = null
+            }
+            !protectedSettingsAuthenticated -> {
+                val activity = context as? FragmentActivity
+                if (activity == null) {
+                    biometricAuthError = tx("Biometric authentication is unavailable.")
+                } else if (androidx.biometric.BiometricManager.from(activity)
+                        .canAuthenticate(biometricAuthenticatorTypes()) != androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
+                    biometricAuthError = tx("Biometric authentication is unavailable.")
+                } else {
+                    biometricAuthError = null
+                    val authenticated = authenticateSensitiveSettings(activity)
+                    if (authenticated) {
+                        protectedSettingsAuthenticated = true
+                        biometricAuthError = null
+                    } else {
+                        biometricAuthError = tx("Authentication was cancelled or failed.")
+                    }
+                }
+            }
+        }
+    }
+
+    DisposableEffect(biometricLockEnabled, isProtectedSettingsRoute) {
+        val lifecycle = ProcessLifecycleOwner.get().lifecycle
+        var backgrounded = false
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                backgrounded = true
+                if (biometricLockEnabled && isProtectedSettingsRoute) protectedSettingsAuthenticated = false
+            } else if (event == Lifecycle.Event.ON_START && backgrounded) {
+                backgrounded = false
+                if (biometricLockEnabled && isProtectedSettingsRoute) biometricAuthAttempt++
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    val needsBiometricGate = biometricLockEnabled && isProtectedSettingsRoute && !protectedSettingsAuthenticated
     val modelUsageCounts = remember(chats, modelOverrides) {
         chats.mapNotNull { savedChat ->
             val override = modelOverrides[savedChat.id]
@@ -336,6 +391,12 @@ fun AppRoot(viewModel: AppViewModel) {
                             val branchId = viewModel.branchMessage(it)
                             navController.navigate("chat/$branchId") { launchSingleTop = true }
                         },
+                        onNavigateToBranch = { messageId ->
+                            viewModel.resolveBranchChat(messageId) { branchChatId ->
+                                if (branchChatId != null) openChat(branchChatId)
+                                else scope.launch { snackbarHostState.showSnackbar(tx("This conversation branch is no longer available.")) }
+                            }
+                        },
                         onRegenerate = { message ->
                             val retryChatId = viewModel.regenerateMessage(message, reasoningLevel, searchModeState)
                             if (retryChatId != null && retryChatId != chatId) {
@@ -346,7 +407,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onOpenAgents = { navController.navigate("agents") { launchSingleTop = true } },
                         onSelectModel = { pid, mid -> viewModel.updateChatProvider(chatId, pid, mid) },
-                        onEditImage = { message, instruction -> viewModel.editGeneratedImage(message, instruction) },
+                        onEditImage = { message, instruction, mask -> viewModel.editGeneratedImage(message, instruction, mask) },
                         onToggleFavorite = { pid, mid -> viewModel.toggleFavoriteModel(pid, mid) },
                         onReasoningChange = { viewModel.setReasoningLevel(it) },
                         onSearchModeChange = { viewModel.setSearchMode(it) },
@@ -490,6 +551,8 @@ fun AppRoot(viewModel: AppViewModel) {
                         onFontSizeChange = { viewModel.setFontSize(it) },
                         streamResponse = streamResponse,
                         onStreamResponseChange = { viewModel.setStreamResponse(it) },
+                        biometricLockEnabled = biometricLockEnabled,
+                        onBiometricLockChange = { viewModel.setBiometricLockEnabled(it) },
                         currentLanguage = language,
                         onLanguageChange = { viewModel.setLanguage(it) },
                         onBack = { navController.popBackStack() }
@@ -560,7 +623,9 @@ fun AppRoot(viewModel: AppViewModel) {
                         onBack = { navController.popBackStack() },
                         runtimeStates = mcpServerRuntime,
                         onTestConnection = viewModel::testMcpServer,
-                        onToggleTool = viewModel::toggleMcpTool
+                        onToggleTool = viewModel::toggleMcpTool,
+                        onListResources = viewModel::listMcpResources,
+                        onListPrompts = viewModel::listMcpPrompts
                     )
                 }
 
@@ -595,7 +660,25 @@ fun AppRoot(viewModel: AppViewModel) {
             }
         )
     }
+    if (needsBiometricGate) {
+        BiometricLockOverlay(
+            error = biometricAuthError,
+            onRetry = {
+                biometricAuthError = null
+                biometricAuthAttempt++
+            },
+            onCancel = {
+                navController.popBackStack()
+                if (isProtectedSettingsDestination(navController.currentBackStackEntry?.destination?.route)) {
+                    navController.popBackStack()
+                }
+            }
+        )
+    }
 }
+
+private fun isProtectedSettingsDestination(route: String?): Boolean =
+    route == "providers" || route == "mcp" || route?.startsWith("add_provider") == true || route?.startsWith("edit_provider/") == true
 
 class AppViewModelFactory(
     private val repository: com.ariai.app.data.repository.ChatRepository,

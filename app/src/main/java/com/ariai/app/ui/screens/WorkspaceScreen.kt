@@ -7,6 +7,8 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
@@ -54,6 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ariai.app.data.models.WorkspaceFile
+import com.ariai.app.data.repository.WorkspaceArchive
 import com.ariai.app.data.repository.executeWorkspaceConsole
 import com.ariai.app.data.repository.renderStaticHtmlPreview
 import com.ariai.app.ui.theme.AriAccent
@@ -83,6 +88,10 @@ import com.ariai.app.ui.theme.paperPopupModifier
 import com.ariai.app.ui.theme.paperPopupShape
 import com.ariai.app.util.tx
 import java.io.ByteArrayInputStream
+import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class WorkspaceTab { EDITOR, PREVIEW, CONSOLE }
 
@@ -112,6 +121,29 @@ fun WorkspaceScreen(
     var generationFileName by remember { mutableStateOf("index.html") }
     var generationPrompt by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
+    var exportNotice by remember { mutableStateOf("") }
+    var exportSnapshot by remember { mutableStateOf<List<WorkspaceFile>>(emptyList()) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val exportZipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) {
+            val filesToExport = exportSnapshot
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val output = context.contentResolver.openOutputStream(uri, "wt")
+                            ?: throw IOException("Could not open the workspace archive output.")
+                        output.use { WorkspaceArchive.writeZip(filesToExport, it) }
+                    }
+                    exportNotice = tx("Workspace ZIP exported.")
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    exportNotice = tx("Could not export the workspace ZIP.")
+                }
+            }
+        }
+    }
     var consoleCommand by remember { mutableStateOf("") }
     var consoleOutput by remember { mutableStateOf(tx("Type help for available safe commands.")) }
     val isHtmlFile = selectedFile?.let { it.name.substringAfterLast('.', "").lowercase() in setOf("html", "htm") } == true
@@ -128,6 +160,15 @@ fun WorkspaceScreen(
                 },
                 title = { Text(tx("Workspace"), color = AriInk, fontWeight = FontWeight.SemiBold) },
                 actions = {
+                    if (files.isNotEmpty()) {
+                        IconButton(onClick = {
+                            exportNotice = ""
+                            exportSnapshot = files.toList()
+                            exportZipLauncher.launch("ariai-workspace.zip")
+                        }, modifier = Modifier.testTag("workspace-export-zip")) {
+                            Icon(Icons.Default.Archive, contentDescription = tx("Export workspace as ZIP"), tint = AriInk)
+                        }
+                    }
                     IconButton(onClick = {
                         generationFileName = selectedFile?.name ?: "index.html"
                         generationPrompt = ""
@@ -153,6 +194,9 @@ fun WorkspaceScreen(
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 2.dp)
             )
+            if (exportNotice.isNotBlank()) {
+                Text(exportNotice, color = AriMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 2.dp))
+            }
             if (files.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),

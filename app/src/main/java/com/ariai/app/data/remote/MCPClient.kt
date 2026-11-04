@@ -42,6 +42,25 @@ data class MCPTool(
     val displayName: String = name
 )
 
+data class MCPResource(
+    val uri: String,
+    val name: String,
+    val description: String = "",
+    val mimeType: String = ""
+)
+
+data class MCPPromptArgument(
+    val name: String,
+    val description: String = "",
+    val required: Boolean = false
+)
+
+data class MCPPrompt(
+    val name: String,
+    val description: String = "",
+    val arguments: List<MCPPromptArgument> = emptyList()
+)
+
 private fun redactMcpSecret(message: String?, secret: String?): String? {
     if (message == null) return null
     val value = secret?.takeIf(String::isNotBlank)
@@ -177,6 +196,8 @@ class MCPConnection internal constructor(
     val tools: List<MCPTool>,
     private val callToolAction: suspend (String, JSONObject) -> String,
     private val closeAction: () -> Unit,
+    private val listResourcesAction: suspend () -> List<MCPResource> = { emptyList() },
+    private val listPromptsAction: suspend () -> List<MCPPrompt> = { emptyList() },
     private val authSecret: String? = null
 ) : Closeable {
     suspend fun callTool(toolName: String, arguments: JSONObject): String {
@@ -192,6 +213,28 @@ class MCPConnection internal constructor(
             if (message.isNullOrBlank()) throw failure
             throw IOException(message, failure)
         }
+    }
+
+    suspend fun listResources(): List<MCPResource> = listResourcesAction().map { resource ->
+        resource.copy(
+            uri = redactMcpSecret(resource.uri, authSecret).orEmpty(),
+            name = redactMcpSecret(resource.name, authSecret).orEmpty(),
+            description = redactMcpSecret(resource.description, authSecret).orEmpty(),
+            mimeType = redactMcpSecret(resource.mimeType, authSecret).orEmpty()
+        )
+    }
+
+    suspend fun listPrompts(): List<MCPPrompt> = listPromptsAction().map { prompt ->
+        prompt.copy(
+            name = redactMcpSecret(prompt.name, authSecret).orEmpty(),
+            description = redactMcpSecret(prompt.description, authSecret).orEmpty(),
+            arguments = prompt.arguments.map { argument ->
+                argument.copy(
+                    name = redactMcpSecret(argument.name, authSecret).orEmpty(),
+                    description = redactMcpSecret(argument.description, authSecret).orEmpty()
+                )
+            }
+        )
     }
 
     /** Convert discovered MCP tools to the app's provider-neutral agent-tool format. */
@@ -266,7 +309,16 @@ class MCPClient(
                 )
             }
             val displayServerName = redactMcpSecret(server.name, server.authSecret).orEmpty().ifBlank { "MCP server" }
-            return MCPConnection(server.id, displayServerName, tools, session::callTool, session::close, server.authSecret)
+            return MCPConnection(
+                serverId = server.id,
+                serverName = displayServerName,
+                tools = tools,
+                callToolAction = session::callTool,
+                closeAction = session::close,
+                listResourcesAction = session::listResources,
+                listPromptsAction = session::listPrompts,
+                authSecret = server.authSecret
+            )
         } catch (failure: Exception) {
             session.close()
             if (failure is CancellationException) throw failure
@@ -332,6 +384,79 @@ class MCPClient(
                 cursor = next
             }
             return tools
+        }
+
+        suspend fun listResources(): List<MCPResource> {
+            val resources = mutableListOf<MCPResource>()
+            val seenUris = mutableSetOf<String>()
+            val seenCursors = mutableSetOf<String>()
+            var cursor: String? = null
+            for (page in 0 until MAX_CATALOG_PAGES) {
+                val params = JSONObject()
+                cursor?.let { params.put("cursor", it) }
+                val result = request("resources/list", params)
+                val array = result.optJSONArray("resources") ?: JSONArray()
+                for (index in 0 until array.length()) {
+                    if (resources.size >= MAX_CATALOG_ITEMS) break
+                    val item = array.optJSONObject(index) ?: continue
+                    val uri = item.optString("uri").trim()
+                        .takeIf { it.isNotBlank() && it.length <= MAX_RESOURCE_URI_LENGTH && it.none { char -> char.code < 0x20 } }
+                        ?: continue
+                    if (!seenUris.add(uri)) continue
+                    val name = sanitizeText(item.optString("name"), MAX_CATALOG_TEXT_LENGTH).ifBlank { uri }
+                    val description = sanitizeText(item.optString("description"), MAX_CATALOG_TEXT_LENGTH)
+                    val mimeType = sanitizeText(item.optString("mimeType"), 128)
+                    resources += MCPResource(uri, name, description, mimeType)
+                }
+                if (resources.size >= MAX_CATALOG_ITEMS) break
+                val next = result.optString("nextCursor").takeIf { it.isNotBlank() } ?: break
+                if (next.length > MAX_CURSOR_LENGTH || !seenCursors.add(next)) break
+                cursor = next
+            }
+            return resources
+        }
+
+        suspend fun listPrompts(): List<MCPPrompt> {
+            val prompts = mutableListOf<MCPPrompt>()
+            val seenNames = mutableSetOf<String>()
+            val seenCursors = mutableSetOf<String>()
+            var cursor: String? = null
+            for (page in 0 until MAX_CATALOG_PAGES) {
+                val params = JSONObject()
+                cursor?.let { params.put("cursor", it) }
+                val result = request("prompts/list", params)
+                val array = result.optJSONArray("prompts") ?: JSONArray()
+                for (index in 0 until array.length()) {
+                    if (prompts.size >= MAX_CATALOG_ITEMS) break
+                    val item = array.optJSONObject(index) ?: continue
+                    val name = sanitizeText(item.optString("name"), MAX_PROMPT_NAME_LENGTH)
+                        .takeIf { it.isNotBlank() && it.none { char -> char.code < 0x20 } }
+                        ?: continue
+                    if (!seenNames.add(name)) continue
+                    val arguments = item.optJSONArray("arguments") ?: JSONArray()
+                    val safeArguments = (0 until minOf(arguments.length(), MAX_PROMPT_ARGUMENTS)).mapNotNull { argumentIndex ->
+                        val argument = arguments.optJSONObject(argumentIndex) ?: return@mapNotNull null
+                        val argumentName = sanitizeText(argument.optString("name"), MAX_PROMPT_NAME_LENGTH)
+                            .takeIf { it.isNotBlank() && it.none { char -> char.code < 0x20 } }
+                            ?: return@mapNotNull null
+                        MCPPromptArgument(
+                            name = argumentName,
+                            description = sanitizeText(argument.optString("description"), MAX_CATALOG_TEXT_LENGTH),
+                            required = argument.optBoolean("required", false)
+                        )
+                    }
+                    prompts += MCPPrompt(
+                        name = name,
+                        description = sanitizeText(item.optString("description"), MAX_CATALOG_TEXT_LENGTH),
+                        arguments = safeArguments
+                    )
+                }
+                if (prompts.size >= MAX_CATALOG_ITEMS) break
+                val next = result.optString("nextCursor").takeIf { it.isNotBlank() } ?: break
+                if (next.length > MAX_CURSOR_LENGTH || !seenCursors.add(next)) break
+                cursor = next
+            }
+            return prompts
         }
     }
 
@@ -587,6 +712,12 @@ class MCPClient(
         const val MAX_TOOL_DESCRIPTION_LENGTH = 2_000
         const val MAX_TOOLS_PER_SERVER = 16
         const val MAX_TOOL_PAGES = 8
+        const val MAX_CATALOG_ITEMS = 100
+        const val MAX_CATALOG_PAGES = 8
+        const val MAX_CATALOG_TEXT_LENGTH = 2_000
+        const val MAX_RESOURCE_URI_LENGTH = 2_048
+        const val MAX_PROMPT_NAME_LENGTH = 128
+        const val MAX_PROMPT_ARGUMENTS = 32
         const val MAX_CURSOR_LENGTH = 1_024
         const val MAX_EARLY_SSE_RESPONSES = 64
         const val DEFAULT_REQUEST_TIMEOUT_MS = 30_000L

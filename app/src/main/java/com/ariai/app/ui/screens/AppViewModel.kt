@@ -14,12 +14,14 @@ import com.ariai.app.data.remote.ToolExecutionUpdate
 import com.ariai.app.data.remote.DefaultAgentTools
 import com.ariai.app.data.remote.MCPClient
 import com.ariai.app.data.remote.MCPConnection
+import com.ariai.app.data.remote.ErrorMapper
 import com.ariai.app.data.remote.shouldOfferCalculatorTool
 import com.ariai.app.data.remote.shouldStreamToolFreeChat
 import com.ariai.app.data.remote.GitHubRepositoryClient
 import com.ariai.app.data.remote.PublicUrlFetcher
 import com.ariai.app.data.remote.userResearchTargets
 import com.ariai.app.data.repository.ChatRepository
+import com.ariai.app.data.repository.AgentChatEvent
 import com.ariai.app.data.repository.WorkspaceRepository
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -33,6 +35,7 @@ enum class ChatMode { TEXT, IMAGE, VIDEO, AUDIO }
 
 private const val MAX_MEDIA_BYTES_PER_REQUEST = 16L * 1024L * 1024L
 private const val MAX_WORKSPACE_CONTEXT_CHARS = 32_000
+private const val MAX_SUMMARY_SOURCE_CHARS = 120_000
 
 internal fun unwrapGeneratedWorkspaceFile(response: String): String {
     val trimmed = response.trim()
@@ -99,6 +102,7 @@ class AppViewModel(
     val defaultProviderId = prefs.defaultProviderFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val defaultModelId = prefs.defaultModelFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val streamResponse = prefs.streamResponseFlow.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val biometricLockEnabled = prefs.biometricLockEnabledFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val fontSize = prefs.fontSizeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 15)
     val reasoningLevel = prefs.reasoningLevelFlow.map { ReasoningLevel.fromName(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ReasoningLevel.OFF)
@@ -112,6 +116,10 @@ class AppViewModel(
 
     fun setStreamResponse(enabled: Boolean) {
         viewModelScope.launch { prefs.setStreamResponse(enabled) }
+    }
+
+    fun setBiometricLockEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setBiometricLockEnabled(enabled) }
     }
 
     fun setFontSize(size: Int) {
@@ -377,6 +385,40 @@ class AppViewModel(
         }
     }
 
+    fun listMcpResources(serverId: String, onResult: (List<com.ariai.app.data.remote.MCPResource>, String?) -> Unit) {
+        loadMcpCatalog(serverId, onResult) { it.listResources() }
+    }
+
+    fun listMcpPrompts(serverId: String, onResult: (List<com.ariai.app.data.remote.MCPPrompt>, String?) -> Unit) {
+        loadMcpCatalog(serverId, onResult) { it.listPrompts() }
+    }
+
+    private fun <T> loadMcpCatalog(
+        serverId: String,
+        onResult: (List<T>, String?) -> Unit,
+        load: suspend (MCPConnection) -> List<T>
+    ) {
+        val server = mcpServers.value.firstOrNull { it.id == serverId }
+        if (server == null || !server.enabled) {
+            onResult(emptyList(), tx("Enable this MCP server before browsing its resources or prompts."))
+            return
+        }
+        viewModelScope.launch {
+            var connection: MCPConnection? = null
+            try {
+                val connected = mcpClient.connect(server)
+                connection = connected
+                onResult(load(connected), null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                onResult(emptyList(), safeMcpFailure(failure, server.authSecret))
+            } finally {
+                runCatching { connection?.close() }
+            }
+        }
+    }
+
     fun toggleMcpTool(serverId: String, toolName: String) {
         if (toolName.isBlank() || toolName.length > 128 || toolName.any { it.code < 0x20 }) return
         if (toolName !in _mcpServerRuntime.value[serverId]?.toolNames.orEmpty()) return
@@ -396,10 +438,24 @@ class AppViewModel(
         }
     }
 
-    private fun safeMcpFailure(failure: Exception, secret: String?): String {
-        var message = failure.message?.takeIf { it.isNotBlank() } ?: "MCP connection failed."
-        secret?.takeIf(String::isNotBlank)?.let { message = message.replace(it, "[redacted]") }
-        return message.filter { it == '\n' || it == '\t' || it >= ' ' }.take(240)
+    private fun safeMcpFailure(failure: Exception, secret: String? = null): String {
+        val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
+        val hasHttpStatus = causes.any { cause ->
+            cause.message?.let { Regex("(?:HTTP|API Error)\\s+\\d{3}", RegexOption.IGNORE_CASE).containsMatchIn(it) } == true
+        }
+        val isTransportFailure = hasHttpStatus || causes.any {
+            it is java.net.UnknownHostException ||
+                it is java.net.SocketTimeoutException ||
+                it is javax.net.ssl.SSLException ||
+                it.message?.contains("CLEARTEXT", ignoreCase = true) == true
+        }
+        if (isTransportFailure) {
+            val mapped = ErrorMapper.map(failure)
+            val message = "${tx(mapped.messageKey)} ${tx(mapped.hintKey)}"
+            return secret?.takeIf(String::isNotBlank)?.let { message.replace(it, "[redacted]") } ?: message
+        }
+        val generic = tx("The MCP server request could not be completed.")
+        return secret?.takeIf(String::isNotBlank)?.let { generic.replace(it, "[redacted]") } ?: generic
     }
 
     suspend fun fetchModels(provider: Provider): List<AIModel> = repository.fetchModels(provider)
@@ -579,15 +635,7 @@ class AppViewModel(
         var usedMediaBytes = 0L
         val newestFirst = mutableListOf<ChatMessage>()
         for (message in history.takeLast(RECENT_MESSAGES_FOR_MODEL).asReversed()) {
-            val characters = message.content.length.toLong() + message.attachments.sumOf { it.textContent?.length?.toLong() ?: 0L }
-            val mediaTokens = message.attachments.sumOf { attachment ->
-                when (attachment.type) {
-                    AttachmentType.IMAGE -> 768L
-                    AttachmentType.VIDEO -> 2048L
-                    else -> 0L
-                }
-            }
-            val estimate = maxOf(1L, (characters + 3L) / 4L) + mediaTokens
+            val estimate = estimateMessageTokens(message)
             val messageMediaBytes = message.attachments.sumOf { it.estimatedBytes() }
             if (newestFirst.isNotEmpty() &&
                 (used + estimate > tokenBudget || usedMediaBytes + messageMediaBytes > mediaByteBudget)
@@ -610,6 +658,122 @@ class AppViewModel(
         val summary = if (idx >= 0) all[idx].content else null
         val after = messagesForModelContext(all.drop(idx + 1))
         return summary to after
+    }
+
+    private fun summarySafeHistory(history: List<ChatMessage>): List<ChatMessage> {
+        var remainingChars = MAX_SUMMARY_SOURCE_CHARS
+        val newestFirst = history.asReversed().mapNotNull { message ->
+            if (remainingChars <= 0) return@mapNotNull null
+            val content = message.content.take(remainingChars)
+            remainingChars -= content.length
+            val textAttachments = mutableListOf<Attachment>()
+            for (attachment in message.attachments) {
+                val attachmentText = attachment.textContent ?: continue
+                if (remainingChars <= 0) break
+                val accepted = attachmentText.take(remainingChars)
+                remainingChars -= accepted.length
+                if (accepted.isNotBlank()) {
+                    textAttachments += attachment.copy(textContent = accepted, base64Data = null, uri = null)
+                }
+            }
+            val omittedMedia = message.attachments.filter {
+                it.type == AttachmentType.IMAGE || it.type == AttachmentType.VIDEO || it.type == AttachmentType.AUDIO
+            }
+            val mediaNote = omittedMedia.joinToString(separator = "\n") { attachment ->
+                "[A ${attachment.type.name.lowercase()} attachment named ${attachment.name} was omitted from this summary request.]"
+            }.take(remainingChars)
+            remainingChars -= mediaNote.length
+            val safeContent = listOf(content, mediaNote).filter { it.isNotBlank() }.joinToString("\n")
+            if (safeContent.isBlank() && textAttachments.isEmpty()) return@mapNotNull null
+            message.copy(content = safeContent, attachments = textAttachments)
+        }
+        return newestFirst.asReversed()
+    }
+
+    private suspend fun summarizeAndStoreHistory(
+        chatId: String,
+        provider: Provider,
+        modelId: String,
+        previousSummary: String?,
+        olderMessages: List<ChatMessage>,
+        retainedMessages: List<ChatMessage>,
+        stream: Boolean,
+        shouldContinue: () -> Boolean
+    ): String {
+        if (olderMessages.size < 2 || retainedMessages.isEmpty()) throw IllegalStateException(tx("Not enough messages to compress yet"))
+        val markerTimestamp = summaryMarkerTimestamp(_messages.value, retainedMessages.first())
+            ?: throw IllegalStateException(tx("History cannot be summarized safely right now. Try again later."))
+        val instruction = ChatMessage(
+            chatId = chatId,
+            role = MessageRole.USER,
+            content = "Create a concise factual memory of only these earlier conversation messages for future turns. Keep user facts, decisions, preferences, names, and unfinished tasks. Do not answer the conversation or invent details. Write in the user's language."
+        )
+        val summary = StringBuilder()
+        repository.streamChat(
+            provider = provider,
+            messages = summarySafeHistory(olderMessages) + instruction,
+            modelId = modelId,
+            systemPrompt = previousSummary?.let { "Summary of the earlier conversation:\n$it" },
+            stream = stream
+        ).collect { chunk ->
+            if (shouldContinue()) summary.append(chunk)
+        }
+        val text = summary.toString().trim()
+        if (!shouldContinue()) return ""
+        if (text.isBlank()) throw IllegalStateException(tx("The provider returned no text response"))
+        val marker = ChatMessage(
+            chatId = chatId,
+            role = MessageRole.SYSTEM,
+            content = text,
+            timestamp = markerTimestamp
+        )
+        if (!repository.saveMessage(marker)) throw IllegalStateException(tx("Could not save the reply. Please try again."))
+        appendMessage(marker)
+        return text
+    }
+
+    private suspend fun maybeAutoSummarizeHistoryBeforeSend(
+        chatId: String,
+        provider: Provider,
+        modelId: String,
+        contextWindow: Int,
+        generation: Long
+    ) {
+        if (_currentChatId.value != chatId || historyCompressionJob?.isActive == true) return
+        val (previousSummary, history) = activeContext(_messages.value)
+        val limit = contextWindow.takeIf { it > 0 } ?: 8192
+        val estimatedTokens = history.sumOf(::estimateMessageTokens)
+        val conservativeHistoryBudget = ((limit.toLong() * 2L / 3L) * 3L / 4L).coerceAtLeast(1024L)
+        val summaryThreshold = conservativeHistoryBudget * 9L / 10L
+        // Reserve space for system instructions and tools; summarize just before the
+        // request builder would start dropping the oldest conversation turns.
+        if (estimatedTokens < summaryThreshold) return
+        val (older, retained) = splitHistoryForSummary(history)
+        if (older.size < 2 || retained.isEmpty()) return
+        if (summaryMarkerTimestamp(_messages.value, retained.first()) == null) return
+
+        setSendStreamingState(generation, streaming = true)
+        try {
+            summarizeAndStoreHistory(
+                chatId = chatId,
+                provider = provider,
+                modelId = modelId,
+                previousSummary = previousSummary,
+                olderMessages = older,
+                retainedMessages = retained,
+                stream = streamResponse.value
+            ) {
+                sendGeneration == generation && _currentChatId.value == chatId
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            if (sendGeneration == generation && _currentChatId.value == chatId) {
+                com.ariai.app.util.AppLog.warn(failure, "automatic history summary")
+            }
+        } finally {
+            setSendStreamingState(generation, streaming = false)
+        }
     }
 
     private fun resolveProvider(chatId: String? = null): Provider? = try {
@@ -640,10 +804,12 @@ class AppViewModel(
         prompt: String,
         source: java.io.File?,
         retryForMessageId: String?,
+        maskFile: java.io.File? = null,
         generation: Long
     ) {
         if (source != null && provider.type == ProviderType.GEMINI) {
             com.ariai.app.data.local.ImageStore.deleteTemp(source)
+            maskFile?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
             postAssistantError(
                 chatId,
                 tx("Image editing is not supported for Gemini providers yet."),
@@ -656,7 +822,7 @@ class AppViewModel(
             val response = if (source == null) {
                 repository.generateImage(provider, ImageGenRequest(prompt = prompt, model = modelId))
             } else {
-                repository.editImage(provider, modelId, source, prompt)
+                repository.editImage(provider, modelId, source, prompt, maskFile)
             }
             val first = response.images.firstOrNull() ?: throw Exception(tx("No image returned"))
             val imageBytes = repository.imageBytes(first)
@@ -680,9 +846,10 @@ class AppViewModel(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}", retryForMessageId)
+            postAssistantError(chatId, ErrorMapper.chatMessage(e, provider.name), retryForMessageId)
         } finally {
             source?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
+            maskFile?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
             setSendStreamingState(generation, streaming = false)
         }
     }
@@ -720,7 +887,7 @@ class AppViewModel(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            postAssistantError(chatId, "❌ Audio error: ${e.message ?: e::class.java.simpleName}", retryForMessageId)
+            postAssistantError(chatId, ErrorMapper.chatMessage(e, provider.name), retryForMessageId)
         } finally {
             setSendStreamingState(generation, streaming = false)
         }
@@ -760,7 +927,7 @@ class AppViewModel(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            postAssistantError(chatId, "❌ Video error: ${e.message ?: e::class.java.simpleName}", retryForMessageId)
+            postAssistantError(chatId, ErrorMapper.chatMessage(e, provider.name), retryForMessageId)
         } finally {
             setSendStreamingState(generation, streaming = false)
         }
@@ -786,12 +953,19 @@ class AppViewModel(
     }
 
     /** Sends an edit request for a generated image; the result is a separate image message. */
-    fun editGeneratedImage(source: ChatMessage, instruction: String) {
-        val path = source.imagePath ?: return
-        val modelId = source.modelId ?: return
+    fun editGeneratedImage(source: ChatMessage, instruction: String, maskFile: java.io.File? = null) {
+        val path = source.imagePath ?: run { maskFile?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }; return }
+        val modelId = source.modelId ?: run { maskFile?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }; return }
         val chatId = source.chatId
-        if (instruction.isBlank() || _isStreaming.value || sendPending) return
-        val provider = providers.value.firstOrNull { it.id == source.providerId } ?: resolveProvider(chatId) ?: return
+        if (instruction.isBlank() || _isStreaming.value || sendPending) {
+            maskFile?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
+            return
+        }
+        val provider = providers.value.firstOrNull { it.id == source.providerId } ?: resolveProvider(chatId)
+        if (provider == null) {
+            maskFile?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
+            return
+        }
         sendPending = true
         _isSending.value = true
         launchSendJob { generation ->
@@ -813,13 +987,16 @@ class AppViewModel(
                     instruction,
                     java.io.File(path),
                     retryForMessageId = null,
+                    maskFile = maskFile,
                     generation = generation
                 )
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "edit image")
-                postAssistantError(chatId, "❌ Image error: ${e.message ?: e::class.java.simpleName}")
+                postAssistantError(chatId, ErrorMapper.chatMessage(e, provider.name))
+            } finally {
+                maskFile?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
             }
         }
     }
@@ -958,6 +1135,17 @@ class AppViewModel(
                 val targetModelId = _modelOverrides.value[chatId]?.second
                     ?: getCurrentChat()?.modelId
                     ?: provider.models.firstOrNull()?.id
+                if (existingUserMessage == null && messageToReplace == null &&
+                    !(provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA)) {
+                    val contextWindow = provider.models.firstOrNull { it.id == targetModelId }?.contextWindow ?: 8192
+                    maybeAutoSummarizeHistoryBeforeSend(
+                        chatId = chatId,
+                        provider = provider,
+                        modelId = targetModelId ?: "openai",
+                        contextWindow = contextWindow,
+                        generation = generation
+                    )
+                }
                 val userMessage = storedUserMessage ?: ChatMessage(
                     chatId = chatId,
                     role = MessageRole.USER,
@@ -1081,6 +1269,7 @@ class AppViewModel(
 
                 setSendStreamingState(generation, streaming = true)
                 var fullResponse = ""
+                var streamedPreview = ""
                 val requestModelId = targetModelId ?: "openai"
                 val responseUsage = AtomicReference<TokenUsage?>(null)
                 val recordUsage: (TokenUsage) -> Unit = responseUsage::set
@@ -1226,7 +1415,8 @@ class AppViewModel(
 
                     val chatOptions = getCurrentChat()
                     val streamEnabled = shouldStreamToolFreeChat(streamResponse.value, functionTools.isNotEmpty())
-                    val responseFlow = if (functionTools.isEmpty()) {
+                    var lastPublishMs = 0L
+                    if (functionTools.isEmpty()) {
                         repository.streamChat(
                             provider = provider,
                             messages = history,
@@ -1240,11 +1430,17 @@ class AppViewModel(
                             stream = streamEnabled,
                             allowUrlContext = hasUrlContext,
                             onUsage = recordUsage
-                        )
+                        ).collect { chunk ->
+                            fullResponse += chunk
+                            // Publish at most ~16 times per second; each publish recomposes and re-renders markdown.
+                            val now = System.currentTimeMillis()
+                            if (now - lastPublishMs >= 60) {
+                                lastPublishMs = now
+                                setSendStreamingContent(generation, fullResponse)
+                            }
+                        }
                     } else {
-                        // Tool-routing steps remain non-streaming until the provider can safely
-                        // stream structured tool-call deltas; ordinary tool-free replies honor the preference.
-                        repository.agentChat(
+                        repository.agentChatStream(
                             provider = provider,
                             messages = history,
                             modelId = requestModelId,
@@ -1255,22 +1451,38 @@ class AppViewModel(
                             searchContext = searchContext,
                             reasoning = reasoning,
                             nativeSearch = nativeSearch,
+                            stream = streamResponse.value,
                             contextWindow = modelContextWindow,
                             allowUrlContext = userProvidedUrls.isNotEmpty(),
-                            onUsage = recordUsage,
-                            onToolProgress = { update ->
-                                publishToolExecutionUpdate(chatId, generation, update)
+                            onUsage = recordUsage
+                        ).collect { event ->
+                            when (event) {
+                                is AgentChatEvent.TextDelta -> {
+                                    streamedPreview += event.text
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastPublishMs >= 60) {
+                                        lastPublishMs = now
+                                        setSendStreamingContent(generation, fullResponse + streamedPreview)
+                                    }
+                                }
+                                AgentChatEvent.ClearTextPreview -> {
+                                    streamedPreview = ""
+                                    setSendStreamingContent(generation, fullResponse)
+                                }
+                                AgentChatEvent.CommitTextPreview -> {
+                                    fullResponse += streamedPreview
+                                    streamedPreview = ""
+                                    setSendStreamingContent(generation, fullResponse)
+                                }
+                                is AgentChatEvent.ToolProgress -> publishToolExecutionUpdate(chatId, generation, event.update)
+                                is AgentChatEvent.Completed -> {
+                                    // The final accumulated step is authoritative; it also covers
+                                    // providers that completed without sending incremental text events.
+                                    fullResponse = event.answer
+                                    streamedPreview = ""
+                                    setSendStreamingContent(generation, fullResponse)
+                                }
                             }
-                        )
-                    }
-                    var lastPublishMs = 0L
-                    responseFlow.collect { chunk ->
-                        fullResponse += chunk
-                        // Publish at most ~16 times per second; each publish recomposes and re-renders markdown.
-                        val now = System.currentTimeMillis()
-                        if (now - lastPublishMs >= 60) {
-                            lastPublishMs = now
-                            setSendStreamingContent(generation, fullResponse)
                         }
                     }
                     setSendStreamingContent(generation, fullResponse)
@@ -1298,11 +1510,12 @@ class AppViewModel(
 
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     // Stopped by the user: keep the text that has arrived so far as the reply.
-                    if (fullResponse.isNotBlank()) {
+                    val partialResponse = fullResponse + streamedPreview
+                    if (partialResponse.isNotBlank()) {
                         val partial = ChatMessage(
                             chatId = chatId,
                             role = MessageRole.ASSISTANT,
-                            content = fullResponse,
+                            content = partialResponse,
                             modelId = requestModelId,
                             providerId = provider.id,
                             usage = responseUsage.get()
@@ -1314,15 +1527,7 @@ class AppViewModel(
                     }
                     throw e
                 } catch (e: Exception) {
-                    val errorMsg = when {
-                        e.message?.startsWith("This provider has no built-in web search") == true ||
-                            e.message?.startsWith("This model is marked as not supporting tool calling") == true -> "⚠️ ${e.message?.take(300)}"
-                        e.message?.contains("API Error 401") == true ->
-                            tx("🔑 The selected provider rejected the API key (HTTP 401). Check its key and Base URL in AI Providers.") + " (${provider.name})"
-                        e.message?.contains("API Error 429") == true -> tx("⏳ Rate limit exceeded. Please wait a moment or try another provider.")
-                        e.message?.contains("Unable to resolve host") == true -> tx("🌐 No internet connection. Please check your network.")
-                        else -> "❌ Error: ${e.message?.take(300) ?: e::class.java.simpleName}"
-                    }
+                    val errorMsg = ErrorMapper.chatMessage(e, provider.name)
 
                     val errorMessage = ChatMessage(
                         chatId = chatId,
@@ -1368,7 +1573,8 @@ class AppViewModel(
             return
         }
         val (previousSummary, history) = activeContext(_messages.value)
-        if (history.size < 2) {
+        val (olderMessages, retainedMessages) = splitHistoryForSummary(history)
+        if (olderMessages.size < 2 || retainedMessages.isEmpty()) {
             onDone(tx("Not enough messages to compress yet"))
             return
         }
@@ -1378,30 +1584,19 @@ class AppViewModel(
             if (historyCompressionGeneration != generation || _currentChatId.value != chatId) return@launch
             _isStreaming.value = true
             try {
-                val instruction = ChatMessage(
-                    chatId = chatId,
-                    role = MessageRole.USER,
-                    content = "Summarize the conversation so far for your own later reference. Keep facts about the user, decisions, preferences and open tasks. Reply in the language the user used. Be concise."
-                )
                 val modelId = getCurrentChat()?.modelId ?: provider.models.firstOrNull()?.id ?: "openai"
-                val systemPrompt = previousSummary?.let { "Summary of the earlier conversation:\n$it" }
-                val summary = StringBuilder()
-                repository.streamChat(
+                val text = summarizeAndStoreHistory(
+                    chatId = chatId,
                     provider = provider,
-                    messages = history + instruction,
                     modelId = modelId,
-                    systemPrompt = systemPrompt,
+                    previousSummary = previousSummary,
+                    olderMessages = olderMessages,
+                    retainedMessages = retainedMessages,
                     stream = streamResponse.value
-                ).collect { chunk ->
-                    if (historyCompressionGeneration == generation) summary.append(chunk)
+                ) {
+                    historyCompressionGeneration == generation && _currentChatId.value == chatId
                 }
-
-                val text = summary.toString().trim()
-                if (text.isBlank()) throw Exception("empty summary")
-                if (historyCompressionGeneration == generation && _currentChatId.value == chatId) {
-                    val marker = ChatMessage(chatId = chatId, role = MessageRole.SYSTEM, content = text)
-                    repository.saveMessage(marker)
-                    appendMessage(marker)
+                if (text.isNotBlank() && historyCompressionGeneration == generation && _currentChatId.value == chatId) {
                     onDone(tx("Older messages compressed"))
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -1606,18 +1801,42 @@ class AppViewModel(
         }
     }
 
+    fun resolveBranchChat(messageId: String, onResult: (String?) -> Unit) {
+        if (messageId.isBlank()) {
+            onResult(null)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                onResult(repository.getMessageById(messageId)?.chatId)
+            } catch (failure: Exception) {
+                com.ariai.app.util.AppLog.warn(failure, "open chat branch")
+                onResult(null)
+            }
+        }
+    }
+
     fun branchMessage(message: ChatMessage): String {
         val newChatId = java.util.UUID.randomUUID().toString()
         val currentMessages = _messages.value
         val branchIndex = currentMessages.indexOfFirst { it.id == message.id }
         val sourceMessages = if (branchIndex >= 0) currentMessages.take(branchIndex + 1) else emptyList()
+        val sourceTarget = sourceMessages.firstOrNull { it.id == message.id } ?: return message.chatId
         val newIds = sourceMessages.associate { it.id to java.util.UUID.randomUUID().toString() }
+        val branchTargetId = newIds.getValue(sourceTarget.id)
+        val siblingIds = linkedBranchSiblingIds(sourceTarget.id, sourceTarget.branchChildren, branchTargetId)
         val branchedMessages = sourceMessages.map { source ->
+            val copiedId = newIds.getValue(source.id)
+            val branchChildren = if (source.id == sourceTarget.id) {
+                siblingIds.filterNot { it == copiedId }
+            } else {
+                source.branchChildren.map { newIds[it] ?: it }.distinct()
+            }
             source.copy(
-                id = newIds.getValue(source.id),
+                id = copiedId,
                 chatId = newChatId,
-                parentId = source.parentId?.let(newIds::get),
-                branchChildren = source.branchChildren.mapNotNull(newIds::get)
+                parentId = source.parentId?.let { newIds[it] ?: it },
+                branchChildren = branchChildren
             )
         }
 
@@ -1637,7 +1856,20 @@ class AppViewModel(
                 updatedAt = now
             )
             repository.saveChat(newChat)
-            branchedMessages.forEach { repository.saveMessage(it) }
+            for (branchMessage in branchedMessages) {
+                if (!repository.saveMessage(branchMessage)) {
+                    com.ariai.app.util.AppLog.warn(IllegalStateException("Could not save a chat branch message"), "branch chat")
+                    return@launch
+                }
+            }
+            val allBranchIds = (listOf(sourceTarget.id) + siblingIds).distinct()
+            if (!repository.saveMessage(sourceTarget.copy(branchChildren = allBranchIds.filterNot { it == sourceTarget.id }))) {
+                com.ariai.app.util.AppLog.warn(IllegalStateException("Could not link the chat branch"), "branch chat")
+            }
+            allBranchIds.filterNot { it == sourceTarget.id || it == branchTargetId }.forEach { siblingId ->
+                val sibling = repository.getMessageById(siblingId) ?: return@forEach
+                repository.saveMessage(sibling.copy(branchChildren = allBranchIds.filterNot { it == siblingId }))
+            }
             if (_currentChatId.value == newChatId) {
                 _messages.value = repository.getMessagesSync(newChatId)
             }
@@ -1699,7 +1931,7 @@ class AppViewModel(
                 id = newIds.getValue(source.id),
                 chatId = newChatId,
                 parentId = source.parentId?.let(newIds::get),
-                branchChildren = source.branchChildren.mapNotNull(newIds::get)
+                branchChildren = source.branchChildren.map { newIds[it] ?: it }.distinct()
             )
         }
         val branchUser = branchMessages.firstOrNull { it.id == newIds[userMessage.id] } ?: return null

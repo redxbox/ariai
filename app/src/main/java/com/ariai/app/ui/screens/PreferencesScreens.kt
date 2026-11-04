@@ -20,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.biometric.BiometricManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,13 +43,13 @@ private fun SettingCard(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontWeight = FontWeight.Medium, color = Ink, fontSize = 15.sp)
             Text(subtitle, fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
         }
-        Switch(checked = checked, onCheckedChange = onChange, colors = SwitchDefaults.colors(checkedTrackColor = Accent))
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled, colors = SwitchDefaults.colors(checkedTrackColor = Accent))
     }
 }
 
@@ -64,10 +66,16 @@ fun PreferencesScreen(
     onFontSizeChange: (Int) -> Unit,
     streamResponse: Boolean,
     onStreamResponseChange: (Boolean) -> Unit,
+    biometricLockEnabled: Boolean,
+    onBiometricLockChange: (Boolean) -> Unit,
     currentLanguage: String,
     onLanguageChange: (String) -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val biometricAvailable = remember(context) {
+        BiometricManager.from(context).canAuthenticate(biometricAuthenticatorTypes()) == BiometricManager.BIOMETRIC_SUCCESS
+    }
     Scaffold(
         containerColor = Surface0,
         topBar = {
@@ -117,6 +125,26 @@ fun PreferencesScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
+                    }
+                }
+            }
+
+            item { SectionTitle(tx("Privacy & security")) }
+            item {
+                SettingCard {
+                    SwitchRow(
+                        title = tx("Lock API keys and MCP"),
+                        subtitle = tx("Require biometric authentication to open provider and MCP settings."),
+                        checked = biometricLockEnabled,
+                        enabled = biometricAvailable || biometricLockEnabled,
+                        onChange = onBiometricLockChange
+                    )
+                    if (!biometricAvailable) {
+                        Text(
+                            tx("Set up a fingerprint, face, or device screen lock before enabling this option."),
+                            fontSize = 12.sp,
+                            color = Ink.copy(alpha = 0.55f)
+                        )
                     }
                 }
             }

@@ -8,6 +8,14 @@ import org.junit.Test
 class ReplyFormatTest {
 
     @Test
+    fun localRendererDetectionFindsMathAndMermaidButIgnoresCodeSamples() {
+        assertTrue(hasLocalRichMarkdown("Inline \$x^2\$ and display \$\$y=mx+b\$\$"))
+        assertTrue(hasLocalRichMarkdown("""\(a+b\)"""))
+        assertTrue(hasLocalRichMarkdown("```mermaid\ngraph TD; A-->B\n```"))
+        assertTrue(!hasLocalRichMarkdown("```text\n\$x\$\n```"))
+        assertTrue(!hasLocalRichMarkdown("The price is \$5 today."))
+    }
+    @Test
     fun codeFenceBecomesSeparatePart() {
         val parts = splitReply("Intro\n```kotlin\nval x = 1\n```\nOutro")
         assertEquals(3, parts.size)

@@ -34,6 +34,7 @@ class PreferencesManager(
         val MCP_SERVERS = stringPreferencesKey("mcp_servers")
         val MCP_SERVER_AUTH = stringPreferencesKey("mcp_server_auth")
         val STREAM_RESPONSE = booleanPreferencesKey("stream_response")
+        val BIOMETRIC_LOCK_ENABLED = booleanPreferencesKey("biometric_lock_enabled")
         val SHOW_REASONING = booleanPreferencesKey("show_reasoning")
         val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
         val AUTO_TITLE = booleanPreferencesKey("auto_title")
@@ -50,6 +51,7 @@ class PreferencesManager(
     val defaultProviderFlow: Flow<String?> = dataStore.data.map { it[DEFAULT_PROVIDER_ID] }
     val defaultModelFlow: Flow<String?> = dataStore.data.map { it[DEFAULT_MODEL_ID] }
     val streamResponseFlow: Flow<Boolean> = dataStore.data.map { it[STREAM_RESPONSE] ?: true }
+    val biometricLockEnabledFlow: Flow<Boolean> = dataStore.data.map { it[BIOMETRIC_LOCK_ENABLED] ?: false }
     val memoryEnabledFlow: Flow<Boolean> = dataStore.data.map { it[MEMORY_ENABLED] ?: true }
     val fontSizeFlow: Flow<Int> = dataStore.data.map { it[FONT_SIZE] ?: 15 }
     val firstLaunchFlow: Flow<Boolean> = dataStore.data.map { it[FIRST_LAUNCH] ?: true }
@@ -187,6 +189,10 @@ class PreferencesManager(
 
     suspend fun setStreamResponse(enabled: Boolean) {
         dataStore.edit { it[STREAM_RESPONSE] = enabled }
+    }
+
+    suspend fun setBiometricLockEnabled(enabled: Boolean) {
+        dataStore.edit { it[BIOMETRIC_LOCK_ENABLED] = enabled }
     }
 
     suspend fun setFontSize(size: Int) {

@@ -6,14 +6,25 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
+import android.util.Xml
 import com.ariai.app.data.models.Attachment
 import com.ariai.app.data.models.AttachmentType
 import com.ariai.app.util.tx
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.InputStream
+import java.io.Writer
+import java.util.zip.ZipInputStream
+import org.xmlpull.v1.XmlPullParser
 
 private const val MAX_IMAGE_EDGE = 1280
 private const val MAX_TEXT_CHARS = 60_000
 private const val MAX_VIDEO_BYTES = 12L * 1024 * 1024
+private const val MAX_PDF_BYTES = 20L * 1024 * 1024
+private const val MAX_DOCX_XML_BYTES = 5 * 1024 * 1024
+private const val MAX_DOCX_EXPANDED_BYTES = 40L * 1024 * 1024
+private const val MAX_PDF_PAGES = 200
+private const val TRUNCATION_NOTICE = "\n[Extracted text truncated to fit the response context.]"
 private val TEXT_EXTENSIONS = setOf(
     "txt", "md", "json", "csv", "xml", "html", "kt", "java", "py", "js", "ts", "yaml", "yml", "log", "sql", "toml"
 )
@@ -24,7 +35,7 @@ sealed interface ReadResult {
 }
 
 /**
- * Reads a file picked by the user. Images are scaled down and JPEG-encoded to keep
+ * Reads a file picked by the user. Images are scaled down and WebP-encoded to keep
  * requests small; text-like files are returned as text to inline into the prompt.
  */
 fun readAttachment(context: Context, uri: Uri): ReadResult {
@@ -34,8 +45,27 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
     return try {
         when {
             mime.startsWith("image/") -> {
-                val bitmap = decodeScaled(context, uri) ?: return ReadResult.Error("Could not read $name")
+                val bitmap = decodeScaled(context, uri) ?: return ReadResult.Error(tx("Could not read this image."))
                 ReadResult.Ok(imageAttachment(bitmap, name))
+            }
+            mime == "application/pdf" || name.substringAfterLast('.', "").equals("pdf", ignoreCase = true) -> {
+                val text = extractPdfText(context, uri)
+                ReadResult.Ok(Attachment(
+                    type = AttachmentType.PDF,
+                    name = name,
+                    mimeType = "application/pdf",
+                    textContent = text
+                ))
+            }
+            mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                name.substringAfterLast('.', "").equals("docx", ignoreCase = true) -> {
+                val text = extractDocxText(resolver.openInputStream(uri) ?: return ReadResult.Error(tx("Could not open this file.")))
+                ReadResult.Ok(Attachment(
+                    type = AttachmentType.DOCX,
+                    name = name,
+                    mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    textContent = text
+                ))
             }
             mime.startsWith("text/") || mime == "application/json" ||
                 name.substringAfterLast('.', "").lowercase() in TEXT_EXTENSIONS -> {
@@ -48,7 +78,7 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
                         result.append(buffer, 0, count)
                     }
                     result.toString()
-                } ?: return ReadResult.Error("Could not open $name")
+                } ?: return ReadResult.Error(tx("Could not open this file."))
                 ReadResult.Ok(
                     Attachment(
                         type = AttachmentType.TEXT,
@@ -73,7 +103,7 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
                         output.write(buffer, 0, count)
                     }
                     output.toByteArray()
-                } ?: return ReadResult.Error("Could not open $name")
+                } ?: return ReadResult.Error(tx("Could not open this file."))
                 if (bytes.size > MAX_VIDEO_BYTES) return ReadResult.Error(tx("Video is larger than 12 MB"))
                 ReadResult.Ok(
                     Attachment(
@@ -84,24 +114,170 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
                     )
                 )
             }
-            else -> ReadResult.Error("$name is not supported yet. Pick an image, a video or a text file.")
+            else -> ReadResult.Error(tx("This file type is not supported yet. Choose an image, video, PDF, DOCX, or text file."))
         }
+    } catch (e: AttachmentReadException) {
+        ReadResult.Error(tx(e.message ?: "Could not read this document."))
     } catch (e: Exception) {
-        ReadResult.Error("Could not read $name")
+        ReadResult.Error(tx("Could not read this file."))
     }
 }
 
+private class AttachmentReadException(message: String) : Exception(message)
+
+private fun extractPdfText(context: Context, uri: Uri): String {
+    val temp = File.createTempFile("ariai-pdf-", ".pdf", context.cacheDir)
+    try {
+        val input = context.contentResolver.openInputStream(uri) ?: throw AttachmentReadException("Could not open PDF.")
+        input.use { source ->
+            temp.outputStream().buffered().use { target ->
+                copyBounded(source, target, MAX_PDF_BYTES, "PDF is larger than 20 MB.")
+            }
+        }
+        return extractPdfTextFromFile(context, temp)
+    } finally {
+        temp.delete()
+    }
+}
+
+internal fun extractPdfTextFromFile(context: Context, pdfFile: File): String {
+    com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context.applicationContext)
+    val document = try {
+        com.tom_roush.pdfbox.pdmodel.PDDocument.load(pdfFile)
+    } catch (password: com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException) {
+        throw AttachmentReadException("This PDF is password-protected.")
+    }
+    document.use { pdf ->
+        if (pdf.numberOfPages <= 0) throw AttachmentReadException("This PDF has no pages.")
+        val writer = LimitedTextWriter(MAX_TEXT_CHARS - TRUNCATION_NOTICE.length)
+        val stripper = com.tom_roush.pdfbox.text.PDFTextStripper().apply {
+            startPage = 1
+            endPage = pdf.numberOfPages.coerceAtMost(MAX_PDF_PAGES)
+        }
+        stripper.writeText(pdf, writer)
+        val extracted = writer.value().trim()
+        if (extracted.isBlank()) {
+            throw AttachmentReadException("No selectable text was found in this PDF. Scanned pages may need OCR.")
+        }
+        val wasTruncated = writer.wasTruncated || pdf.numberOfPages > MAX_PDF_PAGES
+        return if (wasTruncated) extracted + TRUNCATION_NOTICE else extracted
+    }
+}
+
+internal fun extractDocxText(input: InputStream): String {
+    val xml = input.use { source ->
+        ZipInputStream(source.buffered()).use { zip ->
+            var expandedBytes = 0L
+            var documentXml: ByteArray? = null
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                if (entry.isDirectory) continue
+                if (entry.name == "word/document.xml") {
+                    documentXml = readZipEntryBounded(zip, MAX_DOCX_XML_BYTES, "The DOCX document XML is too large.")
+                    break
+                }
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val count = zip.read(buffer)
+                    if (count < 0) break
+                    expandedBytes += count
+                    if (expandedBytes > MAX_DOCX_EXPANDED_BYTES) {
+                        throw AttachmentReadException("The DOCX document expands beyond the supported size.")
+                    }
+                }
+                zip.closeEntry()
+            }
+            documentXml ?: throw AttachmentReadException("This DOCX file has no document.xml content.")
+        }
+    }
+
+    val parser = Xml.newPullParser()
+    parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
+    runCatching { parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false) }
+    parser.setInput(xml.inputStream(), "UTF-8")
+    val text = StringBuilder()
+    val maxChars = MAX_TEXT_CHARS - TRUNCATION_NOTICE.length
+    var truncated = false
+    fun appendLimited(value: String) {
+        val remaining = (maxChars - text.length).coerceAtLeast(0)
+        val accepted = minOf(value.length, remaining)
+        if (accepted > 0) text.append(value, 0, accepted)
+        if (accepted < value.length) truncated = true
+    }
+    var event = parser.eventType
+    while (event != XmlPullParser.END_DOCUMENT && text.length < maxChars) {
+        if (event == XmlPullParser.START_TAG) {
+            when (parser.name.substringAfter(':')) {
+                "p" -> if (text.isNotEmpty() && text.last() != '\n') appendLimited("\n")
+                "t" -> appendLimited(parser.nextText())
+                "tab" -> appendLimited("\t")
+                "br", "cr" -> appendLimited("\n")
+            }
+        }
+        event = parser.next()
+    }
+    truncated = truncated || event != XmlPullParser.END_DOCUMENT
+    val extracted = text.toString().trim()
+    if (extracted.isBlank()) throw AttachmentReadException("No text was found in this DOCX document.")
+    return if (truncated) extracted + TRUNCATION_NOTICE else extracted
+}
+
+private fun readZipEntryBounded(input: InputStream, maxBytes: Int, message: String): ByteArray {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(8192)
+    var total = 0
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        total += count
+        if (total > maxBytes) throw AttachmentReadException(message)
+        output.write(buffer, 0, count)
+    }
+    return output.toByteArray()
+}
+
+private fun copyBounded(input: InputStream, output: java.io.OutputStream, maxBytes: Long, message: String) {
+    val buffer = ByteArray(8192)
+    var total = 0L
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        total += count
+        if (total > maxBytes) throw AttachmentReadException(message)
+        output.write(buffer, 0, count)
+    }
+}
+
+private class LimitedTextWriter(private val maxChars: Int) : Writer() {
+    private val result = StringBuilder()
+    var wasTruncated: Boolean = false
+        private set
+
+    override fun write(chars: CharArray, offset: Int, length: Int) {
+        val remaining = (maxChars - result.length).coerceAtLeast(0)
+        val accepted = minOf(length, remaining)
+        if (accepted > 0) result.append(chars, offset, accepted)
+        if (accepted < length) wasTruncated = true
+    }
+
+    override fun flush() = Unit
+    override fun close() = Unit
+    fun value(): String = result.toString()
+}
+
 /** Wraps a bitmap from the camera preview as an image attachment. */
-fun bitmapAttachment(bitmap: Bitmap, name: String = "camera.jpg"): Attachment =
+fun bitmapAttachment(bitmap: Bitmap, name: String = "camera.webp"): Attachment =
     imageAttachment(scaleDown(bitmap), name)
 
 private fun imageAttachment(bitmap: Bitmap, name: String): Attachment {
     val out = ByteArrayOutputStream()
-    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+    @Suppress("DEPRECATION")
+    bitmap.compress(Bitmap.CompressFormat.WEBP, 82, out)
+    val webpName = name.substringBeforeLast('.', name).ifBlank { "image" } + ".webp"
     return Attachment(
         type = AttachmentType.IMAGE,
-        name = name,
-        mimeType = "image/jpeg",
+        name = webpName,
+        mimeType = "image/webp",
         base64Data = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
     )
 }

@@ -38,7 +38,21 @@ import com.ariai.app.data.models.McpServerItem
 import com.ariai.app.data.models.McpTransport
 import com.ariai.app.data.models.isValidMcpHeaderName
 import com.ariai.app.data.models.isValidMcpServerUrl
+import com.ariai.app.data.remote.MCPPrompt
+import com.ariai.app.data.remote.MCPResource
 import com.ariai.app.ui.theme.*
+
+private enum class McpCatalogKind { RESOURCES, PROMPTS }
+
+private data class McpCatalogDialogState(
+    val serverId: String,
+    val serverName: String,
+    val kind: McpCatalogKind,
+    val loading: Boolean = true,
+    val resources: List<MCPResource> = emptyList(),
+    val prompts: List<MCPPrompt> = emptyList(),
+    val error: String? = null
+)
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
@@ -53,11 +67,14 @@ fun SimpleMcpScreen(
     onBack: () -> Unit,
     runtimeStates: Map<String, McpServerRuntimeState> = emptyMap(),
     onTestConnection: (String) -> Unit = {},
-    onToggleTool: (String, String) -> Unit = { _, _ -> }
+    onToggleTool: (String, String) -> Unit = { _, _ -> },
+    onListResources: (String, (List<MCPResource>, String?) -> Unit) -> Unit = { _, done -> done(emptyList(), null) },
+    onListPrompts: (String, (List<MCPPrompt>, String?) -> Unit) -> Unit = { _, done -> done(emptyList(), null) }
 ) {
     var showAdd by remember { mutableStateOf(false) }
     var editingServer by remember { mutableStateOf<McpServerItem?>(null) }
     var serverToEnable by remember { mutableStateOf<McpServerItem?>(null) }
+    var catalogDialog by remember { mutableStateOf<McpCatalogDialogState?>(null) }
 
     Scaffold(
         containerColor = AriPaper,
@@ -195,6 +212,31 @@ fun SimpleMcpScreen(
                             )
                         }
 
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                enabled = server.enabled && !credentialMissing && !status.isConnecting,
+                                onClick = {
+                                    catalogDialog = McpCatalogDialogState(server.id, server.name, McpCatalogKind.RESOURCES)
+                                    onListResources(server.id) { resources, error ->
+                                        catalogDialog = catalogDialog?.takeIf {
+                                            it.serverId == server.id && it.kind == McpCatalogKind.RESOURCES
+                                        }?.copy(loading = false, resources = resources, error = error)
+                                    }
+                                }
+                            ) { Text(tx("Resources")) }
+                            TextButton(
+                                enabled = server.enabled && !credentialMissing && !status.isConnecting,
+                                onClick = {
+                                    catalogDialog = McpCatalogDialogState(server.id, server.name, McpCatalogKind.PROMPTS)
+                                    onListPrompts(server.id) { prompts, error ->
+                                        catalogDialog = catalogDialog?.takeIf {
+                                            it.serverId == server.id && it.kind == McpCatalogKind.PROMPTS
+                                        }?.copy(loading = false, prompts = prompts, error = error)
+                                    }
+                                }
+                            ) { Text(tx("Prompts")) }
+                        }
+
                         if (status.toolNames.isNotEmpty()) {
                             Text(tx("Discovered tools · select which may be used in chats."), fontSize = 11.sp, color = Ink.copy(alpha = 0.65f))
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -217,6 +259,56 @@ fun SimpleMcpScreen(
 
             item { Spacer(Modifier.height(72.dp)) }
         }
+    }
+
+    catalogDialog?.let { catalog ->
+        val title = tx(if (catalog.kind == McpCatalogKind.RESOURCES) "MCP resources" else "MCP prompts")
+        AlertDialog(
+            onDismissRequest = { catalogDialog = null },
+            title = { Text("$title · ${catalog.serverName}", color = Ink, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    when {
+                        catalog.loading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Accent, strokeWidth = 2.dp)
+                            Text(tx("Loading MCP catalog…"), color = Ink)
+                        }
+                        catalog.error != null -> Text(catalog.error, color = Color(0xFFB3261E))
+                        catalog.kind == McpCatalogKind.RESOURCES && catalog.resources.isEmpty() ->
+                            Text(tx("This server did not advertise any resources."), color = Ink.copy(alpha = 0.65f))
+                        catalog.kind == McpCatalogKind.PROMPTS && catalog.prompts.isEmpty() ->
+                            Text(tx("This server did not advertise any prompts."), color = Ink.copy(alpha = 0.65f))
+                        catalog.kind == McpCatalogKind.RESOURCES -> catalog.resources.forEach { resource ->
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(resource.name, color = Ink, fontWeight = FontWeight.Medium)
+                                Text(resource.uri, color = Ink.copy(alpha = 0.65f), fontSize = 11.sp)
+                                if (resource.mimeType.isNotBlank()) Text(resource.mimeType, color = Ink.copy(alpha = 0.55f), fontSize = 11.sp)
+                                if (resource.description.isNotBlank()) Text(resource.description, color = Ink.copy(alpha = 0.72f), fontSize = 12.sp)
+                            }
+                        }
+                        else -> catalog.prompts.forEach { prompt ->
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(prompt.name, color = Ink, fontWeight = FontWeight.Medium)
+                                if (prompt.description.isNotBlank()) Text(prompt.description, color = Ink.copy(alpha = 0.72f), fontSize = 12.sp)
+                                if (prompt.arguments.isNotEmpty()) {
+                                    val argumentNames = prompt.arguments.joinToString(", ") { argument ->
+                                        argument.name + if (argument.required) " *" else ""
+                                    }
+                                    Text("${tx("Arguments")}: $argumentNames", color = Ink.copy(alpha = 0.6f), fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { catalogDialog = null }) { Text(tx("Close")) }
+            },
+            containerColor = AriCard
+        )
     }
 
     if (showAdd) {

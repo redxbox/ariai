@@ -5,9 +5,6 @@ import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.util.tx
 import kotlinx.coroutines.CancellationException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import javax.net.ssl.SSLException
 
 /** Result of checking a provider's address and key. */
 sealed class ConnectionResult {
@@ -56,55 +53,10 @@ suspend fun checkConnection(provider: Provider, fetch: suspend (Provider) -> Lis
 }
 
 private fun classify(e: Exception): ConnectionResult {
-    val msg = e.message.orEmpty()
-    val code = Regex("(?:HTTP\\s+|API Error\\s+)(\\d{3})", RegexOption.IGNORE_CASE)
-        .find(msg)?.groupValues?.get(1)
-    val status = code?.toIntOrNull()
-    return when {
-        status == 401 || status == 403 -> ConnectionResult.Failed(
-            tx("The API key was rejected"),
-            tx("Check the key. It must belong to this provider and the Base URL must match it."),
-            code
-        )
-        status == 402 -> ConnectionResult.Failed(
-            tx("The account has no credit"),
-            tx("Add credit on the provider's billing page."),
-            code
-        )
-        status == 404 -> ConnectionResult.Failed(
-            tx("The address was not found"),
-            tx("Check the Base URL. Most providers end it with /v1, and it must not point to a specific endpoint."),
-            code
-        )
-        status == 429 -> ConnectionResult.Failed(
-            tx("Too many requests right now"),
-            tx("Wait a minute and try again."),
-            code
-        )
-        status != null && status >= 500 -> ConnectionResult.Failed(
-            tx("The provider's server had an error"),
-            tx("This is on the provider's side. Try again later."),
-            code
-        )
-        e is UnknownHostException -> ConnectionResult.Failed(
-            tx("The server name was not found"),
-            tx("Check the spelling of the Base URL and your internet connection.")
-        )
-        e is SocketTimeoutException -> ConnectionResult.Failed(
-            tx("The server did not answer in time"),
-            tx("Check your connection, or the Base URL.")
-        )
-        e is SSLException -> ConnectionResult.Failed(
-            tx("The secure (https) connection failed"),
-            tx("Check that the Base URL uses https and that the server certificate is valid.")
-        )
-        msg.contains("CLEARTEXT", ignoreCase = true) -> ConnectionResult.Failed(
-            tx("Plain http is blocked on this phone"),
-            tx("Use https. Plain http is allowed only for localhost.")
-        )
-        else -> ConnectionResult.Failed(
-            tx("Could not connect"),
-            msg.take(160).ifBlank { e::class.java.simpleName }
-        )
-    }
+    val mapped = ErrorMapper.map(e)
+    return ConnectionResult.Failed(
+        problem = tx(mapped.messageKey),
+        hint = tx(mapped.hintKey),
+        code = mapped.httpCode
+    )
 }

@@ -576,6 +576,7 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
     var text by remember { mutableStateOf("") }
     var scannedProvider by remember { mutableStateOf<Provider?>(null) }
     var isReadingQr by remember { mutableStateOf(false) }
+    var showLiveQrScanner by remember { mutableStateOf(false) }
     var qrMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -648,6 +649,30 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
                         }
                     }
                 }
+                OutlinedButton(
+                    onClick = {
+                        scannedProvider = null
+                        qrMessage = null
+                        showLiveQrScanner = true
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("provider-import-camera"),
+                    enabled = !isReadingQr,
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AriAccent),
+                    contentPadding = PaddingValues(horizontal = 11.dp, vertical = 9.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(21.dp))
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(tx("Scan provider QR with camera"), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(tx("Use the live camera to scan a provider QR."), fontSize = 10.sp, color = AriMuted, maxLines = 1)
+                        }
+                    }
+                }
                 if (qrMessage != null) {
                     Text(
                         qrMessage.orEmpty(),
@@ -717,6 +742,22 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(tx("Cancel"), color = Ink) } }
     )
+    if (showLiveQrScanner) {
+        LiveQrScannerDialog(
+            onScan = { qrText ->
+                showLiveQrScanner = false
+                val provider = providerFromJson(qrText)
+                if (provider != null) {
+                    scannedProvider = provider
+                    text = ""
+                    qrMessage = tx("Provider QR ready to import")
+                } else {
+                    qrMessage = tx("This QR code does not contain valid provider data.")
+                }
+            },
+            onDismiss = { showLiveQrScanner = false }
+        )
+    }
 }
 
 private fun decodeQrFromImage(context: Context, uri: Uri): String? {

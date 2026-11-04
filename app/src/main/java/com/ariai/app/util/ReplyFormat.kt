@@ -38,6 +38,19 @@ private val headingPrefix = Regex("""^(#{1,6})\s*(.*)$""")
 private val linkColor = Color(0xFF2563EB)
 private const val URL_TRAILING_PUNCTUATION = ".,;:!?،؛؟…"
 
+private val localMathDelimiter = Regex(
+    """\$\$[\s\S]+?\$\$|(?<!\\)\$(?!\s)[^$\n]+?(?<!\\)\$(?!\$)|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)"""
+)
+
+/** True when a completed reply needs the bundled offline KaTeX/Mermaid renderer. */
+internal fun hasLocalRichMarkdown(raw: String): Boolean {
+    val parts = splitReply(raw)
+    if (parts.filterIsInstance<ReplyPart.Code>().any { part ->
+        part.language.trim().lowercase() in setOf("mermaid", "math", "latex", "tex")
+    }) return true
+    return parts.filterIsInstance<ReplyPart.Text>().any { localMathDelimiter.containsMatchIn(it.raw) }
+}
+
 private fun isListItemLine(line: String): Boolean {
     val trimmed = line.trimStart()
     return bulletPrefix.containsMatchIn(trimmed) || numberedPrefix.containsMatchIn(trimmed)

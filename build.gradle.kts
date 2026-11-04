@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application") version "8.13.2" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
-    id("org.jetbrains.kotlin.plugin.parcelize") version "1.9.22" apply false
-    id("org.jetbrains.kotlin.kapt") version "1.9.22" apply false
+    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.2.20" apply false
+    id("org.jetbrains.kotlin.plugin.parcelize") version "2.2.20" apply false
+    id("org.jetbrains.kotlin.kapt") version "2.2.20" apply false
 }

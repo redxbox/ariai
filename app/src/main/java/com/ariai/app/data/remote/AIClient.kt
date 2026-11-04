@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicReference
  * Name-based video detection. Used together with API metadata, because many providers
  * (OpenAI, Gemini, relays) do not say which modalities a model produces.
  */
+private const val MAX_IMAGE_EDIT_FILE_BYTES = 20L * 1024L * 1024L
+
 private val videoModelName = Regex(
     "sora|veo|video|\\bwan[-.]?\\d|kling|seedance|hailuo|runway|luma|ray-?2|pika|\\bltx|cogvideo|hunyuan.?video|mochi|vidu|i2v|t2v",
     RegexOption.IGNORE_CASE
@@ -113,6 +115,181 @@ internal fun mergeTokenUsage(current: TokenUsage?, update: TokenUsage): TokenUsa
     }
     return TokenUsage(prompt, completion, total)
 }
+
+/** Text and structured tool-call events emitted while a tool-enabled completion is in flight. */
+internal sealed interface AgentStepStreamEvent {
+    data class TextDelta(val text: String) : AgentStepStreamEvent
+    data class Completed(val step: AgentStep) : AgentStepStreamEvent
+}
+
+/** Accumulates the three provider streaming dialects used by AriAI. */
+internal class AgentStepStreamAccumulator(private val providerType: ProviderType) {
+    private data class ToolCallBuilder(
+        val id: StringBuilder = StringBuilder(),
+        val name: StringBuilder = StringBuilder(),
+        val arguments: StringBuilder = StringBuilder(),
+        var structuredArguments: JSONObject? = null
+    ) {
+        fun appendArguments(value: Any?) {
+            when (value) {
+                is JSONObject -> {
+                    if (value.length() > 0) {
+                        val merged = structuredArguments ?: JSONObject().also { structuredArguments = it }
+                        value.keys().forEach { key -> merged.put(key, value.opt(key)) }
+                    }
+                }
+                is String -> arguments.append(value)
+            }
+        }
+
+        fun argumentString(): String = when {
+            arguments.isNotEmpty() -> arguments.toString()
+            structuredArguments != null -> structuredArguments.toString()
+            else -> "{}"
+        }
+
+        fun toToolCall(): ToolCall? {
+            val callName = name.toString().takeIf { it.isNotBlank() } ?: return null
+            return ToolCall(
+                id = id.toString().ifBlank { java.util.UUID.randomUUID().toString() },
+                name = callName,
+                arguments = argumentString()
+            )
+        }
+    }
+
+    private val toolCalls = linkedMapOf<String, ToolCallBuilder>()
+    private var accumulatedUsage: TokenUsage? = null
+    val usage: TokenUsage? get() = accumulatedUsage
+
+    /** Returns only newly received user-visible text (never tool argument fragments). */
+    fun consume(json: JSONObject, eventType: String? = null): String {
+        parseTokenUsage(json, providerType)?.let { accumulatedUsage = mergeTokenUsage(accumulatedUsage, it) }
+        return when (providerType) {
+            ProviderType.GEMINI -> consumeGemini(json)
+            ProviderType.ANTHROPIC -> consumeAnthropic(json, eventType)
+            else -> consumeOpenAi(json)
+        }
+    }
+
+    fun finish(): AgentStep = AgentStep(
+        text = text.toString(),
+        toolCalls = toolCalls.values.mapNotNull { it.toToolCall() },
+        usage = accumulatedUsage
+    )
+
+    private val text = StringBuilder()
+
+    private fun consumeOpenAi(json: JSONObject): String {
+        val choices = json.optJSONArray("choices") ?: return ""
+        val receivedText = StringBuilder()
+        for (choiceIndex in 0 until choices.length()) {
+            val choice = choices.optJSONObject(choiceIndex) ?: continue
+            val part = choice.optJSONObject("delta") ?: choice.optJSONObject("message") ?: continue
+            val chunk = streamText(part.opt("content"))
+            if (chunk.isNotEmpty()) {
+                text.append(chunk)
+                receivedText.append(chunk)
+            }
+            part.optJSONObject("function_call")?.let { call ->
+                val builder = toolCalls.getOrPut("openai:0") { ToolCallBuilder() }
+                builder.name.append(call.optString("name"))
+                builder.arguments.append(call.optString("arguments"))
+            }
+            val calls = part.optJSONArray("tool_calls") ?: continue
+            for (index in 0 until calls.length()) {
+                val call = calls.optJSONObject(index) ?: continue
+                val callIndex = call.optInt("index", index)
+                val builder = toolCalls.getOrPut("openai:$callIndex") { ToolCallBuilder() }
+                builder.id.append(call.optString("id"))
+                val function = call.optJSONObject("function") ?: continue
+                builder.name.append(function.optString("name"))
+                builder.arguments.append(function.optString("arguments"))
+            }
+        }
+        return receivedText.toString()
+    }
+
+    private fun consumeAnthropic(json: JSONObject, eventType: String?): String {
+        val type = eventType?.takeIf { it.isNotBlank() } ?: json.optString("type")
+        val block = json.optJSONObject("content_block")
+        val delta = json.optJSONObject("delta")
+        when (type) {
+            "content_block_start" -> if (block?.optString("type") == "tool_use") {
+                val index = json.optInt("index", toolCalls.size)
+                val builder = toolCalls.getOrPut("anthropic:$index") { ToolCallBuilder() }
+                builder.id.append(block.optString("id"))
+                builder.name.append(block.optString("name"))
+                builder.appendArguments(block.optJSONObject("input"))
+            }
+            "content_block_delta" -> when (delta?.optString("type")) {
+                "text_delta" -> {
+                    val chunk = delta.optString("text")
+                    text.append(chunk)
+                    return chunk
+                }
+                "input_json_delta" -> {
+                    val index = json.optInt("index", toolCalls.size - 1)
+                    val builder = toolCalls.getOrPut("anthropic:$index") { ToolCallBuilder() }
+                    builder.arguments.append(delta.optString("partial_json"))
+                }
+            }
+            "message_start", "message_delta" -> {
+                val usageJson = json.optJSONObject("message")?.optJSONObject("usage") ?: json.optJSONObject("usage")
+                if (usageJson != null) {
+                    parseTokenUsage(JSONObject().put("usage", usageJson), providerType)?.let {
+                        accumulatedUsage = mergeTokenUsage(accumulatedUsage, it)
+                    }
+                }
+            }
+        }
+        return ""
+    }
+
+    private fun consumeGemini(json: JSONObject): String {
+        val candidates = json.optJSONArray("candidates") ?: return ""
+        val receivedText = StringBuilder()
+        for (candidateIndex in 0 until candidates.length()) {
+            val candidate = candidates.optJSONObject(candidateIndex) ?: continue
+            val parts = candidate.optJSONObject("content")?.optJSONArray("parts") ?: continue
+            for (partIndex in 0 until parts.length()) {
+                val part = parts.optJSONObject(partIndex) ?: continue
+                val chunk = if (part.optBoolean("thought", false)) "" else part.optString("text")
+                if (chunk.isNotEmpty()) {
+                    text.append(chunk)
+                    receivedText.append(chunk)
+                }
+                val function = part.optJSONObject("functionCall") ?: part.optJSONObject("function_call") ?: continue
+                val name = function.optString("name")
+                val id = function.optString("id")
+                val key = "gemini:$candidateIndex:$partIndex"
+                val builder = toolCalls.getOrPut(key) { ToolCallBuilder() }
+                if (name.isNotBlank() && builder.name.isEmpty()) builder.name.append(name)
+                if (id.isNotBlank() && builder.id.isEmpty()) builder.id.append(id)
+                val arguments = function.opt("args") ?: function.opt("arguments")
+                when (arguments) {
+                    is JSONObject -> builder.appendArguments(arguments)
+                    is String -> builder.arguments.append(arguments)
+                }
+            }
+        }
+        return receivedText.toString()
+    }
+
+    private fun streamText(value: Any?): String = when (value) {
+        is String -> value
+        is JSONArray -> buildString {
+            for (index in 0 until value.length()) {
+                val item = value.optJSONObject(index) ?: continue
+                if (item.optString("type") == "text") append(item.optString("text"))
+            }
+        }
+        is JSONObject -> value.optString("text")
+        else -> ""
+    }
+}
+
+internal class StreamingNotSupportedException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 class AIClient {
     private val client = OkHttpClient.Builder()
@@ -408,6 +585,164 @@ class AIClient {
         }
     }
 
+    /** Streams a tool-enabled step for OpenAI-compatible, Anthropic, and Gemini endpoints. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun chatCompletionStepStream(
+        provider: Provider,
+        messages: List<ChatMessage>,
+        modelId: String,
+        systemPrompt: String?,
+        tools: List<ChatFunctionTool>,
+        temperature: Float = 0.7f,
+        topP: Float = 1.0f,
+        searchContext: String? = null,
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        nativeSearch: Boolean = false,
+        stream: Boolean = true,
+        allowUrlContext: Boolean = true,
+        onUsage: (TokenUsage) -> Unit = {}
+    ): Flow<AgentStepStreamEvent> {
+        if (!stream) return flow {
+            val step = chatCompletionStep(
+                provider, messages, modelId, systemPrompt, tools, temperature, topP,
+                searchContext, reasoning, nativeSearch, allowUrlContext
+            )
+            step.usage?.let { usage -> runCatching { onUsage(usage) } }
+            emit(AgentStepStreamEvent.Completed(step))
+        }
+
+        return callbackFlow {
+            val producer = this
+            val accumulator = AgentStepStreamAccumulator(provider.type)
+            val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+            val lastReportedUsage = AtomicReference<TokenUsage?>(null)
+            val request = Request.Builder()
+                .url(buildChatUrl(provider, modelId))
+                .post(buildRequestBody(
+                    provider = provider,
+                    messages = messages,
+                    modelId = modelId,
+                    systemPrompt = systemPrompt,
+                    temperature = temperature,
+                    topP = topP,
+                    searchContext = searchContext,
+                    isStream = true,
+                    reasoning = reasoning,
+                    nativeSearch = nativeSearch,
+                    functionTools = tools,
+                    allowUrlContext = allowUrlContext
+                ))
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream, application/json")
+                .addProviderHeaders(provider, modelId)
+                .build()
+
+            fun reportUsage() {
+                val usage = accumulator.usage ?: return
+                if (lastReportedUsage.getAndSet(usage) != usage) {
+                    runCatching { onUsage(usage) }
+                        .onFailure { com.ariai.app.util.AppLog.warn(it, "report streamed tool usage") }
+                }
+            }
+
+            fun complete() {
+                if (!finished.compareAndSet(false, true)) return
+                reportUsage()
+                producer.trySend(AgentStepStreamEvent.Completed(accumulator.finish()))
+                producer.close()
+            }
+
+            fun fail(error: IOException) {
+                if (!finished.compareAndSet(false, true)) return
+                producer.close(error)
+            }
+
+            val eventSource = EventSources.createFactory(client).newEventSource(
+                request,
+                object : EventSourceListener() {
+                    override fun onOpen(eventSource: EventSource, response: Response) {
+                        if (response.isSuccessful) return
+                        val body = runCatching {
+                            response.body?.readUtf8AtMost(HttpBodyLimits.ERROR_BYTES).orEmpty()
+                        }.getOrDefault("")
+                        val message = "API Error ${response.code}: ${body.ifBlank { response.message }.take(500)}"
+                        val unsupported = isUnsupportedStreamingResponse(response.code, body)
+                        if (unsupported) fail(StreamingNotSupportedException(message)) else fail(IOException(message))
+                        eventSource.cancel()
+                    }
+
+                    override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+                        if (data.trim() == "[DONE]") {
+                            complete()
+                            eventSource.cancel()
+                            return
+                        }
+                        if (data.isBlank()) return
+                        try {
+                            val json = JSONObject(data)
+                            if (type == "error" || json.optString("type") == "error" || json.has("error")) {
+                                val detail = json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                                    ?: json.optString("message").takeIf { it.isNotBlank() }
+                                    ?: json.optString("error", "Provider returned an error")
+                                fail(IOException(detail.take(500)))
+                                eventSource.cancel()
+                                return
+                            }
+                            val text = accumulator.consume(json, type)
+                            reportUsage()
+                            if (text.isNotEmpty()) {
+                                val result = producer.trySend(AgentStepStreamEvent.TextDelta(text))
+                                if (result.isFailure) eventSource.cancel()
+                            }
+                            if (provider.type == ProviderType.ANTHROPIC &&
+                                (type == "message_stop" || json.optString("type") == "message_stop")) {
+                                complete()
+                                eventSource.cancel()
+                            }
+                        } catch (error: Exception) {
+                            if (error is IOException) {
+                                fail(error)
+                                eventSource.cancel()
+                            } else {
+                                com.ariai.app.util.AppLog.warn(error, "tool SSE event parse")
+                            }
+                        }
+                    }
+
+                    override fun onClosed(eventSource: EventSource) {
+                        complete()
+                    }
+
+                    override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                        val responseBody = runCatching {
+                            response?.body?.readUtf8AtMost(HttpBodyLimits.ERROR_BYTES).orEmpty()
+                        }.getOrDefault("")
+                        val error = if (response != null && !response.isSuccessful) {
+                            val message = "API Error ${response.code}: ${responseBody.ifBlank { response.message }.take(500)}"
+                            if (isUnsupportedStreamingResponse(response.code, responseBody)) {
+                                StreamingNotSupportedException(message, t)
+                            } else IOException(message, t)
+                        } else {
+                            IOException(responseBody.takeIf { it.isNotBlank() } ?: t?.message ?: "Streaming request failed", t)
+                        }
+                        response?.close()
+                        if (!finished.compareAndSet(false, true)) return
+                        producer.close(error)
+                    }
+                }
+            )
+
+            awaitClose { eventSource.cancel() }
+        }
+    }
+
+    internal fun isUnsupportedStreamingResponse(statusCode: Int, body: String): Boolean {
+        if (statusCode in setOf(404, 405, 406, 415, 501)) return true
+        if (statusCode != 400) return false
+        val detail = body.lowercase()
+        return "stream" in detail || "sse" in detail || "event-stream" in detail
+    }
+
     suspend fun generateImage(
         provider: Provider,
         request: ImageGenRequest
@@ -501,7 +836,8 @@ class AIClient {
         provider: Provider,
         model: String,
         image: java.io.File,
-        prompt: String
+        prompt: String,
+        mask: java.io.File? = null
     ): ImageGenResponse = withContext(Dispatchers.IO) {
         val url = "${provider.baseUrl.trimEnd('/')}/images/edits"
         val imageType = when (image.extension.lowercase()) {
@@ -510,13 +846,16 @@ class AIClient {
             "gif" -> "image/gif"
             else -> "image/png"
         }
-        val body = MultipartBody.Builder()
+        require(image.isFile && image.length() <= MAX_IMAGE_EDIT_FILE_BYTES) { "The source image exceeds the supported edit size." }
+        require(mask == null || (mask.isFile && mask.length() <= MAX_IMAGE_EDIT_FILE_BYTES)) { "The image mask exceeds the supported edit size." }
+        val multipart = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("model", model)
             .addFormDataPart("prompt", prompt)
             .addFormDataPart("n", "1")
             .addFormDataPart("image", image.name, image.asRequestBody(imageType.toMediaType()))
-            .build()
+        mask?.let { multipart.addFormDataPart("mask", it.name, it.asRequestBody("image/png".toMediaType())) }
+        val body = multipart.build()
         val request = Request.Builder()
             .url(url)
             .post(body)
@@ -733,7 +1072,7 @@ class AIClient {
         return enabled.filter { it == "google_search" || it == "url_context" }.toMutableList()
     }
 
-    private fun buildChatUrl(provider: Provider, modelId: String = "", forceNonStream: Boolean = false): String {
+    internal fun buildChatUrl(provider: Provider, modelId: String = "", forceNonStream: Boolean = false): String {
         val base = provider.baseUrl.trimEnd('/')
 
         return when (provider.type) {

@@ -60,7 +60,7 @@ cd ariai
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
-The app version is **2.3.0-stable** (`versionCode` 5). The Gradle build uses Kotlin 1.9.22 and Jetpack Compose.
+The app version is **2.3.0-stable** (`versionCode` 5). The Gradle build uses Kotlin 2.2.20 with the official Jetpack Compose compiler plugin.
 
 ## Signed release bundle
 

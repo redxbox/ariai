@@ -14,6 +14,15 @@ import com.ariai.app.data.models.AttachmentType
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collect
+
+sealed interface AgentChatEvent {
+    data class TextDelta(val text: String) : AgentChatEvent
+    data object ClearTextPreview : AgentChatEvent
+    data object CommitTextPreview : AgentChatEvent
+    data class ToolProgress(val update: ToolExecutionUpdate) : AgentChatEvent
+    data class Completed(val answer: String) : AgentChatEvent
+}
 
 class ChatRepository(
     private val db: AppDatabase,
@@ -330,6 +339,110 @@ class ChatRepository(
         emit(answer)
     }.flowOn(Dispatchers.IO)
 
+    /** Streams both provisional answer text and progress while the agent executes tools. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun agentChatStream(
+        provider: Provider,
+        messages: List<ChatMessage>,
+        modelId: String,
+        systemPrompt: String?,
+        tools: List<com.ariai.app.data.remote.ChatFunctionTool>,
+        temperature: Float = 0.7f,
+        topP: Float = 1.0f,
+        searchContext: String? = null,
+        reasoning: ReasoningLevel = ReasoningLevel.AUTO,
+        nativeSearch: Boolean = false,
+        stream: Boolean = true,
+        maxSteps: Int = 6,
+        contextWindow: Int = 8192,
+        allowUrlContext: Boolean = true,
+        onUsage: (TokenUsage) -> Unit = {}
+    ): Flow<AgentChatEvent> = kotlinx.coroutines.flow.channelFlow {
+        val readyMessages = messages.map { message ->
+            message.copy(attachments = message.attachments.map { it.hydrated() })
+        }
+        val toolBudget = ((contextWindow.coerceAtLeast(4096).toLong() * 3L) / 2L)
+            .coerceAtMost(20_000L).toInt()
+        val loop = com.ariai.app.data.remote.AgentLoop(maxSteps = maxSteps, maxTotalToolChars = toolBudget)
+        val answer = loop.runStreaming(
+            initialMessages = readyMessages,
+            tools = tools,
+            onToolProgress = { update -> send(AgentChatEvent.ToolProgress(update)) },
+            onTextDelta = { text -> send(AgentChatEvent.TextDelta(text)) },
+            onDiscardText = { send(AgentChatEvent.ClearTextPreview) },
+            onCommitText = { send(AgentChatEvent.CommitTextPreview) }
+        ) { stepMessages, stepTools, recovery, onTextDelta ->
+            val stepPrompt = if (recovery) {
+                listOfNotNull(
+                    systemPrompt,
+                    "Do not answer with an acknowledgement or progress-only message. Complete the request now using the available tool results, or clearly ask for the exact missing input. If a tool step limit was reached, summarize only what was actually retrieved."
+                ).joinToString("\n\n")
+            } else systemPrompt
+            var receivedDelta = false
+            var completedStep: com.ariai.app.data.remote.AgentStep? = null
+            try {
+                aiClient.chatCompletionStepStream(
+                    provider = provider,
+                    messages = stepMessages,
+                    modelId = modelId,
+                    systemPrompt = stepPrompt,
+                    tools = stepTools,
+                    temperature = temperature,
+                    topP = topP,
+                    searchContext = searchContext,
+                    reasoning = reasoning,
+                    nativeSearch = nativeSearch,
+                    stream = stream,
+                    allowUrlContext = allowUrlContext,
+                    onUsage = onUsage
+                ).collect { event ->
+                    when (event) {
+                        is com.ariai.app.data.remote.AgentStepStreamEvent.TextDelta -> {
+                            if (event.text.isNotEmpty()) {
+                                receivedDelta = true
+                                onTextDelta(event.text)
+                            }
+                        }
+                        is com.ariai.app.data.remote.AgentStepStreamEvent.Completed -> {
+                            completedStep = event.step
+                            event.step.usage?.let(onUsage)
+                            if (!receivedDelta && event.step.text.isNotEmpty()) {
+                                receivedDelta = true
+                                onTextDelta(event.step.text)
+                            }
+                        }
+                    }
+                }
+            } catch (unsupported: com.ariai.app.data.remote.StreamingNotSupportedException) {
+                // Retry exactly once without SSE only when the endpoint rejected streaming before
+                // any text arrived. Never repeat a partially completed/billable model response.
+                if (!stream || receivedDelta) throw unsupported
+                val fallback = aiClient.chatCompletionStep(
+                    provider = provider,
+                    messages = stepMessages,
+                    modelId = modelId,
+                    systemPrompt = stepPrompt,
+                    tools = stepTools,
+                    temperature = temperature,
+                    topP = topP,
+                    searchContext = searchContext,
+                    reasoning = reasoning,
+                    nativeSearch = nativeSearch,
+                    allowUrlContext = allowUrlContext
+                )
+                fallback.usage?.let(onUsage)
+                if (fallback.text.isNotEmpty()) onTextDelta(fallback.text)
+                completedStep = fallback
+            }
+            val step = completedStep ?: throw java.io.IOException("The provider closed the streamed response without a result")
+            if (step.text.isBlank() && step.toolCalls.isEmpty()) {
+                throw java.io.IOException("The provider returned neither a reply nor a tool call")
+            }
+            step
+        }
+        send(AgentChatEvent.Completed(answer))
+    }.flowOn(Dispatchers.IO)
+
     fun streamChat(
         provider: Provider,
         messages: List<ChatMessage>,
@@ -364,8 +477,13 @@ class ChatRepository(
         // Network work must not run on the main thread.
         .flowOn(Dispatchers.IO)
 
-    suspend fun editImage(provider: Provider, model: String, image: java.io.File, prompt: String) =
-        withContext(Dispatchers.IO) { aiClient.editImage(provider, model, image, prompt) }
+    suspend fun editImage(
+        provider: Provider,
+        model: String,
+        image: java.io.File,
+        prompt: String,
+        mask: java.io.File? = null
+    ) = withContext(Dispatchers.IO) { aiClient.editImage(provider, model, image, prompt, mask) }
 
     suspend fun imageBytes(image: com.ariai.app.data.models.GeneratedImage): ByteArray =
         aiClient.imageBytes(image)

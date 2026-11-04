@@ -51,6 +51,55 @@ class AgentLoop(
         tools: List<ChatFunctionTool>,
         onToolProgress: suspend (ToolExecutionUpdate) -> Unit = {},
         requestStep: suspend (List<com.ariai.app.data.models.ChatMessage>, List<ChatFunctionTool>, Boolean) -> AgentStep
+    ): String = runInternal(
+        initialMessages = initialMessages,
+        tools = tools,
+        onToolProgress = onToolProgress,
+        onTextDelta = {},
+        onDiscardText = {},
+        onCommitText = {},
+        requestStep = { messages, availableTools, recovery, _ ->
+            requestStep(messages, availableTools, recovery)
+        }
+    )
+
+    /** Runs the same bounded loop while exposing provisional model text as it arrives. */
+    suspend fun runStreaming(
+        initialMessages: List<com.ariai.app.data.models.ChatMessage>,
+        tools: List<ChatFunctionTool>,
+        onToolProgress: suspend (ToolExecutionUpdate) -> Unit = {},
+        onTextDelta: suspend (String) -> Unit = {},
+        onDiscardText: suspend () -> Unit = {},
+        onCommitText: suspend () -> Unit = {},
+        requestStep: suspend (
+            List<com.ariai.app.data.models.ChatMessage>,
+            List<ChatFunctionTool>,
+            Boolean,
+            suspend (String) -> Unit
+        ) -> AgentStep
+    ): String = runInternal(
+        initialMessages = initialMessages,
+        tools = tools,
+        onToolProgress = onToolProgress,
+        onTextDelta = onTextDelta,
+        onDiscardText = onDiscardText,
+        onCommitText = onCommitText,
+        requestStep = requestStep
+    )
+
+    private suspend fun runInternal(
+        initialMessages: List<com.ariai.app.data.models.ChatMessage>,
+        tools: List<ChatFunctionTool>,
+        onToolProgress: suspend (ToolExecutionUpdate) -> Unit,
+        onTextDelta: suspend (String) -> Unit,
+        onDiscardText: suspend () -> Unit,
+        onCommitText: suspend () -> Unit,
+        requestStep: suspend (
+            List<com.ariai.app.data.models.ChatMessage>,
+            List<ChatFunctionTool>,
+            Boolean,
+            suspend (String) -> Unit
+        ) -> AgentStep
     ): String {
         require(tools.map { it.name }.distinct().size == tools.size) { "Tool names must be unique" }
         require(tools.all { it.name.matches(Regex("^[A-Za-z0-9_-]{1,64}$")) }) { "Tool names must be valid identifiers" }
@@ -62,9 +111,15 @@ class AgentLoop(
         var totalToolCalls = 0
 
         repeat(maxSteps) {
-            val step = requestStep(history, tools, acknowledgementRecoveryUsed)
+            val step = requestStep(history, tools, acknowledgementRecoveryUsed) { delta ->
+                if (delta.isNotEmpty()) onTextDelta(delta)
+            }
             if (step.toolCalls.isEmpty()) {
-                if (acknowledgementWasRequested || !isAcknowledgementOnly(step.text)) return step.text
+                if (acknowledgementWasRequested || !isAcknowledgementOnly(step.text)) {
+                    onCommitText()
+                    return step.text
+                }
+                onDiscardText()
                 if (acknowledgementRecoveryUsed) return acknowledgementFallback(history.lastOrNull()?.content.orEmpty())
                 acknowledgementRecoveryUsed = true
                 // A short acknowledgement is not completion. The next request carries a
@@ -72,6 +127,9 @@ class AgentLoop(
                 return@repeat
             }
 
+            // A model may stream a short preamble before announcing a tool call. Keep it
+            // provisional and remove it from the reply bubble once the structured call arrives.
+            onDiscardText()
             val lastUser = history.lastOrNull { it.role == com.ariai.app.data.models.MessageRole.USER }
                 ?: error("Cannot execute tools without a user message")
             history += com.ariai.app.data.models.ChatMessage(
@@ -136,8 +194,14 @@ class AgentLoop(
 
         // A final synthesis step is still allowed after the tool-step limit, but no more tools
         // are exposed, preventing runaway tool loops.
-        val final = requestStep(history, emptyList(), true)
-        if (final.text.isNotBlank() && !isAcknowledgementOnly(final.text)) return final.text
+        val final = requestStep(history, emptyList(), true) { delta ->
+            if (delta.isNotEmpty()) onTextDelta(delta)
+        }
+        if (final.text.isNotBlank() && !isAcknowledgementOnly(final.text)) {
+            onCommitText()
+            return final.text
+        }
+        onDiscardText()
         return acknowledgementFallback(history.lastOrNull { it.role == com.ariai.app.data.models.MessageRole.USER }?.content.orEmpty())
     }
 

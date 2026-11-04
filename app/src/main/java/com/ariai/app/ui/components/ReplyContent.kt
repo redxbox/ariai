@@ -30,11 +30,17 @@ import com.ariai.app.ui.theme.AriTint
 import com.ariai.app.util.ReplyPart
 import com.ariai.app.util.ReplyBlockCache
 import com.ariai.app.util.formatReply
+import com.ariai.app.util.hasLocalRichMarkdown
 import com.ariai.app.util.tx
 
 /** Shows model replies with tappable links and copyable, line-numbered code blocks. */
 @Composable
 fun ReplyContent(text: String, fontSizeSp: Float, color: Color, streaming: Boolean = false) {
+    val useLocalRenderer = remember(text, streaming) { !streaming && hasLocalRichMarkdown(text) }
+    if (useLocalRenderer) {
+        LocalMarkdownRenderer(text, color, fontSizeSp)
+        return
+    }
     val blockCache = remember { ReplyBlockCache() }
     val parts = remember(text, streaming) { blockCache.parse(text, streaming) }
     val uriHandler = LocalUriHandler.current

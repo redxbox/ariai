@@ -208,4 +208,58 @@ class AgentLoopTest {
 
         assertTrue(answer.contains("بررسی یا پاسخ نهایی تولید نشد"))
     }
+    @Test
+    fun `streams provisional text then discards it for tools and commits the final answer`() = runBlocking {
+        val streamed = mutableListOf<String>()
+        var cleared = 0
+        var committed = 0
+        var requestCount = 0
+        val answer = AgentLoop().runStreaming(
+            initialMessages = listOf(ChatMessage(chatId = "chat", role = MessageRole.USER, content = "Search and summarize")),
+            tools = listOf(ChatFunctionTool("search_web", "Search", JSONObject()) { "result" }),
+            onTextDelta = { streamed += it },
+            onDiscardText = { cleared++ },
+            onCommitText = { committed++ }
+        ) { history, _, _, emitText ->
+            requestCount++
+            if (requestCount == 1) {
+                emitText("Searching now…")
+                AgentStep("Searching now…", listOf(ToolCall("call-1", "search_web", "{}")))
+            } else {
+                assertTrue(history.any { it.role == MessageRole.TOOL && it.content == "result" })
+                emitText("Here is ")
+                emitText("the summary.")
+                AgentStep("Here is the summary.", emptyList())
+            }
+        }
+
+        assertEquals("Here is the summary.", answer)
+        assertEquals(listOf("Searching now…", "Here is ", "the summary."), streamed)
+        assertEquals(1, cleared)
+        assertEquals(1, committed)
+    }
+
+    @Test
+    fun `clears acknowledgement preview before its recovery request`() = runBlocking {
+        val cleared = mutableListOf<Int>()
+        var requestCount = 0
+        val answer = AgentLoop().runStreaming(
+            initialMessages = listOf(ChatMessage(chatId = "chat", role = MessageRole.USER, content = "Review the file")),
+            tools = emptyList(),
+            onDiscardText = { cleared += requestCount }
+        ) { _, _, recovery, emitText ->
+            requestCount++
+            if (!recovery) {
+                emitText("Sure, I'll review it.")
+                AgentStep("Sure, I'll review it.", emptyList())
+            } else {
+                emitText("Please attach the file.")
+                AgentStep("Please attach the file.", emptyList())
+            }
+        }
+
+        assertEquals("Please attach the file.", answer)
+        assertEquals(listOf(1), cleared)
+    }
+
 }

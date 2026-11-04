@@ -12,7 +12,11 @@ import com.ariai.app.ui.theme.*
 
 import android.content.ClipData
 import android.content.ContentValues
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.os.Build
 import android.os.SystemClock
 import android.provider.MediaStore
@@ -44,9 +48,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material.icons.filled.Stop
@@ -62,6 +68,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -71,7 +79,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -139,11 +155,12 @@ fun NewChatScreen(
     onBack: () -> Unit,
     onRenameChat: (String) -> Unit = {},
     onBranchMessage: (ChatMessage) -> Unit,
+    onNavigateToBranch: (String) -> Unit = {},
     onRegenerate: (ChatMessage) -> Unit,
     onCopyMessage: (String) -> Unit,
     onOpenDrawer: () -> Unit = {},
     onSelectModel: (String, String) -> Unit = { _, _ -> },
-    onEditImage: (ChatMessage, String) -> Unit = { _, _ -> },
+    onEditImage: (ChatMessage, String, File?) -> Unit = { _, _, mask -> mask?.delete() },
     onToggleFavorite: (String, String) -> Unit = { _, _ -> },
     onReasoningChange: (ReasoningLevel) -> Unit = {},
     onSearchModeChange: (SearchMode) -> Unit = {},
@@ -178,11 +195,16 @@ fun NewChatScreen(
     var showVoiceDisclosure by remember { mutableStateOf(false) }
     var voiceDisclosureAccepted by remember { mutableStateOf(false) }
     val voiceContext = LocalContext.current
-    val recognizer = remember {
-        if (android.speech.SpeechRecognizer.isRecognitionAvailable(voiceContext)) {
-            android.speech.SpeechRecognizer.createSpeechRecognizer(voiceContext)
-        } else {
-            null
+    val onDeviceSpeechRecognitionAvailable = remember(voiceContext) {
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+            android.speech.SpeechRecognizer.isOnDeviceRecognitionAvailable(voiceContext)
+    }
+    val recognizer = remember(voiceContext, onDeviceSpeechRecognitionAvailable) {
+        when {
+            onDeviceSpeechRecognitionAvailable -> android.speech.SpeechRecognizer.createOnDeviceSpeechRecognizer(voiceContext)
+            android.speech.SpeechRecognizer.isRecognitionAvailable(voiceContext) ->
+                android.speech.SpeechRecognizer.createSpeechRecognizer(voiceContext)
+            else -> null
         }
     }
     DisposableEffect(recognizer) { onDispose { recognizer?.destroy() } }
@@ -256,6 +278,7 @@ fun NewChatScreen(
     }
     if (showVoiceDisclosure) {
         VoiceInputDisclosureDialog(
+            onDeviceRecognition = onDeviceSpeechRecognitionAvailable,
             onDismiss = { showVoiceDisclosure = false },
             onContinue = {
                 showVoiceDisclosure = false
@@ -275,9 +298,10 @@ fun NewChatScreen(
     var editingImage by remember { mutableStateOf<ChatMessage?>(null) }
     editingImage?.let { source ->
         EditImageDialog(
+            source = source,
             onDismiss = { editingImage = null },
-            onConfirm = { instruction ->
-                onEditImage(source, instruction)
+            onConfirm = { instruction, mask ->
+                onEditImage(source, instruction, mask)
                 editingImage = null
             }
         )
@@ -325,6 +349,9 @@ fun NewChatScreen(
         )
     }
     var showAttachments by remember { mutableStateOf(false) }
+    var showNonGeminiVideoWarning by remember { mutableStateOf(false) }
+    var pendingVideoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var mediaPickerVideoConfirmed by remember { mutableStateOf(false) }
     var showThinking by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
@@ -546,7 +573,8 @@ fun NewChatScreen(
         }
     }
 
-    fun addFiles(uris: List<Uri>) {
+    fun readFiles(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         scope.launch {
             for (uri in uris) {
                 when (val result = withContext(Dispatchers.IO) { readAttachment(context, uri) }) {
@@ -557,8 +585,25 @@ fun NewChatScreen(
         }
     }
 
+    fun addFiles(uris: List<Uri>, videoAlreadyConfirmed: Boolean = false) {
+        val videoUris = uris.filter { uri ->
+            runCatching { context.contentResolver.getType(uri)?.startsWith("video/", ignoreCase = true) == true }
+                .getOrDefault(false)
+        }
+        val otherUris = uris.filterNot(videoUris.toSet()::contains)
+        readFiles(otherUris)
+        if (videoUris.isEmpty() || currentProvider?.type == ProviderType.GEMINI || videoAlreadyConfirmed) {
+            readFiles(videoUris)
+        } else {
+            pendingVideoUris = (pendingVideoUris + videoUris).distinct()
+            showNonGeminiVideoWarning = true
+        }
+    }
+
     val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(20)) { uris ->
-        if (uris.isNotEmpty()) addFiles(uris)
+        val confirmedVideo = mediaPickerVideoConfirmed
+        mediaPickerVideoConfirmed = false
+        if (uris.isNotEmpty()) addFiles(uris, videoAlreadyConfirmed = confirmedVideo)
     }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) addFiles(uris)
@@ -621,19 +666,33 @@ fun NewChatScreen(
     if (showAttachments) {
         AttachmentSheet(
             onPhoto = {
+                mediaPickerVideoConfirmed = false
                 launchPickerAfterSheetCloses {
                     mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             },
             onVideoFile = {
-                launchPickerAfterSheetCloses {
-                    mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                if (currentProvider?.type == ProviderType.GEMINI) {
+                    mediaPickerVideoConfirmed = true
+                    launchPickerAfterSheetCloses {
+                        mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                    }
+                } else {
+                    pendingVideoUris = emptyList()
+                    showNonGeminiVideoWarning = true
                 }
             },
             onCamera = { launchPickerAfterSheetCloses { cameraPicker.launch(null) } },
             onFile = {
                 launchPickerAfterSheetCloses {
-                    filePicker.launch(arrayOf("text/*", "application/json", "image/*", "video/*"))
+                    filePicker.launch(arrayOf(
+                        "text/*",
+                        "application/json",
+                        "application/pdf",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "image/*",
+                        "video/*"
+                    ))
                 }
             },
             onCompress = { onCompressHistory { showNote(it) } },
@@ -651,6 +710,37 @@ fun NewChatScreen(
                 else showNote(tx("No audio model. Fetch models in provider settings."))
             },
             onDismiss = { showAttachments = false }
+        )
+    }
+    if (showNonGeminiVideoWarning) {
+        AlertDialog(
+            onDismissRequest = {
+                showNonGeminiVideoWarning = false
+                pendingVideoUris = emptyList()
+            },
+            title = { Text(tx("This provider may not support video")) },
+            text = { Text(tx("Video input is supported by Gemini providers. With the selected provider, the video may be ignored or rejected. Continue anyway?")) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showNonGeminiVideoWarning = false
+                    val selectedVideos = pendingVideoUris
+                    pendingVideoUris = emptyList()
+                    if (selectedVideos.isNotEmpty()) {
+                        readFiles(selectedVideos)
+                    } else {
+                        mediaPickerVideoConfirmed = true
+                        launchPickerAfterSheetCloses {
+                            mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                        }
+                    }
+                }) { Text(tx("Continue")) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showNonGeminiVideoWarning = false
+                    pendingVideoUris = emptyList()
+                }) { Text(tx("Cancel")) }
+            }
         )
     }
     if (showThinking) {
@@ -1220,6 +1310,7 @@ fun NewChatScreen(
                                             active = false
                                         )
                                     }
+                                    val branchIds = branchNavigationIds(m.id, m.branchChildren)
                                     AssistantBlock(
                                         text = m.content,
                                         fontSize = fontSize,
@@ -1233,6 +1324,13 @@ fun NewChatScreen(
                                         onBranch = { onBranchMessage(m) },
                                         onRetry = { onRegenerate(m) }
                                     )
+                                    if (branchIds.size > 1) {
+                                        BranchNavigator(
+                                            messageId = m.id,
+                                            branchMessageIds = branchIds,
+                                            onNavigate = onNavigateToBranch
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1607,6 +1705,42 @@ private fun formatGenerationDuration(totalSeconds: Long): String {
 }
 
 @Composable
+private fun BranchNavigator(
+    messageId: String,
+    branchMessageIds: List<String>,
+    onNavigate: (String) -> Unit
+) {
+    val index = branchMessageIds.indexOf(messageId)
+    if (index < 0 || branchMessageIds.size < 2) return
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.testTag("branch-navigation-$messageId")
+    ) {
+        IconButton(
+            onClick = { onNavigate(branchMessageIds[index - 1]) },
+            enabled = index > 0,
+            modifier = Modifier.size(34.dp).semantics { contentDescription = tx("Previous branch") }
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = if (index > 0) Ink else Muted.copy(alpha = 0.35f), modifier = Modifier.size(17.dp))
+        }
+        Text(
+            "${tx("Branch")} ${index + 1} / ${branchMessageIds.size}",
+            color = Muted,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
+        IconButton(
+            onClick = { onNavigate(branchMessageIds[index + 1]) },
+            enabled = index < branchMessageIds.lastIndex,
+            modifier = Modifier.size(34.dp).semantics { contentDescription = tx("Next branch") }
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = if (index < branchMessageIds.lastIndex) Ink else Muted.copy(alpha = 0.35f), modifier = Modifier.size(17.dp))
+        }
+    }
+}
+
+@Composable
 private fun AssistantBlock(
     text: String,
     fontSize: Int,
@@ -1714,31 +1848,215 @@ private fun FullImageDialog(bitmap: ImageBitmap, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun EditImageDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var text by remember { mutableStateOf("") }
+private fun EditImageDialog(
+    source: ChatMessage,
+    onDismiss: () -> Unit,
+    onConfirm: (String, File?) -> Unit
+) {
+    var text by remember(source.id) { mutableStateOf("") }
+    var strokes by remember(source.id) { mutableStateOf<List<List<Offset>>>(emptyList()) }
+    var activeStroke by remember(source.id) { mutableStateOf<List<Offset>>(emptyList()) }
+    var canvasSize by remember(source.id) { mutableStateOf(IntSize.Zero) }
+    var brushWidthDp by remember(source.id) { mutableStateOf(24f) }
+    var preparingMask by remember(source.id) { mutableStateOf(false) }
+    var maskError by remember(source.id) { mutableStateOf<String?>(null) }
+    val density = LocalDensity.current.density
+    val scope = rememberCoroutineScope()
+    val sourceBitmap by produceState<Bitmap?>(initialValue = null, key1 = source.imagePath) {
+        value = withContext(Dispatchers.IO) { source.imagePath?.let { BitmapFactory.decodeFile(it) } }
+    }
+    val preview = sourceBitmap?.asImageBitmap()
+    DisposableEffect(sourceBitmap) {
+        onDispose { sourceBitmap?.recycle() }
+    }
     val dialogShape = paperPopupShape(26.dp)
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!preparingMask) onDismiss() },
         modifier = paperPopupModifier(dialogShape),
         shape = dialogShape,
         containerColor = AriCard,
         title = { Text(tx("Edit image")) },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = { Text(tx("What should change?")) },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Column(
+                modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                if (preview != null) {
+                    val aspectRatio = preview.width.toFloat() / preview.height.toFloat()
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        val maxCanvasHeight = 250.dp
+                        val displayWidth = minOf(maxWidth, maxCanvasHeight * aspectRatio)
+                        val displayHeight = displayWidth / aspectRatio
+                        Canvas(
+                            modifier = Modifier.width(displayWidth).height(displayHeight)
+                                .clip(RoundedCornerShape(16.dp))
+                                .onSizeChanged { canvasSize = it }
+                                .pointerInput(preview) {
+                                    detectDragGestures(
+                                        onDragStart = { point -> activeStroke = listOf(point) },
+                                        onDrag = { change, _ ->
+                                            change.consume()
+                                            activeStroke = activeStroke + change.position
+                                        },
+                                        onDragEnd = {
+                                            if (activeStroke.isNotEmpty()) strokes = strokes + listOf(activeStroke)
+                                            activeStroke = emptyList()
+                                        },
+                                        onDragCancel = {
+                                            if (activeStroke.isNotEmpty()) strokes = strokes + listOf(activeStroke)
+                                            activeStroke = emptyList()
+                                        }
+                                    )
+                                }
+                        ) {
+                            drawImage(
+                                preview,
+                                dstOffset = IntOffset.Zero,
+                                dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1))
+                            )
+                            val overlayColor = Color(0xAA3977D5)
+                            val widthPx = with(density) { brushWidthDp.dp.toPx() }
+                            (strokes + listOf(activeStroke)).filter { it.isNotEmpty() }.forEach { points ->
+                                if (points.size == 1) {
+                                    drawCircle(overlayColor, radius = widthPx / 2f, center = points.first())
+                                } else {
+                                    val path = Path().apply {
+                                        moveTo(points.first().x, points.first().y)
+                                        points.drop(1).forEach { lineTo(it.x, it.y) }
+                                    }
+                                    drawPath(
+                                        path,
+                                        color = overlayColor,
+                                        style = Stroke(width = widthPx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Text(
+                        tx("Paint the area you want to replace. Leave the canvas blank to edit the full image."),
+                        color = AriMuted,
+                        fontSize = 12.sp
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text(tx("Brush size"), color = AriInk, fontSize = 12.sp)
+                        TextButton(onClick = { strokes = emptyList(); activeStroke = emptyList(); maskError = null }) {
+                            Text(tx("Clear mask"), color = AriAccent)
+                        }
+                    }
+                    Slider(
+                        value = brushWidthDp,
+                        onValueChange = { brushWidthDp = it },
+                        valueRange = 8f..48f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(tx("Image preview unavailable. You can still edit it with a prompt."), color = AriMuted, fontSize = 12.sp)
+                }
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.take(2_000) },
+                    placeholder = { Text(tx("What should change?")) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                maskError?.let { Text(it, color = Color(0xFFB3261E), fontSize = 12.sp) }
+            }
         },
         confirmButton = {
-            TextButton(onClick = { if (text.isNotBlank()) onConfirm(text.trim()) }) { Text(tx("Send")) }
+            TextButton(
+                enabled = text.isNotBlank() && !preparingMask,
+                onClick = {
+                    if (text.isBlank() || preparingMask) return@TextButton
+                    preparingMask = true
+                    maskError = null
+                    val submittedText = text.trim()
+                    val submittedStrokes = strokes + listOf(activeStroke).filter { it.isNotEmpty() }
+                    val submittedBitmap = sourceBitmap
+                    val submittedCanvasSize = canvasSize
+                    val submittedBrushWidth = brushWidthDp
+                    val submittedDensity = density
+                    scope.launch {
+                        var generatedMask: File? = null
+                        try {
+                            val mask = withContext(Dispatchers.IO) {
+                                if (submittedBitmap != null && submittedStrokes.isNotEmpty() && submittedCanvasSize.width > 0 && submittedCanvasSize.height > 0) {
+                                    createImageEditMaskFile(
+                                        bitmap = submittedBitmap,
+                                        strokes = submittedStrokes,
+                                        canvasWidth = submittedCanvasSize.width,
+                                        canvasHeight = submittedCanvasSize.height,
+                                        brushWidthDp = submittedBrushWidth,
+                                        density = submittedDensity
+                                    ).also { generatedMask = it }
+                                } else null
+                            }
+                            preparingMask = false
+                            onConfirm(submittedText, mask)
+                            generatedMask = null // Ownership has moved to the view model.
+                        } catch (cancelled: CancellationException) {
+                            generatedMask?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
+                            preparingMask = false
+                            throw cancelled
+                        } catch (_: Exception) {
+                            generatedMask?.let { com.ariai.app.data.local.ImageStore.deleteTemp(it) }
+                            preparingMask = false
+                            maskError = tx("Could not prepare the image mask.")
+                        }
+                    }
+                }
+            ) { Text(if (preparingMask) tx("Preparing…") else tx("Send")) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(tx("Cancel")) }
+            TextButton(onClick = onDismiss, enabled = !preparingMask) { Text(tx("Cancel")) }
         }
     )
+}
+
+private fun createImageEditMaskFile(
+    bitmap: Bitmap,
+    strokes: List<List<Offset>>,
+    canvasWidth: Int,
+    canvasHeight: Int,
+    brushWidthDp: Float,
+    density: Float
+): File {
+    require(canvasWidth > 0 && canvasHeight > 0)
+    val mask = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+    try {
+        val canvas = android.graphics.Canvas(mask)
+        canvas.drawColor(AndroidColor.WHITE)
+        val scaleX = bitmap.width.toFloat() / canvasWidth
+        val scaleY = bitmap.height.toFloat() / canvasHeight
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.TRANSPARENT
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            strokeWidth = brushWidthDp * density * minOf(scaleX, scaleY)
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+        }
+        strokes.filter { it.isNotEmpty() }.forEach { points ->
+            if (points.size == 1) {
+                paint.style = Paint.Style.FILL
+                canvas.drawCircle(points.first().x * scaleX, points.first().y * scaleY, paint.strokeWidth / 2f, paint)
+                paint.style = Paint.Style.STROKE
+            } else {
+                val path = android.graphics.Path().apply {
+                    moveTo(points.first().x * scaleX, points.first().y * scaleY)
+                    points.drop(1).forEach { lineTo(it.x * scaleX, it.y * scaleY) }
+                }
+                canvas.drawPath(path, paint)
+            }
+        }
+        val png = java.io.ByteArrayOutputStream().use { output ->
+            check(mask.compress(Bitmap.CompressFormat.PNG, 100, output)) { "Could not encode the image mask." }
+            output.toByteArray()
+        }
+        return com.ariai.app.data.local.ImageStore.createTempImage(png, "image/png")
+    } finally {
+        mask.recycle()
+    }
 }
 
 @Composable
