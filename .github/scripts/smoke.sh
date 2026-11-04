@@ -101,6 +101,23 @@ tap() {
       fi
     fi
   fi
+  if (( status != 0 )) && [[ "$label" == "Add to message" ]]; then
+    local activity
+    activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
+    if [[ "$activity" == *NexusLauncherActivity* ]]; then
+      echo "::warning title=AriAI foreground recovery::The launcher covered AriAI before the attachment action; bringing the app back and retrying."
+      if adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
+        | tee -a "$OUT/relaunch-before-attachment.txt"; then
+        if wait_for_main_activity "Choose model" 8 25; then
+          if output="$(python3 .github/scripts/ui_tap.py "$label" 2>&1)"; then
+            status=0
+          else
+            status=$?
+          fi
+        fi
+      fi
+    fi
+  fi
   if (( status != 0 )); then
     echo "$output"
     local detail="${output//$'\n'/ | }"
