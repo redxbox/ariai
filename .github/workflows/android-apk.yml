@@ -59,21 +59,10 @@ jobs:
         run: |
           pattern='^e: |error:|What went wrong|Execution failed|FAILED|Failure|AssertionError|expected:|but was:|Tests run:|There were failing tests|Caused by:'
           for log in unit-tests.log release-lint.log release-build.log build.log; do
-            [ -f "$log" ] || continue
-            if grep -Eq "$pattern" "$log"; then
-              echo "::group::$log diagnostics"
-              grep -E "$pattern" "$log" | tail -25 | while IFS= read -r line; do
-                safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
-                echo "::error title=Gradle validation error::$safe"
-              done
-              echo "::endgroup::"
-              echo "::group::$log final context"
-              tail -25 "$log" | while IFS= read -r line; do
-                safe=$(printf '%s' "$line" | tr -d '\r' | cut -c1-900)
-                echo "::error title=Gradle log tail::$safe"
-              done
-              echo "::endgroup::"
-            fi
+            [ -s "$log" ] || continue
+            summary=$(grep -E "$pattern" "$log" | tail -15 | tr '\r\n' '  ' | cut -c1-3000 || true)
+            final_context=$(tail -35 "$log" | tr '\r\n' '  ' | cut -c1-3000)
+            echo "::error title=Gradle diagnostics::$log | $summary | final log context: $final_context"
           done
           python3 - <<'PY'
           from pathlib import Path
