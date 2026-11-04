@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
+import android.widget.FrameLayout
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -165,14 +166,19 @@ internal fun LiveQrScannerDialog(
     }
 }
 
-private class QrPreviewView(context: Context) : PreviewView(context) {
+private class QrPreviewView(context: Context) : FrameLayout(context) {
     @Volatile var onCodeFound: ((String) -> Unit)? = null
     @Volatile var onCameraError: ((String) -> Unit)? = null
+    private val previewView = PreviewView(context)
     private var controller: QrCameraController? = null
+
+    init {
+        addView(previewView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+    }
 
     fun start(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
         if (controller != null) return
-        controller = QrCameraController(context, lifecycleOwner, this).also { camera ->
+        controller = QrCameraController(context, lifecycleOwner, previewView).also { camera ->
             camera.onCodeFound = { onCodeFound?.invoke(it) }
             camera.onCameraError = { onCameraError?.invoke(it) }
             camera.start()
