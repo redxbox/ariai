@@ -145,6 +145,9 @@ class MCPClientTest {
             assertEquals("summarize", prompts.single().name)
             assertEquals("text", prompts.single().arguments.single().name)
             assertTrue(prompts.single().arguments.single().required)
+            assertEquals("initialize", JSONObject(server.takeRequest().body.readUtf8()).optString("method"))
+            assertEquals("notifications/initialized", JSONObject(server.takeRequest().body.readUtf8()).optString("method"))
+            assertEquals("tools/list", JSONObject(server.takeRequest().body.readUtf8()).optString("method"))
             assertEquals("resources/list", JSONObject(server.takeRequest().body.readUtf8()).optString("method"))
             assertEquals("prompts/list", JSONObject(server.takeRequest().body.readUtf8()).optString("method"))
         } finally {
