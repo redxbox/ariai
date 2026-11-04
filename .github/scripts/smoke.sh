@@ -77,6 +77,14 @@ tap() {
   local label="$1"
   local output
   local status=0
+  if [[ "$label" == "Add to message" ]] && \
+    python3 .github/scripts/ui_tap.py --assert "This provider may not support video" >/dev/null 2>&1; then
+    echo "::notice title=Non-Gemini video disclosure::Verified the video compatibility warning and chose Cancel; no video will be attached."
+    expect_text "Video input is supported by Gemini providers"
+    expect_text "Continue"
+    tap_exact "Cancel"
+    back
+  fi
   if output="$(python3 .github/scripts/ui_tap.py "$label" 2>&1)"; then
     status=0
   else

@@ -486,6 +486,7 @@ class FeatureScreensUiTest {
         compose.setContent {
             AriAiTheme(darkTheme = false, dynamicColor = false) {
                 VoiceInputDisclosureDialog(
+                    onDeviceRecognition = false,
                     onDismiss = { dismissed = true },
                     onContinue = { accepted = true }
                 )
