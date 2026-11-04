@@ -637,6 +637,26 @@ fun NewChatScreen(
         }
     }
 
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            launchPickerAfterSheetCloses { cameraPicker.launch(null) }
+        } else {
+            showNote(tx("Camera permission denied."))
+        }
+    }
+
+    fun launchCameraCapture() {
+        if (
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            launchPickerAfterSheetCloses { cameraPicker.launch(null) }
+        } else {
+            cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+        }
+    }
+
     if (showModelSheet) {
         ModelPickerSheet(
             providers = providers,
@@ -683,7 +703,7 @@ fun NewChatScreen(
                     showNonGeminiVideoWarning = true
                 }
             },
-            onCamera = { launchPickerAfterSheetCloses { cameraPicker.launch(null) } },
+            onCamera = { launchCameraCapture() },
             onFile = {
                 launchPickerAfterSheetCloses {
                     filePicker.launch(arrayOf(

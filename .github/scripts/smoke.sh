@@ -560,6 +560,17 @@ if [[ -z "$camera_handler" || "$camera_handler" == *"No activity found"* ]]; the
 else
   tap "Add to message"
   tap "Camera"
+  camera_permission_choice=""
+  for choice in "While using the app" "Only this time" "Allow only while using the app" "Allow"; do
+    if python3 .github/scripts/ui_tap.py --assert --exact "$choice" >/dev/null 2>&1; then
+      camera_permission_choice="$choice"
+      break
+    fi
+  done
+  if [[ -n "$camera_permission_choice" ]]; then
+    echo "::notice title=Camera permission::Granting the camera permission for the camera-intent walkthrough."
+    tap_exact "$camera_permission_choice"
+  fi
   sleep 3
   shot 15-camera-intent
   return_to_chat_after_external "Camera"
