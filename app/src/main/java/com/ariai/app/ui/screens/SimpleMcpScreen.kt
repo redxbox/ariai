@@ -413,10 +413,13 @@ private fun AddMcpServerSheet(
         skipPartiallyExpanded = true
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 760.dp).verticalScroll(rememberScrollState())
-                .imePadding().padding(horizontal = 20.dp).padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(13.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(max = 760.dp).imePadding()
+                .padding(horizontal = 20.dp).padding(bottom = 12.dp)
         ) {
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
             Text(tx(if (initial == null) "Add MCP server" else "Edit MCP server"), fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = Ink)
             Text(
                 tx(if (initial == null) {
@@ -567,13 +570,16 @@ private fun AddMcpServerSheet(
                     modifier = Modifier.fillMaxWidth().height(48.dp).testTag("mcp-oauth-connect")
                 ) { Text(tx("Connect with OAuth"), fontWeight = FontWeight.SemiBold) }
             }
+            }
 
+            // Pinned below the scrollable form so Save stays reachable on short screens
+            // and with the keyboard open.
             Button(
                 onClick = { onSave(draftServer()) },
                 enabled = valid,
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Accent),
-                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("mcp-server-save")
+                modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp).testTag("mcp-server-save")
             ) { Text(tx("Save"), fontWeight = FontWeight.SemiBold) }
         }
     }

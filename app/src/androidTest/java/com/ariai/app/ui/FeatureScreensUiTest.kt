@@ -168,9 +168,15 @@ class FeatureScreensUiTest {
         compose.waitForIdle()
         compose.onNodeWithTag("quick-parameters-prompt")
             .assertTextContains("Be concise and cite assumptions.")
-        compose.onNodeWithTag("quick-parameters-save").performScrollTo()
-        compose.waitForIdle()
-        compose.onNodeWithTag("quick-parameters-save").assertIsDisplayed().performClick()
+        // The IME inset animation is system-driven and not tracked by waitForIdle;
+        // keep re-scrolling until the action is inside the settled viewport.
+        compose.waitUntil(10_000) {
+            runCatching {
+                compose.onNodeWithTag("quick-parameters-save").performScrollTo()
+                compose.onNodeWithTag("quick-parameters-save").assertIsDisplayed()
+            }.isSuccess
+        }
+        compose.onNodeWithTag("quick-parameters-save").performClick()
         compose.waitForIdle()
 
         compose.runOnIdle {
@@ -444,7 +450,7 @@ class FeatureScreensUiTest {
         compose.onNodeWithTag("mcp-server-url").performTextClearance()
         compose.onNodeWithTag("mcp-server-url").performTextInput("https://mcp.example.test/mcp")
         assertVisible("enabled MCP server Save action") {
-            compose.onNodeWithTag("mcp-server-save").performScrollTo().assertIsDisplayed().performClick()
+            compose.onNodeWithTag("mcp-server-save").assertIsDisplayed().performClick()
         }
         compose.waitForIdle()
 
