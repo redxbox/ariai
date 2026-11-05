@@ -30,7 +30,7 @@ The app does not provide keys, credits, or a built-in free demo account. Use onl
 
 1. In the provider editor, choose **OAuth 2.0** authentication and enter the HTTPS authorization endpoint, token endpoint, public client ID, and optional space-separated scopes.
 2. Register AriAI as a public/native client with the OAuth service and allow this exact redirect URI: `com.ariai.app://oauth2redirect`.
-3. Tap **Connect with OAuth** and complete sign-in in the system browser. AriAI uses Authorization Code with PKCE (S256); it does not request or store a client secret. Tokens are stored encrypted with Android Keystore and refreshed when required.
+3. Tap **Connect with OAuth** and complete sign-in in AppAuth's secure Android Custom Tab (or its compatible-browser fallback). AriAI uses Authorization Code with PKCE (S256), verifies the returned `state`, and does not request or store a client secret. Tokens are encrypted with Android Keystore and refreshed before provider or MCP requests when required.
 
 AriAI uses manually configured endpoints and client IDs; authorization-server discovery, dynamic client registration, and provider-specific non-standard OAuth parameters are not implemented. OAuth token state is bound to the configured provider API or MCP server URL; changing that URL requires signing in again.
 
@@ -43,7 +43,7 @@ AriAI uses manually configured endpoints and client IDs; authorization-server di
 
 1. Open **Settings → MCP servers** and add a server's HTTPS endpoint. The legacy SSE transport is available for existing servers; Streamable HTTP is preferred for new deployments.
 2. Choose no authentication, a Bearer token, a custom HTTP header, or OAuth 2.0. Static credentials and OAuth token state are encrypted locally with Android Keystore; credentials are never placed in the URL.
-3. For OAuth, enter the HTTPS authorization and token endpoints, public client ID, and optional scopes. Register the redirect URI `com.ariai.app://oauth2redirect` with the OAuth service, then tap **Connect with OAuth**. The flow uses Authorization Code with PKCE; AriAI does not accept client secrets.
+3. For OAuth, enter the HTTPS authorization and token endpoints, public client ID, and optional scopes. Register the redirect URI `com.ariai.app://oauth2redirect` with the OAuth service, then tap **Connect with OAuth**. AppAuth opens a secure Android Custom Tab and uses Authorization Code with PKCE S256; AriAI does not accept client secrets.
 4. Test the connection to initialize the MCP session and list tools. New servers start disabled; enabling a server requires an explicit trust confirmation. Select only the discovered tools you want to make available to chats.
 5. For a custom agent, also enable **MCP tools** in that agent's available-tools list. A normal chat may use only the enabled servers and individually allowed tools.
 

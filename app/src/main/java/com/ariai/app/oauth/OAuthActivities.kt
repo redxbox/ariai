@@ -7,7 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import com.ariai.app.AriAiApp
 import com.ariai.app.MainActivity
+import com.ariai.app.data.remote.OAuthFailureStage
 import com.ariai.app.data.remote.PendingOAuthAuthorization
+import com.ariai.app.data.remote.oauthFailureMessageKey
 import com.ariai.app.util.tx
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -30,7 +32,8 @@ class OAuthCompletionActivity : ComponentActivity() {
                 val pending = PendingOAuthAuthorization.fromJson(raw, transactionId)
                     ?: throw IOException(tx("The OAuth sign-in expired. Try again."))
                 AuthorizationException.fromIntent(intent)?.let { exception ->
-                    throw IOException(tx("OAuth authorization failed. Please try again."), exception)
+                    val messageKey = oauthFailureMessageKey(exception.error, OAuthFailureStage.AUTHORIZATION)
+                    throw IOException(tx(messageKey), exception)
                 }
                 val response = AuthorizationResponse.fromIntent(intent)
                     ?: throw IOException(tx("The OAuth redirect did not match the pending sign-in."))

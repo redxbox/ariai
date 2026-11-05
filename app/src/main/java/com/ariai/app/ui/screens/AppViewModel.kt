@@ -14,6 +14,7 @@ import com.ariai.app.data.remote.ToolExecutionUpdate
 import com.ariai.app.data.remote.DefaultAgentTools
 import com.ariai.app.data.remote.MCPClient
 import com.ariai.app.data.remote.MCPConnection
+import com.ariai.app.data.remote.OAuthSessionException
 import com.ariai.app.data.remote.ErrorMapper
 import com.ariai.app.data.remote.shouldOfferCalculatorTool
 import com.ariai.app.data.remote.shouldStreamToolFreeChat
@@ -452,6 +453,9 @@ class AppViewModel(
 
     private fun safeMcpFailure(failure: Exception, secret: String? = null): String {
         val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
+        causes.filterIsInstance<OAuthSessionException>().firstOrNull()?.let { oauthFailure ->
+            return tx(oauthFailure.messageKey)
+        }
         val hasHttpStatus = causes.any { cause ->
             cause.message?.let { Regex("(?:HTTP|API Error)\\s+\\d{3}", RegexOption.IGNORE_CASE).containsMatchIn(it) } == true
         }

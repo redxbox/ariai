@@ -149,6 +149,7 @@ dependencies {
     // Local PDF OCR and selectable-text extraction; DOCX parsing uses Android's XML/ZIP APIs.
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.browser:browser:1.3.0")
     implementation("net.openid:appauth:0.11.1")
     
     // JSON

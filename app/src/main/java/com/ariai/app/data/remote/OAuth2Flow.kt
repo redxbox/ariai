@@ -4,9 +4,9 @@ import android.app.Activity
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
-import android.util.Base64
 import com.ariai.app.data.local.OAuthStateStore
 import com.ariai.app.data.local.PreferencesManager
+import com.ariai.app.data.models.McpAuthType
 import com.ariai.app.data.models.McpServerItem
 import com.ariai.app.data.models.OAuth2Config
 import com.ariai.app.data.models.Provider
@@ -26,7 +26,6 @@ import net.openid.appauth.AuthState
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationRequest
 import net.openid.appauth.AuthorizationResponse
-import net.openid.appauth.AuthorizationService
 import net.openid.appauth.AuthorizationServiceConfiguration
 import net.openid.appauth.ResponseTypeValues
 import net.openid.appauth.TokenResponse
@@ -84,8 +83,8 @@ internal data class PendingOAuthAuthorization(
                 ownerId = ownerId,
                 resourceUri = resourceUri.trim(),
                 config = normalized,
-                state = randomUrlSafe(32),
-                codeVerifier = randomUrlSafe(32),
+                state = OAuthPkce.generateState(),
+                codeVerifier = OAuthPkce.generateCodeVerifier(),
                 createdAtMillis = System.currentTimeMillis()
             )
         }
@@ -105,7 +104,7 @@ internal data class PendingOAuthAuthorization(
             val state = value.optString("state")
             val verifier = value.optString("codeVerifier")
             val createdAt = value.optLong("createdAtMillis", 0L)
-            if (state.length !in 43..128 || verifier.length !in 43..128) return null
+            if (!OAuthPkce.isValidState(state) || !OAuthPkce.isValidCodeVerifier(verifier)) return null
             if (createdAt <= 0L || System.currentTimeMillis() - createdAt !in 0..MAX_AGE_MILLIS) return null
             PendingOAuthAuthorization(id, ownerType, ownerId, resourceUri, config, state, verifier, createdAt)
         }.getOrNull()
@@ -126,7 +125,7 @@ object OAuthAuthorizationLauncher {
             throw IllegalArgumentException("Unsupported OAuth owner type.")
         }
         val pending = PendingOAuthAuthorization.create(type, ownerId, resourceUri, config)
-        val service = AuthorizationService(activity)
+        val service = OAuthAuthorizationServices.create(activity)
         try {
             preferences.addPendingOAuthAuthorization(pending.transactionId, pending.toJson())
             val serviceConfig = AuthorizationServiceConfiguration(
@@ -141,7 +140,11 @@ object OAuthAuthorizationLauncher {
             )
                 .setScopes(pending.config.scopes.split(Regex("\\s+")).filter(String::isNotBlank))
                 .setState(pending.state)
-                .setCodeVerifier(pending.codeVerifier)
+                .setCodeVerifier(
+                    pending.codeVerifier,
+                    OAuthPkce.codeChallenge(pending.codeVerifier),
+                    OAuthPkce.CODE_CHALLENGE_METHOD_S256
+                )
                 .build()
             val requestCode = SecureRandom().nextInt()
             // AppAuth supplies the redirect result through PendingIntent.send(fillInIntent), so
@@ -199,8 +202,12 @@ class OAuthSessionManager(
     }
 
     suspend fun mcpAccessToken(server: McpServerItem): String {
-        val config = server.oauthConfig?.requireValid()
-            ?: throw IOException(tx("Enter valid OAuth settings and connect this MCP server."))
+        if (server.authType != McpAuthType.OAUTH2) {
+            throw OAuthSessionException("Enter valid OAuth settings and connect this MCP server.")
+        }
+        val config = server.oauthConfig?.let { candidate ->
+            runCatching { candidate.requireValid() }.getOrNull()
+        } ?: throw OAuthSessionException("Enter valid OAuth settings and connect this MCP server.")
         val resourceUri = server.url.trim()
         val binding = oauthStateBinding(OAuthOwnerType.MCP_SERVER, server.id, resourceUri)
         return freshAccessToken("mcp:${server.id}", config, binding,
@@ -213,18 +220,23 @@ class OAuthSessionManager(
         response: AuthorizationResponse
     ) {
         val request = response.request
-        val stateMatches = constantTimeEquals(pending.state, request.state.orEmpty())
+        val challenge = OAuthPkce.codeChallenge(pending.codeVerifier)
+        val stateMatches = OAuthPkce.matchesState(pending.state, response.state) &&
+            OAuthPkce.matchesState(pending.state, request.state)
         val redirectMatches = request.redirectUri.toString() == pending.config.redirectUri
         val configurationMatches = request.configuration.authorizationEndpoint.toString() == pending.config.authorizationEndpoint &&
             request.configuration.tokenEndpoint.toString() == pending.config.tokenEndpoint
-        if (!stateMatches || !redirectMatches || !configurationMatches ||
-            request.clientId != pending.config.clientId || request.codeVerifier != pending.codeVerifier ||
-            request.responseType != ResponseTypeValues.CODE
+        val pkceMatches = request.codeVerifier == pending.codeVerifier &&
+            request.codeVerifierChallenge == challenge &&
+            request.codeVerifierChallengeMethod == OAuthPkce.CODE_CHALLENGE_METHOD_S256
+        if (!stateMatches || !redirectMatches || !configurationMatches || !pkceMatches ||
+            request.clientId != pending.config.clientId || request.responseType != ResponseTypeValues.CODE ||
+            response.authorizationCode.isNullOrBlank() || response.authorizationCode.length > MAX_AUTHORIZATION_CODE_LENGTH
         ) {
             throw IOException(tx("The OAuth redirect did not match the pending sign-in."))
         }
 
-        val service = AuthorizationService(appContext)
+        val service = OAuthAuthorizationServices.create(appContext)
         try {
             val tokenResult = try {
                 withTimeout(TOKEN_EXCHANGE_TIMEOUT_MS) {
@@ -247,10 +259,19 @@ class OAuthSessionManager(
             }
             val tokenResponse = tokenResult.fold(
                 onSuccess = { it },
-                onFailure = { throw IOException(tx("OAuth authorization failed. Please try again."), it) }
+                onFailure = { failure ->
+                    val errorCode = (failure as? AuthorizationException)?.error
+                    throw IOException(
+                        tx(oauthFailureMessageKey(errorCode, OAuthFailureStage.TOKEN_EXCHANGE)),
+                        failure
+                    )
+                }
             )
             if (tokenResponse.accessToken.isNullOrBlank()) {
                 throw IOException(tx("OAuth sign-in did not return an access token."))
+            }
+            if (!tokenResponse.tokenType.equals("Bearer", ignoreCase = true)) {
+                throw IOException(tx("The OAuth server did not return a Bearer access token."))
             }
             val authState = AuthState()
             authState.update(response, null as AuthorizationException?)
@@ -280,20 +301,20 @@ class OAuthSessionManager(
     ): String = withContext(Dispatchers.IO) {
         locks.computeIfAbsent(key) { Mutex() }.withLock {
             val rawState = load()?.takeIf(String::isNotBlank)
-                ?: throw IOException(tx("Connect with OAuth before making requests."))
+                ?: throw OAuthSessionException("Connect with OAuth before making requests.")
             val serialized = OAuthStateCodec.decode(rawState, config, binding)
-                ?: throw IOException(tx("OAuth settings changed. Connect again to continue."))
+                ?: throw OAuthSessionException("OAuth settings changed. Connect again to continue.")
             val authState = runCatching { AuthState.jsonDeserialize(serialized) }
-                .getOrElse { throw IOException(tx("The saved OAuth state is invalid. Reconnect to continue."), it) }
+                .getOrElse { throw OAuthSessionException("The saved OAuth state is invalid. Reconnect to continue.", it) }
             val savedConfiguration = authState.getAuthorizationServiceConfiguration()
-                ?: throw IOException(tx("The saved OAuth state is invalid. Reconnect to continue."))
+                ?: throw OAuthSessionException("The saved OAuth state is invalid. Reconnect to continue.")
             if (savedConfiguration.authorizationEndpoint.toString() != config.authorizationEndpoint ||
                 savedConfiguration.tokenEndpoint.toString() != config.tokenEndpoint
             ) {
-                throw IOException(tx("OAuth settings changed. Connect again to continue."))
+                throw OAuthSessionException("OAuth settings changed. Connect again to continue.")
             }
 
-            val service = AuthorizationService(appContext)
+            val service = OAuthAuthorizationServices.create(appContext)
             try {
                 val result = try {
                     withTimeout(TOKEN_REFRESH_TIMEOUT_MS) {
@@ -302,7 +323,7 @@ class OAuthSessionManager(
                                 when {
                                     exception != null -> if (continuation.isActive) continuation.resume(Result.failure(exception))
                                     accessToken.isNullOrBlank() -> if (continuation.isActive) continuation.resume(Result.failure(
-                                        IOException(tx("OAuth authorization expired. Reconnect to continue."))
+                                        OAuthSessionException("OAuth authorization expired. Reconnect to continue.")
                                     ))
                                     else -> if (continuation.isActive) continuation.resume(Result.success(accessToken))
                                 }
@@ -310,15 +331,21 @@ class OAuthSessionManager(
                         }
                     }.fold(
                         onSuccess = { it },
-                        onFailure = { throw IOException(tx("OAuth authorization expired. Reconnect to continue."), it) }
+                        onFailure = { failure ->
+                            val errorCode = (failure as? AuthorizationException)?.error
+                            throw OAuthSessionException(
+                                oauthFailureMessageKey(errorCode, OAuthFailureStage.TOKEN_REFRESH),
+                                failure
+                            )
+                        }
                     )
                 } catch (timeout: TimeoutCancellationException) {
-                    throw IOException(tx("OAuth token refresh timed out. Try again."), timeout)
+                    throw OAuthSessionException("OAuth token refresh timed out. Try again.", timeout)
                 }
 
                 val updatedState = OAuthStateCodec.encode(config, binding, authState.jsonSerializeString())
                 if (updatedState != rawState && !save(rawState, updatedState)) {
-                    throw IOException(tx("OAuth settings changed. Connect again to continue."))
+                    throw OAuthSessionException("OAuth settings changed. Connect again to continue.")
                 }
                 result
             } finally {
@@ -328,6 +355,7 @@ class OAuthSessionManager(
     }
 
     private companion object {
+        const val MAX_AUTHORIZATION_CODE_LENGTH = 8_192
         const val TOKEN_EXCHANGE_TIMEOUT_MS = 45_000L
         const val TOKEN_REFRESH_TIMEOUT_MS = 45_000L
     }
@@ -366,8 +394,3 @@ internal object OAuthStateCodec {
 
 private fun constantTimeEquals(expected: String, actual: String): Boolean =
     MessageDigest.isEqual(expected.toByteArray(Charsets.UTF_8), actual.toByteArray(Charsets.UTF_8))
-
-private fun randomUrlSafe(byteCount: Int): String = Base64.encodeToString(
-    ByteArray(byteCount).also(SecureRandom()::nextBytes),
-    Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
-)

@@ -71,6 +71,34 @@ class MCPClientTest {
     }
 
     @Test
+    fun oauthAccessTokenIsSentAsBearerForEveryMcpRequest() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(jsonResponse(jsonRpcResponse(1, initializeResult())))
+        server.enqueue(MockResponse().setResponseCode(202))
+        server.enqueue(jsonResponse(jsonRpcResponse(2, toolsResult())))
+        server.start()
+
+        val accessToken = "oauth-fresh-access-token"
+        val config = serverConfig(server, McpTransport.STREAMABLE_HTTP).copy(
+            authType = McpAuthType.OAUTH2,
+            authSecret = accessToken
+        )
+        val connection = MCPClient().connect(config)
+        try {
+            assertEquals("echo", connection.tools.single().name)
+            repeat(3) {
+                val request = server.takeRequest()
+                assertEquals("Bearer $accessToken", request.getHeader("Authorization"))
+                assertFalse(request.path.orEmpty().contains(accessToken))
+                assertFalse(request.body.readUtf8().contains(accessToken))
+            }
+        } finally {
+            connection.close()
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun streamableHttpAcceptsSseJsonRpcResponses() = runBlocking {
         val server = MockWebServer()
         server.enqueue(sseResponse(jsonRpcResponse(1, initializeResult())))
