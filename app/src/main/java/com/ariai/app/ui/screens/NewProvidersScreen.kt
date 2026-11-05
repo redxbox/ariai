@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.DragInteraction
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -166,11 +167,13 @@ fun NewProvidersScreen(
     ) { padding ->
         val listState = rememberLazyListState()
         // The search field keeps pulling the list back under the keyboard while
-        // scrolling (bring-into-view). Clear focus as soon as a scroll starts.
+        // scrolling (bring-into-view). Clear focus only when the user actually
+        // drags the list; layout-driven scrolls must not interrupt typing.
         val listFocusManager = LocalFocusManager.current
         LaunchedEffect(listState) {
-            snapshotFlow { listState.isScrollInProgress }
-                .collect { scrolling -> if (scrolling) listFocusManager.clearFocus() }
+            listState.interactionSource.interactions.collect { interaction ->
+                if (interaction is DragInteraction.Start) listFocusManager.clearFocus()
+            }
         }
         LazyColumn(
             state = listState,

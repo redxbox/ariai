@@ -13,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.DragInteraction
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -285,11 +286,13 @@ fun AddProviderScreen(
     LaunchedEffect(tab) { modelListState.scrollToItem(0) }
     // A focused text field keeps dragging the list back under the open keyboard
     // (bring-into-view), which makes scrolling jump until the user taps the screen.
-    // Drop focus the moment a scroll starts so the list stays where it is put.
+    // Only a real user drag dismisses the editor: layout-driven scrolls (the IME
+    // resizing the viewport, bring-into-view) must not yank focus mid-typing.
     val editorFocusManager = LocalFocusManager.current
     LaunchedEffect(modelListState) {
-        snapshotFlow { modelListState.isScrollInProgress }
-            .collect { scrolling -> if (scrolling) editorFocusManager.clearFocus() }
+        modelListState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) editorFocusManager.clearFocus()
+        }
     }
     if (showConnectionDialog) {
         ProviderConnectionDialog(
