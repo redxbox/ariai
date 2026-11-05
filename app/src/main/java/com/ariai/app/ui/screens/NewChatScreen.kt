@@ -2293,6 +2293,7 @@ private fun ModeChip(mode: ChatMode, onClose: () -> Unit, modifier: Modifier) {
     }
 }
 
+@android.annotation.SuppressLint("UnsafeOptInUsageError")
 @Composable
 private fun VideoCard(path: String) {
     val context = LocalContext.current
