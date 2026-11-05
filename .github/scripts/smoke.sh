@@ -39,6 +39,16 @@ step() {
 }
 end_step() { echo "::endgroup::"; }
 
+# Fresh AVDs (-no-snapshot) sometimes boot with no input method selected, so
+# every keyboard-dependent step would wait on a keyboard that never appears.
+# Enable and select the first available IME once, before the walkthrough.
+IME_ID="$(adb shell ime list -s 2>/dev/null | head -n 1 | tr -d '\r' || true)"
+if [[ -n "$IME_ID" ]]; then
+  adb shell ime enable "$IME_ID" >/dev/null 2>&1 || true
+  adb shell ime set "$IME_ID" >/dev/null 2>&1 || true
+  echo "::notice title=IME prewarm::Using input method $IME_ID"
+fi
+
 expect_text() {
   local label="$1"
   local output
@@ -60,8 +70,8 @@ expect_absent_text() {
   local attempt
   # Absence often follows a transition (the keyboard opening hides the fixed
   # actions), and emulator IMEs can take seconds to report their insets.
-  # Poll briefly; a settled absence still passes on the first check.
-  for attempt in $(seq 1 20); do
+  # Poll for up to 20 seconds; a settled absence still passes on the first check.
+  for attempt in $(seq 1 40); do
     status=0
     output="$(python3 .github/scripts/ui_tap.py --assert "$label" 2>&1)" || status=$?
     if [[ "$status" -eq 1 ]]; then
@@ -76,6 +86,10 @@ expect_absent_text() {
     fi
     sleep 0.5
   done
+  echo "$output"
+  local ime_state
+  ime_state="$(adb shell dumpsys input_method 2>/dev/null | grep -E 'mInputShown|mIsInputViewShown' | head -n 2 | tr '\n' ' ' || true)"
+  echo "::notice title=IME state when $label stayed visible::${ime_state:-unknown}"
   echo "::error title=Unexpected UI target::$label is present"
   FAILED=1
   capture_failure "$label"
