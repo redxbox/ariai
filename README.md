@@ -71,15 +71,57 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 The app version is **2.3.0-stable** (`versionCode` 5). The Gradle build uses Kotlin 2.2.20 with the official Jetpack Compose compiler plugin.
 
-## Signed release bundle
+## Releases (GitHub Releases)
 
-The **Signed Android App Bundle** GitHub Actions workflow builds and verifies a signed `.aab`, then uploads it with a SHA-256 checksum; it does not publish to Google Play. It runs manually (`workflow_dispatch`) or for an approved `v*` tag. Configure the release keystore secrets as documented in [`.github/RELEASE_SIGNING.md`](.github/RELEASE_SIGNING.md). Never commit the keystore or put secret values in logs or chat.
+Pushing a version tag (`v*`) runs the **Release APK and Signed AAB** workflow. It validates the tag against `versionName`, runs the JVM unit tests and release lint, builds a signed release APK (`app-release.apk`) and a signed App Bundle (`app-release.aab`), verifies both signatures, and writes `SHA256SUMS.txt`. It then publishes a GitHub Release whose notes are generated automatically from merged pull requests and commit titles, with the APK, AAB, and checksum file attached. The same workflow can be started manually (`workflow_dispatch`), which uploads the assets as workflow artifacts without creating a release. It does not publish to Google Play. Configure the release keystore secrets as documented in [`.github/RELEASE_SIGNING.md`](.github/RELEASE_SIGNING.md). Never commit the keystore or put secret values in logs or chat.
+
+### Tagging the first official release
+
+`versionName` is currently `2.3.0-stable` (`versionCode` 5), so the matching tag is `v2.3.0`:
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag -a v2.3.0 -m "Release v2.3.0 (versionName 2.3.0-stable)"
+git push origin v2.3.0
+```
+
+The workflow fails if the tag does not match `versionName` in `app/build.gradle.kts`; bump `versionName` and `versionCode` and push a new tag when cutting a newer release.
+
+## Branch hygiene (arena/* cleanup)
+
+Finished Arena work branches (`arena/...`) should be removed from both `origin` and the local Git cache. Run this from the repository root (it ignores refs that are already gone):
+
+```bash
+git fetch --prune origin
+for b in arena/5f5dd5fd-ariai arena/01a0af9c-ariai arena/2b1beab4-ariai; do
+  git push origin --delete "$b" 2>/dev/null || true   # delete the branch on origin
+  git branch -D "$b" 2>/dev/null || true               # delete the local branch and its cached copy
+done
+git remote prune origin
+git fetch --prune origin
+git branch -a                                          # verify only main (and any active branch) remain
+```
+
+Only run this for branches that are finished: no open pull request, nothing merged or in progress. Never delete the branch your current work still needs to push to.
+
+### Automatically delete head branches on merge
+
+1. Open the repository on GitHub (`https://github.com/redxbox/ariai`).
+2. Go to **Settings** → **General**.
+3. Scroll down to the **Pull Requests** section.
+4. Enable **Automatically delete head branches** (GitHub saves it immediately).
+5. From then on, GitHub deletes each head branch right after its pull request is merged.
+
+### Stale branch sweep
+
+The scheduled **Prune stale arena branches** workflow (`.github/workflows/stale-branches.yml`) runs weekly and on demand (`workflow_dispatch`). It deletes `origin/arena/*` branches whose last commit is older than 30 days and that have no open pull request, so abandoned work branches never accumulate again.
 
 ## Known limitations
 
 - The workspace console is deliberately not a general-purpose terminal: it has no shell, PRoot, package manager, or code execution. The HTML preview is static and does not run JavaScript, remote assets, or app frameworks.
 - OAuth endpoint discovery and dynamic client registration are not implemented; provider-specific non-standard OAuth parameters and client secrets are not supported. MCP also does not support local `stdio` processes, resource/prompt APIs, or subscriptions. Connected servers may perform consequential actions through tools that the user explicitly enabled.
-- Persistent memory controls are not implemented. Provider QR import from a gallery image and live camera scanning, plus offline LaTeX/Mermaid rendering, are supported.
+- Persistent memory controls are not implemented. Provider QR import from a gallery image and live camera scanning are supported.
 - Provider-specific features may fail or be unavailable when an endpoint does not implement the expected API. Check that provider's documentation and model capabilities.
 - The repository checkout has no top-level project `LICENSE` file. `THIRD_PARTY_LICENSES` contains dependency notices; it does not declare the project's own license.
 

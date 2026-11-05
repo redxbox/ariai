@@ -1,17 +1,17 @@
-name: Signed Android App Bundle
+name: Release APK and Signed AAB
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  signed-aab:
-    name: Test and build signed AAB
+  release:
+    name: Build, verify, and publish release assets
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -27,13 +27,32 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Validate tag against app versionName
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          version_name="$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -n1)"
+          tag_version="${GITHUB_REF_NAME#v}"
+          echo "versionName=$version_name tag=$GITHUB_REF_NAME"
+          case "$version_name" in
+            "$tag_version"|"$tag_version"*)
+              echo "Tag matches versionName."
+              ;;
+            *)
+              echo "::error::Tag '$GITHUB_REF_NAME' does not match versionName '$version_name'. Bump versionName/versionCode in app/build.gradle.kts first, then retag."
+              exit 1
+              ;;
+          esac
+
       - name: Run unit tests and release lint
         run: |
           set -o pipefail
-          chmod +x gradlew
           ./gradlew --no-daemon :app:testDebugUnitTest :app:lintRelease --stacktrace 2>&1 | tee validation.log
 
-      - name: Build and verify signed Android App Bundle
+      - name: Build signed release APK and App Bundle
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.RELEASE_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD || secrets.ANDROID_STORE_PASSWORD }}
@@ -70,22 +89,54 @@ jobs:
           export ARIAI_RELEASE_KEY_ALIAS="$ANDROID_KEY_ALIAS"
           export ARIAI_RELEASE_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
 
-          ./gradlew --no-daemon :app:bundleRelease --stacktrace
-          bundle='app/build/outputs/bundle/release/app-release.aab'
-          test -s "$bundle"
-          jarsigner -verify "$bundle"
-          sha256sum "$bundle" > "$bundle.sha256"
+          ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease --stacktrace 2>&1 | tee release-build.log
 
-      - name: Upload signed AAB and checksum
+          apk='app/build/outputs/apk/release/app-release.apk'
+          bundle='app/build/outputs/bundle/release/app-release.aab'
+          test -s "$apk"
+          test -s "$bundle"
+
+          # Validate both signatures before anything is published.
+          verify_out="$(jarsigner -verify "$bundle" 2>&1 || true)"
+          printf '%s\n' "$verify_out"
+          grep -q 'jar verified' <<<"$verify_out"
+
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$sdk_root"
+          apksigner_bin="$(find "$sdk_root/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n1 || true)"
+          test -n "$apksigner_bin"
+          "$apksigner_bin" verify --verbose --print-certs "$apk" | tee apksigner-verify.log
+
+          stage="$RUNNER_TEMP/release-assets"
+          mkdir -p "$stage"
+          cp "$apk" "$stage/app-release.apk"
+          cp "$bundle" "$stage/app-release.aab"
+          (cd "$stage" && sha256sum app-release.apk app-release.aab > SHA256SUMS.txt)
+          echo 'SHA-256 checksums:'
+          cat "$stage/SHA256SUMS.txt"
+
+      - name: Upload release assets as workflow artifact
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: ariai-release-aab-${{ github.run_number }}
+          name: ariai-release-assets-${{ github.run_number }}
           path: |
-            app/build/outputs/bundle/release/app-release.aab
-            app/build/outputs/bundle/release/app-release.aab.sha256
+            ${{ runner.temp }}/release-assets/app-release.apk
+            ${{ runner.temp }}/release-assets/app-release.aab
+            ${{ runner.temp }}/release-assets/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Create GitHub Release with generated notes and assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ runner.temp }}/release-assets/app-release.apk
+            ${{ runner.temp }}/release-assets/app-release.aab
+            ${{ runner.temp }}/release-assets/SHA256SUMS.txt
 
       - name: Upload validation logs
         if: always()
@@ -94,6 +145,8 @@ jobs:
           name: release-validation-logs
           path: |
             validation.log
+            release-build.log
+            apksigner-verify.log
             app/build/reports/lint-results-release.html
           if-no-files-found: ignore
           retention-days: 7
