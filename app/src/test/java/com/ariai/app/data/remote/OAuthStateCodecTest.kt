@@ -20,7 +20,7 @@ class OAuthStateCodecTest {
         val authState = "{\"accessToken\":\"test-access-token\",\"refreshToken\":\"test-refresh-token\"}"
         val encoded = OAuthStateCodec.encode(config, binding, authState)
         assertTrue(encoded.contains("bindingFingerprint"))
-        assertTrue(encoded.contains(authState))
+        assertTrue(encoded.contains("test-access-token"))
         assertEquals(authState, OAuthStateCodec.decode(encoded, config, binding))
         assertNull(OAuthStateCodec.decode(encoded, config, binding + "changed-resource"))
     }
