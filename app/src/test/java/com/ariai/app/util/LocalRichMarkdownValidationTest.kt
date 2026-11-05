@@ -35,7 +35,7 @@ class LocalRichMarkdownValidationTest {
 
     @Test
     fun escapedDollarSignsAreNotTreatedAsMath() {
-        assertFalse(hasLocalRichMarkdown("Escaped \$5 and \$6 stay plain text."))
+        assertFalse(hasLocalRichMarkdown("Escaped \\$5 and \\$6 stay plain text."))
         assertFalse(hasLocalRichMarkdown("Path C:\\temp\\\$file is not math."))
     }
 
