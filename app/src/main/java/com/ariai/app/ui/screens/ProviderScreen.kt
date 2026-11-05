@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,9 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -41,251 +42,12 @@ import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.ConnectionResult
 import com.ariai.app.data.remote.checkConnection
 import com.ariai.app.ui.components.ProviderBrandMark
-import com.ariai.app.util.LocalStrings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ProviderListScreen(
-    providers: List<Provider>,
-    onAddProvider: () -> Unit,
-    onEditProvider: (Provider) -> Unit,
-    onDeleteProvider: (Provider) -> Unit,
-    onTestProvider: (Provider) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val strings = LocalStrings.current
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(tx("AI Providers"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(tx("Connect. Mix. Create."), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onAddProvider) {
-                        Icon(Icons.Default.Add, contentDescription = tx("Add"))
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddProvider,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(strings.addProvider, fontWeight = FontWeight.Bold) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(16.dp)
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Filter chips simple
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf(tx("All"), tx("Cloud"), tx("Local"), tx("Custom")).forEachIndexed { index, label ->
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (index == 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.clickable { }
-                        ) {
-                            Text(label, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            if (providers.isEmpty()) {
-                item {
-                    Card(
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.size(80.dp).clip(CircleShape).background(
-                                    Brush.linearGradient(colors = listOf(AriInk.copy(alpha = 0.3f), AriInk.copy(alpha = 0.3f)))
-                                ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("🔌", style = MaterialTheme.typography.displaySmall)
-                            }
-                            Text(tx("No providers yet"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(tx("Add your first AI provider to start chatting"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-
-            items(count = providers.size, key = { index -> "provider:${providers[index].id}" }) { index ->
-                val provider = providers[index]
-                GlassProviderCard(
-                    provider = provider,
-                    onEdit = { onEditProvider(provider) },
-                    onDelete = { onDeleteProvider(provider) },
-                    onTest = { onTestProvider(provider) }
-                )
-            }
-
-            item {
-                Text(tx("Popular Providers"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-            }
-
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PopularProviderRow(name = "OpenAI", subtitle = "GPT-4o, 4o-mini, o3", letter = "O", colors = listOf(AriOpenAI, AriOpenAI.copy(alpha = 0.55f)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Anthropic", subtitle = "Claude 3.7, 3.5", letter = "C", colors = listOf(AriAnthropic, AriAnthropic.copy(alpha = 0.55f)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Google", subtitle = "Gemini 2.0, 1.5", letter = "G", colors = listOf(AriGemini, AriGemini.copy(alpha = 0.55f)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Meta", subtitle = "Llama 3.3, 3.1", letter = "M", colors = listOf(AriMuted, AriMuted), onClick = onAddProvider)
-                    PopularProviderRow(name = "DeepSeek", subtitle = "R1, V3", letter = "D", colors = listOf(AriMuted, AriMuted), onClick = onAddProvider)
-                    PopularProviderRow(name = "Qwen", subtitle = "Qwen3, Qwen2.5", letter = "Q", colors = listOf(AriCustom, AriCustom.copy(alpha = 0.55f)), onClick = onAddProvider)
-                    PopularProviderRow(name = "Mistral", subtitle = tx("Large, Medium, Small"), letter = "Mi", colors = listOf(AriAccent, AriAccent.copy(alpha = 0.55f)), onClick = onAddProvider)
-                }
-            }
-
-            item {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
-                    modifier = Modifier.fillMaxWidth().clickable { onAddProvider() }
-                ) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text(tx("Add Custom Provider"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(80.dp)) }
-        }
-    }
-}
-
-@Composable
-fun GlassProviderCard(
-    provider: Provider,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onTest: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var showMenu by remember { mutableStateOf(false) }
-    var enabled by remember { mutableStateOf(provider.enabled) }
-
-    val providerColor = when (provider.type) {
-        ProviderType.OPENAI -> listOf(AriOpenAI, AriOpenAI.copy(alpha = 0.55f))
-        ProviderType.GEMINI -> listOf(AriGemini, AriGemini.copy(alpha = 0.55f))
-        ProviderType.ANTHROPIC -> listOf(AriAnthropic, AriAnthropic.copy(alpha = 0.55f))
-        ProviderType.OLLAMA -> listOf(Color(0xFF000000), Color(0xFF434343))
-        else -> listOf(AriInk, AriInk)
-    }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(colors = providerColor)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = when (provider.type) {
-                        ProviderType.OPENAI -> "O"
-                        ProviderType.GEMINI -> "G"
-                        ProviderType.ANTHROPIC -> "C"
-                        ProviderType.OLLAMA -> "L"
-                        else -> provider.name.firstOrNull()?.toString() ?: "A"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AriCard,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(provider.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(
-                    if (provider.models.isNotEmpty()) provider.models.take(2).joinToString(", ") { it.displayName } else provider.baseUrl.take(30),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-            Switch(
-                checked = enabled,
-                onCheckedChange = { enabled = it },
-                modifier = Modifier.semantics { contentDescription = "${provider.name} ${tx("Enable")}" }
-            )
-            Box {
-                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.MoreVert, contentDescription = tx("Provider options"), modifier = Modifier.size(18.dp))
-                }
-                val menuShape = paperPopupShape(16.dp, 12.dp)
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false },
-                    modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
-                ) {
-                    DropdownMenuItem(text = { Text(tx("Test")) }, onClick = { showMenu = false; onTest() }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) })
-                    DropdownMenuItem(text = { Text(tx("Edit")) }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) })
-                    DropdownMenuItem(text = { Text(tx("Delete")) }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PopularProviderRow(
-    name: String,
-    subtitle: String,
-    letter: String,
-    colors: List<Color>,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(colors = colors)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(letter, color = AriCard, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Switch(checked = false, onCheckedChange = { onClick() })
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 internal data class ProviderPreset(val labelKey: String, val type: ProviderType, val baseUrl: String, val color: Color) {
@@ -323,6 +85,7 @@ fun AddProviderScreen(
     presetLabelKey: String? = null,
     fetchModels: suspend (Provider) -> List<AIModel>,
     onSave: (Provider) -> Unit,
+    onAuthorizeOAuth: (Provider) -> Unit = {},
     onBack: () -> Unit,
     onCheckProvider: suspend (Provider) -> ConnectionResult = { provider -> checkConnection(provider, fetchModels) },
     onDelete: (String) -> Unit = {},
@@ -352,6 +115,35 @@ fun AddProviderScreen(
     var selectedType by remember(initialProvider?.id, presetLabelKey, presetType) {
         mutableStateOf(initialProvider?.type ?: initialPreset?.type ?: presetType ?: ProviderType.OPENAI)
     }
+    var authType by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.authType ?: ProviderAuthType.API_KEY)
+    }
+    var oauthAuthorizationEndpoint by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.oauthConfig?.authorizationEndpoint.orEmpty())
+    }
+    var oauthTokenEndpoint by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.oauthConfig?.tokenEndpoint.orEmpty())
+    }
+    var oauthClientId by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.oauthConfig?.clientId.orEmpty())
+    }
+    var oauthScopes by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.oauthConfig?.scopes.orEmpty())
+    }
+    val oauthConfig = OAuth2Config(
+        authorizationEndpoint = oauthAuthorizationEndpoint,
+        tokenEndpoint = oauthTokenEndpoint,
+        clientId = oauthClientId,
+        scopes = oauthScopes
+    ).normalized()
+    val oauthSettingsUnchanged = initialProvider?.let {
+        it.oauthConfig.sameSettingsAs(oauthConfig) && it.baseUrl.trim() == baseUrl.trim()
+    } == true
+    val oauthState = initialProvider?.oauthStateJson?.takeIf {
+        authType == ProviderAuthType.OAUTH2 && oauthSettingsUnchanged
+    }
+    val oauthStateNeedsReentry = authType == ProviderAuthType.OAUTH2 &&
+        initialProvider?.oauthStateNeedsReentry == true && oauthSettingsUnchanged
     var reveal by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
     var advancedOpen by remember { mutableStateOf(false) }
@@ -360,6 +152,8 @@ fun AddProviderScreen(
     val providerId = remember { initialProvider?.id ?: java.util.UUID.randomUUID().toString() }
     var models by remember { mutableStateOf(initialProvider?.models ?: emptyList()) }
     var modelsEdited by remember { mutableStateOf(initialProvider != null) }
+    val configNeedsReentry = initialProvider?.providerConfigNeedsReentry == true
+    var replaceLockedConfigConfirmed by remember(initialProvider?.id) { mutableStateOf(false) }
     var showAddModel by remember { mutableStateOf(false) }
     var modelFilter by remember { mutableStateOf("") }
     var modelsExpanded by remember { mutableStateOf(false) }
@@ -371,10 +165,16 @@ fun AddProviderScreen(
     var showConnectionDialog by remember { mutableStateOf(false) }
     var checkingConnection by remember { mutableStateOf(false) }
     var connectionResult by remember { mutableStateOf<ConnectionResult?>(null) }
-    // Key of the URL/key/type the models were last fetched for. Save fetches again when it changes.
-    fun sourceKey() = "${baseUrl.trim()}|${apiKey.trim()}|$selectedType"
+    // Bound auth settings to the model catalog source so changes require an explicit refresh.
+    fun sourceKey() = if (authType == ProviderAuthType.OAUTH2) {
+        "${baseUrl.trim()}|$selectedType|${oauthConfig.fingerprint()}"
+    } else "${baseUrl.trim()}|${apiKey.trim()}|$selectedType|${authType.name}"
     var fetchedKey by remember {
-        mutableStateOf(initialProvider?.let { "${it.baseUrl.trim()}|${it.apiKey.trim()}|${it.type}" })
+        mutableStateOf(initialProvider?.let { provider ->
+            if (provider.authType == ProviderAuthType.OAUTH2 && provider.oauthConfig != null) {
+                "${provider.baseUrl.trim()}|${provider.type}|${provider.oauthConfig.fingerprint()}"
+            } else "${provider.baseUrl.trim()}|${provider.apiKey.trim()}|${provider.type}|${provider.authType.name}"
+        })
     }
     fun draftProvider(list: List<AIModel>) = Provider(
         id = providerId,
@@ -382,12 +182,19 @@ fun AddProviderScreen(
         type = selectedType,
         baseUrl = baseUrl.trim(),
         apiKey = apiKey.trim(),
-        models = list.map { it.copy(providerId = providerId) },
+        models = (if (authType == ProviderAuthType.OAUTH2 && list.isEmpty()) {
+            getDefaultModelsForType(selectedType, providerId)
+        } else list).map { it.copy(providerId = providerId) },
         enabled = enabled,
         customHeaders = headers.filter { it.first.isNotBlank() }.toMap(),
         customBody = customBody.trim().ifBlank { null },
         createdAt = initialProvider?.createdAt ?: System.currentTimeMillis(),
-        apiKeyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
+        apiKeyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank(),
+        providerConfigNeedsReentry = configNeedsReentry && !replaceLockedConfigConfirmed,
+        authType = authType,
+        oauthConfig = oauthConfig.takeIf { authType == ProviderAuthType.OAUTH2 },
+        oauthStateJson = oauthState,
+        oauthStateNeedsReentry = oauthStateNeedsReentry
     )
     fun runConnectionCheck() {
         if (checkingConnection || fetching) return
@@ -454,21 +261,36 @@ fun AddProviderScreen(
             }
         }
     }
-    val keyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
-    val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody) && !keyNeedsReentry
+    val keyNeedsReentry = authType == ProviderAuthType.API_KEY && selectedType != ProviderType.OLLAMA &&
+        initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
+    val oauthConfigError = if (authType == ProviderAuthType.OAUTH2) oauthConfig.validationError() else null
+    val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody) &&
+        !keyNeedsReentry && oauthConfigError == null
     val visibleModels = models.filter {
         modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
     }
     fun saveProviderDraft() {
-        if (sourceKey() != fetchedKey) {
-            // URL, key or type changed: refresh the models before saving.
+        val oauthNeedsInitialAuthorization = authType == ProviderAuthType.OAUTH2 && oauthState.isNullOrBlank()
+        if (sourceKey() != fetchedKey && !oauthNeedsInitialAuthorization &&
+            (!configNeedsReentry || replaceLockedConfigConfirmed)
+        ) {
+            // Refresh catalogs only when the selected authentication state can access the endpoint.
             fetchAndMerge(onDone = { list -> onSave(draftProvider(list)) })
         } else {
+            // The repository preserves locked ciphertext unless replacement was explicitly confirmed.
             onSave(draftProvider(models))
         }
     }
     val modelListState = rememberLazyListState()
     LaunchedEffect(tab) { modelListState.scrollToItem(0) }
+    // A focused text field keeps dragging the list back under the open keyboard
+    // (bring-into-view), which makes scrolling jump until the user taps the screen.
+    // Drop focus the moment a scroll starts so the list stays where it is put.
+    val editorFocusManager = LocalFocusManager.current
+    LaunchedEffect(modelListState) {
+        snapshotFlow { modelListState.isScrollInProgress }
+            .collect { scrolling -> if (scrolling) editorFocusManager.clearFocus() }
+    }
     if (showConnectionDialog) {
         ProviderConnectionDialog(
             providerName = name.trim().ifBlank { tx("New provider") },
@@ -600,32 +422,120 @@ fun AddProviderScreen(
                             colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        OutlinedTextField(
-                            value = apiKey,
-                            onValueChange = { apiKey = it },
-                            label = { Text(tx("API key")) },
-                            singleLine = true,
-                            visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
-                            trailingIcon = {
-                                IconButton(onClick = { reveal = !reveal }) {
-                                    Icon(Icons.Default.Visibility, contentDescription = if (reveal) tx("Hide key") else tx("Show key"), tint = AriInk.copy(alpha = 0.5f))
-                                }
-                            },
-                            shape = RoundedCornerShape(18.dp),
-                            colors = providerFieldColors(),
-                            modifier = Modifier.fillMaxWidth().testTag("provider-api-key")
-                        )
-                        Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
-                        if (keyNeedsReentry) {
+                        Text(tx("Authentication"), fontWeight = FontWeight.Medium, color = AriInk)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = authType == ProviderAuthType.API_KEY,
+                                onClick = { authType = ProviderAuthType.API_KEY },
+                                label = { Text(tx("API key")) }
+                            )
+                            FilterChip(
+                                selected = authType == ProviderAuthType.OAUTH2,
+                                onClick = { authType = ProviderAuthType.OAUTH2 },
+                                label = { Text(tx("OAuth 2.0")) }
+                            )
+                        }
+                        if (authType == ProviderAuthType.API_KEY) {
+                            OutlinedTextField(
+                                value = apiKey,
+                                onValueChange = { apiKey = it },
+                                label = { Text(tx("API key")) },
+                                singleLine = true,
+                                visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    IconButton(onClick = { reveal = !reveal }) {
+                                        Icon(Icons.Default.Visibility, contentDescription = if (reveal) tx("Hide key") else tx("Show key"), tint = AriInk.copy(alpha = 0.5f))
+                                    }
+                                },
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-api-key")
+                            )
+                            Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
+                            if (keyNeedsReentry) {
+                                Text(
+                                    "${tx("The saved API key could not be unlocked.")} ${tx("Re-enter it in AI Providers and save.")}",
+                                    fontSize = 12.sp,
+                                    color = AriAccent
+                                )
+                            }
+                        } else {
                             Text(
-                                "${tx("The saved API key could not be unlocked.")} ${tx("Re-enter it in AI Providers and save.")}",
+                                tx("Uses OAuth 2.0 Authorization Code with PKCE for native public clients. AriAI never stores a client secret."),
+                                fontSize = 12.sp,
+                                color = AriInk.copy(alpha = 0.62f)
+                            )
+                            OutlinedTextField(
+                                value = oauthAuthorizationEndpoint,
+                                onValueChange = { oauthAuthorizationEndpoint = it.take(OAuth2Config.MAX_ENDPOINT_LENGTH) },
+                                label = { Text(tx("Authorization endpoint (HTTPS)")) },
+                                singleLine = true,
+                                isError = oauthAuthorizationEndpoint.isNotBlank() && !isValidOAuth2Endpoint(oauthAuthorizationEndpoint),
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-oauth-authorization-endpoint")
+                            )
+                            OutlinedTextField(
+                                value = oauthTokenEndpoint,
+                                onValueChange = { oauthTokenEndpoint = it.take(OAuth2Config.MAX_ENDPOINT_LENGTH) },
+                                label = { Text(tx("Token endpoint (HTTPS)")) },
+                                singleLine = true,
+                                isError = oauthTokenEndpoint.isNotBlank() && !isValidOAuth2Endpoint(oauthTokenEndpoint),
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-oauth-token-endpoint")
+                            )
+                            OutlinedTextField(
+                                value = oauthClientId,
+                                onValueChange = { oauthClientId = it.take(OAuth2Config.MAX_CLIENT_ID_LENGTH) },
+                                label = { Text(tx("OAuth client ID")) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-oauth-client-id")
+                            )
+                            OutlinedTextField(
+                                value = oauthScopes,
+                                onValueChange = { oauthScopes = it.take(OAuth2Config.MAX_SCOPES_LENGTH) },
+                                label = { Text(tx("Scopes (space-separated)")) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-oauth-scopes")
+                            )
+                            Text(tx("Redirect URI"), fontSize = 12.sp, color = AriMuted)
+                            SelectionContainer {
+                                Text(OAuth2Config.DEFAULT_REDIRECT_URI, fontSize = 13.sp, color = AriInk)
+                            }
+                            Text(
+                                if (oauthStateNeedsReentry) tx("Saved OAuth state could not be unlocked. Connect again to replace it.")
+                                else if (!oauthState.isNullOrBlank()) tx("OAuth connected; tokens are stored encrypted on this device.")
+                                else tx("Not connected. Save and connect to authorize this provider."),
+                                fontSize = 12.sp,
+                                color = if (oauthStateNeedsReentry) AriAccent else AriInk.copy(alpha = 0.62f)
+                            )
+                            OutlinedButton(
+                                onClick = { onAuthorizeOAuth(draftProvider(models)) },
+                                enabled = name.isNotBlank() && baseUrl.isNotBlank() && oauthConfigError == null,
+                                shape = RoundedCornerShape(18.dp),
+                                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("provider-oauth-connect")
+                            ) { Text(tx("Connect with OAuth"), fontWeight = FontWeight.SemiBold) }
+                        }
+                        if (configNeedsReentry) {
+                            Text(
+                                "${tx("Saved provider settings could not be unlocked.")} ${tx("Re-enter the provider configuration in AI Providers and save.")}",
                                 fontSize = 12.sp,
                                 color = AriAccent
                             )
+                            TextButton(onClick = { replaceLockedConfigConfirmed = true }) {
+                                Text(tx("Replace with current provider settings"), color = AriAccent)
+                            }
                         }
                         FetchModelsRow(
                             fetching = fetching,
-                            canFetch = baseUrl.isNotBlank() && !keyNeedsReentry,
+                            canFetch = baseUrl.isNotBlank() && !keyNeedsReentry &&
+                                (authType == ProviderAuthType.API_KEY || (!oauthState.isNullOrBlank() && !oauthStateNeedsReentry)) &&
+                                (!configNeedsReentry || replaceLockedConfigConfirmed),
                             status = fetchError ?: if (models.isEmpty()) null else "${models.size} ${tx("models")}",
                             isError = fetchError != null,
                             onFetch = { fetchAndMerge({}, showModelsWhenFetched = true) }
@@ -1298,11 +1208,6 @@ private fun AddModelSheet(
 
         }
     }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(start = 6.dp))
 }
 
 /** Fetch models from the API, with the status or error underneath. */

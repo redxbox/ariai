@@ -14,6 +14,7 @@ import com.ariai.app.data.remote.ToolExecutionUpdate
 import com.ariai.app.data.remote.DefaultAgentTools
 import com.ariai.app.data.remote.MCPClient
 import com.ariai.app.data.remote.MCPConnection
+import com.ariai.app.data.remote.OAuthSessionException
 import com.ariai.app.data.remote.ErrorMapper
 import com.ariai.app.data.remote.shouldOfferCalculatorTool
 import com.ariai.app.data.remote.shouldStreamToolFreeChat
@@ -82,7 +83,8 @@ Capability and tool honesty:
 class AppViewModel(
     private val repository: ChatRepository,
     private val prefs: PreferencesManager,
-    private val workspaceRepository: WorkspaceRepository
+    private val workspaceRepository: WorkspaceRepository,
+    private val oauthSessionManager: com.ariai.app.data.remote.OAuthSessionManager
 ) : ViewModel() {
     private val publicUrlFetcher = PublicUrlFetcher()
     private val githubRepositoryClient = GitHubRepositoryClient()
@@ -262,8 +264,6 @@ class AppViewModel(
     private val _streamingContent = MutableStateFlow("")
     val streamingContent = _streamingContent.asStateFlow()
 
-    private val _generatedImages = MutableStateFlow<List<GeneratedImage>>(emptyList())
-    val generatedImages = _generatedImages.asStateFlow()
     private val _generatedMediaBytes = MutableStateFlow(0L)
     val generatedMediaBytes = _generatedMediaBytes.asStateFlow()
 
@@ -286,9 +286,6 @@ class AppViewModel(
             }
         }
     }
-
-    private val _isGeneratingImage = MutableStateFlow(false)
-    val isGeneratingImage = _isGeneratingImage.asStateFlow()
 
     fun setLanguage(lang: String) {
         viewModelScope.launch { prefs.setLanguage(lang) }
@@ -330,16 +327,23 @@ class AppViewModel(
         }
     }
 
-    fun addMcpServer(server: McpServerItem) {
+    fun addMcpServer(server: McpServerItem, onSaved: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
-            prefs.updateMcpServers { current ->
-                if (current.any { it.id == server.id }) {
-                    current.map { existing -> if (existing.id == server.id) server else existing }
-                } else {
-                    current + server
+            val saved = runCatching {
+                prefs.updateMcpServers { current ->
+                    if (current.any { it.id == server.id }) {
+                        current.map { existing -> if (existing.id == server.id) server else existing }
+                    } else {
+                        current + server
+                    }
                 }
+                true
+            }.getOrElse {
+                com.ariai.app.util.AppLog.warn(it, "save MCP server")
+                false
             }
-            _mcpServerRuntime.update { it - server.id }
+            if (saved) _mcpServerRuntime.update { it - server.id }
+            onSaved(saved)
         }
     }
 
@@ -359,13 +363,20 @@ class AppViewModel(
         }
     }
 
+    private suspend fun serverForMcpRequest(server: McpServerItem): McpServerItem =
+        if (server.authType == McpAuthType.OAUTH2) {
+            server.copy(authSecret = oauthSessionManager.mcpAccessToken(server))
+        } else server
+
     fun testMcpServer(id: String) {
         val configuredServer = mcpServers.value.firstOrNull { it.id == id } ?: return
         val server = configuredServer.copy(enabled = true)
         _mcpServerRuntime.update { states -> states + (id to McpServerRuntimeState(isConnecting = true)) }
         viewModelScope.launch {
+            var requestServer = server
             try {
-                val tools = mcpClient.testConnection(server)
+                requestServer = serverForMcpRequest(server)
+                val tools = mcpClient.testConnection(requestServer)
                 _mcpServerRuntime.update { states ->
                     states + (id to McpServerRuntimeState(
                         toolNames = tools.map { it.displayName }.take(MAX_MCP_TOOLS_PER_TURN),
@@ -377,7 +388,7 @@ class AppViewModel(
             } catch (failure: Exception) {
                 _mcpServerRuntime.update { states ->
                     states + (id to McpServerRuntimeState(
-                        error = safeMcpFailure(failure, server.authSecret),
+                        error = safeMcpFailure(failure, requestServer.authSecret),
                         checkedAtMillis = System.currentTimeMillis()
                     ))
                 }
@@ -405,14 +416,16 @@ class AppViewModel(
         }
         viewModelScope.launch {
             var connection: MCPConnection? = null
+            var requestServer = server
             try {
-                val connected = mcpClient.connect(server)
+                requestServer = serverForMcpRequest(server)
+                val connected = mcpClient.connect(requestServer)
                 connection = connected
                 onResult(load(connected), null)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                onResult(emptyList(), safeMcpFailure(failure, server.authSecret))
+                onResult(emptyList(), safeMcpFailure(failure, requestServer.authSecret))
             } finally {
                 runCatching { connection?.close() }
             }
@@ -440,6 +453,9 @@ class AppViewModel(
 
     private fun safeMcpFailure(failure: Exception, secret: String? = null): String {
         val causes = generateSequence<Throwable>(failure) { it.cause }.take(8).toList()
+        causes.filterIsInstance<OAuthSessionException>().firstOrNull()?.let { oauthFailure ->
+            return tx(oauthFailure.messageKey)
+        }
         val hasHttpStatus = causes.any { cause ->
             cause.message?.let { Regex("(?:HTTP|API Error)\\s+\\d{3}", RegexOption.IGNORE_CASE).containsMatchIn(it) } == true
         }
@@ -459,6 +475,11 @@ class AppViewModel(
     }
 
     suspend fun fetchModels(provider: Provider): List<AIModel> = repository.fetchModels(provider)
+
+    /** Persists a provider draft without first calling its API; used before browser OAuth sign-in. */
+    fun persistProvider(provider: Provider, onSaved: (Boolean) -> Unit = {}) {
+        viewModelScope.launch { onSaved(repository.saveProvider(provider)) }
+    }
 
     fun saveProvider(provider: Provider, onSaved: (Boolean) -> Unit = {}) {
         saveProviderAndReturn(provider) { savedProvider -> onSaved(savedProvider != null) }
@@ -1092,6 +1113,26 @@ class AppViewModel(
             postImmediateError("⚠️ No provider configured. Add a provider in Settings > AI Providers.")
             return false
         }
+        val inputModelId = _modelOverrides.value[chatId]?.second
+            ?: getCurrentChat()?.modelId
+            ?: provider.models.firstOrNull()?.id
+        val contextWindow = provider.models.firstOrNull { it.id == inputModelId }?.contextWindow
+            ?.takeIf { it > 0 } ?: 8192
+        // Match recentForModel's conservative history budget and reject a single oversized turn
+        // instead of allowing that method to force it into a request above the context limit.
+        val inputTokenBudget = safeUserInputTokenBudget(contextWindow)
+        val inputEstimate = estimateMessageTokens(
+            ChatMessage(
+                chatId = chatId,
+                role = MessageRole.USER,
+                content = requestContent,
+                attachments = requestAttachments
+            )
+        )
+        if (inputEstimate > inputTokenBudget) {
+            postImmediateError(tx("This message and its attachments are too large for the selected model's context. Shorten the text or remove files."))
+            return false
+        }
 
         val localSearchKey = if (searchMode == SearchMode.LOCAL || (searchMode == SearchMode.MODEL && !supportsNativeSearch(provider))) {
             resolveSearchProviderKey(searchKeys.value, searchProvider.value)?.let { name ->
@@ -1114,6 +1155,10 @@ class AppViewModel(
         sendPending = true
         _isSending.value = true
         launchSendJob { generation ->
+            // Set once the user turn is persisted so cancellation/error paths can
+            // always attach a visible outcome to the question that was asked.
+            var sentUserMessageId: String? = null
+            var cancellationHandled = false
             try {
                 if (!chatPersistenceGate.await(chatId)) {
                     onUserMessageSaved(false)
@@ -1135,17 +1180,6 @@ class AppViewModel(
                 val targetModelId = _modelOverrides.value[chatId]?.second
                     ?: getCurrentChat()?.modelId
                     ?: provider.models.firstOrNull()?.id
-                if (existingUserMessage == null && messageToReplace == null &&
-                    !(provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA)) {
-                    val contextWindow = provider.models.firstOrNull { it.id == targetModelId }?.contextWindow ?: 8192
-                    maybeAutoSummarizeHistoryBeforeSend(
-                        chatId = chatId,
-                        provider = provider,
-                        modelId = targetModelId ?: "openai",
-                        contextWindow = contextWindow,
-                        generation = generation
-                    )
-                }
                 val userMessage = storedUserMessage ?: ChatMessage(
                     chatId = chatId,
                     role = MessageRole.USER,
@@ -1165,9 +1199,32 @@ class AppViewModel(
                 } else {
                     appendMessage(userMessage)
                 }
+                sentUserMessageId = userMessage.id
+
+                // Persist the turn before the optional history summary: the question must
+                // never vanish if the app is backgrounded while the summary is generated.
+                if (existingUserMessage == null && messageToReplace == null && !provider.providerConfigNeedsReentry &&
+                    !(provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA)) {
+                    val contextWindow = provider.models.firstOrNull { it.id == targetModelId }?.contextWindow ?: 8192
+                    maybeAutoSummarizeHistoryBeforeSend(
+                        chatId = chatId,
+                        provider = provider,
+                        modelId = targetModelId ?: "openai",
+                        contextWindow = contextWindow,
+                        generation = generation
+                    )
+                }
 
                 val sentContent = userMessage.content
                 val sentAttachments = userMessage.attachments
+                if (provider.providerConfigNeedsReentry) {
+                    postAssistantError(
+                        chatId,
+                        "${tx("Saved provider settings could not be unlocked.")} ${tx("Re-enter the provider configuration in AI Providers and save.")} (${provider.name})",
+                        userMessage.id
+                    )
+                    return@launchSendJob
+                }
                 if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
                     postAssistantError(
                         chatId,
@@ -1335,8 +1392,10 @@ class AppViewModel(
                                     generation,
                                     ToolExecutionUpdate(connectionProgressId, "Connecting to MCP", ToolExecutionPhase.RUNNING)
                                 )
+                                var requestServer = server
                                 try {
-                                    val connection = mcpClient.connect(server)
+                                    requestServer = serverForMcpRequest(server)
+                                    val connection = mcpClient.connect(requestServer)
                                     mcpConnectionsForTurn += connection
                                     val discovered = connection.asChatFunctionTools(server.allowedToolNames).take(remainingMcpTools)
                                     tools.addAll(discovered)
@@ -1374,7 +1433,7 @@ class AppViewModel(
                                     )
                                     _mcpServerRuntime.update { states ->
                                         states + (server.id to McpServerRuntimeState(
-                                            error = safeMcpFailure(failure, server.authSecret),
+                                            error = safeMcpFailure(failure, requestServer.authSecret),
                                             checkedAtMillis = System.currentTimeMillis()
                                         ))
                                     }
@@ -1509,6 +1568,7 @@ class AppViewModel(
                     }
 
                 } catch (e: kotlinx.coroutines.CancellationException) {
+                    cancellationHandled = true
                     // Stopped by the user: keep the text that has arrived so far as the reply.
                     val partialResponse = fullResponse + streamedPreview
                     if (partialResponse.isNotBlank()) {
@@ -1524,6 +1584,13 @@ class AppViewModel(
                             repository.saveMessage(partial)
                             appendMessage(partial)
                         }
+                    } else if (sendGeneration - generation <= 1) {
+                        // Nothing arrived yet: never leave the question without a visible outcome.
+                        postAssistantError(
+                            chatId,
+                            tx("The reply was interrupted before it arrived. Send again to retry."),
+                            userMessage.id
+                        )
                     }
                     throw e
                 } catch (e: Exception) {
@@ -1548,10 +1615,42 @@ class AppViewModel(
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 setSendStreamingState(generation, streaming = false)
+                // Cancellation outside the streaming block (e.g. during the history
+                // summary) still has to leave a visible, retryable outcome behind.
+                if (!cancellationHandled && sendGeneration - generation <= 1) {
+                    val keptParentId = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        sentUserMessageId ?: existingUserMessage?.id ?: run {
+                            if (messageToReplace == null && requestContent.isNotBlank()) {
+                                // The turn was cancelled before it reached the database.
+                                val keptTurn = ChatMessage(
+                                    chatId = chatId,
+                                    role = MessageRole.USER,
+                                    content = requestContent,
+                                    attachments = requestAttachments
+                                )
+                                if (repository.saveMessage(keptTurn)) {
+                                    appendMessage(keptTurn)
+                                    keptTurn.id
+                                } else null
+                            } else {
+                                _messages.value.lastOrNull { it.role == MessageRole.USER }?.id
+                            }
+                        }
+                    }
+                    postAssistantError(
+                        chatId,
+                        tx("The reply was interrupted before it arrived. Send again to retry."),
+                        keptParentId
+                    )
+                }
                 throw e
             } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "sendMessage")
                 setSendStreamingState(generation, streaming = false)
+                if (sendGeneration == generation) {
+                    // Surface setup failures too; a silent log leaves the question with no outcome.
+                    postAssistantError(chatId, ErrorMapper.chatMessage(e, provider.name), sentUserMessageId)
+                }
             }
         }
         return true
@@ -1970,28 +2069,6 @@ class AppViewModel(
             )
         }
         return newChatId
-    }
-
-    fun generateImage(prompt: String, model: String, size: String) {
-        val provider = providers.value.firstOrNull { it.models.any { m -> m.supportsImageGen } }
-            ?: providers.value.firstOrNull() ?: return
-
-        viewModelScope.launch {
-            _isGeneratingImage.value = true
-            try {
-                val request = ImageGenRequest(
-                    prompt = prompt,
-                    model = model,
-                    size = size
-                )
-                val response = repository.generateImage(provider, request)
-                _generatedImages.value = response.images + _generatedImages.value
-            } catch (e: Exception) {
-                // Handle error
-            } finally {
-                _isGeneratingImage.value = false
-            }
-        }
     }
 
     /** Resolves a chat for UI state even before Room has emitted a newly inserted row. */

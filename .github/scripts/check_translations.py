@@ -28,6 +28,22 @@ DYNAMIC_KEYS = {
     "AI news today",
     "Python best practices",
     "Quantum computing",
+    "Connect with OAuth before making requests.",
+    "Enter valid OAuth settings and connect this MCP server.",
+    "OAuth authorization expired. Reconnect to continue.",
+    "OAuth settings changed. Connect again to continue.",
+    "OAuth token refresh timed out. Try again.",
+    "The saved OAuth state is invalid. Reconnect to continue.",
+    "OAuth access was denied. You can try signing in again.",
+    "OAuth authorization expired or was rejected. Start sign-in again.",
+    "OAuth token exchange failed. Check your connection and try again.",
+    "OAuth token refresh failed. Check your connection and try again.",
+    "The OAuth authorization code expired or was already used. Start sign-in again.",
+    "The OAuth client was rejected. Check the client ID and OAuth server configuration.",
+    "The OAuth refresh token expired or was revoked. Reconnect to continue.",
+    "The OAuth server rejected the requested scopes. Check the configured scopes.",
+    "The OAuth server rejected the request. Check the OAuth configuration.",
+    "The OAuth server is temporarily unavailable. Try again later.",
 }
 
 source_text = "\n".join(

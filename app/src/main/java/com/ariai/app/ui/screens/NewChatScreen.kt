@@ -21,6 +21,7 @@ import android.graphics.PorterDuffXfermode
 import android.os.Build
 import android.os.SystemClock
 import android.provider.MediaStore
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -74,6 +75,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -103,6 +107,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ariai.app.data.DocumentTextExtractor
 import com.ariai.app.data.models.Attachment
 import com.ariai.app.data.models.AttachmentType
 import com.ariai.app.data.models.Agent
@@ -149,6 +154,7 @@ fun NewChatScreen(
     searchMode: SearchMode = SearchMode.OFF,
     searchProvider: String? = null,
     searchKeys: Map<String, String> = emptyMap(),
+    biometricLockEnabled: Boolean = false,
     favorites: Set<String> = emptySet(),
     modelUsageCounts: Map<Pair<String, String>, Int> = emptyMap(),
     onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode, (Boolean) -> Unit) -> Boolean,
@@ -202,7 +208,8 @@ fun NewChatScreen(
     }
     val recognizer = remember(voiceContext, onDeviceSpeechRecognitionAvailable) {
         when {
-            onDeviceSpeechRecognitionAvailable -> android.speech.SpeechRecognizer.createOnDeviceSpeechRecognizer(voiceContext)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && onDeviceSpeechRecognitionAvailable ->
+                android.speech.SpeechRecognizer.createOnDeviceSpeechRecognizer(voiceContext)
             android.speech.SpeechRecognizer.isRecognitionAvailable(voiceContext) ->
                 android.speech.SpeechRecognizer.createSpeechRecognizer(voiceContext)
             else -> null
@@ -355,7 +362,25 @@ fun NewChatScreen(
     var mediaPickerVideoConfirmed by remember { mutableStateOf(false) }
     var showThinking by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
+    var searchSheetAuthenticated by remember(biometricLockEnabled) { mutableStateOf(!biometricLockEnabled) }
+    var sensitiveAuthAttempt by remember { mutableIntStateOf(0) }
+    val currentShowSearch by rememberUpdatedState(showSearch)
     var showTopMenu by remember { mutableStateOf(false) }
+    DisposableEffect(biometricLockEnabled) {
+        val lifecycle = ProcessLifecycleOwner.get().lifecycle
+        var backgrounded = false
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                backgrounded = true
+                if (biometricLockEnabled && currentShowSearch) searchSheetAuthenticated = false
+            } else if (event == Lifecycle.Event.ON_START && backgrounded) {
+                backgrounded = false
+                if (biometricLockEnabled && currentShowSearch) sensitiveAuthAttempt++
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -516,6 +541,26 @@ fun NewChatScreen(
         scope.launch { snackbarHostState.showSnackbar(text) }
     }
 
+    LaunchedEffect(showSearch, biometricLockEnabled, sensitiveAuthAttempt) {
+        if (!showSearch) {
+            searchSheetAuthenticated = !biometricLockEnabled
+            return@LaunchedEffect
+        }
+        if (!biometricLockEnabled) {
+            searchSheetAuthenticated = true
+            return@LaunchedEffect
+        }
+        searchSheetAuthenticated = false
+        val activity = context as? androidx.fragment.app.FragmentActivity
+        val authenticated = activity != null && authenticateSensitiveSettings(activity)
+        if (authenticated) {
+            searchSheetAuthenticated = true
+        } else {
+            showSearch = false
+            showNote(tx("Authentication was cancelled or failed."))
+        }
+    }
+
     fun copyToClipboard(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText(tx("Message"), text))
@@ -577,8 +622,28 @@ fun NewChatScreen(
     fun readFiles(uris: List<Uri>) {
         if (uris.isEmpty()) return
         scope.launch {
+            val documentExtractor = DocumentTextExtractor(context)
             for (uri in uris) {
-                when (val result = withContext(Dispatchers.IO) { readAttachment(context, uri) }) {
+                val isDocument = try {
+                    documentExtractor.supports(uri)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    false
+                }
+                val result = if (isDocument) {
+                    val extractedText = documentExtractor.extractText(uri)
+                    if (extractedText.isFailure) {
+                        showNote(tx("Could not read this document."))
+                        continue
+                    }
+                    withContext(Dispatchers.IO) {
+                        readAttachment(context, uri, extractedText.getOrThrow())
+                    }
+                } else {
+                    withContext(Dispatchers.IO) { readAttachment(context, uri) }
+                }
+                when (result) {
                     is ReadResult.Ok -> pending = pending + result.attachment
                     is ReadResult.Error -> showNote(result.message)
                 }
@@ -767,7 +832,7 @@ fun NewChatScreen(
     if (showThinking) {
         ThinkingDepthSheet(level = reasoning, onLevelChange = onReasoningChange, onDismiss = { showThinking = false })
     }
-    if (showSearch) {
+    if (showSearch && (!biometricLockEnabled || searchSheetAuthenticated)) {
         SearchSheet(
             mode = searchMode,
             providers = providers,
@@ -1359,19 +1424,17 @@ fun NewChatScreen(
                     if (hasStreamingText) {
                         item(key = "streaming") {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ToolExecutionTimeline(toolExecutionUpdates)
                                 if (generationActive) {
-                                    GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
+                                    GenerationWorkCard(waitingStatus, elapsedGenerationSeconds, toolExecutionUpdates)
+                                } else {
+                                    ToolExecutionTimeline(toolExecutionUpdates)
                                 }
                                 AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
                             }
                         }
                     } else if (showWaitingStatus) {
                         item(key = "waiting-status") {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ToolExecutionTimeline(toolExecutionUpdates)
-                                GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
-                            }
+                            GenerationWorkCard(waitingStatus, elapsedGenerationSeconds, toolExecutionUpdates)
                         }
                     } else if (toolExecutionUpdates.isNotEmpty() && messages.lastOrNull()?.role != MessageRole.ASSISTANT) {
                         item(key = "tool-timeline") {
@@ -1524,6 +1587,9 @@ private fun ContextUsageIndicator(
 
 @Composable
 private fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
+    val extractedText = attachment.textContent?.takeIf(String::isNotBlank)
+    val preview = remember(extractedText) { extractedText?.let { attachmentTextPreview(it) } }
+    val estimatedTokens = remember(extractedText) { extractedText?.let(::estimateAttachmentTextTokens) }
     Surface(shape = RoundedCornerShape(18.dp), color = AriCard, shadowElevation = 0.dp) {
         Row(
             modifier = Modifier.padding(start = 10.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
@@ -1536,14 +1602,36 @@ private fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
             }
             Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text(
-                attachment.name,
-                fontSize = 12.sp,
-                color = Ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 140.dp)
-            )
+            Column(
+                modifier = Modifier.widthIn(max = 190.dp).padding(vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                Text(
+                    attachment.name,
+                    fontSize = 12.sp,
+                    color = Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!preview.isNullOrBlank()) {
+                    Text(
+                        preview,
+                        color = Muted,
+                        fontSize = 10.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("attachment-text-preview")
+                    )
+                    Text(
+                        "${tx("Approx.")} $estimatedTokens ${tx("tokens in context")}",
+                        color = Muted,
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("attachment-token-estimate")
+                    )
+                }
+            }
             IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Default.Close, contentDescription = tx("Remove attachment"), tint = Ink.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
             }
@@ -1710,6 +1798,142 @@ private fun GenerationStatus(label: String, elapsedSeconds: Long, active: Boolea
             )
         }
     }
+}
+
+/**
+ * Live status card while a reply is being generated: an animated "thinking /
+ * searching" header with the elapsed time, plus every tool step executed so far,
+ * all inside one frame.
+ */
+@Composable
+private fun GenerationWorkCard(
+    label: String,
+    elapsedSeconds: Long,
+    updates: List<ToolExecutionUpdate>,
+    modifier: Modifier = Modifier
+) {
+    val steps = updates.takeLast(8)
+    val hiddenCount = updates.size - steps.size
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = AriCard,
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.85f)),
+        modifier = modifier
+            .padding(start = 4.dp)
+            .widthIn(max = 380.dp)
+            .animateContentSize(tween(200, easing = FastOutSlowInEasing))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PulsingWorkDot()
+                val statusText = if (elapsedSeconds > 0L) {
+                    "$label · ${formatGenerationDuration(elapsedSeconds)}"
+                } else {
+                    label
+                }
+                Text(
+                    statusText,
+                    color = Ink,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("chat-generation-status-active")
+                )
+            }
+            if (steps.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.testTag("chat-tool-timeline"),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    if (hiddenCount > 0) {
+                        Text("+$hiddenCount", color = Muted.copy(alpha = 0.7f), fontSize = 10.sp)
+                    }
+                    steps.forEach { update -> GenerationWorkStep(update) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GenerationWorkStep(update: ToolExecutionUpdate) {
+    val label = tx(update.label)
+    val statusText = when (update.phase) {
+        ToolExecutionPhase.COMPLETED -> if (update.elapsedMs >= 1_000L) {
+            "$label · ${formatGenerationDuration(update.elapsedMs / 1_000L)}"
+        } else {
+            label
+        }
+        ToolExecutionPhase.FAILED -> "$label · ${tx("Failed")}"
+        ToolExecutionPhase.CANCELLED -> "$label · ${tx("Stopped")}"
+        ToolExecutionPhase.RUNNING -> label
+    }
+    Row(
+        modifier = Modifier.testTag("chat-tool-execution-step"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        when (update.phase) {
+            ToolExecutionPhase.RUNNING -> CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                strokeWidth = 1.5.dp,
+                color = Accent
+            )
+            ToolExecutionPhase.COMPLETED -> Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = Accent.copy(alpha = 0.85f),
+                modifier = Modifier.size(13.dp)
+            )
+            ToolExecutionPhase.FAILED -> Icon(
+                Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = Muted,
+                modifier = Modifier.size(13.dp)
+            )
+            ToolExecutionPhase.CANCELLED -> Icon(
+                Icons.Default.Stop,
+                contentDescription = null,
+                tint = Muted,
+                modifier = Modifier.size(13.dp)
+            )
+        }
+        Text(
+            statusText,
+            color = if (update.phase == ToolExecutionPhase.RUNNING) Ink else Muted,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/** Small breathing dot that signals an active generation without a heavy spinner. */
+@Composable
+private fun PulsingWorkDot() {
+    val transition = rememberInfiniteTransition(label = "generation-work-dot")
+    val alpha by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "generation-work-dot-alpha"
+    )
+    Box(
+        modifier = Modifier
+            .size(9.dp)
+            .clip(CircleShape)
+            .background(Accent.copy(alpha = alpha))
+    )
 }
 
 private fun formatGenerationDuration(totalSeconds: Long): String {
@@ -2250,6 +2474,7 @@ private fun ModeChip(mode: ChatMode, onClose: () -> Unit, modifier: Modifier) {
     }
 }
 
+@android.annotation.SuppressLint("UnsafeOptInUsageError")
 @Composable
 private fun VideoCard(path: String) {
     val context = LocalContext.current
@@ -2324,6 +2549,7 @@ private fun AudioCard(path: String) {
 }
 
 /** Plays a generated video inside the app with the Media3 player and its standard controls. */
+@androidx.media3.common.util.UnstableApi
 @Composable
 private fun VideoPlayerDialog(path: String, onDismiss: () -> Unit) {
     val context = LocalContext.current

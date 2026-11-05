@@ -6,16 +6,16 @@ AriAi is an Android chat client for connecting to AI providers with your own cre
 
 ## Current features
 
-- **Providers:** OpenAI, Google Gemini, Anthropic, Ollama, and OpenAI-compatible endpoints. Add your own endpoint and credentials, or import provider settings from JSON/a QR image in the gallery; the app does not automatically create a free demo provider.
+- **Providers:** OpenAI, Google Gemini, Anthropic, Ollama, and OpenAI-compatible endpoints. Add your own endpoint and credentials, or import provider settings from JSON/a QR image in the gallery; compatible providers can use OAuth 2.0 Authorization Code with PKCE for public clients. The app does not automatically create a free demo provider.
 - **Chat:** streaming preference for ordinary tool-free replies, searchable model switching, provider health/latency checks, a context-use gauge using provider-reported token counts when available and a labeled estimate otherwise, conversation folders, branching, retry, per-chat temperature/top-P/system-prompt controls, and Markdown for headings, lists, links, simple tables, and fenced code blocks with basic syntax coloring and line numbers. Tool-routed replies use a non-streaming request path.
 - **Agents:** built-in and custom agents, prompt variables/examples, provider/model binding, temperature/top-P defaults, and opt-in calculator/web-search/MCP tools. Agent settings are stored locally; unsupported arbitrary code execution, persistent memory, and callable image generation are visibly unavailable.
 - **Workspace:** AI-assisted generation and updating of one text file at a time using the selected text model, small UTF-8 files in private app storage, a static HTML preview with JavaScript and network requests blocked, and a read-only console limited to listing/reading those workspace files.
-- **Tools:** request-scoped calculator, configured web search, reading a URL supplied by the user, read-only access to public GitHub repository files, and remote MCP tools where the selected model supports tool calls. MCP supports Streamable HTTP and legacy HTTP+SSE, JSON-RPC initialization, tool discovery and calls, Bearer/custom-header credentials encrypted with Android Keystore, and per-server/per-tool opt-in. Remote endpoints require HTTPS; HTTP is limited to loopback development. MCP tool outputs are treated as untrusted data.
+- **Tools:** request-scoped calculator, configured web search, reading a URL supplied by the user, read-only access to public GitHub repository files, and remote MCP tools where the selected model supports tool calls. MCP supports Streamable HTTP and legacy HTTP+SSE, JSON-RPC initialization, tool discovery and calls, encrypted Bearer/custom-header credentials and OAuth 2.0 PKCE tokens, and per-server/per-tool opt-in. Remote endpoints require HTTPS; HTTP is limited to loopback development. MCP tool outputs are treated as untrusted data.
 - **Web search:** off by default. Gemini and Anthropic can use built-in web search with the AI provider's existing API key. Choose either provider in the chat search sheet; its gear opens inline key settings, and the same key is saved to the provider and reused for search. The Search service settings page manages these two providers—no separate search API key is needed. Results and availability depend on the provider and account limits.
-- **Attachments:** scaled images, videos up to 12 MB, and supported plain-text/code files. Video bytes are sent only to compatible Gemini requests; other providers receive a note that the video cannot be viewed. PDF and DOCX extraction are not implemented.
+- **Attachments:** scaled images, videos up to 12 MB, supported plain-text/code files, and bounded on-device text extraction from PDFs and DOCX files, including offline Persian/English OCR for scanned PDF pages (other OCR scripts are not bundled). OCR is limited to 20 scanned pages per file; PDF extraction reads at most the first 20 pages and 60,000 characters. Video bytes are sent only to compatible Gemini requests; other providers receive a note that the video cannot be viewed. Extracted text remains on-device until you send the message to your selected provider. Audio-file attachments are not supported.
 - **Media:** image, video, or audio generation is available only when a configured provider/model exposes the relevant capability. Provider API support and costs vary. Image editing is not available for Gemini providers.
 - **Appearance and language:** light/dark/system theme, optional Android 12+ dynamic accent colors, and translated UI strings in English and Persian. Some unkeyed descriptions and provider-returned error details remain in English.
-- **Privacy:** data remains on-device unless you invoke a feature that sends it to a configured provider or service. See the [privacy policy](PRIVACY_POLICY.md) and the [Google Play Data Safety worksheet](PLAY_DATA_SAFETY.md).
+- **Privacy:** provider API keys, custom headers/bodies/model headers, search keys, MCP credentials, OAuth token state, and pending sign-in data are encrypted with Android Keystore at rest. PDF/DOCX extraction and Persian/English OCR run on-device; chat inference is sent to the provider you select when you send a message. See the [privacy policy](PRIVACY_POLICY.md) and [Google Play Data Safety worksheet](PLAY_DATA_SAFETY.md).
 
 ## Configure a provider
 
@@ -26,6 +26,14 @@ AriAi is an Android chat client for connecting to AI providers with your own cre
 
 The app does not provide keys, credits, or a built-in free demo account. Use only endpoints and credentials you trust.
 
+### Configure an OAuth 2.0 provider
+
+1. In the provider editor, choose **OAuth 2.0** authentication and enter the HTTPS authorization endpoint, token endpoint, public client ID, and optional space-separated scopes.
+2. Register AriAI as a public/native client with the OAuth service and allow this exact redirect URI: `com.ariai.app://oauth2redirect`.
+3. Tap **Connect with OAuth** and complete sign-in in AppAuth's secure Android Custom Tab (or its compatible-browser fallback). AriAI uses Authorization Code with PKCE (S256), verifies the returned `state`, and does not request or store a client secret. Tokens are encrypted with Android Keystore and refreshed before provider or MCP requests when required.
+
+AriAI uses manually configured endpoints and client IDs; authorization-server discovery, dynamic client registration, and provider-specific non-standard OAuth parameters are not implemented. OAuth token state is bound to the configured provider API or MCP server URL; changing that URL requires signing in again.
+
 ## Configure web search
 
 1. In a chat, open the **Web search** sheet and use the gear beside **Google Gemini** or **Anthropic Claude** to enter the AI provider's API key inline. Saving it connects the provider, selects its text model, and enables web search with that same key. Adding or editing a Gemini/Anthropic provider from **AI Providers** also activates native search.
@@ -34,11 +42,12 @@ The app does not provide keys, credits, or a built-in free demo account. Use onl
 ## Configure MCP tools
 
 1. Open **Settings → MCP servers** and add a server's HTTPS endpoint. The legacy SSE transport is available for existing servers; Streamable HTTP is preferred for new deployments.
-2. Choose no authentication, a Bearer token, or a custom HTTP header. Credentials are encrypted locally with Android Keystore and are never placed in the URL.
-3. Test the connection to initialize the MCP session and list tools. New servers start disabled; enabling a server requires an explicit trust confirmation. Select only the discovered tools you want to make available to chats.
-4. For a custom agent, also enable **MCP tools** in that agent's available-tools list. A normal chat may use only the enabled servers and individually allowed tools.
+2. Choose no authentication, a Bearer token, a custom HTTP header, or OAuth 2.0. Static credentials and OAuth token state are encrypted locally with Android Keystore; credentials are never placed in the URL.
+3. For OAuth, enter the HTTPS authorization and token endpoints, public client ID, and optional scopes. Register the redirect URI `com.ariai.app://oauth2redirect` with the OAuth service, then tap **Connect with OAuth**. AppAuth opens a secure Android Custom Tab and uses Authorization Code with PKCE S256; AriAI does not accept client secrets.
+4. Test the connection to initialize the MCP session and list tools. New servers start disabled; enabling a server requires an explicit trust confirmation. Select only the discovered tools you want to make available to chats.
+5. For a custom agent, also enable **MCP tools** in that agent's available-tools list. A normal chat may use only the enabled servers and individually allowed tools.
 
-AriAI currently supports static Bearer/custom-header credentials; browser-based OAuth, local `stdio` processes, MCP resources/prompts, and subscriptions are not implemented. MCP servers can read or change data when their enabled tools are called. Review a server before trusting it; server descriptions and results are untrusted.
+AriAI supports OAuth 2.0 Authorization Code with PKCE for compatible MCP servers using manually entered authorization/token endpoints and a pre-registered public client. Authorization-server discovery and dynamic client registration are not implemented, and client secrets are not supported. Local `stdio` processes, MCP resources/prompts, and subscriptions are also unavailable. MCP servers can read or change data when their enabled tools are called. Review a server before trusting it; server descriptions and results are untrusted.
 
 ## Privacy and Google Play data safety
 
@@ -62,15 +71,57 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 The app version is **2.3.0-stable** (`versionCode` 5). The Gradle build uses Kotlin 2.2.20 with the official Jetpack Compose compiler plugin.
 
-## Signed release bundle
+## Releases (GitHub Releases)
 
-The **Signed Android App Bundle** GitHub Actions workflow builds and verifies a signed `.aab`, then uploads it with a SHA-256 checksum; it does not publish to Google Play. It runs manually (`workflow_dispatch`) or for an approved `v*` tag. Configure the release keystore secrets as documented in [`.github/RELEASE_SIGNING.md`](.github/RELEASE_SIGNING.md). Never commit the keystore or put secret values in logs or chat.
+Pushing a version tag (`v*`) runs the **Release APK and Signed AAB** workflow. It validates the tag against `versionName`, runs the JVM unit tests and release lint, builds a signed release APK (`app-release.apk`) and a signed App Bundle (`app-release.aab`), verifies both signatures, and writes `SHA256SUMS.txt`. It then publishes a GitHub Release whose notes are generated automatically from merged pull requests and commit titles, with the APK, AAB, and checksum file attached. The same workflow can be started manually (`workflow_dispatch`), which uploads the assets as workflow artifacts without creating a release. It does not publish to Google Play. Configure the release keystore secrets as documented in [`.github/RELEASE_SIGNING.md`](.github/RELEASE_SIGNING.md). Never commit the keystore or put secret values in logs or chat.
+
+### Tagging the first official release
+
+`versionName` is currently `2.3.0-stable` (`versionCode` 5), so the matching tag is `v2.3.0`:
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag -a v2.3.0 -m "Release v2.3.0 (versionName 2.3.0-stable)"
+git push origin v2.3.0
+```
+
+The workflow fails if the tag does not match `versionName` in `app/build.gradle.kts`; bump `versionName` and `versionCode` and push a new tag when cutting a newer release.
+
+## Branch hygiene (arena/* cleanup)
+
+Finished Arena work branches (`arena/...`) should be removed from both `origin` and the local Git cache. Run this from the repository root (it ignores refs that are already gone):
+
+```bash
+git fetch --prune origin
+for b in arena/5f5dd5fd-ariai arena/01a0af9c-ariai arena/2b1beab4-ariai; do
+  git push origin --delete "$b" 2>/dev/null || true   # delete the branch on origin
+  git branch -D "$b" 2>/dev/null || true               # delete the local branch and its cached copy
+done
+git remote prune origin
+git fetch --prune origin
+git branch -a                                          # verify only main (and any active branch) remain
+```
+
+Only run this for branches that are finished: no open pull request, nothing merged or in progress. Never delete the branch your current work still needs to push to.
+
+### Automatically delete head branches on merge
+
+1. Open the repository on GitHub (`https://github.com/redxbox/ariai`).
+2. Go to **Settings** → **General**.
+3. Scroll down to the **Pull Requests** section.
+4. Enable **Automatically delete head branches** (GitHub saves it immediately).
+5. From then on, GitHub deletes each head branch right after its pull request is merged.
+
+### Stale branch sweep
+
+The scheduled **Prune stale arena branches** workflow (`.github/workflows/stale-branches.yml`) runs weekly and on demand (`workflow_dispatch`). It deletes `origin/arena/*` branches whose last commit is older than 30 days and that have no open pull request, so abandoned work branches never accumulate again.
 
 ## Known limitations
 
 - The workspace console is deliberately not a general-purpose terminal: it has no shell, PRoot, package manager, or code execution. The HTML preview is static and does not run JavaScript, remote assets, or app frameworks.
-- MCP does not yet support OAuth, local `stdio` processes, resource/prompt APIs, or subscriptions. Connected servers may perform consequential actions through tools that the user explicitly enabled.
-- PDF/DOCX text extraction, persistent memory controls, camera-based QR scanning, and LaTeX/Mermaid rendering are not implemented. Provider QR import from a gallery image is supported.
+- OAuth endpoint discovery and dynamic client registration are not implemented; provider-specific non-standard OAuth parameters and client secrets are not supported. MCP also does not support local `stdio` processes, resource/prompt APIs, or subscriptions. Connected servers may perform consequential actions through tools that the user explicitly enabled.
+- Persistent memory controls are not implemented. Provider QR import from a gallery image and live camera scanning are supported.
 - Provider-specific features may fail or be unavailable when an endpoint does not implement the expected API. Check that provider's documentation and model capabilities.
 - The repository checkout has no top-level project `LICENSE` file. `THIRD_PARTY_LICENSES` contains dependency notices; it does not declare the project's own license.
 

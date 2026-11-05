@@ -2,6 +2,9 @@ package com.ariai.app
 
 import com.ariai.app.ui.theme.*
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -39,8 +42,11 @@ import com.ariai.app.ui.drawer.AppDrawerContent
 import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
 import com.ariai.app.util.LocalStrings
+import com.ariai.app.data.models.McpServerItem
+import com.ariai.app.data.models.OAuth2Config
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
+import com.ariai.app.data.remote.OAuthAuthorizationLauncher
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.util.UiLang
 import com.ariai.app.util.getStringsForLanguage
@@ -49,12 +55,23 @@ import kotlinx.coroutines.launch
 
 private const val PRIVACY_POLICY_URL = "https://github.com/redxbox/ariai/blob/main/PRIVACY_POLICY.md"
 
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val app = application as AriAiApp
-            val viewModelFactory = AppViewModelFactory(app.repository, app.preferencesManager, app.workspaceRepository)
+            val viewModelFactory = AppViewModelFactory(
+                app.repository,
+                app.preferencesManager,
+                app.workspaceRepository,
+                app.oauthSessionManager
+            )
             val viewModel: AppViewModel = viewModel(factory = viewModelFactory)
 
             val language by viewModel.language.collectAsState()
@@ -100,10 +117,51 @@ fun AppRoot(viewModel: AppViewModel) {
     val context = LocalContext.current
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: startRoute
-    val isProtectedSettingsRoute = currentRoute == "providers" || currentRoute == "mcp" ||
-        currentRoute.startsWith("add_provider") || currentRoute.startsWith("edit_provider/")
+    val isProtectedSettingsRoute = isSensitiveSettingsRoute(currentRoute)
     val snackbarHostState = remember { SnackbarHostState() }
     var showAbout by remember { mutableStateOf(false) }
+
+    fun beginOAuth(ownerType: String, ownerId: String, resourceUri: String, config: OAuth2Config) {
+        val activity = context.findActivity()
+        if (activity == null) {
+            scope.launch { snackbarHostState.showSnackbar(tx("OAuth sign-in is unavailable here.")) }
+            return
+        }
+        val app = activity.application as AriAiApp
+        scope.launch {
+            try {
+                OAuthAuthorizationLauncher.begin(activity, app.preferencesManager, ownerType, ownerId, resourceUri, config)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                snackbarHostState.showSnackbar(failure.message ?: tx("Could not open the OAuth sign-in page."))
+            }
+        }
+    }
+
+    fun authorizeProvider(provider: Provider) {
+        val config = provider.oauthConfig
+        if (config == null) {
+            scope.launch { snackbarHostState.showSnackbar(tx("Enter valid OAuth settings and client ID.")) }
+            return
+        }
+        viewModel.persistProvider(provider) { saved ->
+            if (saved) beginOAuth("PROVIDER", provider.id, provider.baseUrl, config)
+            else scope.launch { snackbarHostState.showSnackbar(tx("Could not save provider. Please try again.")) }
+        }
+    }
+
+    fun authorizeMcpServer(server: McpServerItem) {
+        val config = server.oauthConfig
+        if (config == null) {
+            scope.launch { snackbarHostState.showSnackbar(tx("Enter valid OAuth settings and client ID.")) }
+            return
+        }
+        viewModel.addMcpServer(server) { saved ->
+            if (saved) beginOAuth("MCP_SERVER", server.id, server.url, config)
+            else scope.launch { snackbarHostState.showSnackbar(tx("Could not save MCP server. Please try again.")) }
+        }
+    }
 
     val providers by viewModel.providers.collectAsState()
     val chats by viewModel.chats.collectAsState()
@@ -255,7 +313,7 @@ fun AppRoot(viewModel: AppViewModel) {
 
     fun activateNativeSearch(provider: Provider) {
         if (provider.type != ProviderType.GEMINI && provider.type != ProviderType.ANTHROPIC) return
-        if (!provider.enabled || provider.apiKey.isBlank() || provider.apiKeyNeedsReentry) return
+        if (!provider.enabled || provider.apiKey.isBlank() || provider.apiKeyNeedsReentry || provider.providerConfigNeedsReentry) return
         val textModel = provider.models.firstOrNull { it.outputsText && it.id.isNotBlank() } ?: return
         currentChatId?.let { viewModel.updateChatProvider(it, provider.id, textModel.id) }
             ?: viewModel.setDefaultSelection(provider.id, textModel.id)
@@ -378,6 +436,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         searchMode = searchModeState,
                         searchProvider = searchProviderState,
                         searchKeys = searchKeys,
+                        biometricLockEnabled = biometricLockEnabled,
                         favorites = favoriteModels,
                         modelUsageCounts = modelUsageCounts,
                         onSendMessage = { text, files, level, mode, onSaved ->
@@ -447,6 +506,7 @@ fun AppRoot(viewModel: AppViewModel) {
                                 onSaved(savedProvider)
                             }
                         },
+                        onAuthorizeOAuth = { provider -> authorizeProvider(provider) },
                         onImportProvider = { provider ->
                             viewModel.saveProviderAndReturn(provider) { savedProvider ->
                                 if (savedProvider == null) {
@@ -489,6 +549,7 @@ fun AppRoot(viewModel: AppViewModel) {
                                 }
                             }
                         },
+                        onAuthorizeOAuth = { provider -> authorizeProvider(provider) },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -512,6 +573,7 @@ fun AppRoot(viewModel: AppViewModel) {
                                 }
                             }
                         },
+                        onAuthorizeOAuth = { provider -> authorizeProvider(provider) },
                         onBack = { navController.popBackStack() },
                         onDelete = { id -> viewModel.deleteProvider(id); navController.popBackStack() }
                     )
@@ -618,7 +680,8 @@ fun AppRoot(viewModel: AppViewModel) {
                     SimpleMcpScreen(
                         servers = mcpServers,
                         onToggle = viewModel::toggleMcpServer,
-                        onAdd = viewModel::addMcpServer,
+                        onAdd = { viewModel.addMcpServer(it) },
+                        onAuthorizeOAuth = { server -> authorizeMcpServer(server) },
                         onRemove = viewModel::removeMcpServer,
                         onBack = { navController.popBackStack() },
                         runtimeStates = mcpServerRuntime,
@@ -678,17 +741,18 @@ fun AppRoot(viewModel: AppViewModel) {
 }
 
 private fun isProtectedSettingsDestination(route: String?): Boolean =
-    route == "providers" || route == "mcp" || route?.startsWith("add_provider") == true || route?.startsWith("edit_provider/") == true
+    route?.let(::isSensitiveSettingsRoute) == true
 
 class AppViewModelFactory(
     private val repository: com.ariai.app.data.repository.ChatRepository,
     private val prefs: com.ariai.app.data.local.PreferencesManager,
-    private val workspaceRepository: com.ariai.app.data.repository.WorkspaceRepository
+    private val workspaceRepository: com.ariai.app.data.repository.WorkspaceRepository,
+    private val oauthSessionManager: com.ariai.app.data.remote.OAuthSessionManager
 ) : androidx.lifecycle.ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AppViewModel::class.java)) {
-            return AppViewModel(repository, prefs, workspaceRepository) as T
+            return AppViewModel(repository, prefs, workspaceRepository, oauthSessionManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

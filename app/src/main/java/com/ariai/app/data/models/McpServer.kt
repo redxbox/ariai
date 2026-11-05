@@ -13,7 +13,8 @@ enum class McpTransport(val label: String) {
 enum class McpAuthType {
     NONE,
     BEARER,
-    CUSTOM_HEADER
+    CUSTOM_HEADER,
+    OAUTH2
 }
 
 /**
@@ -28,8 +29,12 @@ data class McpServerItem(
     val enabled: Boolean = true,
     val authType: McpAuthType = McpAuthType.NONE,
     val authHeaderName: String = "X-API-Key",
+    /** Static credentials or encrypted OAuth AuthState JSON, hydrated only in memory. */
     val authSecret: String? = null,
-    val allowedToolNames: Set<String> = emptySet()
+    val allowedToolNames: Set<String> = emptySet(),
+    val oauthConfig: OAuth2Config? = null,
+    /** In-memory command used to clear an otherwise preserved encrypted secret during edits. */
+    val clearAuthSecret: Boolean = false
 )
 
 /** Small, version-tolerant codec for non-secret MCP server metadata. */
@@ -55,6 +60,7 @@ object McpServerCodec {
                     .put("authHeaderName", server.authHeaderName.trim().take(MAX_HEADER_LENGTH))
                     .put("allowedTools", JSONArray(server.allowedToolNames.take(MAX_TOOLS_PER_SERVER)
                         .map { it.take(MAX_TOOL_NAME_LENGTH) }.filter(String::isNotBlank)))
+                    .apply { server.oauthConfig?.let { put("oauthConfig", it.toJson()) } }
             )
         }
     }.toString()
@@ -80,6 +86,10 @@ object McpServerCodec {
                 if (authType == McpAuthType.CUSTOM_HEADER && !isValidMcpHeaderName(headerName)) {
                     return@mapNotNull null
                 }
+                val oauthConfig = if (authType == McpAuthType.OAUTH2) {
+                    OAuth2Config.fromJson(item.optJSONObject("oauthConfig") ?: return@mapNotNull null)
+                        ?: return@mapNotNull null
+                } else null
                 val allowedTools = item.optJSONArray("allowedTools")?.let { names ->
                     buildSet {
                         for (toolIndex in 0 until minOf(names.length(), MAX_TOOLS_PER_SERVER)) {
@@ -97,7 +107,8 @@ object McpServerCodec {
                     authType = authType,
                     authHeaderName = headerName,
                     authSecret = null,
-                    allowedToolNames = allowedTools
+                    allowedToolNames = allowedTools,
+                    oauthConfig = oauthConfig
                 )
             }
         }.getOrDefault(emptyList())
@@ -107,7 +118,7 @@ object McpServerCodec {
 /** Stores only per-server ciphertext in DataStore, so one lost credential does not block edits. */
 object McpServerAuthCipherCodec {
     private const val MAX_SERVERS = 50
-    private const val MAX_CIPHERTEXT_LENGTH = 12_000
+    private const val MAX_CIPHERTEXT_LENGTH = 64_000
 
     fun encode(ciphertexts: Map<String, String>): String = JSONArray().apply {
         ciphertexts.entries.take(MAX_SERVERS).forEach { (id, value) ->

@@ -2,6 +2,7 @@ package com.ariai.app.data.remote
 
 import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
+import com.ariai.app.data.models.ProviderAuthType
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.util.tx
 import kotlinx.coroutines.CancellationException
@@ -24,14 +25,28 @@ suspend fun checkConnection(provider: Provider, fetch: suspend (Provider) -> Lis
             tx("It must start with https:// and point to the API root, for example https://api.openai.com/v1")
         )
     }
-    if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
+    if (provider.providerConfigNeedsReentry) {
+        return ConnectionResult.Failed(
+            tx("Saved provider settings could not be unlocked."),
+            tx("Re-enter the provider configuration in AI Providers and save.")
+        )
+    }
+    if (provider.authType == ProviderAuthType.API_KEY && provider.apiKeyNeedsReentry &&
+        provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA
+    ) {
         return ConnectionResult.Failed(
             tx("The saved API key could not be unlocked."),
             tx("Re-enter it in AI Providers and save.")
         )
     }
-    if (provider.type != ProviderType.OLLAMA && provider.apiKey.isBlank()) {
+    if (provider.authType == ProviderAuthType.API_KEY && provider.type != ProviderType.OLLAMA && provider.apiKey.isBlank()) {
         return ConnectionResult.Failed(tx("No API key entered"), tx("Paste the key from the provider's dashboard."))
+    }
+    if (provider.authType == ProviderAuthType.OAUTH2 && provider.oauthConfig?.validationError() != null) {
+        return ConnectionResult.Failed(tx("OAuth settings are incomplete."), tx("Enter valid OAuth endpoints and client ID."))
+    }
+    if (provider.authType == ProviderAuthType.OAUTH2 && provider.oauthStateJson.isNullOrBlank()) {
+        return ConnectionResult.Failed(tx("Connect this provider with OAuth before testing."), tx("Use the Connect with OAuth button in provider settings."))
     }
     return try {
         val startedAt = System.nanoTime()

@@ -3,7 +3,7 @@ name: Android APK
 on:
   push:
     branches:
-      - arena/5f5dd5fd-ariai
+      - 'arena/**'
   workflow_dispatch:
 
 permissions:
@@ -90,6 +90,29 @@ jobs:
                       if message:
                           name = f"{case.attrib.get('classname', 'unknown')}.{case.attrib.get('name', 'unknown')}"
                           print(f"::error title=JVM unit test failure::{name}: {message}")
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          for report in Path("app/build/reports").glob("lint-results-*.xml"):
+              try:
+                  root = ET.parse(report).getroot()
+              except (ET.ParseError, OSError):
+                  continue
+              for issue in root.findall("issue"):
+                  if issue.attrib.get("severity", "").lower() not in {"error", "fatal"}:
+                      continue
+                  location = issue.find("location")
+                  source = ""
+                  if location is not None:
+                      source = location.attrib.get("file", "")
+                      if location.attrib.get("line"):
+                          source += f":{location.attrib['line']}"
+                  message = " ".join(issue.attrib.get("message", "").split())[:1200]
+                  issue_id = issue.attrib.get("id", "Lint")
+                  detail = f"{issue_id} {source}: {message}".strip().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print(f"::error title=Android lint::{detail}")
           PY
 
       - name: Upload APK artifact

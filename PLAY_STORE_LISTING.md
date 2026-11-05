@@ -24,7 +24,7 @@ Draft for AriAI 2.3.0. Confirm product name, publisher/contact details, content 
 > Build custom agents with their own prompts and settings. Agents can use built-in calculator and optional web-search tools, plus remote MCP tools you explicitly enable.
 >
 > **Connect remote tools with MCP**
-> Discover and allow individual tools from Streamable HTTP or legacy SSE servers. Remote MCP connections use HTTPS. Review each server and tool before enabling it; external tools can process the arguments you send and their responses are treated as untrusted data.
+> Discover and allow individual tools from Streamable HTTP or legacy SSE servers. Connect compatible servers with Bearer tokens, custom headers, or OAuth 2.0 PKCE. Remote MCP connections use HTTPS. Review each server and tool before enabling it; external tools can process the arguments you send and their responses are treated as untrusted data.
 >
 > **Keep a local workspace**
 > Create and edit small text files in a private on-device workspace and view static HTML previews. The preview does not execute JavaScript or make network requests.
@@ -32,7 +32,7 @@ Draft for AriAI 2.3.0. Confirm product name, publisher/contact details, content 
 > **Data and privacy**
 > AriAI has no AriAI account or developer-operated chat backend. Conversations and files are stored in app-private storage on your device. When you send a prompt, use search, attach a file, use speech recognition, or call an enabled remote tool, the information needed for that feature is sent to the service you selected. Review the [Privacy Policy](https://github.com/redxbox/ariai/blob/main/PRIVACY_POLICY.md) and the privacy terms of your providers.
 >
-> Some features require your own paid provider account. Models can make mistakes; check important information. PDF/DOCX extraction, local MCP stdio, MCP OAuth, resources, prompts, and arbitrary code execution are not supported.
+> Compatible AI providers and MCP servers support OAuth 2.0 Authorization Code with PKCE; users configure a public client and its HTTPS endpoints, and AriAI does not store client secrets. Some features require your own provider account. Models can make mistakes; check important information. PDF/DOCX text extraction and offline OCR for Persian/English scanned PDF pages run on-device (OCR is limited to 20 pages per file). Local MCP stdio, resources, prompts, authorization-server discovery, dynamic client registration, and arbitrary code execution are not supported.
 
 ## فارسی
 
@@ -56,7 +56,7 @@ Draft for AriAI 2.3.0. Confirm product name, publisher/contact details, content 
 > Agent سفارشی با prompt و تنظیمات خودش بسازید. Agent می‌تواند از ماشین‌حساب، جستجوی وب اختیاری و ابزارهای MCP راه‌دور که خودتان فعال می‌کنید استفاده کند.
 >
 > **ابزارهای MCP راه‌دور را وصل کنید**
-> ابزارهای جداگانه را از سرورهای Streamable HTTP یا SSE قدیمی کشف و مجاز کنید. اتصال MCP راه‌دور از HTTPS استفاده می‌کند. پیش از فعال‌کردن سرور و ابزار آن را بررسی کنید؛ سرور خارجی ممکن است آرگومان‌های ارسالی را پردازش کند و پاسخ آن دادهٔ غیرقابل‌اعتماد است.
+> ابزارهای جداگانه را از سرورهای Streamable HTTP یا SSE قدیمی کشف و مجاز کنید. به سرورهای سازگار با Bearer token، header سفارشی یا OAuth 2.0 PKCE وصل شوید. اتصال MCP راه‌دور از HTTPS استفاده می‌کند. پیش از فعال‌کردن سرور و ابزار آن را بررسی کنید؛ سرور خارجی ممکن است آرگومان‌های ارسالی را پردازش کند و پاسخ آن دادهٔ غیرقابل‌اعتماد است.
 >
 > **فضای کاری محلی**
 > فایل متنی کوچک را در فضای کاری خصوصی روی دستگاه بسازید و ویرایش کنید و پیش‌نمایش HTML ایستا ببینید. پیش‌نمایش JavaScript اجرا نمی‌کند و درخواست شبکه نمی‌فرستد.
@@ -64,7 +64,7 @@ Draft for AriAI 2.3.0. Confirm product name, publisher/contact details, content 
 > **داده و حریم خصوصی**
 > AriAI حساب کاربری یا سرور گفتگوی تحت مدیریت توسعه‌دهنده ندارد. گفتگوها و فایل‌ها در فضای خصوصی برنامه روی دستگاه نگهداری می‌شوند. هنگام ارسال پیام، جستجو، پیوست فایل، تشخیص گفتار یا فراخوانی ابزار راه‌دور، اطلاعات لازم برای همان قابلیت به سرویس انتخابی فرستاده می‌شود. [سیاست حریم خصوصی](https://github.com/redxbox/ariai/blob/main/PRIVACY_POLICY.md) و سیاست ارائه‌دهندگان خود را بخوانید.
 >
-> بعضی قابلیت‌ها به حساب پولی ارائه‌دهنده نیاز دارند. پاسخ مدل ممکن است اشتباه باشد؛ اطلاعات مهم را بررسی کنید. استخراج PDF/DOCX، MCP محلی stdio، OAuth، resources، prompts و اجرای کد دلخواه پشتیبانی نمی‌شوند.
+> ارائه‌دهندگان هوش مصنوعی و سرورهای MCP سازگار از OAuth 2.0 Authorization Code با PKCE پشتیبانی می‌کنند؛ کاربر client عمومی و endpointهای HTTPS را تنظیم می‌کند و AriAI client secret را ذخیره نمی‌کند. پاسخ مدل ممکن است اشتباه باشد؛ اطلاعات مهم را بررسی کنید. استخراج PDF/DOCX و OCR آفلاین صفحه‌های اسکن‌شدهٔ PDF به فارسی و انگلیسی روی دستگاه انجام می‌شود (حداکثر ۲۰ صفحه برای هر فایل). stdio محلی MCP، resources، prompts، کشف خودکار endpointهای OAuth، ثبت پویای client و اجرای کد دلخواه پشتیبانی نمی‌شوند.
 
 ## Store asset checklist
 

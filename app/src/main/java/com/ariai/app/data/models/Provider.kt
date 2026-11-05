@@ -12,6 +12,11 @@ enum class ProviderType {
     CUSTOM
 }
 
+enum class ProviderAuthType {
+    API_KEY,
+    OAUTH2
+}
+
 @Parcelize
 data class Provider(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -25,7 +30,14 @@ data class Provider(
     val customBody: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     /** True when encrypted key data exists but Android Keystore could not unlock it. */
-    val apiKeyNeedsReentry: Boolean = false
+    val apiKeyNeedsReentry: Boolean = false,
+    /** True when encrypted custom headers/body/model settings cannot be opened; re-save these settings. */
+    val providerConfigNeedsReentry: Boolean = false,
+    val authType: ProviderAuthType = ProviderAuthType.API_KEY,
+    val oauthConfig: OAuth2Config? = null,
+    /** Encrypted in Room; this decrypted AuthState JSON exists only in memory. */
+    val oauthStateJson: String? = null,
+    val oauthStateNeedsReentry: Boolean = false
 ) : Parcelable
 
 @Parcelize

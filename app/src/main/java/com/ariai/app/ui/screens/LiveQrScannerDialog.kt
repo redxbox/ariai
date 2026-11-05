@@ -176,6 +176,7 @@ private class QrPreviewView(context: Context) : FrameLayout(context) {
         addView(previewView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
+    @android.annotation.SuppressLint("UnsafeOptInUsageError")
     fun start(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
         if (controller != null) return
         controller = QrCameraController(context, lifecycleOwner, previewView).also { camera ->
@@ -208,6 +209,7 @@ private class QrCameraController(
     @Volatile private var cameraProvider: ProcessCameraProvider? = null
     @Volatile private var closed = false
 
+    @androidx.camera.core.ExperimentalGetImage
     fun start() {
         try {
             val providerFuture = ProcessCameraProvider.getInstance(context)

@@ -1,6 +1,11 @@
-# Signed release AAB
+# Release APK and signed AAB
 
-The `Signed Android App Bundle` workflow runs `:app:bundleRelease`, verifies the bundle signature, and uploads the `.aab` plus SHA-256 checksum as a GitHub Actions artifact. It does **not** publish to Google Play or create a GitHub Release. Start it with `workflow_dispatch` after this workflow is present on the selected branch, or push a `v*` tag when the release is approved.
+The `Release APK and Signed AAB` workflow (`.github/workflows/release-aab.yml`) runs `:app:assembleRelease` and `:app:bundleRelease`, verifies the APK signature with `apksigner` and the bundle signature with `jarsigner`, and produces `SHA256SUMS.txt` covering both files.
+
+- On a pushed `v*` tag (for example `v2.3.0`, matching `versionName` in `app/build.gradle.kts`) it additionally creates a GitHub Release whose notes are generated automatically from merged pull requests and commit titles, and attaches `app-release.apk`, `app-release.aab`, and `SHA256SUMS.txt`.
+- On `workflow_dispatch` it uploads the same files as a workflow artifact only; no release is created.
+
+It does **not** publish to Google Play. Tag commands are documented in the top-level `README.md` under "Releases (GitHub Releases)".
 
 ## Required repository secrets
 

@@ -53,7 +53,14 @@ data class ProviderEntity(
     val customHeaders: String,
     val customBody: String?,
     val createdAt: Long,
-    @ColumnInfo(defaultValue = "'[]'") val modelsJson: String = "[]"
+    @ColumnInfo(defaultValue = "'[]'") val modelsJson: String = "[]",
+    @ColumnInfo(defaultValue = "'API_KEY'") val authType: String = "API_KEY",
+    val oauthAuthorizationEndpoint: String? = null,
+    val oauthTokenEndpoint: String? = null,
+    val oauthClientId: String? = null,
+    val oauthScopes: String? = null,
+    val oauthRedirectUri: String? = null,
+    val oauthState: String? = null
 )
 
 @Entity(tableName = "chats", indices = [Index(value = ["updatedAt"], name = "index_chats_updatedAt")])
@@ -126,6 +133,80 @@ interface ProviderDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProvider(provider: ProviderEntity)
 
+    @Query("""
+        UPDATE providers
+        SET apiKey = :apiKey,
+            customHeaders = :customHeaders,
+            customBody = :customBody,
+            modelsJson = :modelsJson,
+            oauthState = :oauthState
+        WHERE id = :id
+          AND apiKey = :oldApiKey
+          AND customHeaders = :oldCustomHeaders
+          AND customBody IS :oldCustomBody
+          AND modelsJson = :oldModelsJson
+          AND oauthState IS :oldOauthState
+    """)
+    suspend fun migrateProviderSecretsIfUnchanged(
+        id: String,
+        oldApiKey: String,
+        oldCustomHeaders: String,
+        oldCustomBody: String?,
+        oldModelsJson: String,
+        oldOauthState: String?,
+        apiKey: String,
+        customHeaders: String,
+        customBody: String?,
+        modelsJson: String,
+        oauthState: String?
+    ): Int
+
+    @Query("""
+        UPDATE providers SET oauthState = :newCiphertext
+        WHERE id = :id
+          AND baseUrl = :resourceUri
+          AND authType = 'OAUTH2'
+          AND oauthAuthorizationEndpoint = :authorizationEndpoint
+          AND oauthTokenEndpoint = :tokenEndpoint
+          AND oauthClientId = :clientId
+          AND oauthScopes = :scopes
+          AND oauthRedirectUri = :redirectUri
+          AND oauthState IS :oldCiphertext
+    """)
+    suspend fun updateOAuthStateIfUnchanged(
+        id: String,
+        resourceUri: String,
+        authorizationEndpoint: String,
+        tokenEndpoint: String,
+        clientId: String,
+        scopes: String,
+        redirectUri: String,
+        oldCiphertext: String?,
+        newCiphertext: String
+    ): Int
+
+    @Query("""
+        UPDATE providers SET oauthState = :ciphertext
+        WHERE id = :id
+          AND baseUrl = :resourceUri
+          AND authType = 'OAUTH2'
+          AND oauthAuthorizationEndpoint = :authorizationEndpoint
+          AND oauthTokenEndpoint = :tokenEndpoint
+          AND oauthClientId = :clientId
+          AND oauthScopes = :scopes
+          AND oauthRedirectUri = :redirectUri
+    """)
+    suspend fun replaceOAuthStateForAuthorization(
+        id: String,
+        resourceUri: String,
+        authorizationEndpoint: String,
+        tokenEndpoint: String,
+        clientId: String,
+        scopes: String,
+        redirectUri: String,
+        ciphertext: String
+    ): Int
+
     @Delete
     suspend fun deleteProvider(provider: ProviderEntity)
 
@@ -193,7 +274,7 @@ interface AgentDao {
 
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

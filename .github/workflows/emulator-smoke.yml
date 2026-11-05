@@ -2,8 +2,9 @@ name: Android emulator walkthrough and provider test
 
 on:
   push:
-    branches:
-      - arena/5f5dd5fd-ariai
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:

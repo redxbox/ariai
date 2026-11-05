@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -36,6 +37,9 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.McpAuthType
 import com.ariai.app.data.models.McpServerItem
 import com.ariai.app.data.models.McpTransport
+import com.ariai.app.data.models.OAuth2Config
+import com.ariai.app.data.models.isValidOAuth2Endpoint
+import com.ariai.app.data.models.sameSettingsAs
 import com.ariai.app.data.models.isValidMcpHeaderName
 import com.ariai.app.data.models.isValidMcpServerUrl
 import com.ariai.app.data.remote.MCPPrompt
@@ -63,6 +67,7 @@ fun SimpleMcpScreen(
     servers: List<McpServerItem>,
     onToggle: (String) -> Unit,
     onAdd: (McpServerItem) -> Unit,
+    onAuthorizeOAuth: (McpServerItem) -> Unit = {},
     onRemove: (String) -> Unit,
     onBack: () -> Unit,
     runtimeStates: Map<String, McpServerRuntimeState> = emptyMap(),
@@ -315,6 +320,7 @@ fun SimpleMcpScreen(
         AddMcpServerSheet(
             initial = editingServer,
             onSave = { onAdd(it); showAdd = false; editingServer = null },
+            onAuthorizeOAuth = { server -> onAuthorizeOAuth(server); showAdd = false; editingServer = null },
             onDismiss = { showAdd = false; editingServer = null }
         )
     }
@@ -343,6 +349,7 @@ fun SimpleMcpScreen(
 private fun AddMcpServerSheet(
     initial: McpServerItem?,
     onSave: (McpServerItem) -> Unit,
+    onAuthorizeOAuth: (McpServerItem) -> Unit,
     onDismiss: () -> Unit
 ) {
     var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
@@ -351,13 +358,54 @@ private fun AddMcpServerSheet(
     var authType by remember(initial?.id) { mutableStateOf(initial?.authType ?: McpAuthType.NONE) }
     var authHeaderName by remember(initial?.id) { mutableStateOf(initial?.authHeaderName ?: "X-API-Key") }
     var authSecret by remember(initial?.id) { mutableStateOf("") }
+    var oauthAuthorizationEndpoint by remember(initial?.id) { mutableStateOf(initial?.oauthConfig?.authorizationEndpoint.orEmpty()) }
+    var oauthTokenEndpoint by remember(initial?.id) { mutableStateOf(initial?.oauthConfig?.tokenEndpoint.orEmpty()) }
+    var oauthClientId by remember(initial?.id) { mutableStateOf(initial?.oauthConfig?.clientId.orEmpty()) }
+    var oauthScopes by remember(initial?.id) { mutableStateOf(initial?.oauthConfig?.scopes.orEmpty()) }
+    val oauthConfig = OAuth2Config(
+        authorizationEndpoint = oauthAuthorizationEndpoint,
+        tokenEndpoint = oauthTokenEndpoint,
+        clientId = oauthClientId,
+        scopes = oauthScopes
+    ).normalized()
     val urlValid = isValidMcpServerUrl(url)
     val canKeepSavedCredential = initial != null && initial.authType == authType && !initial.authSecret.isNullOrBlank()
     val suppliedCredentialIsValid = authSecret.isNotBlank() && authSecret.length <= 4_096 && authSecret.none { it == '\r' || it == '\n' }
-    val authValid = authType == McpAuthType.NONE ||
-        ((suppliedCredentialIsValid || (authSecret.isBlank() && canKeepSavedCredential)) &&
-            (authType != McpAuthType.CUSTOM_HEADER || isValidMcpHeaderName(authHeaderName)))
+    val authValid = when (authType) {
+        McpAuthType.NONE -> true
+        McpAuthType.OAUTH2 -> oauthConfig.validationError() == null
+        McpAuthType.BEARER, McpAuthType.CUSTOM_HEADER ->
+            (suppliedCredentialIsValid || (authSecret.isBlank() && canKeepSavedCredential)) &&
+                (authType != McpAuthType.CUSTOM_HEADER || isValidMcpHeaderName(authHeaderName))
+    }
     val valid = name.isNotBlank() && urlValid && authValid
+
+    fun draftServer(): McpServerItem = McpServerItem(
+        id = initial?.id ?: java.util.UUID.randomUUID().toString(),
+        name = name.trim(),
+        url = url.trim(),
+        transport = transport,
+        enabled = initial?.enabled ?: false,
+        authType = authType,
+        authHeaderName = authHeaderName.trim().ifBlank { "X-API-Key" },
+        authSecret = when (authType) {
+            McpAuthType.NONE -> null
+            McpAuthType.OAUTH2 -> initial?.takeIf {
+                it.oauthConfig.sameSettingsAs(oauthConfig) && it.url.trim() == url.trim()
+            }?.authSecret
+            else -> when {
+                authSecret.isNotBlank() -> authSecret.trim()
+                canKeepSavedCredential -> initial?.authSecret
+                else -> null
+            }
+        },
+        allowedToolNames = initial?.allowedToolNames.orEmpty(),
+        oauthConfig = oauthConfig.takeIf { authType == McpAuthType.OAUTH2 },
+        clearAuthSecret = initial != null && authType != McpAuthType.NONE && authSecret.isBlank() &&
+            (authType != initial.authType ||
+                (authType == McpAuthType.OAUTH2 &&
+                    (!initial.oauthConfig.sameSettingsAs(oauthConfig) || initial.url.trim() != url.trim())))
+    )
 
     PaperBottomSheet(
         onDismissRequest = onDismiss,
@@ -427,8 +475,66 @@ private fun AddMcpServerSheet(
                     onClick = { authType = McpAuthType.CUSTOM_HEADER },
                     label = { Text(tx("Custom header")) }
                 )
+                FilterChip(
+                    selected = authType == McpAuthType.OAUTH2,
+                    onClick = { authType = McpAuthType.OAUTH2 },
+                    label = { Text(tx("OAuth 2.0")) }
+                )
             }
-            if (authType != McpAuthType.NONE) {
+            if (authType == McpAuthType.OAUTH2) {
+                Text(
+                    tx("Uses OAuth 2.0 Authorization Code with PKCE. No client secret is stored in the app."),
+                    fontSize = 12.sp,
+                    color = Ink.copy(alpha = 0.62f)
+                )
+                OutlinedTextField(
+                    value = oauthAuthorizationEndpoint,
+                    onValueChange = { oauthAuthorizationEndpoint = it.take(OAuth2Config.MAX_ENDPOINT_LENGTH) },
+                    label = { Text(tx("Authorization endpoint (HTTPS)")) },
+                    singleLine = true,
+                    isError = oauthAuthorizationEndpoint.isNotBlank() && !isValidOAuth2Endpoint(oauthAuthorizationEndpoint),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("mcp-oauth-authorization-endpoint")
+                )
+                OutlinedTextField(
+                    value = oauthTokenEndpoint,
+                    onValueChange = { oauthTokenEndpoint = it.take(OAuth2Config.MAX_ENDPOINT_LENGTH) },
+                    label = { Text(tx("Token endpoint (HTTPS)")) },
+                    singleLine = true,
+                    isError = oauthTokenEndpoint.isNotBlank() && !isValidOAuth2Endpoint(oauthTokenEndpoint),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("mcp-oauth-token-endpoint")
+                )
+                OutlinedTextField(
+                    value = oauthClientId,
+                    onValueChange = { oauthClientId = it.take(OAuth2Config.MAX_CLIENT_ID_LENGTH) },
+                    label = { Text(tx("OAuth client ID")) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("mcp-oauth-client-id")
+                )
+                OutlinedTextField(
+                    value = oauthScopes,
+                    onValueChange = { oauthScopes = it.take(OAuth2Config.MAX_SCOPES_LENGTH) },
+                    label = { Text(tx("Scopes (space-separated)")) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("mcp-oauth-scopes")
+                )
+                Text(tx("Redirect URI"), fontSize = 12.sp, color = Ink.copy(alpha = 0.62f))
+                SelectionContainer {
+                    Text(OAuth2Config.DEFAULT_REDIRECT_URI, fontSize = 13.sp, color = Ink)
+                }
+                Text(
+                    if (initial?.authType == McpAuthType.OAUTH2 &&
+                        initial.oauthConfig.sameSettingsAs(oauthConfig) && initial.url.trim() == url.trim() &&
+                        !initial.authSecret.isNullOrBlank()
+                    ) tx("OAuth connected; tokens are stored encrypted on this device.")
+                    else tx("Save and connect to authorize this MCP server."),
+                    fontSize = 12.sp,
+                    color = Ink.copy(alpha = 0.62f)
+                )
+            } else if (authType != McpAuthType.NONE) {
                 if (authType == McpAuthType.CUSTOM_HEADER) {
                     OutlinedTextField(
                         value = authHeaderName,
@@ -453,27 +559,17 @@ private fun AddMcpServerSheet(
                 )
             }
 
+            if (authType == McpAuthType.OAUTH2) {
+                OutlinedButton(
+                    onClick = { onAuthorizeOAuth(draftServer()) },
+                    enabled = valid,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("mcp-oauth-connect")
+                ) { Text(tx("Connect with OAuth"), fontWeight = FontWeight.SemiBold) }
+            }
+
             Button(
-                onClick = {
-                    onSave(
-                        McpServerItem(
-                            id = initial?.id ?: java.util.UUID.randomUUID().toString(),
-                            name = name.trim(),
-                            url = url.trim(),
-                            transport = transport,
-                            enabled = initial?.enabled ?: false,
-                            authType = authType,
-                            authHeaderName = authHeaderName.trim().ifBlank { "X-API-Key" },
-                            authSecret = when {
-                                authType == McpAuthType.NONE -> null
-                                authSecret.isNotBlank() -> authSecret.trim()
-                                canKeepSavedCredential -> initial?.authSecret
-                                else -> null
-                            },
-                            allowedToolNames = initial?.allowedToolNames.orEmpty()
-                        )
-                    )
-                },
+                onClick = { onSave(draftServer()) },
                 enabled = valid,
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Accent),

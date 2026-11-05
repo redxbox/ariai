@@ -293,39 +293,6 @@ internal fun ModelPickerWorkspace(
 }
 
 @Composable
-internal fun ModelPickerGridBadge(
-    modifier: Modifier = Modifier,
-    size: Dp = 40.dp
-) {
-    Surface(
-        modifier = modifier.size(size),
-        shape = RoundedCornerShape(size * 0.30f),
-        color = AriAccentSoft,
-        tonalElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(size * 0.23f),
-            verticalArrangement = Arrangement.spacedBy(size * 0.09f)
-        ) {
-            repeat(2) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(size * 0.09f)
-                ) {
-                    repeat(2) {
-                        Box(
-                            modifier = Modifier.weight(1f).fillMaxHeight()
-                                .clip(RoundedCornerShape(size * 0.08f))
-                                .background(AriAccent)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun ProviderPickerPane(
     providers: List<Provider>,
     selectedProviderId: String?,

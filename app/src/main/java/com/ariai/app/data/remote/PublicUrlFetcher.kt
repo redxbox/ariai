@@ -58,7 +58,7 @@ private fun isPublicInternetAddress(address: InetAddress): Boolean {
     }
 }
 
-/** Read-only fetcher for user-supplied public HTTP(S) URLs. */
+/** Read-only fetcher for user-supplied public HTTPS URLs. */
 class PublicUrlFetcher {
     private val client = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
@@ -169,7 +169,7 @@ class PublicUrlFetcher {
         val uri = try { URI(rawUrl.trim()) } catch (e: Exception) { throw IOException("Invalid URL", e) }
         if (uri.normalize() != uri) throw IOException("URL path contains dot segments")
         val scheme = uri.scheme?.lowercase()
-        if (scheme != "https" && scheme != "http") throw IOException("Only HTTP and HTTPS URLs can be opened")
+        if (scheme != "https") throw IOException("Only HTTPS URLs can be opened")
         if (uri.userInfo != null) throw IOException("URLs containing credentials are not allowed")
         val host = uri.host?.lowercase()?.trimEnd('.') ?: throw IOException("URL has no valid host")
         if (host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {

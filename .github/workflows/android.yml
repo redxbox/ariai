@@ -31,10 +31,6 @@ jobs:
     - name: Check Persian translation coverage
       run: python3 .github/scripts/check_translations.py
     
-    - name: Clean
-      run: ./gradlew clean --stacktrace
-      continue-on-error: true
-    
     - name: Unit tests
       run: |
         set -o pipefail
@@ -85,7 +81,6 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
     - uses: actions/checkout@v7
     - name: Set up JDK 17
@@ -96,4 +91,4 @@ jobs:
     - name: Grant execute permission
       run: chmod +x gradlew
     - name: Run Lint
-      run: ./gradlew :app:lintDebug --stacktrace || true
+      run: ./gradlew :app:lintDebug --stacktrace

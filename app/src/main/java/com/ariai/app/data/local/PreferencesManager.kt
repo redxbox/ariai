@@ -8,8 +8,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import com.ariai.app.data.models.McpServerAuthCipherCodec
 import com.ariai.app.data.models.McpServerCodec
+import com.ariai.app.data.models.McpAuthType
 import com.ariai.app.data.models.McpServerItem
+import com.ariai.app.data.models.OAuth2Config
+import com.ariai.app.data.models.sameSettingsAs
 import com.ariai.app.util.KeyVault
+import kotlinx.coroutines.flow.first
+import org.json.JSONObject
 
 val Context.dataStore by preferencesDataStore(name = "ariai_prefs")
 
@@ -33,6 +38,9 @@ class PreferencesManager(
         val SERPER_API_KEY = stringPreferencesKey("serper_api_key")
         val MCP_SERVERS = stringPreferencesKey("mcp_servers")
         val MCP_SERVER_AUTH = stringPreferencesKey("mcp_server_auth")
+        private val OAUTH_PENDING_AUTHORIZATIONS = stringPreferencesKey("oauth_pending_authorizations")
+        private const val MAX_PENDING_OAUTH_FLOWS = 4
+        private const val MAX_PENDING_OAUTH_JSON_LENGTH = 12_000
         val STREAM_RESPONSE = booleanPreferencesKey("stream_response")
         val BIOMETRIC_LOCK_ENABLED = booleanPreferencesKey("biometric_lock_enabled")
         val SHOW_REASONING = booleanPreferencesKey("show_reasoning")
@@ -89,7 +97,7 @@ class PreferencesManager(
             prefs[MCP_SERVERS] = McpServerCodec.encode(updated)
             val updatedCiphertexts = buildMap {
                 updated.take(50).forEach { server ->
-                    if (server.authType == com.ariai.app.data.models.McpAuthType.NONE) return@forEach
+                    if (server.authType == McpAuthType.NONE || server.clearAuthSecret) return@forEach
                     val secret = server.authSecret?.takeIf(String::isNotBlank)
                     val ciphertext = if (secret != null) KeyVault.encrypt(secret) else encryptedSecrets[server.id]
                     ciphertext?.let { put(server.id, it) }
@@ -100,6 +108,87 @@ class PreferencesManager(
             } else {
                 prefs[MCP_SERVER_AUTH] = McpServerAuthCipherCodec.encode(updatedCiphertexts)
             }
+        }
+    }
+
+    suspend fun getMcpOAuthState(serverId: String): String? =
+        mcpServersFlow.first().firstOrNull { it.id == serverId && it.authType == McpAuthType.OAUTH2 }?.authSecret
+
+    /** Replaces the OAuth state only if the saved MCP config and previous token state still match. */
+    suspend fun updateMcpOAuthStateIfUnchanged(
+        serverId: String,
+        config: OAuth2Config,
+        resourceUri: String,
+        expectedState: String,
+        replacementState: String
+    ): Boolean = updateMcpOAuthState(serverId, config, resourceUri, expectedState, replacementState)
+
+    /** Commits a newly authorized MCP state only when the current server still has the same config. */
+    suspend fun replaceMcpOAuthStateForAuthorization(
+        serverId: String,
+        config: OAuth2Config,
+        resourceUri: String,
+        state: String
+    ): Boolean = updateMcpOAuthState(
+        serverId, config, resourceUri, expectedState = null, replacementState = state
+    )
+
+    private suspend fun updateMcpOAuthState(
+        serverId: String,
+        config: OAuth2Config,
+        resourceUri: String,
+        expectedState: String?,
+        replacementState: String
+    ): Boolean {
+        var updated = false
+        dataStore.edit { prefs ->
+            val servers = McpServerCodec.decode(prefs[MCP_SERVERS])
+            val server = servers.firstOrNull {
+                it.id == serverId && it.authType == McpAuthType.OAUTH2 &&
+                    it.oauthConfig.sameSettingsAs(config) && it.url == resourceUri.trim()
+            } ?: return@edit
+            val ciphertexts = McpServerAuthCipherCodec.decode(prefs[MCP_SERVER_AUTH])
+            val storedState = ciphertexts[serverId]?.let(KeyVault::decryptOrNull)
+            if (expectedState != null && storedState != expectedState) return@edit
+            val ciphertext = KeyVault.encrypt(replacementState)
+            val updatedCiphertexts = ciphertexts + (serverId to ciphertext)
+            prefs[MCP_SERVERS] = McpServerCodec.encode(servers.map { current ->
+                if (current.id == server.id) current.copy(authSecret = null) else current
+            })
+            prefs[MCP_SERVER_AUTH] = McpServerAuthCipherCodec.encode(updatedCiphertexts)
+            updated = true
+        }
+        return updated
+    }
+
+    suspend fun addPendingOAuthAuthorization(transactionId: String, json: String) {
+        require(transactionId.isNotBlank() && transactionId.length <= 64)
+        require(json.length <= MAX_PENDING_OAUTH_JSON_LENGTH)
+        dataStore.edit { prefs ->
+            val stored = prefs[OAUTH_PENDING_AUTHORIZATIONS]?.let(KeyVault::decryptOrNull)
+            val pending = runCatching { JSONObject(stored.orEmpty()) }.getOrDefault(JSONObject())
+            pending.put(transactionId, json)
+            while (pending.length() > MAX_PENDING_OAUTH_FLOWS) {
+                val keys = pending.keys()
+                if (!keys.hasNext()) break
+                pending.remove(keys.next())
+            }
+            prefs[OAUTH_PENDING_AUTHORIZATIONS] = KeyVault.encrypt(pending.toString())
+        }
+    }
+
+    suspend fun getPendingOAuthAuthorization(transactionId: String): String? =
+        dataStore.data.first()[OAUTH_PENDING_AUTHORIZATIONS]
+            ?.let(KeyVault::decryptOrNull)
+            ?.let { runCatching { JSONObject(it).optString(transactionId).takeIf(String::isNotBlank) }.getOrNull() }
+
+    suspend fun removePendingOAuthAuthorization(transactionId: String) {
+        dataStore.edit { prefs ->
+            val stored = prefs[OAUTH_PENDING_AUTHORIZATIONS]?.let(KeyVault::decryptOrNull)
+            val pending = runCatching { JSONObject(stored.orEmpty()) }.getOrDefault(JSONObject())
+            pending.remove(transactionId)
+            if (pending.length() == 0) prefs.remove(OAUTH_PENDING_AUTHORIZATIONS)
+            else prefs[OAUTH_PENDING_AUTHORIZATIONS] = KeyVault.encrypt(pending.toString())
         }
     }
 

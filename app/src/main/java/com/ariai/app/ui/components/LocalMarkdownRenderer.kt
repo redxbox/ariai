@@ -25,7 +25,12 @@ import org.json.JSONObject
 
 private const val LOCAL_MARKDOWN_PAGE = "file:///android_asset/rendering/markdown.html"
 
-/** Offline Markdown renderer for replies containing LaTeX or Mermaid diagrams. */
+/**
+ * Offline Markdown renderer for replies containing LaTeX or Mermaid diagrams.
+ * KaTeX and mermaid.min.js load from bundled assets only; the WebView blocks
+ * network loads, keeps real file:// access off, supports smooth pinch zoom,
+ * and scrolls both ways for oversized diagrams and formulas.
+ */
 @Composable
 internal fun LocalMarkdownRenderer(
     markdown: String,
@@ -64,19 +69,24 @@ private class LocalMarkdownWebView(context: Context) : WebView(context) {
     init {
         setBackgroundColor(AndroidColor.TRANSPARENT)
         overScrollMode = View.OVER_SCROLL_NEVER
-        isVerticalScrollBarEnabled = false
-        isHorizontalScrollBarEnabled = false
+        // Two-way scrolling: the page scrolls vertically past the height cap and
+        // wide Mermaid/formula blocks scroll horizontally inside their containers.
+        isVerticalScrollBarEnabled = true
+        isHorizontalScrollBarEnabled = true
         settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = false
-            allowFileAccess = true // The page and all rendering libraries are bundled app assets.
+            // file:///android_asset stays readable with file access disabled, so the
+            // renderer never reaches real file:// paths such as app-private storage.
+            allowFileAccess = false
             allowContentAccess = false
             allowFileAccessFromFileURLs = false
             allowUniversalAccessFromFileURLs = false
             blockNetworkLoads = true
-            builtInZoomControls = false
+            // Smooth pinch zoom for large diagrams; zoom buttons stay hidden.
+            setSupportZoom(true)
+            builtInZoomControls = true
             displayZoomControls = false
-            setSupportZoom(false)
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
         webViewClient = object : WebViewClient() {
