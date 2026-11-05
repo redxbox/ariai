@@ -206,7 +206,8 @@ fun NewChatScreen(
     }
     val recognizer = remember(voiceContext, onDeviceSpeechRecognitionAvailable) {
         when {
-            onDeviceSpeechRecognitionAvailable -> android.speech.SpeechRecognizer.createOnDeviceSpeechRecognizer(voiceContext)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && onDeviceSpeechRecognitionAvailable ->
+                android.speech.SpeechRecognizer.createOnDeviceSpeechRecognizer(voiceContext)
             android.speech.SpeechRecognizer.isRecognitionAvailable(voiceContext) ->
                 android.speech.SpeechRecognizer.createSpeechRecognizer(voiceContext)
             else -> null
@@ -2366,6 +2367,7 @@ private fun AudioCard(path: String) {
 }
 
 /** Plays a generated video inside the app with the Media3 player and its standard controls. */
+@OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun VideoPlayerDialog(path: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
