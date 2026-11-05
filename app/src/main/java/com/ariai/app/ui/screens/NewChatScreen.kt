@@ -2367,7 +2367,7 @@ private fun AudioCard(path: String) {
 }
 
 /** Plays a generated video inside the app with the Media3 player and its standard controls. */
-@OptIn(androidx.media3.common.util.UnstableApi::class)
+@androidx.media3.common.util.UnstableApi
 @Composable
 private fun VideoPlayerDialog(path: String, onDismiss: () -> Unit) {
     val context = LocalContext.current

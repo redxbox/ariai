@@ -208,7 +208,7 @@ private class QrCameraController(
     @Volatile private var cameraProvider: ProcessCameraProvider? = null
     @Volatile private var closed = false
 
-    @OptIn(androidx.camera.core.ExperimentalGetImage::class)
+    @androidx.camera.core.ExperimentalGetImage
     fun start() {
         try {
             val providerFuture = ProcessCameraProvider.getInstance(context)
