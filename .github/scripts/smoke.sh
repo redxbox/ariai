@@ -603,7 +603,8 @@ tap "Server URL"
 type_text "https://example.org/mcp"
 tap "SSE"
 shot 21-mcp-sse-selected
-tap "Save"
+# OAuth fields make this form taller than the screen; scroll before saving.
+tap_scroll "Save"
 expect_text "ArenaSmokeServer"
 expect_text "Disabled"
 shot 22-mcp-server-added

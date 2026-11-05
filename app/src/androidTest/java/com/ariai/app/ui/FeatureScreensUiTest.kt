@@ -165,9 +165,12 @@ class FeatureScreensUiTest {
 
         compose.onNodeWithTag("quick-parameters-prompt")
             .performTextInput("Be concise and cite assumptions.")
+        compose.waitForIdle()
         compose.onNodeWithTag("quick-parameters-prompt")
             .assertTextContains("Be concise and cite assumptions.")
-        compose.onNodeWithTag("quick-parameters-save").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithTag("quick-parameters-save").performScrollTo()
+        compose.waitForIdle()
+        compose.onNodeWithTag("quick-parameters-save").assertIsDisplayed().performClick()
         compose.waitForIdle()
 
         compose.runOnIdle {
