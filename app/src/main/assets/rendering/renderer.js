@@ -60,7 +60,31 @@
         breaks: true,
         renderer: createRenderer()
       });
-      mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral' });
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: 'neutral',
+        // Keep diagrams at their natural size so large charts scroll both ways
+        // instead of being shrunk below readability.
+        useMaxWidth: false,
+        flowchart: { useMaxWidth: false },
+        sequence: { useMaxWidth: false },
+        class: { useMaxWidth: false },
+        state: { useMaxWidth: false },
+        er: { useMaxWidth: false },
+        journey: { useMaxWidth: false },
+        gantt: { useMaxWidth: false },
+        pie: { useMaxWidth: false },
+        quadrantChart: { useMaxWidth: false },
+        requirement: { useMaxWidth: false },
+        gitGraph: { useMaxWidth: false },
+        mindmap: { useMaxWidth: false },
+        timeline: { useMaxWidth: false },
+        sankey: { useMaxWidth: false },
+        block: { useMaxWidth: false },
+        kanban: { useMaxWidth: false },
+        architecture: { useMaxWidth: false }
+      });
       await renderMermaid(root);
       renderMathInElement(root, {
         delimiters: [

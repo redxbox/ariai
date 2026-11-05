@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ariai.app.util.hasLocalRichMarkdown
 
 @Composable
 fun MarkdownText(
@@ -235,6 +236,13 @@ fun MessageBubble(
                         text = content,
                         color = MaterialTheme.colorScheme.onPrimary,
                         style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                    )
+                } else if (hasLocalRichMarkdown(content)) {
+                    // Math or Mermaid content goes to the offline WebView renderer.
+                    LocalMarkdownRenderer(
+                        markdown = content,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSizeSp = 14f
                     )
                 } else {
                     MarkdownText(text = content)
