@@ -229,9 +229,10 @@ class OAuthSessionManager(
         val pkceMatches = request.codeVerifier == pending.codeVerifier &&
             request.codeVerifierChallenge == challenge &&
             request.codeVerifierChallengeMethod == OAuthPkce.CODE_CHALLENGE_METHOD_S256
+        val authorizationCode = response.authorizationCode
         if (!stateMatches || !redirectMatches || !configurationMatches || !pkceMatches ||
             request.clientId != pending.config.clientId || request.responseType != ResponseTypeValues.CODE ||
-            response.authorizationCode.isNullOrBlank() || response.authorizationCode.length > MAX_AUTHORIZATION_CODE_LENGTH
+            authorizationCode.isNullOrBlank() || authorizationCode.length > MAX_AUTHORIZATION_CODE_LENGTH
         ) {
             throw IOException(tx("The OAuth redirect did not match the pending sign-in."))
         }

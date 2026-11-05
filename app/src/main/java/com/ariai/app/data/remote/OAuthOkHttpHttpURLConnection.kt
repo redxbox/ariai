@@ -136,7 +136,7 @@ internal class OAuthOkHttpHttpURLConnection(
         val currentResponse = responseOrNull() ?: return null
         if (n == 0) return statusLine(currentResponse)
         val headerIndex = n - 1
-        return if (headerIndex in 0 until currentResponse.headers.size()) {
+        return if (headerIndex in 0 until currentResponse.headers.size) {
             currentResponse.headers.value(headerIndex)
         } else {
             null
@@ -147,7 +147,7 @@ internal class OAuthOkHttpHttpURLConnection(
         if (n <= 0) return null
         val currentResponse = responseOrNull() ?: return null
         val headerIndex = n - 1
-        return if (headerIndex in 0 until currentResponse.headers.size()) {
+        return if (headerIndex in 0 until currentResponse.headers.size) {
             currentResponse.headers.name(headerIndex)
         } else {
             null
