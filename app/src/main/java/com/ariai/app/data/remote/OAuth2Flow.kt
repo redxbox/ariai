@@ -208,7 +208,7 @@ class OAuthSessionManager(
             save = { old, new -> stateStore.updateMcpStateIfUnchanged(server.id, config, resourceUri, old, new) })
     }
 
-    suspend fun completeAuthorization(
+    internal suspend fun completeAuthorization(
         pending: PendingOAuthAuthorization,
         response: AuthorizationResponse
     ) {
