@@ -38,7 +38,8 @@ class AriAiApp : Application() {
                 com.ariai.app.data.local.MIGRATION_4_5,
                 com.ariai.app.data.local.MIGRATION_5_6,
                 com.ariai.app.data.local.MIGRATION_6_7,
-                com.ariai.app.data.local.MIGRATION_7_8
+                com.ariai.app.data.local.MIGRATION_7_8,
+                com.ariai.app.data.local.MIGRATION_8_9
             )
             .build()
     }
@@ -47,7 +48,14 @@ class AriAiApp : Application() {
         PreferencesManager(this)
     }
 
-    val aiClient by lazy { AIClient() }
+    val oauthStateStore by lazy {
+        com.ariai.app.data.local.OAuthStateStore(database, preferencesManager)
+    }
+    val oauthSessionManager by lazy {
+        com.ariai.app.data.remote.OAuthSessionManager(oauthStateStore, this)
+    }
+
+    val aiClient by lazy { AIClient(oauthSessionManager) }
     val searchClient by lazy { SearchClient() }
 
     val repository by lazy {

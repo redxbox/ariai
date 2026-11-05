@@ -6,16 +6,16 @@ AriAi is an Android chat client for connecting to AI providers with your own cre
 
 ## Current features
 
-- **Providers:** OpenAI, Google Gemini, Anthropic, Ollama, and OpenAI-compatible endpoints. Add your own endpoint and credentials, or import provider settings from JSON/a QR image in the gallery; the app does not automatically create a free demo provider.
+- **Providers:** OpenAI, Google Gemini, Anthropic, Ollama, and OpenAI-compatible endpoints. Add your own endpoint and credentials, or import provider settings from JSON/a QR image in the gallery; compatible providers can use OAuth 2.0 Authorization Code with PKCE for public clients. The app does not automatically create a free demo provider.
 - **Chat:** streaming preference for ordinary tool-free replies, searchable model switching, provider health/latency checks, a context-use gauge using provider-reported token counts when available and a labeled estimate otherwise, conversation folders, branching, retry, per-chat temperature/top-P/system-prompt controls, and Markdown for headings, lists, links, simple tables, and fenced code blocks with basic syntax coloring and line numbers. Tool-routed replies use a non-streaming request path.
 - **Agents:** built-in and custom agents, prompt variables/examples, provider/model binding, temperature/top-P defaults, and opt-in calculator/web-search/MCP tools. Agent settings are stored locally; unsupported arbitrary code execution, persistent memory, and callable image generation are visibly unavailable.
 - **Workspace:** AI-assisted generation and updating of one text file at a time using the selected text model, small UTF-8 files in private app storage, a static HTML preview with JavaScript and network requests blocked, and a read-only console limited to listing/reading those workspace files.
-- **Tools:** request-scoped calculator, configured web search, reading a URL supplied by the user, read-only access to public GitHub repository files, and remote MCP tools where the selected model supports tool calls. MCP supports Streamable HTTP and legacy HTTP+SSE, JSON-RPC initialization, tool discovery and calls, Bearer/custom-header credentials encrypted with Android Keystore, and per-server/per-tool opt-in. Remote endpoints require HTTPS; HTTP is limited to loopback development. MCP tool outputs are treated as untrusted data.
+- **Tools:** request-scoped calculator, configured web search, reading a URL supplied by the user, read-only access to public GitHub repository files, and remote MCP tools where the selected model supports tool calls. MCP supports Streamable HTTP and legacy HTTP+SSE, JSON-RPC initialization, tool discovery and calls, encrypted Bearer/custom-header credentials and OAuth 2.0 PKCE tokens, and per-server/per-tool opt-in. Remote endpoints require HTTPS; HTTP is limited to loopback development. MCP tool outputs are treated as untrusted data.
 - **Web search:** off by default. Gemini and Anthropic can use built-in web search with the AI provider's existing API key. Choose either provider in the chat search sheet; its gear opens inline key settings, and the same key is saved to the provider and reused for search. The Search service settings page manages these two providers—no separate search API key is needed. Results and availability depend on the provider and account limits.
-- **Attachments:** scaled images, videos up to 12 MB, and supported plain-text/code files. Video bytes are sent only to compatible Gemini requests; other providers receive a note that the video cannot be viewed. PDF and DOCX extraction are not implemented.
+- **Attachments:** scaled images, videos up to 12 MB, supported plain-text/code files, and bounded on-device text extraction from PDFs and DOCX files, including offline Persian/English OCR for scanned PDF pages (other OCR scripts are not bundled). OCR is limited to 20 scanned pages per file; total PDF extraction is limited to 200 pages and 60,000 characters. Video bytes are sent only to compatible Gemini requests; other providers receive a note that the video cannot be viewed. Extracted text remains on-device until you send the message to your selected provider. Audio-file attachments are not supported.
 - **Media:** image, video, or audio generation is available only when a configured provider/model exposes the relevant capability. Provider API support and costs vary. Image editing is not available for Gemini providers.
 - **Appearance and language:** light/dark/system theme, optional Android 12+ dynamic accent colors, and translated UI strings in English and Persian. Some unkeyed descriptions and provider-returned error details remain in English.
-- **Privacy:** data remains on-device unless you invoke a feature that sends it to a configured provider or service. See the [privacy policy](PRIVACY_POLICY.md) and the [Google Play Data Safety worksheet](PLAY_DATA_SAFETY.md).
+- **Privacy:** provider API keys, custom headers/bodies/model headers, search keys, MCP credentials, OAuth token state, and pending sign-in data are encrypted with Android Keystore at rest. PDF/DOCX extraction and Persian/English OCR run on-device; chat inference is sent to the provider you select when you send a message. See the [privacy policy](PRIVACY_POLICY.md) and [Google Play Data Safety worksheet](PLAY_DATA_SAFETY.md).
 
 ## Configure a provider
 
@@ -26,6 +26,14 @@ AriAi is an Android chat client for connecting to AI providers with your own cre
 
 The app does not provide keys, credits, or a built-in free demo account. Use only endpoints and credentials you trust.
 
+### Configure an OAuth 2.0 provider
+
+1. In the provider editor, choose **OAuth 2.0** authentication and enter the HTTPS authorization endpoint, token endpoint, public client ID, and optional space-separated scopes.
+2. Register AriAI as a public/native client with the OAuth service and allow this exact redirect URI: `com.ariai.app://oauth2redirect`.
+3. Tap **Connect with OAuth** and complete sign-in in the system browser. AriAI uses Authorization Code with PKCE (S256); it does not request or store a client secret. Tokens are stored encrypted with Android Keystore and refreshed when required.
+
+AriAI uses manually configured endpoints and client IDs; authorization-server discovery, dynamic client registration, and provider-specific non-standard OAuth parameters are not implemented. OAuth token state is bound to the configured provider API or MCP server URL; changing that URL requires signing in again.
+
 ## Configure web search
 
 1. In a chat, open the **Web search** sheet and use the gear beside **Google Gemini** or **Anthropic Claude** to enter the AI provider's API key inline. Saving it connects the provider, selects its text model, and enables web search with that same key. Adding or editing a Gemini/Anthropic provider from **AI Providers** also activates native search.
@@ -34,11 +42,12 @@ The app does not provide keys, credits, or a built-in free demo account. Use onl
 ## Configure MCP tools
 
 1. Open **Settings → MCP servers** and add a server's HTTPS endpoint. The legacy SSE transport is available for existing servers; Streamable HTTP is preferred for new deployments.
-2. Choose no authentication, a Bearer token, or a custom HTTP header. Credentials are encrypted locally with Android Keystore and are never placed in the URL.
-3. Test the connection to initialize the MCP session and list tools. New servers start disabled; enabling a server requires an explicit trust confirmation. Select only the discovered tools you want to make available to chats.
-4. For a custom agent, also enable **MCP tools** in that agent's available-tools list. A normal chat may use only the enabled servers and individually allowed tools.
+2. Choose no authentication, a Bearer token, a custom HTTP header, or OAuth 2.0. Static credentials and OAuth token state are encrypted locally with Android Keystore; credentials are never placed in the URL.
+3. For OAuth, enter the HTTPS authorization and token endpoints, public client ID, and optional scopes. Register the redirect URI `com.ariai.app://oauth2redirect` with the OAuth service, then tap **Connect with OAuth**. The flow uses Authorization Code with PKCE; AriAI does not accept client secrets.
+4. Test the connection to initialize the MCP session and list tools. New servers start disabled; enabling a server requires an explicit trust confirmation. Select only the discovered tools you want to make available to chats.
+5. For a custom agent, also enable **MCP tools** in that agent's available-tools list. A normal chat may use only the enabled servers and individually allowed tools.
 
-AriAI currently supports static Bearer/custom-header credentials; browser-based OAuth, local `stdio` processes, MCP resources/prompts, and subscriptions are not implemented. MCP servers can read or change data when their enabled tools are called. Review a server before trusting it; server descriptions and results are untrusted.
+AriAI supports OAuth 2.0 Authorization Code with PKCE for compatible MCP servers using manually entered authorization/token endpoints and a pre-registered public client. Authorization-server discovery and dynamic client registration are not implemented, and client secrets are not supported. Local `stdio` processes, MCP resources/prompts, and subscriptions are also unavailable. MCP servers can read or change data when their enabled tools are called. Review a server before trusting it; server descriptions and results are untrusted.
 
 ## Privacy and Google Play data safety
 
@@ -69,8 +78,8 @@ The **Signed Android App Bundle** GitHub Actions workflow builds and verifies a 
 ## Known limitations
 
 - The workspace console is deliberately not a general-purpose terminal: it has no shell, PRoot, package manager, or code execution. The HTML preview is static and does not run JavaScript, remote assets, or app frameworks.
-- MCP does not yet support OAuth, local `stdio` processes, resource/prompt APIs, or subscriptions. Connected servers may perform consequential actions through tools that the user explicitly enabled.
-- PDF/DOCX text extraction, persistent memory controls, camera-based QR scanning, and LaTeX/Mermaid rendering are not implemented. Provider QR import from a gallery image is supported.
+- OAuth endpoint discovery and dynamic client registration are not implemented; provider-specific non-standard OAuth parameters and client secrets are not supported. MCP also does not support local `stdio` processes, resource/prompt APIs, or subscriptions. Connected servers may perform consequential actions through tools that the user explicitly enabled.
+- Persistent memory controls are not implemented. Provider QR import from a gallery image and live camera scanning, plus offline LaTeX/Mermaid rendering, are supported.
 - Provider-specific features may fail or be unavailable when an endpoint does not implement the expected API. Check that provider's documentation and model capabilities.
 - The repository checkout has no top-level project `LICENSE` file. `THIRD_PARTY_LICENSES` contains dependency notices; it does not declare the project's own license.
 

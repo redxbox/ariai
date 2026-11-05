@@ -1,9 +1,6 @@
 name: Android APK
 
 on:
-  push:
-    branches:
-      - arena/5f5dd5fd-ariai
   workflow_dispatch:
 
 permissions:

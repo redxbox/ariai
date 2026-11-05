@@ -52,36 +52,77 @@ class ChatRepository(
     suspend fun saveProvider(provider: Provider): Boolean = persistWithResult(
         prepare = {
             withContext(Dispatchers.IO) {
-                val entity = provider.toEntity()
-                if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank()) {
-                    // Preserve ciphertext if a non-key setting (for example enabled state) is saved.
-                    val storedKey = db.providerDao().getProviderById(provider.id)?.apiKey
-                    if (storedKey != null) entity.copy(apiKey = storedKey) else entity
-                } else {
-                    entity
+                var entity = provider.toEntity()
+                val needsStoredCiphertext =
+                    (provider.apiKeyNeedsReentry && provider.apiKey.isBlank()) ||
+                        provider.providerConfigNeedsReentry || provider.oauthStateNeedsReentry
+                if (needsStoredCiphertext) {
+                    val stored = db.providerDao().getProviderById(provider.id)
+                    if (stored != null) {
+                        if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank()) {
+                            // Preserve the key if a non-key setting (for example enabled state) is saved.
+                            entity = entity.copy(apiKey = stored.apiKey)
+                        }
+                        if (provider.providerConfigNeedsReentry) {
+                            // Preserve locked config ciphertext until the user explicitly re-enters it.
+                            entity = entity.copy(
+                                customHeaders = stored.customHeaders,
+                                customBody = stored.customBody,
+                                modelsJson = stored.modelsJson
+                            )
+                        }
+                        if (provider.oauthStateNeedsReentry) {
+                            entity = entity.copy(oauthState = stored.oauthState)
+                        }
+                    }
                 }
+                entity
             }
         },
         persist = { entity -> db.providerDao().insertProvider(entity) },
         onFailure = { com.ariai.app.util.AppLog.warn(it, "saveProvider") }
     )
 
-    /** Safely upgrades legacy plain-text provider keys without decrypting or replacing ciphertext. */
+    /** Encrypts legacy plaintext provider credentials and custom request configuration in place. */
     suspend fun migrateProviderKeysToEncrypted() {
         val providers = try {
             db.providerDao().getAllProvidersSync()
         } catch (e: Exception) {
-            com.ariai.app.util.AppLog.warn(e, "provider key migration")
+            com.ariai.app.util.AppLog.warn(e, "provider secret migration")
             return
         }
         providers.forEach { entity ->
-            if (entity.apiKey.isNotBlank() && !entity.apiKey.startsWith("enc1:")) {
+            val updated = runCatching {
+                entity.copy(
+                    apiKey = encryptLegacyValue(entity.apiKey),
+                    customHeaders = encryptLegacyValue(entity.customHeaders),
+                    customBody = entity.customBody?.let(::encryptLegacyValue),
+                    modelsJson = encryptLegacyValue(entity.modelsJson),
+                    oauthState = entity.oauthState?.let(::encryptLegacyValue)
+                )
+            }.onFailure { com.ariai.app.util.AppLog.warn(it, "provider secret migration") }.getOrNull()
+            if (updated != null && updated != entity) {
                 runCatching {
-                    db.providerDao().insertProvider(entity.copy(apiKey = com.ariai.app.util.KeyVault.encrypt(entity.apiKey)))
-                }.onFailure { com.ariai.app.util.AppLog.warn(it, "provider key migration") }
+                    db.providerDao().migrateProviderSecretsIfUnchanged(
+                        id = entity.id,
+                        oldApiKey = entity.apiKey,
+                        oldCustomHeaders = entity.customHeaders,
+                        oldCustomBody = entity.customBody,
+                        oldModelsJson = entity.modelsJson,
+                        oldOauthState = entity.oauthState,
+                        apiKey = updated.apiKey,
+                        customHeaders = updated.customHeaders,
+                        customBody = updated.customBody,
+                        modelsJson = updated.modelsJson,
+                        oauthState = updated.oauthState
+                    )
+                }.onFailure { com.ariai.app.util.AppLog.warn(it, "provider secret migration") }
             }
         }
     }
+
+    private fun encryptLegacyValue(value: String): String =
+        if (value.isBlank() || value.startsWith("enc1:")) value else com.ariai.app.util.KeyVault.encrypt(value)
 
     suspend fun deleteProvider(id: String) {
         try {
@@ -516,23 +557,55 @@ class ChatRepository(
 
     // Mappers with safety
     private fun ProviderEntity.toModel(): Provider {
-        val decryptedKey = com.ariai.app.util.KeyVault.decryptOrNull(apiKey)
-        val apiKeyNeedsReentry = apiKey.startsWith("enc1:") && decryptedKey == null
+        val keyVault = com.ariai.app.util.KeyVault
+        val decryptedKey = keyVault.decryptOrNull(apiKey)
+        val decryptedHeaders = keyVault.decryptOrNull(customHeaders)
+        val decryptedBody = customBody?.let(keyVault::decryptOrNull)
+        val decryptedModels = keyVault.decryptOrNull(modelsJson)
+        val parsedAuthType = runCatching { ProviderAuthType.valueOf(authType) }
+            .getOrDefault(ProviderAuthType.API_KEY)
+        val decryptedOAuthState = oauthState?.let(keyVault::decryptOrNull)
+        val oauthStateNeedsReentry = parsedAuthType == ProviderAuthType.OAUTH2 &&
+            oauthState?.startsWith("enc1:") == true && decryptedOAuthState == null
+        val oauthConfig = if (
+            !oauthAuthorizationEndpoint.isNullOrBlank() && !oauthTokenEndpoint.isNullOrBlank() &&
+            !oauthClientId.isNullOrBlank() && oauthScopes != null
+        ) runCatching {
+            OAuth2Config(
+                authorizationEndpoint = oauthAuthorizationEndpoint.orEmpty(),
+                tokenEndpoint = oauthTokenEndpoint.orEmpty(),
+                clientId = oauthClientId.orEmpty(),
+                scopes = oauthScopes.orEmpty(),
+                redirectUri = oauthRedirectUri ?: OAuth2Config.DEFAULT_REDIRECT_URI
+            ).requireValid()
+        }.getOrNull() else null
+        val apiKeyNeedsReentry = parsedAuthType == ProviderAuthType.API_KEY && apiKey.startsWith("enc1:") && decryptedKey == null
+        val providerConfigNeedsReentry =
+            (customHeaders.startsWith("enc1:") && decryptedHeaders == null) ||
+                (customBody?.startsWith("enc1:") == true && decryptedBody == null) ||
+                (modelsJson.startsWith("enc1:") && decryptedModels == null)
+        val providerType = try { ProviderType.valueOf(type) } catch (e: Exception) { ProviderType.OPENAI_COMPATIBLE }
+        val safeModelsJson = decryptedModels ?: if (modelsJson.startsWith("enc1:")) "[]" else modelsJson
         return try {
             Provider(
                 id = id,
                 name = name,
-                type = try { ProviderType.valueOf(type) } catch (e: Exception) { ProviderType.OPENAI_COMPATIBLE },
+                type = providerType,
                 baseUrl = baseUrl,
                 apiKey = decryptedKey.orEmpty(),
                 enabled = enabled,
-                customHeaders = try { Converters().toStringMap(customHeaders) } catch (e: Exception) { emptyMap() },
-                customBody = customBody,
+                customHeaders = try { Converters().toStringMap(decryptedHeaders.orEmpty()) } catch (e: Exception) { emptyMap() },
+                customBody = decryptedBody,
                 createdAt = createdAt,
                 apiKeyNeedsReentry = apiKeyNeedsReentry,
-                models = com.ariai.app.data.models.modelsFromJson(modelsJson).ifEmpty {
+                providerConfigNeedsReentry = providerConfigNeedsReentry,
+                authType = parsedAuthType,
+                oauthConfig = oauthConfig,
+                oauthStateJson = decryptedOAuthState,
+                oauthStateNeedsReentry = oauthStateNeedsReentry,
+                models = com.ariai.app.data.models.modelsFromJson(safeModelsJson).ifEmpty {
                     // Providers saved before model storage existed start with the defaults.
-                    if (modelsJson == "[]") com.ariai.app.data.models.getDefaultModelsForType(runCatching { ProviderType.valueOf(type) }.getOrDefault(ProviderType.OPENAI_COMPATIBLE), id) else emptyList()
+                    if (safeModelsJson == "[]") com.ariai.app.data.models.getDefaultModelsForType(providerType, id) else emptyList()
                 }
             )
         } catch (e: Exception) {
@@ -542,7 +615,8 @@ class ChatRepository(
                 type = ProviderType.OPENAI_COMPATIBLE,
                 baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" },
                 apiKey = decryptedKey.orEmpty(),
-                apiKeyNeedsReentry = apiKeyNeedsReentry
+                apiKeyNeedsReentry = apiKeyNeedsReentry,
+                providerConfigNeedsReentry = providerConfigNeedsReentry
             )
         }
     }
@@ -552,13 +626,21 @@ class ChatRepository(
         name = name,
         type = type.name,
         baseUrl = baseUrl,
-        // Encrypt at rest; KeyVault.decrypt() still reads legacy plain-text database rows.
         apiKey = com.ariai.app.util.KeyVault.encrypt(apiKey),
         enabled = enabled,
-        customHeaders = try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { "" },
-        customBody = customBody,
+        customHeaders = com.ariai.app.util.KeyVault.encrypt(
+            try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { "" }
+        ),
+        customBody = customBody?.let(com.ariai.app.util.KeyVault::encrypt),
         createdAt = createdAt,
-        modelsJson = com.ariai.app.data.models.modelsToJson(models)
+        modelsJson = com.ariai.app.util.KeyVault.encrypt(com.ariai.app.data.models.modelsToJson(models)),
+        authType = authType.name,
+        oauthAuthorizationEndpoint = oauthConfig?.normalized()?.authorizationEndpoint,
+        oauthTokenEndpoint = oauthConfig?.normalized()?.tokenEndpoint,
+        oauthClientId = oauthConfig?.normalized()?.clientId,
+        oauthScopes = oauthConfig?.normalized()?.scopes,
+        oauthRedirectUri = oauthConfig?.normalized()?.redirectUri,
+        oauthState = oauthStateJson?.takeIf(String::isNotBlank)?.let(com.ariai.app.util.KeyVault::encrypt)
     )
 
     private fun ChatEntity.toModel() = Chat(

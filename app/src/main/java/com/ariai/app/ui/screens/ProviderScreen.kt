@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -323,6 +324,7 @@ fun AddProviderScreen(
     presetLabelKey: String? = null,
     fetchModels: suspend (Provider) -> List<AIModel>,
     onSave: (Provider) -> Unit,
+    onAuthorizeOAuth: (Provider) -> Unit = {},
     onBack: () -> Unit,
     onCheckProvider: suspend (Provider) -> ConnectionResult = { provider -> checkConnection(provider, fetchModels) },
     onDelete: (String) -> Unit = {},
@@ -352,6 +354,35 @@ fun AddProviderScreen(
     var selectedType by remember(initialProvider?.id, presetLabelKey, presetType) {
         mutableStateOf(initialProvider?.type ?: initialPreset?.type ?: presetType ?: ProviderType.OPENAI)
     }
+    var authType by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.authType ?: ProviderAuthType.API_KEY)
+    }
+    var oauthAuthorizationEndpoint by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.oauthConfig?.authorizationEndpoint.orEmpty())
+    }
+    var oauthTokenEndpoint by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.oauthConfig?.tokenEndpoint.orEmpty())
+    }
+    var oauthClientId by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.oauthConfig?.clientId.orEmpty())
+    }
+    var oauthScopes by remember(initialProvider?.id) {
+        mutableStateOf(initialProvider?.oauthConfig?.scopes.orEmpty())
+    }
+    val oauthConfig = OAuth2Config(
+        authorizationEndpoint = oauthAuthorizationEndpoint,
+        tokenEndpoint = oauthTokenEndpoint,
+        clientId = oauthClientId,
+        scopes = oauthScopes
+    ).normalized()
+    val oauthSettingsUnchanged = initialProvider?.let {
+        it.oauthConfig.sameSettingsAs(oauthConfig) && it.baseUrl.trim() == baseUrl.trim()
+    } == true
+    val oauthState = initialProvider?.oauthStateJson?.takeIf {
+        authType == ProviderAuthType.OAUTH2 && oauthSettingsUnchanged
+    }
+    val oauthStateNeedsReentry = authType == ProviderAuthType.OAUTH2 &&
+        initialProvider?.oauthStateNeedsReentry == true && oauthSettingsUnchanged
     var reveal by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
     var advancedOpen by remember { mutableStateOf(false) }
@@ -360,6 +391,8 @@ fun AddProviderScreen(
     val providerId = remember { initialProvider?.id ?: java.util.UUID.randomUUID().toString() }
     var models by remember { mutableStateOf(initialProvider?.models ?: emptyList()) }
     var modelsEdited by remember { mutableStateOf(initialProvider != null) }
+    val configNeedsReentry = initialProvider?.providerConfigNeedsReentry == true
+    var replaceLockedConfigConfirmed by remember(initialProvider?.id) { mutableStateOf(false) }
     var showAddModel by remember { mutableStateOf(false) }
     var modelFilter by remember { mutableStateOf("") }
     var modelsExpanded by remember { mutableStateOf(false) }
@@ -371,10 +404,16 @@ fun AddProviderScreen(
     var showConnectionDialog by remember { mutableStateOf(false) }
     var checkingConnection by remember { mutableStateOf(false) }
     var connectionResult by remember { mutableStateOf<ConnectionResult?>(null) }
-    // Key of the URL/key/type the models were last fetched for. Save fetches again when it changes.
-    fun sourceKey() = "${baseUrl.trim()}|${apiKey.trim()}|$selectedType"
+    // Bound auth settings to the model catalog source so changes require an explicit refresh.
+    fun sourceKey() = if (authType == ProviderAuthType.OAUTH2) {
+        "${baseUrl.trim()}|$selectedType|${oauthConfig.fingerprint()}"
+    } else "${baseUrl.trim()}|${apiKey.trim()}|$selectedType|${authType.name}"
     var fetchedKey by remember {
-        mutableStateOf(initialProvider?.let { "${it.baseUrl.trim()}|${it.apiKey.trim()}|${it.type}" })
+        mutableStateOf(initialProvider?.let { provider ->
+            if (provider.authType == ProviderAuthType.OAUTH2 && provider.oauthConfig != null) {
+                "${provider.baseUrl.trim()}|${provider.type}|${provider.oauthConfig.fingerprint()}"
+            } else "${provider.baseUrl.trim()}|${provider.apiKey.trim()}|${provider.type}|${provider.authType.name}"
+        })
     }
     fun draftProvider(list: List<AIModel>) = Provider(
         id = providerId,
@@ -382,12 +421,19 @@ fun AddProviderScreen(
         type = selectedType,
         baseUrl = baseUrl.trim(),
         apiKey = apiKey.trim(),
-        models = list.map { it.copy(providerId = providerId) },
+        models = (if (authType == ProviderAuthType.OAUTH2 && list.isEmpty()) {
+            getDefaultModelsForType(selectedType, providerId)
+        } else list).map { it.copy(providerId = providerId) },
         enabled = enabled,
         customHeaders = headers.filter { it.first.isNotBlank() }.toMap(),
         customBody = customBody.trim().ifBlank { null },
         createdAt = initialProvider?.createdAt ?: System.currentTimeMillis(),
-        apiKeyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
+        apiKeyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank(),
+        providerConfigNeedsReentry = configNeedsReentry && !replaceLockedConfigConfirmed,
+        authType = authType,
+        oauthConfig = oauthConfig.takeIf { authType == ProviderAuthType.OAUTH2 },
+        oauthStateJson = oauthState,
+        oauthStateNeedsReentry = oauthStateNeedsReentry
     )
     fun runConnectionCheck() {
         if (checkingConnection || fetching) return
@@ -454,16 +500,23 @@ fun AddProviderScreen(
             }
         }
     }
-    val keyNeedsReentry = selectedType != ProviderType.OLLAMA && initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
-    val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody) && !keyNeedsReentry
+    val keyNeedsReentry = authType == ProviderAuthType.API_KEY && selectedType != ProviderType.OLLAMA &&
+        initialProvider?.apiKeyNeedsReentry == true && apiKey.isBlank()
+    val oauthConfigError = if (authType == ProviderAuthType.OAUTH2) oauthConfig.validationError() else null
+    val canSave = name.isNotBlank() && baseUrl.isNotBlank() && isValidJsonObject(customBody) &&
+        !keyNeedsReentry && oauthConfigError == null
     val visibleModels = models.filter {
         modelFilter.isBlank() || it.id.contains(modelFilter, ignoreCase = true) || it.displayName.contains(modelFilter, ignoreCase = true)
     }
     fun saveProviderDraft() {
-        if (sourceKey() != fetchedKey) {
-            // URL, key or type changed: refresh the models before saving.
+        val oauthNeedsInitialAuthorization = authType == ProviderAuthType.OAUTH2 && oauthState.isNullOrBlank()
+        if (sourceKey() != fetchedKey && !oauthNeedsInitialAuthorization &&
+            (!configNeedsReentry || replaceLockedConfigConfirmed)
+        ) {
+            // Refresh catalogs only when the selected authentication state can access the endpoint.
             fetchAndMerge(onDone = { list -> onSave(draftProvider(list)) })
         } else {
+            // The repository preserves locked ciphertext unless replacement was explicitly confirmed.
             onSave(draftProvider(models))
         }
     }
@@ -600,32 +653,120 @@ fun AddProviderScreen(
                             colors = providerFieldColors(),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        OutlinedTextField(
-                            value = apiKey,
-                            onValueChange = { apiKey = it },
-                            label = { Text(tx("API key")) },
-                            singleLine = true,
-                            visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
-                            trailingIcon = {
-                                IconButton(onClick = { reveal = !reveal }) {
-                                    Icon(Icons.Default.Visibility, contentDescription = if (reveal) tx("Hide key") else tx("Show key"), tint = AriInk.copy(alpha = 0.5f))
-                                }
-                            },
-                            shape = RoundedCornerShape(18.dp),
-                            colors = providerFieldColors(),
-                            modifier = Modifier.fillMaxWidth().testTag("provider-api-key")
-                        )
-                        Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
-                        if (keyNeedsReentry) {
+                        Text(tx("Authentication"), fontWeight = FontWeight.Medium, color = AriInk)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = authType == ProviderAuthType.API_KEY,
+                                onClick = { authType = ProviderAuthType.API_KEY },
+                                label = { Text(tx("API key")) }
+                            )
+                            FilterChip(
+                                selected = authType == ProviderAuthType.OAUTH2,
+                                onClick = { authType = ProviderAuthType.OAUTH2 },
+                                label = { Text(tx("OAuth 2.0")) }
+                            )
+                        }
+                        if (authType == ProviderAuthType.API_KEY) {
+                            OutlinedTextField(
+                                value = apiKey,
+                                onValueChange = { apiKey = it },
+                                label = { Text(tx("API key")) },
+                                singleLine = true,
+                                visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    IconButton(onClick = { reveal = !reveal }) {
+                                        Icon(Icons.Default.Visibility, contentDescription = if (reveal) tx("Hide key") else tx("Show key"), tint = AriInk.copy(alpha = 0.5f))
+                                    }
+                                },
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-api-key")
+                            )
+                            Text(tx("Stored only on this device."), fontSize = 12.sp, color = AriInk.copy(alpha = 0.5f))
+                            if (keyNeedsReentry) {
+                                Text(
+                                    "${tx("The saved API key could not be unlocked.")} ${tx("Re-enter it in AI Providers and save.")}",
+                                    fontSize = 12.sp,
+                                    color = AriAccent
+                                )
+                            }
+                        } else {
                             Text(
-                                "${tx("The saved API key could not be unlocked.")} ${tx("Re-enter it in AI Providers and save.")}",
+                                tx("Uses OAuth 2.0 Authorization Code with PKCE for native public clients. AriAI never stores a client secret."),
+                                fontSize = 12.sp,
+                                color = AriInk.copy(alpha = 0.62f)
+                            )
+                            OutlinedTextField(
+                                value = oauthAuthorizationEndpoint,
+                                onValueChange = { oauthAuthorizationEndpoint = it.take(OAuth2Config.MAX_ENDPOINT_LENGTH) },
+                                label = { Text(tx("Authorization endpoint (HTTPS)")) },
+                                singleLine = true,
+                                isError = oauthAuthorizationEndpoint.isNotBlank() && !isValidOAuth2Endpoint(oauthAuthorizationEndpoint),
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-oauth-authorization-endpoint")
+                            )
+                            OutlinedTextField(
+                                value = oauthTokenEndpoint,
+                                onValueChange = { oauthTokenEndpoint = it.take(OAuth2Config.MAX_ENDPOINT_LENGTH) },
+                                label = { Text(tx("Token endpoint (HTTPS)")) },
+                                singleLine = true,
+                                isError = oauthTokenEndpoint.isNotBlank() && !isValidOAuth2Endpoint(oauthTokenEndpoint),
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-oauth-token-endpoint")
+                            )
+                            OutlinedTextField(
+                                value = oauthClientId,
+                                onValueChange = { oauthClientId = it.take(OAuth2Config.MAX_CLIENT_ID_LENGTH) },
+                                label = { Text(tx("OAuth client ID")) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-oauth-client-id")
+                            )
+                            OutlinedTextField(
+                                value = oauthScopes,
+                                onValueChange = { oauthScopes = it.take(OAuth2Config.MAX_SCOPES_LENGTH) },
+                                label = { Text(tx("Scopes (space-separated)")) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(18.dp),
+                                colors = providerFieldColors(),
+                                modifier = Modifier.fillMaxWidth().testTag("provider-oauth-scopes")
+                            )
+                            Text(tx("Redirect URI"), fontSize = 12.sp, color = AriMuted)
+                            SelectionContainer {
+                                Text(OAuth2Config.DEFAULT_REDIRECT_URI, fontSize = 13.sp, color = AriInk)
+                            }
+                            Text(
+                                if (oauthStateNeedsReentry) tx("Saved OAuth state could not be unlocked. Connect again to replace it.")
+                                else if (!oauthState.isNullOrBlank()) tx("OAuth connected; tokens are stored encrypted on this device.")
+                                else tx("Not connected. Save and connect to authorize this provider."),
+                                fontSize = 12.sp,
+                                color = if (oauthStateNeedsReentry) AriAccent else AriInk.copy(alpha = 0.62f)
+                            )
+                            OutlinedButton(
+                                onClick = { onAuthorizeOAuth(draftProvider(models)) },
+                                enabled = name.isNotBlank() && baseUrl.isNotBlank() && oauthConfigError == null,
+                                shape = RoundedCornerShape(18.dp),
+                                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("provider-oauth-connect")
+                            ) { Text(tx("Connect with OAuth"), fontWeight = FontWeight.SemiBold) }
+                        }
+                        if (configNeedsReentry) {
+                            Text(
+                                "${tx("Saved provider settings could not be unlocked.")} ${tx("Re-enter the provider configuration in AI Providers and save.")}",
                                 fontSize = 12.sp,
                                 color = AriAccent
                             )
+                            TextButton(onClick = { replaceLockedConfigConfirmed = true }) {
+                                Text(tx("Replace with current provider settings"), color = AriAccent)
+                            }
                         }
                         FetchModelsRow(
                             fetching = fetching,
-                            canFetch = baseUrl.isNotBlank() && !keyNeedsReentry,
+                            canFetch = baseUrl.isNotBlank() && !keyNeedsReentry &&
+                                (authType == ProviderAuthType.API_KEY || (!oauthState.isNullOrBlank() && !oauthStateNeedsReentry)) &&
+                                (!configNeedsReentry || replaceLockedConfigConfirmed),
                             status = fetchError ?: if (models.isEmpty()) null else "${models.size} ${tx("models")}",
                             isError = fetchError != null,
                             onFetch = { fetchAndMerge({}, showModelsWhenFetched = true) }

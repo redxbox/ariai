@@ -101,7 +101,7 @@ private fun Request.Builder.applyMcpAuthentication(server: McpServerItem): Reque
     val secret = server.authSecret?.trim().orEmpty()
     when (server.authType) {
         McpAuthType.NONE -> Unit
-        McpAuthType.BEARER -> header("Authorization", "Bearer $secret")
+        McpAuthType.BEARER, McpAuthType.OAUTH2 -> header("Authorization", "Bearer $secret")
         McpAuthType.CUSTOM_HEADER -> header(server.authHeaderName.trim(), secret)
     }
     return this
@@ -341,6 +341,9 @@ class MCPClient(
         if (server.authType == McpAuthType.NONE) return
         val secret = server.authSecret?.trim().orEmpty()
         require(secret.isNotBlank()) { "Re-enter the saved MCP credential before connecting." }
+        if (server.authType == McpAuthType.OAUTH2) {
+            require(!secret.trimStart().startsWith("{")) { "Resolve the saved OAuth state before connecting to the MCP server." }
+        }
         require(secret.length <= MAX_AUTH_VALUE_LENGTH && secret.all { it.code in 0x20..0x7e }) {
             "The MCP credential contains invalid characters or is too long."
         }

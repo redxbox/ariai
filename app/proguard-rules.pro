@@ -21,3 +21,6 @@
 
 # PdfBox's optional JP2 decoder is not needed for PDF text extraction.
 -dontwarn com.gemalto.jp2.**
+
+# Tesseract's native JNI entry points use these Java wrapper names.
+-keep class com.googlecode.tesseract.android.** { *; }

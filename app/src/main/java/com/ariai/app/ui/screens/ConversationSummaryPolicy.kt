@@ -4,6 +4,12 @@ import com.ariai.app.data.models.AttachmentType
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
 
+/** Conservative request budget reserved for one user turn after leaving room for system/tool context and output. */
+internal fun safeUserInputTokenBudget(contextWindow: Int): Long {
+    val limit = contextWindow.takeIf { it > 0 } ?: 8192
+    return ((limit.toLong() * 2L / 3L) * 3L / 4L).coerceAtLeast(1024L)
+}
+
 /** Conservative, media-aware token estimate used to decide when history should be summarized. */
 internal fun estimateMessageTokens(message: ChatMessage): Long {
     val characters = message.content.length.toLong() +

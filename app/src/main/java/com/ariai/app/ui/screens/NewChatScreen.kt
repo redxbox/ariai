@@ -74,6 +74,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -149,6 +152,7 @@ fun NewChatScreen(
     searchMode: SearchMode = SearchMode.OFF,
     searchProvider: String? = null,
     searchKeys: Map<String, String> = emptyMap(),
+    biometricLockEnabled: Boolean = false,
     favorites: Set<String> = emptySet(),
     modelUsageCounts: Map<Pair<String, String>, Int> = emptyMap(),
     onSendMessage: (String, List<Attachment>, ReasoningLevel, SearchMode, (Boolean) -> Unit) -> Boolean,
@@ -355,7 +359,25 @@ fun NewChatScreen(
     var mediaPickerVideoConfirmed by remember { mutableStateOf(false) }
     var showThinking by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
+    var searchSheetAuthenticated by remember(biometricLockEnabled) { mutableStateOf(!biometricLockEnabled) }
+    var sensitiveAuthAttempt by remember { mutableIntStateOf(0) }
+    val currentShowSearch by rememberUpdatedState(showSearch)
     var showTopMenu by remember { mutableStateOf(false) }
+    DisposableEffect(biometricLockEnabled) {
+        val lifecycle = ProcessLifecycleOwner.get().lifecycle
+        var backgrounded = false
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                backgrounded = true
+                if (biometricLockEnabled && currentShowSearch) searchSheetAuthenticated = false
+            } else if (event == Lifecycle.Event.ON_START && backgrounded) {
+                backgrounded = false
+                if (biometricLockEnabled && currentShowSearch) sensitiveAuthAttempt++
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -514,6 +536,26 @@ fun NewChatScreen(
 
     fun showNote(text: String) {
         scope.launch { snackbarHostState.showSnackbar(text) }
+    }
+
+    LaunchedEffect(showSearch, biometricLockEnabled, sensitiveAuthAttempt) {
+        if (!showSearch) {
+            searchSheetAuthenticated = !biometricLockEnabled
+            return@LaunchedEffect
+        }
+        if (!biometricLockEnabled) {
+            searchSheetAuthenticated = true
+            return@LaunchedEffect
+        }
+        searchSheetAuthenticated = false
+        val activity = context as? androidx.fragment.app.FragmentActivity
+        val authenticated = activity != null && authenticateSensitiveSettings(activity)
+        if (authenticated) {
+            searchSheetAuthenticated = true
+        } else {
+            showSearch = false
+            showNote(tx("Authentication was cancelled or failed."))
+        }
     }
 
     fun copyToClipboard(text: String) {
@@ -767,7 +809,7 @@ fun NewChatScreen(
     if (showThinking) {
         ThinkingDepthSheet(level = reasoning, onLevelChange = onReasoningChange, onDismiss = { showThinking = false })
     }
-    if (showSearch) {
+    if (showSearch && (!biometricLockEnabled || searchSheetAuthenticated)) {
         SearchSheet(
             mode = searchMode,
             providers = providers,

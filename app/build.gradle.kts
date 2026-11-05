@@ -29,6 +29,7 @@ android {
         targetSdk = 36
         versionCode = 5
         versionName = "2.3.0-stable"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.ariai.app"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -79,7 +80,7 @@ android {
         }
     }
     lint {
-        abortOnError = false
+        abortOnError = true
     }
 }
 
@@ -143,10 +144,12 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
 
-    // Text extraction from user-selected PDFs; DOCX parsing uses Android's XML/ZIP APIs.
+    // Local PDF OCR and selectable-text extraction; DOCX parsing uses Android's XML/ZIP APIs.
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("net.openid:appauth:0.11.1")
     
     // JSON
     implementation("org.json:json:20231013")

@@ -15,5 +15,7 @@ class PublicUrlFetcherTest {
         assertThrows(IOException::class.java) { runBlocking { fetcher.fetch("http://[::1]/") } }
         assertThrows(IOException::class.java) { runBlocking { fetcher.fetch("http://localhost/") } }
         assertThrows(IOException::class.java) { runBlocking { fetcher.fetch("https://user:password@example.com/") } }
+        assertThrows(IOException::class.java) { runBlocking { fetcher.fetch("http://example.com/") } }
+        assertThrows(IOException::class.java) { runBlocking { fetcher.fetchImageBytes("http://example.com/image.png") } }
     }
 }

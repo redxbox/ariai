@@ -68,7 +68,7 @@ internal data class NativeSearchProviderOption(
 
     val hasUsableKey: Boolean
         get() = provider?.let {
-            it.enabled && it.apiKey.isNotBlank() && !it.apiKeyNeedsReentry && supportsNativeSearch(it)
+            it.enabled && it.apiKey.isNotBlank() && !it.apiKeyNeedsReentry && !it.providerConfigNeedsReentry && supportsNativeSearch(it)
         } == true
 
     val isReady: Boolean
@@ -84,14 +84,14 @@ internal fun nativeSearchProviderOptions(
     val typedProviders = providers.filter { it.type == type }
     val selectedProvider = typedProviders.firstOrNull { it.id == selectedProviderId }
     val keyedProvider = typedProviders.firstOrNull {
-        it.enabled && it.apiKey.isNotBlank() && !it.apiKeyNeedsReentry && supportsNativeSearch(it)
+        it.enabled && it.apiKey.isNotBlank() && !it.apiKeyNeedsReentry && !it.providerConfigNeedsReentry && supportsNativeSearch(it)
     }
     val selectedUsableProvider = selectedProvider?.takeIf {
-        it.enabled && it.apiKey.isNotBlank() && !it.apiKeyNeedsReentry && supportsNativeSearch(it)
+        it.enabled && it.apiKey.isNotBlank() && !it.apiKeyNeedsReentry && !it.providerConfigNeedsReentry && supportsNativeSearch(it)
     }
     val provider = selectedUsableProvider ?: keyedProvider ?: selectedProvider ?: typedProviders.firstOrNull { it.enabled } ?: typedProviders.firstOrNull()
     val usable = provider?.takeIf {
-        it.enabled && it.apiKey.isNotBlank() && !it.apiKeyNeedsReentry && supportsNativeSearch(it)
+        it.enabled && it.apiKey.isNotBlank() && !it.apiKeyNeedsReentry && !it.providerConfigNeedsReentry && supportsNativeSearch(it)
     }
     val textModels = usable?.models.orEmpty().filter { it.outputsText && it.id.isNotBlank() }
     val model = if (provider?.id == selectedProviderId) {

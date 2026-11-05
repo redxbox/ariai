@@ -76,6 +76,29 @@ class McpServerCodecTest {
     }
 
     @Test
+    fun oauthConfigurationIsMetadataButTokenStateRemainsOutsideTheCodec() {
+        val config = OAuth2Config(
+            authorizationEndpoint = "https://identity.example.test/oauth/authorize",
+            tokenEndpoint = "https://identity.example.test/oauth/token",
+            clientId = "mcp-client",
+            scopes = "tools.read tools.write"
+        )
+        val server = McpServerItem(
+            id = "oauth-server",
+            name = "OAuth MCP",
+            url = "https://mcp.example.test/mcp",
+            transport = McpTransport.STREAMABLE_HTTP,
+            authType = McpAuthType.OAUTH2,
+            authSecret = "must-not-serialize-token",
+            oauthConfig = config
+        )
+        val encoded = McpServerCodec.encode(listOf(server))
+        assertTrue(encoded.contains(config.clientId))
+        assertFalse(encoded.contains("must-not-serialize"))
+        assertEquals(server.copy(authSecret = null), McpServerCodec.decode(encoded).single())
+    }
+
+    @Test
     fun malformedStoredDataFailsClosed() {
         assertTrue(McpServerCodec.decode("not-json").isEmpty())
         assertTrue(McpServerCodec.decode(null).isEmpty())

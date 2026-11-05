@@ -11,6 +11,13 @@ import org.junit.Test
 
 class ConversationSummaryPolicyTest {
     @Test
+    fun `user input budget reserves context for tools and output`() {
+        assertEquals(3_999L, safeUserInputTokenBudget(8_000))
+        assertEquals(1_024L, safeUserInputTokenBudget(512))
+        assertEquals(safeUserInputTokenBudget(8_192), safeUserInputTokenBudget(0))
+    }
+
+    @Test
     fun `split preserves a complete latest user turn`() {
         val history = listOf(
             message(MessageRole.USER, 1),

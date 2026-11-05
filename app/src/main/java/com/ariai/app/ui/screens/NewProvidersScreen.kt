@@ -97,7 +97,8 @@ fun NewProvidersScreen(
     onToggleProvider: (Provider) -> Unit = {},
     fetchModels: (suspend (Provider) -> List<AIModel>)? = null,
     onSaveProvider: ((Provider, (Provider?) -> Unit) -> Unit)? = null,
-    onAddProviderPreset: ((ProviderType, String) -> Unit)? = null
+    onAddProviderPreset: ((ProviderType, String) -> Unit)? = null,
+    onAuthorizeOAuth: (Provider) -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
     var showImport by remember { mutableStateOf(false) }
@@ -275,6 +276,7 @@ fun NewProvidersScreen(
                             }
                         }
                     },
+                    onAuthorizeOAuth = onAuthorizeOAuth,
                     onBack = {
                         showAddProvider = false
                         addProviderPreset = null

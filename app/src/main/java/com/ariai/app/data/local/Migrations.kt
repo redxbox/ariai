@@ -72,3 +72,16 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         db.execSQL("ALTER TABLE messages ADD COLUMN totalTokens INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** Adds native OAuth 2.0 PKCE configuration and encrypted token-state storage for providers. */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE providers ADD COLUMN authType TEXT NOT NULL DEFAULT 'API_KEY'")
+        db.execSQL("ALTER TABLE providers ADD COLUMN oauthAuthorizationEndpoint TEXT")
+        db.execSQL("ALTER TABLE providers ADD COLUMN oauthTokenEndpoint TEXT")
+        db.execSQL("ALTER TABLE providers ADD COLUMN oauthClientId TEXT")
+        db.execSQL("ALTER TABLE providers ADD COLUMN oauthScopes TEXT")
+        db.execSQL("ALTER TABLE providers ADD COLUMN oauthRedirectUri TEXT")
+        db.execSQL("ALTER TABLE providers ADD COLUMN oauthState TEXT")
+    }
+}

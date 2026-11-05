@@ -39,6 +39,10 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
+internal fun isSensitiveSettingsRoute(route: String): Boolean =
+    route == "providers" || route == "mcp" || route == "search_service" ||
+        route.startsWith("add_provider") || route.startsWith("edit_provider/")
+
 internal fun biometricAuthenticatorTypes(): Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
     BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
 } else {

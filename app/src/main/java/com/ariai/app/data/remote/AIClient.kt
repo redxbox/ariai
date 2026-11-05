@@ -291,7 +291,19 @@ internal class AgentStepStreamAccumulator(private val providerType: ProviderType
 
 internal class StreamingNotSupportedException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
-class AIClient {
+internal fun decodeGeneratedImageBase64(encoded: String, maxBytes: Int = HttpBodyLimits.IMAGE_BYTES): ByteArray {
+    require(maxBytes in 1..HttpBodyLimits.IMAGE_BYTES) { "Requested image limit is out of range" }
+    val maxEncodedChars = ((maxBytes.toLong() + 2L) / 3L) * 4L
+    if (encoded.length.toLong() > maxEncodedChars) throw IOException("Image exceeds the ${maxBytes / 1024} KB limit")
+    val decoded = java.util.Base64.getMimeDecoder().decode(encoded)
+    if (decoded.size > maxBytes) throw IOException("Image exceeds the ${maxBytes / 1024} KB limit")
+    return decoded
+}
+
+class AIClient(
+    private val oauthSessionManager: OAuthSessionManager? = null
+) {
+    private val publicUrlFetcher = PublicUrlFetcher()
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
@@ -301,12 +313,30 @@ class AIClient {
         .build()
 
     /** Applies provider auth, then custom headers so explicitly configured headers can override defaults. */
-    private fun Request.Builder.addProviderHeaders(provider: Provider, modelId: String? = null): Request.Builder {
-        if (provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA) {
+    private suspend fun Request.Builder.addProviderHeaders(provider: Provider, modelId: String? = null): Request.Builder {
+        if (provider.providerConfigNeedsReentry) {
+            throw IOException(
+                "${tx("Saved provider settings could not be unlocked.")} " +
+                    tx("Re-enter the provider configuration in AI Providers and save.")
+            )
+        }
+        if (provider.authType == ProviderAuthType.API_KEY && provider.apiKeyNeedsReentry &&
+            provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA
+        ) {
             throw IOException("${tx("The saved API key could not be unlocked.")} ${tx("Re-enter it in AI Providers and save.")}")
         }
-        val key = provider.apiKey.trim()
-        when (provider.type) {
+        if (provider.authType == ProviderAuthType.OAUTH2 && provider.oauthStateNeedsReentry) {
+            throw IOException(tx("Reconnect this provider; its saved OAuth state could not be unlocked."))
+        }
+        val key = when (provider.authType) {
+            ProviderAuthType.API_KEY -> provider.apiKey.trim()
+            ProviderAuthType.OAUTH2 -> (oauthSessionManager
+                ?: throw IOException(tx("OAuth is unavailable. Restart AriAI and try again.")))
+                .providerAccessToken(provider)
+        }
+        if (provider.authType == ProviderAuthType.OAUTH2) {
+            header("Authorization", "Bearer $key")
+        } else when (provider.type) {
             ProviderType.GEMINI -> if (key.isNotBlank()) header("x-goog-api-key", key)
             ProviderType.ANTHROPIC -> {
                 if (key.isNotBlank()) header("x-api-key", key)
@@ -910,14 +940,9 @@ class AIClient {
     /** Returns the bytes of a generated image, from its base64 payload or its URL. */
     suspend fun imageBytes(image: GeneratedImage): ByteArray = withContext(Dispatchers.IO) {
         val b64 = image.base64
-        if (!b64.isNullOrBlank()) {
-            return@withContext android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
-        }
-        val url = image.url ?: throw Exception("No image data returned")
-        client.executeCancellable(Request.Builder().url(url).build()).use { r ->
-            if (!r.isSuccessful) throw Exception("Image download failed: HTTP ${r.code}")
-            r.body?.readBytesAtMost(HttpBodyLimits.IMAGE_BYTES) ?: throw Exception("Empty image response")
-        }
+        if (!b64.isNullOrBlank()) return@withContext decodeGeneratedImageBase64(b64)
+        val url = image.url ?: throw IOException("No image data returned")
+        publicUrlFetcher.fetchImageBytes(url, maxBytes = HttpBodyLimits.IMAGE_BYTES)
     }
 
     /**
@@ -1553,7 +1578,7 @@ class AIClient {
         else -> ""
     }
 
-    private fun parseGeminiResponse(json: JSONObject): String {
+    internal fun parseGeminiResponse(json: JSONObject): String {
         return try {
             val candidates = json.optJSONArray("candidates") ?: return ""
             if (candidates.length() == 0) return ""
@@ -1563,7 +1588,8 @@ class AIClient {
             if (parts.length() == 0) return ""
             buildString {
                 for (i in 0 until parts.length()) {
-                    append(parts.optJSONObject(i)?.optString("text", "").orEmpty())
+                    val part = parts.optJSONObject(i) ?: continue
+                    if (!part.optBoolean("thought", false)) append(part.optString("text", ""))
                 }
             }
         } catch (e: Exception) {
@@ -1609,7 +1635,7 @@ class AIClient {
     /** Veo on the Gemini API: start a long-running operation, poll it, then download the MP4. */
     private suspend fun generateVeo(provider: Provider, modelId: String, prompt: String, onProgress: (String) -> Unit): ByteArray {
         val base = provider.baseUrl.trim().trimEnd('/')
-        fun keyed(b: Request.Builder): Request.Builder = b.addProviderHeaders(provider, modelId)
+        suspend fun keyed(b: Request.Builder): Request.Builder = b.addProviderHeaders(provider, modelId)
         onProgress("Sending request")
         val body = JSONObject()
             .put("instances", JSONArray().put(JSONObject().put("prompt", prompt)))
@@ -1674,7 +1700,7 @@ class AIClient {
         onProgress: (String) -> Unit = {}
     ): ByteArray = withContext(Dispatchers.IO) {
         val base = provider.baseUrl.trim().trimEnd('/')
-        fun auth(b: Request.Builder): Request.Builder = b.addProviderHeaders(provider, modelId)
+        suspend fun auth(b: Request.Builder): Request.Builder = b.addProviderHeaders(provider, modelId)
         if (base.contains("pollinations.ai")) {
             onProgress("Rendering")
             val origin = base.removeSuffix("/v1")

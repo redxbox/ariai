@@ -10,9 +10,9 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Encrypts API keys before they are written to disk. The AES key lives in the Android Keystore,
- * so the database and preference files hold only ciphertext. Values without the prefix are
- * legacy plain text; callers migrate those values after a successful read.
+ * Encrypts provider/search credentials and custom provider request configuration before they are
+ * written to disk. The AES key lives in Android Keystore, so supported storage fields hold only
+ * ciphertext. Values without the prefix are legacy plain text and are migrated after a successful read.
  */
 object KeyVault {
     private const val ALIAS = "ariai_key_vault"
@@ -42,7 +42,7 @@ object KeyVault {
             PREFIX + Base64.encodeToString(cipher.iv + data, Base64.NO_WRAP)
         } catch (e: Exception) {
             AppLog.warn(e, "KeyVault.encrypt")
-            throw IllegalStateException("Could not encrypt API key with Android Keystore", e)
+            throw IllegalStateException("Could not encrypt secret with Android Keystore", e)
         }
     }
 

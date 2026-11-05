@@ -37,6 +37,26 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".oauth.OAuthCompletionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AriAi" />
+        <activity
+            android:name=".oauth.OAuthCanceledActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AriAi" />
+        <activity
+            android:name="net.openid.appauth.RedirectUriReceiverActivity"
+            android:exported="true"
+            tools:node="replace">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.ariai.app" android:host="oauth2redirect" />
+            </intent-filter>
+        </activity>
+
         <provider
         android:name="androidx.core.content.FileProvider"
         android:authorities="${applicationId}.fileprovider"
