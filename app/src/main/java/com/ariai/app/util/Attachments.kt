@@ -31,7 +31,9 @@ private const val MAX_VIDEO_BYTES = 12L * 1024 * 1024
 private const val MAX_PDF_BYTES = 20L * 1024 * 1024
 private const val MAX_DOCX_XML_BYTES = 5 * 1024 * 1024
 private const val MAX_DOCX_EXPANDED_BYTES = 40L * 1024 * 1024
-private const val MAX_PDF_PAGES = 200
+internal const val MAX_PDF_EXTRACT_PAGES = 20
+internal fun pdfPageCountToExtract(pageCount: Int, maximumPages: Int = MAX_PDF_EXTRACT_PAGES): Int =
+    pageCount.coerceAtLeast(0).coerceAtMost(maximumPages.coerceAtLeast(0))
 private const val MAX_OCR_PAGES = 20
 private const val MAX_OCR_PAGE_EDGE = 1800
 private const val TRUNCATION_NOTICE = "\n[Extracted text truncated to fit the response context.]"
@@ -51,10 +53,10 @@ sealed interface ReadResult {
  * Reads a file picked by the user. Images are scaled down and WebP-encoded to keep
  * requests small; text-like files are returned as text to inline into the prompt.
  */
-fun readAttachment(context: Context, uri: Uri): ReadResult {
+fun readAttachment(context: Context, uri: Uri, extractedDocumentText: String? = null): ReadResult {
     val resolver = context.contentResolver
     val mime = resolver.getType(uri) ?: "application/octet-stream"
-    val name = displayName(context, uri) ?: "file"
+    val name = attachmentDisplayName(context, uri) ?: "file"
     return try {
         when {
             mime.startsWith("image/") -> {
@@ -62,7 +64,7 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
                 ReadResult.Ok(imageAttachment(bitmap, name))
             }
             mime == "application/pdf" || name.substringAfterLast('.', "").equals("pdf", ignoreCase = true) -> {
-                val text = extractPdfText(context, uri)
+                val text = extractedDocumentText ?: extractPdfText(context, uri)
                 ReadResult.Ok(Attachment(
                     type = AttachmentType.PDF,
                     name = name,
@@ -72,7 +74,9 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
             }
             mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
                 name.substringAfterLast('.', "").equals("docx", ignoreCase = true) -> {
-                val text = extractDocxText(resolver.openInputStream(uri) ?: return ReadResult.Error(tx("Could not open this file.")))
+                val text = extractedDocumentText ?: extractDocxText(
+                    resolver.openInputStream(uri) ?: return ReadResult.Error(tx("Could not open this file."))
+                )
                 ReadResult.Ok(Attachment(
                     type = AttachmentType.DOCX,
                     name = name,
@@ -138,7 +142,7 @@ fun readAttachment(context: Context, uri: Uri): ReadResult {
 
 private class AttachmentReadException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-private fun extractPdfText(context: Context, uri: Uri): String {
+internal fun extractPdfText(context: Context, uri: Uri): String {
     val temp = File.createTempFile("ariai-pdf-", ".pdf", context.cacheDir)
     try {
         val input = context.contentResolver.openInputStream(uri) ?: throw AttachmentReadException("Could not open PDF.")
@@ -166,8 +170,8 @@ internal fun extractPdfTextFromFile(context: Context, pdfFile: File): String {
         val pageTexts = mutableListOf<String>()
         val scannedPageIndexes = mutableListOf<Int>()
         var usedCharacters = 0
-        var truncated = pdf.numberOfPages > MAX_PDF_PAGES
-        val pageCount = pdf.numberOfPages.coerceAtMost(MAX_PDF_PAGES)
+        val pageCount = pdfPageCountToExtract(pdf.numberOfPages)
+        var truncated = pdf.numberOfPages > pageCount
 
         for (pageNumber in 1..pageCount) {
             val separatorLength = if (usedCharacters > 0) 2 else 0
@@ -345,7 +349,10 @@ private fun installOcrModels(context: Context): File = synchronized(OCR_DATA_LOC
     root
 }
 
-internal fun extractDocxText(input: InputStream): String {
+internal fun extractDocxText(
+    input: InputStream,
+    parserFactory: () -> XmlPullParser = { Xml.newPullParser() }
+): String {
     val xml = input.use { source ->
         ZipInputStream(source.buffered()).use { zip ->
             var expandedBytes = 0L
@@ -372,7 +379,7 @@ internal fun extractDocxText(input: InputStream): String {
         }
     }
 
-    val parser = Xml.newPullParser()
+    val parser = parserFactory()
     parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
     runCatching { parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false) }
     parser.setInput(xml.inputStream(), "UTF-8")
@@ -518,7 +525,7 @@ private fun scaleDown(bitmap: Bitmap): Bitmap {
     )
 }
 
-private fun displayName(context: Context, uri: Uri): String? =
+internal fun attachmentDisplayName(context: Context, uri: Uri): String? =
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
         if (cursor.moveToFirst()) cursor.getString(0) else null
     }

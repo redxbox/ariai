@@ -106,6 +106,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ariai.app.data.DocumentTextExtractor
 import com.ariai.app.data.models.Attachment
 import com.ariai.app.data.models.AttachmentType
 import com.ariai.app.data.models.Agent
@@ -620,8 +621,28 @@ fun NewChatScreen(
     fun readFiles(uris: List<Uri>) {
         if (uris.isEmpty()) return
         scope.launch {
+            val documentExtractor = DocumentTextExtractor(context)
             for (uri in uris) {
-                when (val result = withContext(Dispatchers.IO) { readAttachment(context, uri) }) {
+                val isDocument = try {
+                    documentExtractor.supports(uri)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    false
+                }
+                val result = if (isDocument) {
+                    val extractedText = documentExtractor.extractText(uri)
+                    if (extractedText.isFailure) {
+                        showNote(tx("Could not read this document."))
+                        continue
+                    }
+                    withContext(Dispatchers.IO) {
+                        readAttachment(context, uri, extractedText.getOrThrow())
+                    }
+                } else {
+                    withContext(Dispatchers.IO) { readAttachment(context, uri) }
+                }
+                when (result) {
                     is ReadResult.Ok -> pending = pending + result.attachment
                     is ReadResult.Error -> showNote(result.message)
                 }
@@ -1567,6 +1588,9 @@ private fun ContextUsageIndicator(
 
 @Composable
 private fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
+    val extractedText = attachment.textContent?.takeIf(String::isNotBlank)
+    val preview = remember(extractedText) { extractedText?.let { attachmentTextPreview(it) } }
+    val estimatedTokens = remember(extractedText) { extractedText?.let(::estimateAttachmentTextTokens) }
     Surface(shape = RoundedCornerShape(18.dp), color = AriCard, shadowElevation = 0.dp) {
         Row(
             modifier = Modifier.padding(start = 10.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
@@ -1579,14 +1603,36 @@ private fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
             }
             Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text(
-                attachment.name,
-                fontSize = 12.sp,
-                color = Ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 140.dp)
-            )
+            Column(
+                modifier = Modifier.widthIn(max = 190.dp).padding(vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                Text(
+                    attachment.name,
+                    fontSize = 12.sp,
+                    color = Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!preview.isNullOrBlank()) {
+                    Text(
+                        preview,
+                        color = Muted,
+                        fontSize = 10.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("attachment-text-preview")
+                    )
+                    Text(
+                        "${tx("Approx.")} $estimatedTokens ${tx("tokens in context")}",
+                        color = Muted,
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("attachment-token-estimate")
+                    )
+                }
+            }
             IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Default.Close, contentDescription = tx("Remove attachment"), tint = Ink.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
             }
