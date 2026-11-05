@@ -1155,6 +1155,10 @@ class AppViewModel(
         sendPending = true
         _isSending.value = true
         launchSendJob { generation ->
+            // Set once the user turn is persisted so cancellation/error paths can
+            // always attach a visible outcome to the question that was asked.
+            var sentUserMessageId: String? = null
+            var cancellationHandled = false
             try {
                 if (!chatPersistenceGate.await(chatId)) {
                     onUserMessageSaved(false)
@@ -1176,17 +1180,6 @@ class AppViewModel(
                 val targetModelId = _modelOverrides.value[chatId]?.second
                     ?: getCurrentChat()?.modelId
                     ?: provider.models.firstOrNull()?.id
-                if (existingUserMessage == null && messageToReplace == null && !provider.providerConfigNeedsReentry &&
-                    !(provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA)) {
-                    val contextWindow = provider.models.firstOrNull { it.id == targetModelId }?.contextWindow ?: 8192
-                    maybeAutoSummarizeHistoryBeforeSend(
-                        chatId = chatId,
-                        provider = provider,
-                        modelId = targetModelId ?: "openai",
-                        contextWindow = contextWindow,
-                        generation = generation
-                    )
-                }
                 val userMessage = storedUserMessage ?: ChatMessage(
                     chatId = chatId,
                     role = MessageRole.USER,
@@ -1205,6 +1198,21 @@ class AppViewModel(
                     appendMessage(repository.getMessageById(userMessage.id) ?: userMessage)
                 } else {
                     appendMessage(userMessage)
+                }
+                sentUserMessageId = userMessage.id
+
+                // Persist the turn before the optional history summary: the question must
+                // never vanish if the app is backgrounded while the summary is generated.
+                if (existingUserMessage == null && messageToReplace == null && !provider.providerConfigNeedsReentry &&
+                    !(provider.apiKeyNeedsReentry && provider.apiKey.isBlank() && provider.type != ProviderType.OLLAMA)) {
+                    val contextWindow = provider.models.firstOrNull { it.id == targetModelId }?.contextWindow ?: 8192
+                    maybeAutoSummarizeHistoryBeforeSend(
+                        chatId = chatId,
+                        provider = provider,
+                        modelId = targetModelId ?: "openai",
+                        contextWindow = contextWindow,
+                        generation = generation
+                    )
                 }
 
                 val sentContent = userMessage.content
@@ -1560,6 +1568,7 @@ class AppViewModel(
                     }
 
                 } catch (e: kotlinx.coroutines.CancellationException) {
+                    cancellationHandled = true
                     // Stopped by the user: keep the text that has arrived so far as the reply.
                     val partialResponse = fullResponse + streamedPreview
                     if (partialResponse.isNotBlank()) {
@@ -1575,6 +1584,13 @@ class AppViewModel(
                             repository.saveMessage(partial)
                             appendMessage(partial)
                         }
+                    } else if (sendGeneration - generation <= 1) {
+                        // Nothing arrived yet: never leave the question without a visible outcome.
+                        postAssistantError(
+                            chatId,
+                            tx("The reply was interrupted before it arrived. Send again to retry."),
+                            userMessage.id
+                        )
                     }
                     throw e
                 } catch (e: Exception) {
@@ -1599,10 +1615,42 @@ class AppViewModel(
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 setSendStreamingState(generation, streaming = false)
+                // Cancellation outside the streaming block (e.g. during the history
+                // summary) still has to leave a visible, retryable outcome behind.
+                if (!cancellationHandled && sendGeneration - generation <= 1) {
+                    val keptParentId = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        sentUserMessageId ?: existingUserMessage?.id ?: run {
+                            if (messageToReplace == null && requestContent.isNotBlank()) {
+                                // The turn was cancelled before it reached the database.
+                                val keptTurn = ChatMessage(
+                                    chatId = chatId,
+                                    role = MessageRole.USER,
+                                    content = requestContent,
+                                    attachments = requestAttachments
+                                )
+                                if (repository.saveMessage(keptTurn)) {
+                                    appendMessage(keptTurn)
+                                    keptTurn.id
+                                } else null
+                            } else {
+                                _messages.value.lastOrNull { it.role == MessageRole.USER }?.id
+                            }
+                        }
+                    }
+                    postAssistantError(
+                        chatId,
+                        tx("The reply was interrupted before it arrived. Send again to retry."),
+                        keptParentId
+                    )
+                }
                 throw e
             } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "sendMessage")
                 setSendStreamingState(generation, streaming = false)
+                if (sendGeneration == generation) {
+                    // Surface setup failures too; a silent log leaves the question with no outcome.
+                    postAssistantError(chatId, ErrorMapper.chatMessage(e, provider.name), sentUserMessageId)
+                }
             }
         }
         return true

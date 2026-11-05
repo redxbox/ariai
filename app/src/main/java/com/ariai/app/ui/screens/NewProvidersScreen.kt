@@ -32,6 +32,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
@@ -43,6 +44,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -162,7 +164,16 @@ fun NewProvidersScreen(
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        // The search field keeps pulling the list back under the keyboard while
+        // scrolling (bring-into-view). Clear focus as soon as a scroll starts.
+        val listFocusManager = LocalFocusManager.current
+        LaunchedEffect(listState) {
+            snapshotFlow { listState.isScrollInProgress }
+                .collect { scrolling -> if (scrolling) listFocusManager.clearFocus() }
+        }
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(13.dp)

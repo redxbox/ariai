@@ -442,6 +442,7 @@ internal val faStrings: Map<String, String> = mapOf(
         "Connecting to MCP" to "در حال اتصال به MCP",
         "Failed" to "ناموفق",
         "Stopped" to "متوقف شد",
+        "The reply was interrupted before it arrived. Send again to retry." to "پاسخ پیش از رسیدن قطع شد. برای تلاش دوباره، دوباره بفرستید.",
         "Preparing image generation" to "آماده‌سازی تصویر",
         "Preparing video generation" to "آماده‌سازی ویدیو",
         "Preparing audio generation" to "آماده‌سازی صدا",

@@ -21,6 +21,7 @@ import android.graphics.PorterDuffXfermode
 import android.os.Build
 import android.os.SystemClock
 import android.provider.MediaStore
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -1423,19 +1424,17 @@ fun NewChatScreen(
                     if (hasStreamingText) {
                         item(key = "streaming") {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ToolExecutionTimeline(toolExecutionUpdates)
                                 if (generationActive) {
-                                    GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
+                                    GenerationWorkCard(waitingStatus, elapsedGenerationSeconds, toolExecutionUpdates)
+                                } else {
+                                    ToolExecutionTimeline(toolExecutionUpdates)
                                 }
                                 AssistantBlock(text = currentStreamingContent, streaming = isStreaming, fontSize = fontSize)
                             }
                         }
                     } else if (showWaitingStatus) {
                         item(key = "waiting-status") {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ToolExecutionTimeline(toolExecutionUpdates)
-                                GenerationStatus(waitingStatus, elapsedGenerationSeconds, active = true)
-                            }
+                            GenerationWorkCard(waitingStatus, elapsedGenerationSeconds, toolExecutionUpdates)
                         }
                     } else if (toolExecutionUpdates.isNotEmpty() && messages.lastOrNull()?.role != MessageRole.ASSISTANT) {
                         item(key = "tool-timeline") {
@@ -1799,6 +1798,142 @@ private fun GenerationStatus(label: String, elapsedSeconds: Long, active: Boolea
             )
         }
     }
+}
+
+/**
+ * Live status card while a reply is being generated: an animated "thinking /
+ * searching" header with the elapsed time, plus every tool step executed so far,
+ * all inside one frame.
+ */
+@Composable
+private fun GenerationWorkCard(
+    label: String,
+    elapsedSeconds: Long,
+    updates: List<ToolExecutionUpdate>,
+    modifier: Modifier = Modifier
+) {
+    val steps = updates.takeLast(8)
+    val hiddenCount = updates.size - steps.size
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = AriCard,
+        border = BorderStroke(0.75.dp, AriLine.copy(alpha = 0.85f)),
+        modifier = modifier
+            .padding(start = 4.dp)
+            .widthIn(max = 380.dp)
+            .animateContentSize(tween(200, easing = FastOutSlowInEasing))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PulsingWorkDot()
+                val statusText = if (elapsedSeconds > 0L) {
+                    "$label · ${formatGenerationDuration(elapsedSeconds)}"
+                } else {
+                    label
+                }
+                Text(
+                    statusText,
+                    color = Ink,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("chat-generation-status-active")
+                )
+            }
+            if (steps.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.testTag("chat-tool-timeline"),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    if (hiddenCount > 0) {
+                        Text("+$hiddenCount", color = Muted.copy(alpha = 0.7f), fontSize = 10.sp)
+                    }
+                    steps.forEach { update -> GenerationWorkStep(update) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GenerationWorkStep(update: ToolExecutionUpdate) {
+    val label = tx(update.label)
+    val statusText = when (update.phase) {
+        ToolExecutionPhase.COMPLETED -> if (update.elapsedMs >= 1_000L) {
+            "$label · ${formatGenerationDuration(update.elapsedMs / 1_000L)}"
+        } else {
+            label
+        }
+        ToolExecutionPhase.FAILED -> "$label · ${tx("Failed")}"
+        ToolExecutionPhase.CANCELLED -> "$label · ${tx("Stopped")}"
+        ToolExecutionPhase.RUNNING -> label
+    }
+    Row(
+        modifier = Modifier.testTag("chat-tool-execution-step"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        when (update.phase) {
+            ToolExecutionPhase.RUNNING -> CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                strokeWidth = 1.5.dp,
+                color = Accent
+            )
+            ToolExecutionPhase.COMPLETED -> Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = Accent.copy(alpha = 0.85f),
+                modifier = Modifier.size(13.dp)
+            )
+            ToolExecutionPhase.FAILED -> Icon(
+                Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = Muted,
+                modifier = Modifier.size(13.dp)
+            )
+            ToolExecutionPhase.CANCELLED -> Icon(
+                Icons.Default.Stop,
+                contentDescription = null,
+                tint = Muted,
+                modifier = Modifier.size(13.dp)
+            )
+        }
+        Text(
+            statusText,
+            color = if (update.phase == ToolExecutionPhase.RUNNING) Ink else Muted,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/** Small breathing dot that signals an active generation without a heavy spinner. */
+@Composable
+private fun PulsingWorkDot() {
+    val transition = rememberInfiniteTransition(label = "generation-work-dot")
+    val alpha by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "generation-work-dot-alpha"
+    )
+    Box(
+        modifier = Modifier
+            .size(9.dp)
+            .clip(CircleShape)
+            .background(Accent.copy(alpha = alpha))
+    )
 }
 
 private fun formatGenerationDuration(totalSeconds: Long): String {

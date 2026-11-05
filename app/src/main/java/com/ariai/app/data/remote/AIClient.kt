@@ -306,7 +306,9 @@ class AIClient(
     private val publicUrlFetcher = PublicUrlFetcher()
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
+        // Long-silence tolerance: reasoning models and agent steps can pause between
+        // tokens for minutes; a 2-minute gap cut replies off mid-answer.
+        .readTimeout(300, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .addNetworkInterceptor(clientIdentityInterceptor)
