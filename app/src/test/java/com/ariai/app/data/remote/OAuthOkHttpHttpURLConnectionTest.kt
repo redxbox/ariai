@@ -18,7 +18,7 @@ class OAuthOkHttpHttpURLConnectionTest {
         try {
             val requestBody = "grant_type=authorization_code&code=sample-code"
             val connection = OAuthOkHttpHttpURLConnection(
-                server.url("/token").url,
+                server.url("/token").toUrl(),
                 OkHttpClient.Builder().build()
             )
             connection.requestMethod = "POST"
@@ -55,7 +55,7 @@ class OAuthOkHttpHttpURLConnectionTest {
 
         try {
             val connection = OAuthOkHttpHttpURLConnection(
-                server.url("/token").url,
+                server.url("/token").toUrl(),
                 OkHttpClient.Builder().build()
             )
             connection.requestMethod = "POST"
