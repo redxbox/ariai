@@ -57,20 +57,29 @@ expect_absent_text() {
   local label="$1"
   local output
   local status=0
-  output="$(python3 .github/scripts/ui_tap.py --assert "$label" 2>&1)" || status=$?
-  if [[ "$status" -eq 0 ]]; then
-    echo "::error title=Unexpected UI target::$label is present"
-    FAILED=1
-    capture_failure "$label"
-    return 1
-  elif [[ "$status" -ne 1 ]]; then
-    echo "$output"
-    echo "::error title=UI absence check failed::$label; ui_tap.py exited with status $status"
-    FAILED=1
-    capture_failure "$label"
-    return 1
-  fi
-  echo "Confirmed absent: $label"
+  local attempt
+  # Absence often follows a transition (the keyboard opening hides the fixed
+  # actions), and emulator IMEs can take seconds to report their insets.
+  # Poll briefly; a settled absence still passes on the first check.
+  for attempt in $(seq 1 20); do
+    status=0
+    output="$(python3 .github/scripts/ui_tap.py --assert "$label" 2>&1)" || status=$?
+    if [[ "$status" -eq 1 ]]; then
+      echo "Confirmed absent: $label"
+      return 0
+    elif [[ "$status" -ne 0 ]]; then
+      echo "$output"
+      echo "::error title=UI absence check failed::$label; ui_tap.py exited with status $status"
+      FAILED=1
+      capture_failure "$label"
+      return 1
+    fi
+    sleep 0.5
+  done
+  echo "::error title=Unexpected UI target::$label is present"
+  FAILED=1
+  capture_failure "$label"
+  return 1
 }
 
 tap() {
