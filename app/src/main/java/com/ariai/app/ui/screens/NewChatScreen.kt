@@ -73,6 +73,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.res.painterResource
+import com.ariai.app.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.Lifecycle
@@ -859,7 +861,7 @@ fun NewChatScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
                     navigationIcon = {
                         IconButton(onClick = onOpenDrawer) {
-                            Icon(Icons.Default.Menu, contentDescription = tx("Open menu"), tint = Ink)
+                            Icon(painterResource(R.drawable.ic_menu_slanted), contentDescription = tx("Open menu"), tint = Ink)
                         }
                     },
                     title = {
@@ -1495,10 +1497,10 @@ private fun ChatHeaderTitle(
                 .testTag("chat-title-text")
                 .padding(vertical = 5.dp),
             color = Ink,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            fontSize = 15.sp
+            fontSize = 13.sp
         )
     }
 }

@@ -259,7 +259,14 @@ fun AppRoot(viewModel: AppViewModel) {
 
     fun go(route: String) {
         scope.launch { drawerState.close() }
-        navController.navigate(route) { launchSingleTop = true }
+        navController.navigate(route) {
+            // Keep the back stack shallow when switching drawer destinations:
+            // collapse any previous destination above the graph start and
+            // restore the target's saved state instead of stacking screens.
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
 
     fun openChat(chatId: String) {
@@ -362,8 +369,8 @@ fun AppRoot(viewModel: AppViewModel) {
                 enterTransition = {
                     fadeIn(tween(220)) + slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { it / 6 }
                 },
-                exitTransition = { fadeOut(tween(160)) },
-                popEnterTransition = { fadeIn(tween(220)) },
+                exitTransition = { fadeOut(tween(160)) + slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { -it / 6 } },
+                popEnterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { -it / 6 } },
                 popExitTransition = {
                     fadeOut(tween(160)) + slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it / 6 }
                 }
