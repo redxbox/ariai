@@ -490,7 +490,6 @@ fun NewChatScreen(
     } else {
         storedChatTitle ?: tx("New chat")
     }
-    val isFreshEmptyChat = activeAgent == null && isUntitledChat && messages.isEmpty()
 
     // Follow the newest text only while the user is at the bottom. Once they scroll up, stay where they are.
     var followStream by remember { mutableStateOf(true) }
@@ -861,18 +860,16 @@ fun NewChatScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBg),
                     navigationIcon = {
                         IconButton(onClick = onOpenDrawer) {
-                            Icon(painterResource(R.drawable.ic_menu_slanted), contentDescription = tx("Open menu"), tint = Ink)
+                            Icon(painterResource(R.drawable.ic_menu_staggered), contentDescription = tx("Open menu"), tint = Ink)
                         }
                     },
                     title = {
-                        if (!isFreshEmptyChat) {
-                            ChatHeaderTitle(
-                                chatTitle = chatHeaderTitle,
-                                activeAgent = activeAgent,
-                                onTitleClick = startRenamingChat,
-                                onAgentClick = onOpenAgents
-                            )
-                        }
+                        ChatHeaderTitle(
+                            chatTitle = chatHeaderTitle,
+                            activeAgent = activeAgent,
+                            onTitleClick = startRenamingChat,
+                            onAgentClick = onOpenAgents
+                        )
                     },
                     actions = {
                         val contextLimit = selectedModelCapabilities?.contextWindow?.takeIf { it > 0 } ?: 0
@@ -900,6 +897,15 @@ fun NewChatScreen(
                                     val prefix = if (actualPromptTokens == null) tx("Approx.") + " " else ""
                                     showNote("$prefix$tokenCount / $contextLimit ${tx("tokens in context")}")
                                 }
+                            )
+                        } else {
+                            // Fresh chat or a model without a known context window: keep the
+                            // indicator visible; tapping it points the user at the model picker.
+                            ContextUsageIndicator(
+                                tokens = 0,
+                                contextWindow = 0,
+                                approximate = true,
+                                onClick = { showNote(tx("Choose model")) }
                             )
                         }
                         Box {
