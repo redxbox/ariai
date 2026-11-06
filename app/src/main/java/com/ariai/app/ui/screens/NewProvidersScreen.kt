@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -265,16 +266,18 @@ fun NewProvidersScreen(
     }
 
     if (showAddProvider && fetchModelsForAdd != null && saveProviderForAdd != null) {
+        val addProviderSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val addProviderSheetFix = rememberSheetScrollFix(addProviderSheetState)
         ModalBottomSheet(
             onDismissRequest = {
                 showAddProvider = false
                 addProviderPreset = null
             },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState = addProviderSheetState,
             containerColor = AriPaper,
             contentColor = AriInk
         ) {
-            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.90f)) {
+            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.90f).nestedScroll(addProviderSheetFix)) {
                 AddProviderScreen(
                     presetType = addProviderPreset?.type,
                     presetLabelKey = addProviderPreset?.labelKey,

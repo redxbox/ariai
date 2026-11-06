@@ -1139,9 +1139,11 @@ private fun AddModelSheet(
                 ) { Text(tx("Add"), fontWeight = FontWeight.SemiBold) }
             }
             // Scrollable body: the add action stays reachable in the sheet header.
+            val addModelScrollState = rememberScrollState()
+            ClearFocusOnScroll(addModelScrollState)
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(addModelScrollState)
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {

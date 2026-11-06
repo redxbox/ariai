@@ -67,11 +67,13 @@ fun AttachmentSheet(
         shape = paperSheetShape(40.dp),
         showOutline = false
     ) {
+        val sheetScrollState = rememberScrollState()
+        ClearFocusOnScroll(sheetScrollState)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 520.dp, max = 700.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(sheetScrollState)
                 .padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
@@ -277,10 +279,12 @@ fun SearchSheet(
         shape = paperSheetShape(30.dp),
         showOutline = false
     ) {
+        val sheetScrollState = rememberScrollState()
+        ClearFocusOnScroll(sheetScrollState)
         Column(
             modifier = Modifier.fillMaxWidth()
                 .heightIn(max = 520.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(sheetScrollState)
                 .animateContentSize()
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp),

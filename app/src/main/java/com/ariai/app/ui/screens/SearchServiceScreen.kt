@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.ui.theme.AriCard
+import com.ariai.app.ui.theme.ClearFocusOnScroll
 import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
 import com.ariai.app.ui.theme.AriPaper
@@ -64,7 +66,10 @@ fun SearchServiceScreen(
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        ClearFocusOnScroll(listState)
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding).navigationBarsPadding(),
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

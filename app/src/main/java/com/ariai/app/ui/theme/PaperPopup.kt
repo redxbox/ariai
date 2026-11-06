@@ -12,6 +12,7 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -56,6 +57,7 @@ fun PaperBottomSheet(
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState(
         skipPartiallyExpanded = skipPartiallyExpanded
     )
+    val scrollFix = rememberSheetScrollFix(sheetState)
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
@@ -68,7 +70,7 @@ fun PaperBottomSheet(
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding(),
+            modifier = Modifier.fillMaxWidth().nestedScroll(scrollFix).navigationBarsPadding().imePadding(),
             content = content
         )
     }
