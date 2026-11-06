@@ -11,6 +11,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.focus.LocalFocusManager
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 
@@ -55,6 +56,7 @@ fun ClearFocusOnScroll(scrollState: ScrollState) {
  * and swipe-to-dismiss (positive y) keep working, and a partially expanded sheet can still be
  * opened further by flinging upwards.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun rememberSheetScrollFix(sheetState: SheetState): NestedScrollConnection =
     remember(sheetState) {
