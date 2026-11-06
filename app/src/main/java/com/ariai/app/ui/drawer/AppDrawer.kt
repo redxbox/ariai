@@ -70,9 +70,7 @@ fun ColumnScope.AppDrawerContent(
     onAbout: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    val isToolsRoute = currentRoute == "search" || currentRoute == "mcp"
     val drawerAccent = MaterialTheme.colorScheme.primary
-    var toolsExpanded by remember(currentRoute) { mutableStateOf(isToolsRoute) }
 
     val rows: List<DrawerRow> = remember(chats, query, UiLang.code) {
         // Older databases may contain malformed chat rows. They must never produce a `chat/` route.
@@ -237,43 +235,9 @@ fun ColumnScope.AppDrawerContent(
     ) {
         FooterAction(Icons.Default.FolderOpen, tx("Workspace"), currentRoute == "workspace") { onNavigate("workspace") }
         FooterAction(Icons.Default.Person, tx("Agents & prompts"), currentRoute == "agents") { onNavigate("agents") }
+        FooterAction(Icons.Default.Search, tx("Search"), currentRoute == "search") { onNavigate("search") }
+        FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }
         FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(if (isToolsRoute) AriTint else Color.Transparent)
-                .semantics { stateDescription = if (toolsExpanded) tx("Expanded") else tx("Collapsed") }
-                .clickable(role = Role.Button) { toolsExpanded = !toolsExpanded }
-                .heightIn(min = 48.dp)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Icon(
-                Icons.Default.Extension,
-                contentDescription = null,
-                tint = if (isToolsRoute) MaterialTheme.colorScheme.primary else AriMuted,
-                modifier = Modifier.size(21.dp)
-            )
-            Text(
-                tx("Tools"),
-                fontSize = 14.sp,
-                color = Ink,
-                fontWeight = if (isToolsRoute) FontWeight.SemiBold else FontWeight.Normal
-            )
-            Spacer(Modifier.weight(1f))
-            Icon(
-                if (toolsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint = AriMuted,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        if (toolsExpanded) {
-            Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                FooterAction(Icons.Default.Search, tx("Search"), currentRoute == "search") { onNavigate("search") }
-                FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }
-            }
-        }
         FooterAction(
             Icons.Default.Settings,
             tx("Settings"),
