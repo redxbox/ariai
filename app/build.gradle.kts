@@ -60,6 +60,11 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            // Debug/testing builds target handheld devices only: package just arm64-v8a to keep the APK small.
+            // Release builds stay universal (all ABIs) until the pre-release artifact is produced.
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
         }
     }
     compileOptions {
