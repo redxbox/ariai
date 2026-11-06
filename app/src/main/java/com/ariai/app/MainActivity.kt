@@ -263,7 +263,7 @@ fun AppRoot(viewModel: AppViewModel) {
             // Keep the back stack shallow when switching drawer destinations:
             // collapse any previous destination above the graph start and
             // restore the target's saved state instead of stacking screens.
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
