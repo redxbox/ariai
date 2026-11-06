@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.Brush
@@ -283,14 +282,9 @@ fun AddProviderScreen(
     }
     val modelListState = rememberLazyListState()
     LaunchedEffect(tab) { modelListState.scrollToItem(0) }
-    // A focused text field keeps dragging the list back under the open keyboard
-    // (bring-into-view), which makes scrolling jump until the user taps the screen.
-    // Drop focus the moment a scroll starts so the list stays where it is put.
-    val editorFocusManager = LocalFocusManager.current
-    LaunchedEffect(modelListState) {
-        snapshotFlow { modelListState.isScrollInProgress }
-            .collect { scrolling -> if (scrolling) editorFocusManager.clearFocus() }
-    }
+    // A focused field keeps pulling the list back under the keyboard (bring-into-view);
+    // dropping focus on the user's own vertical drag keeps the list where it is put.
+    ClearFocusOnScroll(modelListState)
     if (showConnectionDialog) {
         ProviderConnectionDialog(
             providerName = name.trim().ifBlank { tx("New provider") },

@@ -44,7 +44,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -167,12 +166,8 @@ fun NewProvidersScreen(
     ) { padding ->
         val listState = rememberLazyListState()
         // The search field keeps pulling the list back under the keyboard while
-        // scrolling (bring-into-view). Clear focus as soon as a scroll starts.
-        val listFocusManager = LocalFocusManager.current
-        LaunchedEffect(listState) {
-            snapshotFlow { listState.isScrollInProgress }
-                .collect { scrolling -> if (scrolling) listFocusManager.clearFocus() }
-        }
+        // scrolling; dropping focus on the user's own vertical drag keeps it in place.
+        ClearFocusOnScroll(listState)
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
