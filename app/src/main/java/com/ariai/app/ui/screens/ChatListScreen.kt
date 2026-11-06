@@ -31,33 +31,9 @@ import com.ariai.app.data.models.Chat
 import com.ariai.app.ui.components.ConfirmDeleteChatDialog
 import java.text.SimpleDateFormat
 import java.util.*
+import com.ariai.app.util.ChatDateBucket
+import com.ariai.app.util.chatDateBucket
 import com.ariai.app.util.UiLang
-
-private enum class ChatDateBucket(val labelKey: String) {
-    PINNED("Pinned"),
-    TODAY("Today"),
-    YESTERDAY("Yesterday"),
-    PREVIOUS_7_DAYS("Previous 7 days"),
-    EARLIER("Earlier")
-}
-
-private fun chatDateBucket(timestamp: Long, now: Long = System.currentTimeMillis()): ChatDateBucket {
-    val todayStart = Calendar.getInstance().apply {
-        timeInMillis = now
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
-    val yesterdayStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
-    val previousWeekStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }
-    return when {
-        timestamp >= todayStart.timeInMillis -> ChatDateBucket.TODAY
-        timestamp >= yesterdayStart.timeInMillis -> ChatDateBucket.YESTERDAY
-        timestamp >= previousWeekStart.timeInMillis -> ChatDateBucket.PREVIOUS_7_DAYS
-        else -> ChatDateBucket.EARLIER
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -183,11 +159,11 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Default.MoreVert, contentDescription = tx("Chat options"), tint = AriInk.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                 }
-                val menuShape = paperPopupShape(16.dp, 12.dp)
+                val menuShape = paperPopupShape(16.dp)
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
-                    modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
+                    modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape))
                 ) {
                     DropdownMenuItem(text = { Text(tx("Pin")) }, onClick = { showMenu = false; onPin() }, leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) })
                     DropdownMenuItem(text = { Text(tx("Delete")) }, onClick = { showMenu = false; confirmDelete = true }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
@@ -208,7 +184,6 @@ fun formatTimeClean(timestamp: Long): String {
     val diff = (System.currentTimeMillis() - timestamp).coerceAtLeast(0L)
     val locale = when (UiLang.code) {
         "fa" -> Locale.forLanguageTag("fa-IR")
-        "ar" -> Locale.forLanguageTag("ar")
         else -> Locale.US
     }
     return when {
@@ -220,4 +195,3 @@ fun formatTimeClean(timestamp: Long): String {
     }
 }
 
-fun formatTime(timestamp: Long): String = formatTimeClean(timestamp)

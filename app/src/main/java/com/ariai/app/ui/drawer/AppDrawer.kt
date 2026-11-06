@@ -2,6 +2,8 @@ package com.ariai.app.ui.drawer
 
 import com.ariai.app.util.UiLang
 import com.ariai.app.util.tx
+import com.ariai.app.util.ChatDateBucket
+import com.ariai.app.util.chatDateBucket
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -40,33 +42,8 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.Provider
 import com.ariai.app.ui.components.ConfirmDeleteChatDialog
-import java.util.Calendar
-
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private enum class DayBucket(val labelKey: String) {
-    PINNED("Pinned"), TODAY("Today"), YESTERDAY("Yesterday"), PREVIOUS_7_DAYS("Previous 7 days"), EARLIER("Earlier");
-
-    val label: String get() = tx(labelKey)
-}
-
-private fun bucketOf(timestamp: Long, now: Long = System.currentTimeMillis()): DayBucket {
-    val todayStart = Calendar.getInstance().apply {
-        timeInMillis = now
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
-    val yesterdayStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
-    val previousWeekStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }
-    return when {
-        timestamp >= todayStart.timeInMillis -> DayBucket.TODAY
-        timestamp >= yesterdayStart.timeInMillis -> DayBucket.YESTERDAY
-        timestamp >= previousWeekStart.timeInMillis -> DayBucket.PREVIOUS_7_DAYS
-        else -> DayBucket.EARLIER
-    }
-}
 
 private sealed interface DrawerRow {
     data class Header(val id: String, val label: String) : DrawerRow
@@ -104,7 +81,7 @@ fun ColumnScope.AppDrawerContent(
         val out = mutableListOf<DrawerRow>()
         val pinned = filtered.filter { it.isPinned }
         if (pinned.isNotEmpty()) {
-            out += DrawerRow.Header("header:pinned", DayBucket.PINNED.label)
+            out += DrawerRow.Header("header:pinned", tx(ChatDateBucket.PINNED.labelKey))
             pinned.forEach { out += DrawerRow.ChatRow(it) }
         }
         val rest = filtered.filterNot { it.isPinned }.sortedByDescending { it.updatedAt }
@@ -119,10 +96,10 @@ fun ColumnScope.AppDrawerContent(
             }
         }
         val unfiled = rest.filter { it.folder.isNullOrBlank() }
-        DayBucket.values().filter { it != DayBucket.PINNED }.forEach { bucket ->
-            val group = unfiled.filter { bucketOf(it.updatedAt) == bucket }
+        ChatDateBucket.values().filter { it != ChatDateBucket.PINNED }.forEach { bucket ->
+            val group = unfiled.filter { chatDateBucket(it.updatedAt) == bucket }
             if (group.isNotEmpty()) {
-                out += DrawerRow.Header("header:${bucket.name.lowercase()}", bucket.label)
+                out += DrawerRow.Header("header:${bucket.name.lowercase()}", tx(bucket.labelKey))
                 group.forEach { out += DrawerRow.ChatRow(it) }
             }
         }
@@ -355,11 +332,11 @@ private fun ChatRowItem(
             IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Default.MoreVert, contentDescription = tx("Chat options"), tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
             }
-            val menuShape = paperPopupShape(16.dp, 12.dp)
+            val menuShape = paperPopupShape(16.dp)
             DropdownMenu(
                 expanded = menu,
                 onDismissRequest = { menu = false },
-                modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
+                modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape))
             ) {
                 DropdownMenuItem(
                     text = { Text(if (chat.isPinned) tx("Unpin") else tx("Pin")) },

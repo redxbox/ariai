@@ -904,11 +904,11 @@ fun NewChatScreen(
                             IconButton(onClick = { showTopMenu = true }) {
                                 Icon(Icons.Default.MoreHoriz, contentDescription = tx("More"), tint = Ink)
                             }
-                            val menuShape = paperPopupShape(18.dp, 12.dp)
+                            val menuShape = paperPopupShape(18.dp)
                             DropdownMenu(
                                 expanded = showTopMenu,
                                 onDismissRequest = { showTopMenu = false },
-                                modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
+                                modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape))
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(if (checkingConnection) tx("Checking…") else tx("Check connection")) },

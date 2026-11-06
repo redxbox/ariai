@@ -35,10 +35,14 @@ class ChatRepository(
             try {
                 list.map { it.toModel() }
             } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "row parse failed")
                 emptyList()
             }
         }
-        .catch { emit(emptyList()) }
+        .catch { e ->
+            com.ariai.app.util.AppLog.warn(e, "list flow failed")
+            emit(emptyList())
+        }
 
     /** Asks the provider's API which models it supports. Throws on failure. */
     suspend fun fetchModels(provider: Provider): List<AIModel> = aiClient.listModels(provider)
@@ -46,6 +50,7 @@ class ChatRepository(
     suspend fun getProviderById(id: String): Provider? = try {
         db.providerDao().getProviderById(id)?.toModel()
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "provider row")
         null
     }
 
@@ -147,11 +152,15 @@ class ChatRepository(
                 }
             }.sortedByDescending { it.updatedAt }
         }
-        .catch { emit(emptyList()) }
+        .catch { e ->
+            com.ariai.app.util.AppLog.warn(e, "list flow failed")
+            emit(emptyList())
+        }
 
     suspend fun getChatById(id: String): Chat? = try {
         db.chatDao().getChatById(id)?.toModel()
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "chat row")
         null
     }
 
@@ -189,20 +198,26 @@ class ChatRepository(
                 try {
                     list.map { it.toModel() }.sortedBy { it.timestamp }
                 } catch (e: Exception) {
+                    com.ariai.app.util.AppLog.warn(e, "messages parse failed")
                     emptyList()
                 }
             }
-            .catch { emit(emptyList()) }
+            .catch { e ->
+            com.ariai.app.util.AppLog.warn(e, "list flow failed")
+            emit(emptyList())
+        }
 
     suspend fun getMessagesSync(chatId: String): List<ChatMessage> = try {
         db.messageDao().getMessagesForChatSync(chatId).map { it.toModel() }.sortedBy { it.timestamp }
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "messages sync read")
         emptyList()
     }
 
     suspend fun getMessageById(id: String): ChatMessage? = try {
         db.messageDao().getMessageById(id)?.toModel()
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "message row")
         null
     }
 
@@ -312,10 +327,14 @@ class ChatRepository(
                     list.map { it.toModel() }
                 }
             } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "agents parse; using built-ins")
                 getBuiltInAgents()
             }
         }
-        .catch { emit(getBuiltInAgents()) }
+        .catch { e ->
+            com.ariai.app.util.AppLog.warn(e, "agents flow failed")
+            emit(getBuiltInAgents())
+        }
 
     suspend fun saveAgent(agent: Agent) {
         try {
@@ -584,7 +603,10 @@ class ChatRepository(
             (customHeaders.startsWith("enc1:") && decryptedHeaders == null) ||
                 (customBody?.startsWith("enc1:") == true && decryptedBody == null) ||
                 (modelsJson.startsWith("enc1:") && decryptedModels == null)
-        val providerType = try { ProviderType.valueOf(type) } catch (e: Exception) { ProviderType.OPENAI_COMPATIBLE }
+        val providerType = try { ProviderType.valueOf(type) } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "provider type")
+            ProviderType.OPENAI_COMPATIBLE
+        }
         val safeModelsJson = decryptedModels ?: if (modelsJson.startsWith("enc1:")) "[]" else modelsJson
         return try {
             Provider(
@@ -594,7 +616,10 @@ class ChatRepository(
                 baseUrl = baseUrl,
                 apiKey = decryptedKey.orEmpty(),
                 enabled = enabled,
-                customHeaders = try { Converters().toStringMap(decryptedHeaders.orEmpty()) } catch (e: Exception) { emptyMap() },
+                customHeaders = try { Converters().toStringMap(decryptedHeaders.orEmpty()) } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "custom headers parse")
+                emptyMap()
+            },
                 customBody = decryptedBody,
                 createdAt = createdAt,
                 apiKeyNeedsReentry = apiKeyNeedsReentry,
@@ -609,6 +634,7 @@ class ChatRepository(
                 }
             )
         } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "provider toModel")
             Provider(
                 id = id,
                 name = name.ifBlank { "Unknown" },
@@ -629,7 +655,7 @@ class ChatRepository(
         apiKey = com.ariai.app.util.KeyVault.encrypt(apiKey),
         enabled = enabled,
         customHeaders = com.ariai.app.util.KeyVault.encrypt(
-            try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { "" }
+            try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e, "custom headers serialize"); "" }
         ),
         customBody = customBody?.let(com.ariai.app.util.KeyVault::encrypt),
         createdAt = createdAt,
@@ -700,6 +726,7 @@ class ChatRepository(
             val bytes = java.io.File(uri).readBytes()
             copy(base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
         } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "attachment hydrate")
             this
         }
     }
@@ -718,6 +745,7 @@ class ChatRepository(
             )
         }
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "attachments parse")
         emptyList()
     }
 
@@ -755,6 +783,7 @@ class ChatRepository(
                 .takeIf { it.promptTokens > 0 || it.completionTokens > 0 || it.totalTokens > 0 }
         )
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "message toModel")
         ChatMessage(id = id, chatId = chatId, role = MessageRole.USER, content = content, timestamp = timestamp)
     }
 

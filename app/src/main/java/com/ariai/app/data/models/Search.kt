@@ -29,15 +29,6 @@ fun searchProviderTypeForKey(provider: String): SearchProviderType? = when (prov
     else -> null
 }
 
-fun searchProviderDisplayName(provider: String?): String? = when (provider?.trim()?.lowercase()) {
-    "bing" -> "Bing"
-    "tavily" -> "Tavily"
-    "brave" -> "Brave Search"
-    "exa" -> "Exa"
-    "serper" -> "Google Search"
-    else -> null
-}
-
 data class SearchProvider(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,

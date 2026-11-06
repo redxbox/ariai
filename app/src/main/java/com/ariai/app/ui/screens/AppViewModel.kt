@@ -802,6 +802,7 @@ class AppViewModel(
         val providerId = chatId?.let { _modelOverrides.value[it]?.first } ?: chat?.providerId
         resolveEnabledProvider(providers.value, providerId)
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "resolve provider")
         null
     }
 

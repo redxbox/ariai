@@ -41,7 +41,6 @@ import androidx.navigation.navArgument
 import com.ariai.app.ui.drawer.AppDrawerContent
 import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
-import com.ariai.app.util.LocalStrings
 import com.ariai.app.data.models.McpServerItem
 import com.ariai.app.data.models.OAuth2Config
 import com.ariai.app.data.models.Provider
@@ -49,7 +48,6 @@ import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.remote.OAuthAuthorizationLauncher
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.util.UiLang
-import com.ariai.app.util.getStringsForLanguage
 import com.ariai.app.util.tx
 import kotlinx.coroutines.launch
 
@@ -77,8 +75,6 @@ class MainActivity : FragmentActivity() {
             val language by viewModel.language.collectAsState()
             val theme by viewModel.theme.collectAsState()
             val dynamicColor by viewModel.dynamicColor.collectAsState()
-            val strings = getStringsForLanguage(language)
-
             val isDarkTheme = when (theme) {
                 "light" -> false
                 "dark" -> true
@@ -86,12 +82,10 @@ class MainActivity : FragmentActivity() {
             }
 
             SideEffect { UiLang.code = language }
-            val direction = if (language == "fa" || language == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
+            val direction = if (language == "fa") LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                CompositionLocalProvider(LocalStrings provides strings) {
-                    AriAiTheme(darkTheme = isDarkTheme, dynamicColor = dynamicColor) {
-                        AppRoot(viewModel = viewModel)
-                    }
+                AriAiTheme(darkTheme = isDarkTheme, dynamicColor = dynamicColor) {
+                    AppRoot(viewModel = viewModel)
                 }
             }
         }

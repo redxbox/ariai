@@ -496,7 +496,7 @@ private fun LocalSearchProviderPicker(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false },
                         modifier = Modifier.background(AriCard, menuShape)
-                            .then(paperPopupModifier(menuShape, 8.dp))
+                            .then(paperPopupModifier(menuShape))
                             .testTag("search-provider-menu")
                     ) {
                         listOf("brave", "bing").forEach { provider ->

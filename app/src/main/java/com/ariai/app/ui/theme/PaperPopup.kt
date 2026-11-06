@@ -19,25 +19,20 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-private val DEFAULT_PAPER_FOLD_SIZE = 12.dp
-
 /** Shared rounded geometry for menus and centered dialogs. */
 fun paperPopupShape(
-    cornerRadius: Dp,
-    @Suppress("UNUSED_PARAMETER") foldSize: Dp = DEFAULT_PAPER_FOLD_SIZE
+    cornerRadius: Dp
 ): Shape = RoundedCornerShape(cornerRadius)
 
 /** Large, soft top corners make sheets read as floating surfaces rather than hard panels. */
 fun paperSheetShape(
-    cornerRadius: Dp,
-    @Suppress("UNUSED_PARAMETER") foldSize: Dp = DEFAULT_PAPER_FOLD_SIZE
+    cornerRadius: Dp
 ): Shape = RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)
 
 /** A hairline outline keeps light dialogs distinct from the lavender page behind them. */
 @Composable
 fun paperPopupModifier(
-    shape: Shape,
-    @Suppress("UNUSED_PARAMETER") foldSize: Dp = DEFAULT_PAPER_FOLD_SIZE
+    shape: Shape
 ): Modifier = Modifier.border(BorderStroke(0.75.dp, AriLine.copy(alpha = 0.9f)), shape)
 
 /**

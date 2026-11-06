@@ -53,6 +53,7 @@ fun modelsFromJson(raw: String): List<AIModel> = try {
         )
     }
 } catch (e: Exception) {
+    com.ariai.app.util.AppLog.warn(e, "models fromJson")
     emptyList()
 }
 
