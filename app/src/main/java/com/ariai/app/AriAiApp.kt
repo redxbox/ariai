@@ -3,6 +3,7 @@ package com.ariai.app
 import android.app.Application
 import kotlinx.coroutines.launch
 import androidx.room.Room
+import com.ariai.app.data.local.ALL_MIGRATIONS
 import com.ariai.app.data.local.AppDatabase
 import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.remote.AIClient
@@ -31,16 +32,7 @@ class AriAiApp : Application() {
             AppDatabase::class.java,
             "ariai_db"
         )
-            .addMigrations(
-                com.ariai.app.data.local.MIGRATION_1_2,
-                com.ariai.app.data.local.MIGRATION_2_3,
-                com.ariai.app.data.local.MIGRATION_3_4,
-                com.ariai.app.data.local.MIGRATION_4_5,
-                com.ariai.app.data.local.MIGRATION_5_6,
-                com.ariai.app.data.local.MIGRATION_6_7,
-                com.ariai.app.data.local.MIGRATION_7_8,
-                com.ariai.app.data.local.MIGRATION_8_9
-            )
+            .addMigrations(*ALL_MIGRATIONS)
             .build()
     }
 
