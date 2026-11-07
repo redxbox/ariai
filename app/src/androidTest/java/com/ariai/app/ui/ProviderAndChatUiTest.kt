@@ -66,7 +66,7 @@ class ProviderAndChatUiTest {
     }
 
     @Test
-    fun emptyWelcomeDoesNotDuplicateTheTopModelSelector() {
+    fun emptyWelcomeShowsChatHeaderAndSingleModelSelector() {
         val provider = Provider(
             id = "provider-empty-model-selector-test",
             name = "Model selector test provider",
@@ -107,12 +107,12 @@ class ProviderAndChatUiTest {
             compose.onNodeWithText("Choose model").assertIsDisplayed()
         }
         compose.onNodeWithTag("empty-chat-watermark").assertIsDisplayed()
-        assertTrue("an untitled empty chat should not show a header title or brain badge", listOf(
-            "chat-title-header",
-            "chat-agent-button"
-        ).all { tag -> compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() })
+        compose.onNodeWithTag("chat-title-header").assertIsDisplayed()
+        compose.onNodeWithTag("chat-agent-button").assertIsDisplayed()
+        compose.onNodeWithTag("chat-title-text").assertTextEquals("New chat")
+        compose.onNodeWithTag("chat-context-usage").assertIsDisplayed()
+        compose.onNodeWithText("~0%", useUnmergedTree = true).assertExists()
         assertTrue("welcome copy should be replaced by the watermark", listOf(
-            "New chat",
             "How can I help you?",
             "Add your first AI provider to start chatting"
         ).all { text -> compose.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty() })
