@@ -598,12 +598,15 @@ expect_text "Add MCP server"
 shot 20-mcp-add-form
 tap "Name"
 type_text "ArenaSmokeServer"
-# Keep focus inside the form: Back can dismiss this sheet even when the emulator IME is slow.
 tap "Server URL"
 type_text "https://example.org/mcp"
 tap "SSE"
 shot 21-mcp-sse-selected
-tap_scroll "Save"
+# The single-line URL field's Done action hides the IME without swiping the draggable sheet.
+adb shell input keyevent KEYCODE_ENTER
+sleep 1
+expect_text "Add MCP server"
+tap "Save"
 expect_text "ArenaSmokeServer"
 expect_text "Disabled"
 shot 22-mcp-server-added
