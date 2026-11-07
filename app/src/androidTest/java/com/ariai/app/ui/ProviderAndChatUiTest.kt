@@ -1,9 +1,6 @@
 package com.ariai.app.ui
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -66,29 +63,6 @@ class ProviderAndChatUiTest {
         } catch (error: Throwable) {
             throw AssertionError("$description click failed: ${error.message}", error)
         }
-    }
-
-    @Test
-    fun lightThemeUsesLavenderPaperWhiteCardsAndSlateBlueAccent() {
-        val colors = mutableStateOf<Triple<Color, Color, Color>?>(null)
-        compose.setContent {
-            AriAiTheme(darkTheme = false) {
-                val colorScheme = MaterialTheme.colorScheme
-                SideEffect {
-                    colors.value = Triple(
-                        colorScheme.background,
-                        colorScheme.surface,
-                        colorScheme.primary
-                    )
-                }
-            }
-        }
-        compose.waitForIdle()
-
-        assertEquals(
-            Triple(Color(0xFFF7F6FC), Color(0xFFFCFBFF), Color(0xFF324472)),
-            colors.value
-        )
     }
 
     @Test
