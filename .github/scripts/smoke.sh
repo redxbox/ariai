@@ -602,11 +602,21 @@ tap "Server URL"
 type_text "https://example.org/mcp"
 tap "SSE"
 shot 21-mcp-sse-selected
-# The single-line URL field's Done action hides the IME without swiping the draggable sheet.
-adb shell input keyevent KEYCODE_ENTER
-sleep 1
+# Save sits below the emulator IME. Check that the keyboard is actually shown before Back,
+# so a slow IME cannot turn this into a dismiss of the draggable sheet itself.
+ime_state="$(adb shell dumpsys input_method)"
+if grep -q 'mInputShown=true' <<<"$ime_state"; then
+  echo "Hiding the visible software keyboard before saving the MCP server."
+  back
+else
+  echo "Software keyboard already hidden; leaving the MCP form untouched."
+fi
 expect_text "Add MCP server"
-tap "Save"
+if python3 .github/scripts/ui_tap.py --assert --exact "Save" >/dev/null 2>&1; then
+  tap_exact "Save"
+else
+  tap_scroll "Save"
+fi
 expect_text "ArenaSmokeServer"
 expect_text "Disabled"
 shot 22-mcp-server-added
