@@ -130,6 +130,21 @@ tap() {
   sleep 0.8
 }
 
+tap_last() {
+  local label="$1"
+  local output
+  if ! output="$(python3 .github/scripts/ui_tap.py --last "$label" 2>&1)"; then
+    echo "$output"
+    local detail="${output//$'\n'/ | }"
+    echo "::error title=Last UI target missing::${label}; ${detail:0:1200}"
+    FAILED=1
+    capture_failure "$label"
+    return 1
+  fi
+  echo "$output"
+  sleep 0.8
+}
+
 tap_exact() {
   local label="$1"
   local output
@@ -720,8 +735,8 @@ for provider in OpenAI Anthropic Ollama Custom Gemini; do
   expect_text "Base URL"
   expect_text "API key"
   if [[ "$provider" == "Gemini" ]]; then
-    # Typing into the form should not leave the fixed actions floating over the editor.
-    tap "API key"
+    # Focus the API-key field rather than the same-labeled Authentication chip; actions hide under the IME.
+    tap_last "API key"
     expect_absent_text "Save"
     expect_absent_text "Test"
     shot 29-gemini-form-with-keyboard

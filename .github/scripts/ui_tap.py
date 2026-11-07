@@ -51,7 +51,12 @@ def visible_bounds(node: ET.Element, width: int, height: int) -> tuple[int, int,
     return (left, top, right, bottom) if right > left and bottom > top else None
 
 
-def locate(xml: str, label: str, exact_only: bool = False) -> tuple[int, int] | None:
+def locate(
+    xml: str,
+    label: str,
+    exact_only: bool = False,
+    last_match: bool = False,
+) -> tuple[int, int] | None:
     root = ET.fromstring(xml)
     width, height = screen_size()
     needle = label.casefold()
@@ -64,7 +69,12 @@ def locate(xml: str, label: str, exact_only: bool = False) -> tuple[int, int] | 
         elif not exact_only and any(needle in value.casefold() for value in values):
             partial.append(node)
 
-    for node in exact + partial:
+    candidates = (
+        list(reversed(exact)) + list(reversed(partial))
+        if last_match
+        else exact + partial
+    )
+    for node in candidates:
         bounds = visible_bounds(node, width, height)
         if bounds is not None:
             left, top, right, bottom = bounds
@@ -132,6 +142,7 @@ def main() -> int:
     scroll.add_argument("--scroll-up", action="store_true", help="scroll up until the label is visible")
     parser.add_argument("--assert", dest="assert_only", action="store_true", help="check visibility without tapping")
     parser.add_argument("--exact", action="store_true", help="require an exact label match instead of a substring")
+    parser.add_argument("--last", action="store_true", help="tap the last visible exact match before partial matches")
     parser.add_argument("label", nargs="+", help="visible text or content description")
     args = parser.parse_args()
     label = " ".join(args.label)
@@ -148,7 +159,7 @@ def main() -> int:
                     print(f"VISIBLE: {label}")
                     return 0
             else:
-                position = locate(xml, label, exact_only=args.exact)
+                position = locate(xml, label, exact_only=args.exact, last_match=args.last)
                 if position is not None:
                     run_adb("shell", "input", "tap", str(position[0]), str(position[1]))
                     print(f"tapped {label!r} at {position}")
