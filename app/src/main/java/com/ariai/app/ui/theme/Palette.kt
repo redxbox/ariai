@@ -17,24 +17,24 @@ data class AriPalette(
 )
 
 val LightAriPalette = AriPalette(
-    // Soft lavender paper and near-white cards, sampled from the supplied RikkaHub references.
-    paper = Color(0xFFF7F6FC),
-    card = Color(0xFFFCFBFF),
-    ink = Color(0xFF26262D),
-    muted = Color(0xFF747681),
-    line = Color(0xFFE7E5EE),
-    tint = Color(0xFFEBEAF3),
-    fold = Color(0xFFDAD9E4)
+    // Warm neutral paper (not lavender), white cards, and mint-tinted controls.
+    paper = Color(0xFFFBFAF8),
+    card = Color(0xFFFFFFFF),
+    ink = Color(0xFF262A2B),
+    muted = Color(0xFF70787A),
+    line = Color(0xFFE6E5E0),
+    tint = Color(0xFFE4F3EF),
+    fold = Color(0xFFD4E1DC)
 )
 
 val DarkAriPalette = AriPalette(
-    paper = Color(0xFF111319),
-    card = Color(0xFF1A1D25),
-    ink = Color(0xFFF2F1F7),
-    muted = Color(0xFFA4A3AE),
-    line = Color(0xFF343642),
-    tint = Color(0xFF272A34),
-    fold = Color(0xFF3B3D49)
+    paper = Color(0xFF11191B),
+    card = Color(0xFF192426),
+    ink = Color(0xFFF1F5F3),
+    muted = Color(0xFFA2ADAB),
+    line = Color(0xFF303D3E),
+    tint = Color(0xFF203437),
+    fold = Color(0xFF324548)
 )
 
 val LocalAriPalette = staticCompositionLocalOf { LightAriPalette }

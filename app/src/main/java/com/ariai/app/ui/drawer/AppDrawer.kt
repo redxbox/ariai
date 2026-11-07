@@ -28,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -112,10 +113,11 @@ fun ColumnScope.AppDrawerContent(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
-            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(15.dp)).background(AriTint),
+            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(15.dp))
+                .background(Brush.linearGradient(listOf(AriBrandTeal, AriBrandGreen))),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = drawerAccent, modifier = Modifier.size(21.dp))
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text("AriAI", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp)
@@ -128,11 +130,14 @@ fun ColumnScope.AppDrawerContent(
         onClick = onNewChat,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
         shape = RoundedCornerShape(17.dp),
-        border = BorderStroke(1.dp, AriLine.copy(alpha = 0.72f)),
+        border = BorderStroke(1.dp, drawerAccent),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AriTint, contentColor = Ink)
+        colors = ButtonDefaults.buttonColors(
+            containerColor = drawerAccent,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        )
     ) {
-        Icon(Icons.Default.Add, contentDescription = null, tint = drawerAccent, modifier = Modifier.size(18.dp))
+        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(tx("New chat"), fontWeight = FontWeight.SemiBold)
     }

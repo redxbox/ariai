@@ -2,14 +2,19 @@ package com.ariai.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Icy-blue surfaces pair with deep AriAI navy for clear contrast: #324472 on #DCEBFF.
-val AriAccent = Color(0xFF324472)
-val AriAccentLight = Color(0xFFDCEBFF)
-val AriAccentDark = Color(0xFF324472)
-val AriAccentSoft = Color(0xFFDCEBFF)
-val AriAccentGreen = Color(0xFF568A65)
-val AriAccentGreenSoft = Color(0xFFE3F1E5)
-val AriError = Color(0xFFC4565E)
+// Deep teal is AriAI's primary action color; mint and coral are reserved for soft states.
+val AriAccent = Color(0xFF0E6470)
+val AriAccentLight = Color(0xFF9DD8D0)
+val AriAccentDark = Color(0xFF094B53)
+val AriAccentSoft = Color(0xFFDDF2EE)
+val AriAccentGreen = Color(0xFF26725C)
+val AriAccentGreenSoft = Color(0xFFDDF2E9)
+val AriError = Color(0xFFAD4A42)
+val AriErrorSoft = Color(0xFFFBE6E2)
+
+// A restrained teal-to-green gradient is used only for AriAI's brand mark.
+val AriBrandTeal = Color(0xFF0F9692)
+val AriBrandGreen = Color(0xFF3C9162)
 
 // Soft brand colours for providers and tags (kept light, like the reference).
 val AriOpenAI = Color(0xFF2E9E84)

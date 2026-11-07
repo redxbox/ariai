@@ -317,7 +317,7 @@ fun AddProviderScreen(
             containerColor = AriCard,
             title = { Text(tx("Delete provider?")) },
             text = { Text("${initialProvider.name} and its models will be removed.") },
-            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete(initialProvider.id) }) { Text(tx("Delete"), color = AriAccent) } },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete(initialProvider.id) }) { Text(tx("Delete"), color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tx("Cancel")) } }
         )
     }

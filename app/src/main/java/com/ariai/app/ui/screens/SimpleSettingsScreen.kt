@@ -99,7 +99,14 @@ fun SimpleSettingsScreen(
                     SimpleGroup(title = tx("Data")) {
                         SimpleRow(icon = Icons.Default.Storage, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Data & storage"), subtitle = tx("Export list, storage overview"), onClick = onStorageClick)
                         HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Delete, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Delete all chats"), subtitle = tx("Remove every conversation"), onClick = onClearAll)
+                        SimpleRow(
+                            icon = Icons.Default.Delete,
+                            tint = AriError,
+                            iconBackground = AriErrorSoft,
+                            title = tx("Delete all chats"),
+                            subtitle = tx("Remove every conversation"),
+                            onClick = onClearAll
+                        )
                     }
                 }
 
@@ -142,10 +149,10 @@ fun SimpleGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-fun SimpleRow(icon: ImageVector, title: String, subtitle: String, tint: Color? = null, onClick: () -> Unit) {
+fun SimpleRow(icon: ImageVector, title: String, subtitle: String, tint: Color? = null, iconBackground: Color = AriTint, onClick: () -> Unit) {
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Row(modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(AriTint), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(iconBackground), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = tint ?: AriInk.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
         }
         Column(modifier = Modifier.weight(1f)) {

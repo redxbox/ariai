@@ -58,7 +58,7 @@ fun StorageScreen(
             title = { Text(tx("Delete generated files?")) },
             text = { Text(tx("Generated images and videos will be removed. Chats stay, but these files will no longer open.")) },
             confirmButton = {
-                TextButton(onClick = { confirmGenerated = false; onClearGenerated() }) { Text(tx("Delete"), color = AriAccent) }
+                TextButton(onClick = { confirmGenerated = false; onClearGenerated() }) { Text(tx("Delete"), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { confirmGenerated = false }) { Text(tx("Cancel")) } }
         )
@@ -73,7 +73,7 @@ fun StorageScreen(
             title = { Text(tx("Delete all chats?")) },
             text = { Text(tx("This removes every conversation on this device. It cannot be undone.")) },
             confirmButton = {
-                TextButton(onClick = { confirmClear = false; onClearAll() }) { Text(tx("Delete all"), color = AriAccent) }
+                TextButton(onClick = { confirmClear = false; onClearAll() }) { Text(tx("Delete all"), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(tx("Cancel")) } }
         )
@@ -148,9 +148,9 @@ fun StorageScreen(
                     modifier = Modifier.fillMaxWidth().clickable(enabled = generatedBytes > 0) { confirmGenerated = true }
                 ) {
                     Row(modifier = Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Delete, contentDescription = null, tint = AriAccent)
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(tx("Delete generated files"), fontWeight = FontWeight.Medium, color = AriAccent)
+                            Text(tx("Delete generated files"), fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error)
                             Text(
                                 tx("Generated images and videos") + " · " + String.format("%.1f MB", generatedBytes / 1048576.0),
                                 fontSize = 12.sp, color = Ink.copy(alpha = 0.5f)
@@ -167,9 +167,9 @@ fun StorageScreen(
                     modifier = Modifier.fillMaxWidth().clickable(enabled = chats.isNotEmpty()) { confirmClear = true }
                 ) {
                     Row(modifier = Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Delete, contentDescription = null, tint = AriAccent)
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(tx("Delete all chats"), fontWeight = FontWeight.Medium, color = AriAccent)
+                            Text(tx("Delete all chats"), fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error)
                             Text(tx("Removes every conversation on this device"), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                         }
                     }

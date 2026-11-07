@@ -29,7 +29,7 @@ fun paperSheetShape(
     cornerRadius: Dp
 ): Shape = RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)
 
-/** A hairline outline keeps light dialogs distinct from the lavender page behind them. */
+/** A hairline outline keeps light dialogs distinct from the neutral page behind them. */
 @Composable
 fun paperPopupModifier(
     shape: Shape
