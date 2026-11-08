@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.parcelize")
     id("com.google.devtools.ksp")
+    id("androidx.room")
 }
 
 val releaseKeystorePath = System.getenv("ARIAI_RELEASE_KEYSTORE_FILE")
@@ -89,9 +90,9 @@ android {
     }
 }
 
-ksp {
+room {
     // Keep versioned Room schemas available as the migration baseline.
-    arg("room.schemaLocation", "$projectDir/schemas")
+    schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
