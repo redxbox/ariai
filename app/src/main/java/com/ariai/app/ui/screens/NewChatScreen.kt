@@ -15,7 +15,6 @@ import android.provider.MediaStore
 import androidx.compose.foundation.Image
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import java.io.File
 import android.content.ClipboardManager
 import android.content.Context
@@ -24,21 +23,12 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.res.painterResource
@@ -55,8 +45,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import com.ariai.app.data.DocumentTextExtractor
 import com.ariai.app.data.models.Attachment
@@ -948,196 +936,35 @@ fun NewChatScreen(
             }
         },
         bottomBar = {
-            Column(
-                modifier = Modifier.fillMaxWidth().background(PageBg).navigationBarsPadding().imePadding()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (pending.isNotEmpty()) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
-                    ) {
-                        items(pending, key = { it.id }) { attachment ->
-                            PendingChip(attachment) { pending = pending.filterNot { it.id == attachment.id } }
-                        }
+            ChatComposerBar(
+                pending = pending,
+                onRemoveAttachment = { attachmentId ->
+                    pending = pending.filterNot { it.id == attachmentId }
+                },
+                inputText = inputText,
+                onInputTextChange = { inputText = it },
+                onExpand = { showFullEditor = true },
+                chatMode = chatMode,
+                onChatModeChange = onChatModeChange,
+                selectedModelReady = selectedModelReady,
+                isStreaming = isStreaming,
+                isSending = isSending,
+                onStopGeneration = onStopGeneration,
+                onSend = { send() },
+                onShowAttachments = { showAttachments = true },
+                searchMode = searchMode,
+                onShowSearch = { showSearch = true },
+                listening = listening,
+                onToggleListening = {
+                    if (listening) {
+                        recognizer?.stopListening()
+                        listening = false
+                    } else {
+                        requestVoiceInput()
                     }
-                }
-
-                // Keep model selection above the conversation so it never crowds message entry.
-                val composerShape = RoundedCornerShape(32.dp)
-                Surface(
-                    shape = composerShape,
-                    color = AriCard,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize(tween(220, easing = FastOutSlowInEasing))
-                        .border(1.dp, AriLine.copy(alpha = 0.9f), composerShape)
-                        .testTag("chat-composer-container")
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                            .animateContentSize(tween(220, easing = FastOutSlowInEasing))
-                    ) {
-                        // Long messages get an expand button that opens a full-screen editor.
-                        if (inputText.length > 120 || inputText.contains('\n')) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                IconButton(onClick = { showFullEditor = true }) {
-                                    Icon(
-                                        Icons.Default.OpenInFull,
-                                        contentDescription = tx("Expand message"),
-                                        tint = Ink.copy(alpha = 0.55f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        }
-                        if (chatMode != ChatMode.TEXT) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 4.dp)) {
-                                ModeChip(mode = chatMode, onClose = { onChatModeChange(ChatMode.TEXT) }, modifier = Modifier)
-                            }
-                        }
-                        val canSend = (inputText.isNotBlank() || pending.isNotEmpty()) && selectedModelReady && !isStreaming && !isSending
-                        val sendButtonColor by animateColorAsState(
-                            targetValue = if (canSend) AriAccentSoft else AriAccentSoft.copy(alpha = 0.58f),
-                            animationSpec = tween(200, easing = FastOutSlowInEasing),
-                            label = "chat-send-background"
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Resolve paragraph direction from the input itself so Persian remains RTL
-                            // even when the app's interface language is English.
-                            TextField(
-                                value = inputText,
-                                onValueChange = { inputText = it },
-                                placeholder = {
-                                    Text(
-                                        activeAgent?.name?.takeIf { it.isNotBlank() }?.let { "${tx("Message")} $it" }
-                                            ?: tx("Message AriAI"),
-                                        color = Muted
-                                    )
-                                },
-                                textStyle = LocalTextStyle.current.copy(
-                                    textAlign = TextAlign.Start,
-                                    textDirection = TextDirection.ContentOrLtr
-                                ),
-                                modifier = Modifier.weight(1f).testTag("chat-composer"),
-                                maxLines = 12,
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    disabledContainerColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    cursorColor = Accent,
-                                    focusedTextColor = Ink,
-                                    unfocusedTextColor = Ink
-                                )
-                            )
-                            if (isStreaming || isSending) {
-                                // Keep a 48 dp tap target while drawing a smaller, rounded stop control.
-                                Surface(
-                                    onClick = { onStopGeneration() },
-                                    modifier = Modifier.size(48.dp).testTag("chat-send-button"),
-                                    shape = CircleShape,
-                                    color = Color.Transparent,
-                                    contentColor = AriAccent,
-                                    shadowElevation = 0.dp,
-                                    tonalElevation = 0.dp
-                                ) {
-                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Surface(
-                                            modifier = Modifier.size(40.dp).testTag("chat-send-button-visual"),
-                                            shape = RoundedCornerShape(14.dp),
-                                            color = AriAccentSoft,
-                                            contentColor = AriAccent,
-                                            shadowElevation = 1.dp,
-                                            tonalElevation = 0.dp
-                                        ) {
-                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                Icon(Icons.Default.Stop, contentDescription = tx("Stop"), modifier = Modifier.size(18.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                Surface(
-                                    onClick = { send() },
-                                    enabled = canSend,
-                                    modifier = Modifier.size(48.dp).testTag("chat-send-button"),
-                                    shape = CircleShape,
-                                    color = Color.Transparent,
-                                    contentColor = AriAccent,
-                                    shadowElevation = 0.dp,
-                                    tonalElevation = 0.dp
-                                ) {
-                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Surface(
-                                            modifier = Modifier.size(40.dp).testTag("chat-send-button-visual"),
-                                            shape = RoundedCornerShape(14.dp),
-                                            color = sendButtonColor,
-                                            contentColor = AriAccent,
-                                            shadowElevation = if (canSend) 2.dp else 1.dp,
-                                            tonalElevation = 0.dp
-                                        ) {
-                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    Icons.Default.ArrowUpward,
-                                                    contentDescription = tx("Send"),
-                                                    tint = AriAccent,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            ComposerActionButton(Icons.Default.Add, tx("Add to message"), active = false) {
-                                showAttachments = true
-                            }
-                            Spacer(Modifier.width(4.dp))
-                            ComposerActionButton(
-                                Icons.Default.Search,
-                                tx("Web search"),
-                                active = searchMode != SearchMode.OFF,
-                                stateful = true
-                            ) {
-                                showSearch = true
-                            }
-                            Spacer(Modifier.width(4.dp))
-                            ComposerActionButton(
-                                icon = if (listening) Icons.Default.Stop else Icons.Default.Mic,
-                                description = if (listening) tx("Stop listening") else tx("Voice input"),
-                                active = listening,
-                                stateful = true,
-                                activeStateDescription = tx("Listening…")
-                            ) {
-                                when {
-                                    listening -> {
-                                        recognizer?.stopListening()
-                                        listening = false
-                                    }
-                                    else -> requestVoiceInput()
-                                }
-                            }
-                            if (listening) {
-                                Spacer(Modifier.width(6.dp))
-                                ListeningIndicator()
-                            }
-                            Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
+                },
+                activeAgent = activeAgent
+            )
         }
     ) { padding ->
         if (messages.isEmpty() && !hasStreamingText && !isSending) {
