@@ -46,6 +46,7 @@ private val remoteImageFetcher by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { Publ
 private const val MAX_REMOTE_IMAGE_SIDE = 2_048
 private const val MAX_REMOTE_IMAGE_PIXELS = 100_000_000L
 
+/** Shows a generated image. Decoding runs off the main thread and is downsampled to save memory. */
 @Composable
 internal fun GeneratedImageView(path: String) {
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = path) {
