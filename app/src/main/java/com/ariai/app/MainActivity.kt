@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -72,9 +73,9 @@ class MainActivity : FragmentActivity() {
             )
             val viewModel: AppViewModel = viewModel(factory = viewModelFactory)
 
-            val language by viewModel.language.collectAsState()
-            val theme by viewModel.theme.collectAsState()
-            val dynamicColor by viewModel.dynamicColor.collectAsState()
+            val language by viewModel.language.collectAsStateWithLifecycle()
+            val theme by viewModel.theme.collectAsStateWithLifecycle()
+            val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
             val isDarkTheme = when (theme) {
                 "light" -> false
                 "dark" -> true
@@ -157,37 +158,37 @@ fun AppRoot(viewModel: AppViewModel) {
         }
     }
 
-    val providers by viewModel.providers.collectAsState()
-    val chats by viewModel.chats.collectAsState()
-    val modelOverrides by viewModel.modelOverrides.collectAsState()
-    val chatModes by viewModel.chatModes.collectAsState()
-    val messages by viewModel.messages.collectAsState()
-    val isStreaming by viewModel.isStreaming.collectAsState()
-    val isSending by viewModel.isSending.collectAsState()
-    val streamingContent by viewModel.streamingContent.collectAsState()
-    val toolExecutionUpdates by viewModel.toolExecutionUpdates.collectAsState()
-    val generatedMediaBytes by viewModel.generatedMediaBytes.collectAsState()
-    val language by viewModel.language.collectAsState()
-    val theme by viewModel.theme.collectAsState()
-    val dynamicColor by viewModel.dynamicColor.collectAsState()
-    val agents by viewModel.agents.collectAsState()
-    val workspaceFiles by viewModel.workspaceFiles.collectAsState()
-    val mcpServers by viewModel.mcpServers.collectAsState()
-    val mcpServerRuntime by viewModel.mcpServerRuntime.collectAsState()
-    val currentChatId by viewModel.currentChatId.collectAsState()
-    val defaultProviderId by viewModel.defaultProviderId.collectAsState()
-    val defaultModelId by viewModel.defaultModelId.collectAsState()
-    val reasoningLevel by viewModel.reasoningLevel.collectAsState()
-    val streamResponse by viewModel.streamResponse.collectAsState()
-    val biometricLockEnabled by viewModel.biometricLockEnabled.collectAsState()
+    val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val chats by viewModel.chats.collectAsStateWithLifecycle()
+    val modelOverrides by viewModel.modelOverrides.collectAsStateWithLifecycle()
+    val chatModes by viewModel.chatModes.collectAsStateWithLifecycle()
+    val messages by viewModel.messages.collectAsStateWithLifecycle()
+    val isStreaming by viewModel.isStreaming.collectAsStateWithLifecycle()
+    val isSending by viewModel.isSending.collectAsStateWithLifecycle()
+    val streamingContent by viewModel.streamingContent.collectAsStateWithLifecycle()
+    val toolExecutionUpdates by viewModel.toolExecutionUpdates.collectAsStateWithLifecycle()
+    val generatedMediaBytes by viewModel.generatedMediaBytes.collectAsStateWithLifecycle()
+    val language by viewModel.language.collectAsStateWithLifecycle()
+    val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
+    val agents by viewModel.agents.collectAsStateWithLifecycle()
+    val workspaceFiles by viewModel.workspaceFiles.collectAsStateWithLifecycle()
+    val mcpServers by viewModel.mcpServers.collectAsStateWithLifecycle()
+    val mcpServerRuntime by viewModel.mcpServerRuntime.collectAsStateWithLifecycle()
+    val currentChatId by viewModel.currentChatId.collectAsStateWithLifecycle()
+    val defaultProviderId by viewModel.defaultProviderId.collectAsStateWithLifecycle()
+    val defaultModelId by viewModel.defaultModelId.collectAsStateWithLifecycle()
+    val reasoningLevel by viewModel.reasoningLevel.collectAsStateWithLifecycle()
+    val streamResponse by viewModel.streamResponse.collectAsStateWithLifecycle()
+    val biometricLockEnabled by viewModel.biometricLockEnabled.collectAsStateWithLifecycle()
     var protectedSettingsAuthenticated by remember { mutableStateOf(false) }
     var biometricAuthAttempt by remember { mutableIntStateOf(0) }
     var biometricAuthError by remember { mutableStateOf<String?>(null) }
-    val searchModeState by viewModel.searchMode.collectAsState()
-    val searchProviderState by viewModel.searchProvider.collectAsState()
-    val searchKeys by viewModel.searchKeys.collectAsState()
-    val favoriteModels by viewModel.favoriteModels.collectAsState()
-    val fontSize by viewModel.fontSize.collectAsState()
+    val searchModeState by viewModel.searchMode.collectAsStateWithLifecycle()
+    val searchProviderState by viewModel.searchProvider.collectAsStateWithLifecycle()
+    val searchKeys by viewModel.searchKeys.collectAsStateWithLifecycle()
+    val favoriteModels by viewModel.favoriteModels.collectAsStateWithLifecycle()
+    val fontSize by viewModel.fontSize.collectAsStateWithLifecycle()
 
     LaunchedEffect(biometricLockEnabled, isProtectedSettingsRoute, biometricAuthAttempt) {
         when {
