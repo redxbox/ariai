@@ -89,6 +89,11 @@ android {
     }
 }
 
+ksp {
+    // Keep versioned Room schemas available as the migration baseline.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("net.sf.kxml:kxml2:2.3.0")

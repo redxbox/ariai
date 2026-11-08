@@ -263,7 +263,7 @@ interface AgentDao {
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
     version = 9,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
