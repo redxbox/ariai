@@ -56,6 +56,25 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug --stacktrace 2>&1 | tee build.log
 
+      - name: Expose initial Room schema for baseline capture
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import base64
+          from pathlib import Path
+
+          schema_files = sorted(Path("app/schemas").rglob("*.json"))
+          if not schema_files:
+              raise SystemExit("Room schema export did not create any JSON files.")
+          for schema in schema_files:
+              encoded = base64.b64encode(schema.read_bytes()).decode("ascii")
+              relative_path = schema.relative_to("app/schemas").as_posix()
+              chunks = [encoded[index:index + 4000] for index in range(0, len(encoded), 4000)]
+              for index, chunk in enumerate(chunks, start=1):
+                  message = f"{relative_path}|{index}/{len(chunks)}|{chunk}"
+                  print(f"::notice file=.github/workflows/android-apk.yml,line=1,title=ROOM_SCHEMA_EXPORT::{message}")
+          PY
+
       - name: Report Android validation errors
         if: failure()
         run: |
