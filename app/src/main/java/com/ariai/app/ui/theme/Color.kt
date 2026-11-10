@@ -9,12 +9,19 @@ val AriAccentDark = Color(0xFF094B53)
 val AriAccentSoft = Color(0xFFDDF2EE)
 val AriAccentGreen = Color(0xFF26725C)
 val AriAccentGreenSoft = Color(0xFFDDF2E9)
+
+// Menu accent stops sampled from the supplied Mi Mover screenshot (1220 x 2712 JPEG).
+// Each is the median RGB from an unobstructed 90 x 60 px patch near the top of its card:
+// mint left/right at (140, 1940)/(460, 1940), blue left/right at (710, 1940)/(1020, 1940).
+val AriMenuMintStart = Color(0xFF54DEBD)
+val AriMenuMintEnd = Color(0xFF59E0BF)
+val AriMenuBlueStart = Color(0xFF63B3FE)
+val AriMenuBlueEnd = Color(0xFF64BCFD)
+// Sampled dark label/foreground color from the same reference, used on the bright menu accents.
+val AriMenuInk = Color(0xFF333333)
+
 val AriError = Color(0xFFAD4A42)
 val AriErrorSoft = Color(0xFFFBE6E2)
-
-// A restrained teal-to-green gradient is used only for AriAI's brand mark.
-val AriBrandTeal = Color(0xFF0F9692)
-val AriBrandGreen = Color(0xFF3C9162)
 
 // Soft brand colours for providers and tags (kept light, like the reference).
 val AriOpenAI = Color(0xFF2E9E84)

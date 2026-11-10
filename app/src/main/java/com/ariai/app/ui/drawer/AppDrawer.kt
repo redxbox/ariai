@@ -71,7 +71,8 @@ fun ColumnScope.AppDrawerContent(
     onAbout: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    val drawerAccent = MaterialTheme.colorScheme.primary
+    // Use the sampled mint for the main drawer action, keeping text dark for legibility.
+    val drawerAccent = AriMenuMintStart
 
     val rows: List<DrawerRow> = remember(chats, query, UiLang.code) {
         // Older databases may contain malformed chat rows. They must never produce a `chat/` route.
@@ -114,10 +115,10 @@ fun ColumnScope.AppDrawerContent(
     ) {
         Box(
             modifier = Modifier.size(42.dp).clip(RoundedCornerShape(15.dp))
-                .background(Brush.linearGradient(listOf(AriBrandTeal, AriBrandGreen))),
+                .background(Brush.linearGradient(listOf(AriMenuMintStart, AriMenuBlueStart))),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = AriMenuInk, modifier = Modifier.size(21.dp))
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text("AriAI", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp)
@@ -134,10 +135,10 @@ fun ColumnScope.AppDrawerContent(
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = drawerAccent,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            contentColor = AriMenuInk
         )
     ) {
-        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+        Icon(Icons.Default.Add, contentDescription = null, tint = AriMenuInk, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(tx("New chat"), fontWeight = FontWeight.SemiBold)
     }
@@ -281,7 +282,7 @@ private fun ChatRowItem(
     ) {
         if (selected) {
             // A small brand-coloured marker keeps the open chat easy to find without a bright row fill.
-            Box(Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+            Box(Modifier.size(6.dp).clip(CircleShape).background(AriMenuBlueStart))
             Spacer(Modifier.width(8.dp))
         }
         if (chat.isPinned) {
@@ -393,7 +394,7 @@ private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, on
         Icon(
             icon,
             contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else AriMuted,
+            tint = if (selected) AriMenuBlueStart else AriMuted,
             modifier = Modifier.size(21.dp)
         )
         Text(

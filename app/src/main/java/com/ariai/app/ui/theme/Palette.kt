@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 
 /** Neutral surfaces and text. Light and dark sets are switched by [AriAiTheme]. */
 data class AriPalette(
@@ -17,14 +18,15 @@ data class AriPalette(
 )
 
 val LightAriPalette = AriPalette(
-    // Warm neutral paper (not lavender), white cards, and mint-tinted controls.
-    paper = Color(0xFFFBFAF8),
+    // Neutral light surfaces, text and dividers sampled from the Mi Mover reference.
+    paper = Color(0xFFFBFBFB),
     card = Color(0xFFFFFFFF),
-    ink = Color(0xFF262A2B),
-    muted = Color(0xFF70787A),
-    line = Color(0xFFE6E5E0),
-    tint = Color(0xFFE4F3EF),
-    fold = Color(0xFFD4E1DC)
+    ink = AriMenuInk,
+    muted = Color(0xFF757575),
+    line = Color(0xFFDFE1E0),
+    // Keep selected surfaces quiet: this is a 10% blend of the sampled mint over sampled paper.
+    tint = AriMenuMintStart.copy(alpha = 0.10f).compositeOver(Color(0xFFFBFBFB)),
+    fold = Color(0xFFDFE1E0)
 )
 
 val DarkAriPalette = AriPalette(
