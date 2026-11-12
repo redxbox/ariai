@@ -2,11 +2,13 @@ package com.ariai.app.data.models
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.Serializable
 import org.json.JSONObject
 import java.net.URI
 import java.security.MessageDigest
 
 /** Configuration for a native OAuth 2.0 public client using Authorization Code + PKCE (S256). */
+@Serializable
 @Parcelize
 data class OAuth2Config(
     val authorizationEndpoint: String,

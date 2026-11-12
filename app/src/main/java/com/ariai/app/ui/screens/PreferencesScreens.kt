@@ -9,6 +9,7 @@ import com.ariai.app.ui.theme.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Provider
 
-private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Surface0: Color @Composable @ReadOnlyComposable get() = AriPaper
 @Composable
@@ -49,7 +49,12 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled
             Text(title, fontWeight = FontWeight.Medium, color = Ink, fontSize = 15.sp)
             Text(subtitle, fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
         }
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled, colors = SwitchDefaults.colors(checkedTrackColor = Accent))
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            enabled = enabled,
+            colors = SwitchDefaults.colors(checkedTrackColor = AriMenuMintStart, checkedThumbColor = AriMenuInk)
+        )
     }
 }
 
@@ -76,6 +81,14 @@ fun PreferencesScreen(
     val biometricAvailable = remember(context) {
         BiometricManager.from(context).canAuthenticate(biometricAuthenticatorTypes()) == BiometricManager.BIOMETRIC_SUCCESS
     }
+    val menuChipColors = FilterChipDefaults.filterChipColors(
+        containerColor = AriCard,
+        labelColor = Ink,
+        selectedContainerColor = AriMenuBlueStart,
+        selectedLabelColor = AriMenuInk,
+        selectedLeadingIconColor = AriMenuInk,
+        selectedTrailingIconColor = AriMenuInk
+    )
     Scaffold(
         containerColor = Surface0,
         topBar = {
@@ -86,7 +99,10 @@ fun PreferencesScreen(
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        ClearFocusOnScroll(listState)
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -97,11 +113,11 @@ fun PreferencesScreen(
                     Text(tx("Theme"), fontWeight = FontWeight.Medium, color = Ink)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         listOf("system" to tx("System"), "light" to tx("Light"), "dark" to tx("Dark")).forEach { (key, label) ->
-                            FilterChip(selected = theme == key, onClick = { onThemeChange(key) }, label = { Text(label) }, modifier = Modifier.weight(1f))
+                            FilterChip(selected = theme == key, onClick = { onThemeChange(key) }, label = { Text(label) }, colors = menuChipColors, modifier = Modifier.weight(1f))
                         }
                     }
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
                         SwitchRow(
                             title = tx("Dynamic colors"),
                             subtitle = tx("Use colors from your wallpaper while keeping AriAI's paper surfaces."),
@@ -122,6 +138,7 @@ fun PreferencesScreen(
                                 selected = currentLanguage == code,
                                 onClick = { onLanguageChange(code) },
                                 label = { Text(label) },
+                                colors = menuChipColors,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -158,7 +175,7 @@ fun PreferencesScreen(
                         checked = streamResponse,
                         onChange = onStreamResponseChange
                     )
-                    HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
+                    HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
                     Text(tx("Default thinking depth"), fontWeight = FontWeight.Medium, color = Ink)
                     Text(tx("Used for new messages. You can change it per message in the chat."), fontSize = 12.sp, color = Ink.copy(alpha = 0.5f))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
@@ -167,15 +184,16 @@ fun PreferencesScreen(
                                 selected = reasoning == level,
                                 onClick = { onReasoningChange(level) },
                                 label = { Text(level.label, fontSize = 12.sp, maxLines = 1) },
+                                colors = menuChipColors,
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
-                    HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
+                    HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
                     Text(tx("Message text size"), fontWeight = FontWeight.Medium, color = Ink)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         listOf(13 to tx("Small"), 15 to tx("Medium"), 17 to tx("Large")).forEach { (size, label) ->
-                            FilterChip(selected = fontSize == size, onClick = { onFontSizeChange(size) }, label = { Text(label) }, modifier = Modifier.weight(1f))
+                            FilterChip(selected = fontSize == size, onClick = { onFontSizeChange(size) }, label = { Text(label) }, colors = menuChipColors, modifier = Modifier.weight(1f))
                         }
                     }
                     Text(tx("Preview: the quick brown fox jumps over the lazy dog."), fontSize = fontSize.sp, color = Ink.copy(alpha = 0.7f))
@@ -211,7 +229,10 @@ fun DefaultModelScreen(
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        ClearFocusOnScroll(listState)
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -233,7 +254,11 @@ fun DefaultModelScreen(
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(tx("No models yet"), fontWeight = FontWeight.SemiBold, color = Ink)
-                        Button(onClick = onAddProvider, shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text(tx("Add provider")) }
+                        Button(
+                            onClick = onAddProvider,
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AriMenuMintStart, contentColor = AriMenuInk)
+                        ) { Text(tx("Add provider")) }
                     }
                 }
             }
@@ -245,15 +270,15 @@ fun DefaultModelScreen(
                     val selected = isSelectedModel(provider.id, model.id, defaultProviderId, defaultModelId)
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = if (selected) Accent.copy(alpha = 0.10f) else AriCard,
+                        color = if (selected) AriMenuBlueStart.copy(alpha = 0.10f) else AriCard,
                         modifier = Modifier.fillMaxWidth().clickable { onSelect(provider.id, model.id) }
                     ) {
                         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(model.displayName, fontWeight = FontWeight.Medium, color = if (selected) Accent else Ink)
+                                Text(model.displayName, fontWeight = FontWeight.Medium, color = Ink)
                                 Text(model.id, fontSize = 11.sp, color = Ink.copy(alpha = 0.45f))
                             }
-                            RadioButton(selected = selected, onClick = { onSelect(provider.id, model.id) }, colors = RadioButtonDefaults.colors(selectedColor = Accent))
+                            RadioButton(selected = selected, onClick = { onSelect(provider.id, model.id) }, colors = RadioButtonDefaults.colors(selectedColor = AriMenuBlueStart))
                         }
                     }
                 }

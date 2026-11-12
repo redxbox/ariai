@@ -2,15 +2,19 @@ package com.ariai.app.data.models
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class MessageRole {
     USER, ASSISTANT, SYSTEM, TOOL
 }
 
+@Serializable
 enum class MessageStatus {
     SENDING, SENT, ERROR, STREAMING
 }
 
+@Serializable
 @Parcelize
 data class Attachment(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -23,10 +27,12 @@ data class Attachment(
     val textContent: String? = null
 ) : Parcelable
 
+@Serializable
 enum class AttachmentType {
     IMAGE, VIDEO, PDF, DOCX, TEXT, AUDIO
 }
 
+@Serializable
 @Parcelize
 data class ChatMessage(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -50,6 +56,7 @@ data class ChatMessage(
     val usage: TokenUsage? = null
 ) : Parcelable
 
+@Serializable
 @Parcelize
 data class ToolCall(
     val id: String,
@@ -58,6 +65,7 @@ data class ToolCall(
     val result: String? = null
 ) : Parcelable
 
+@Serializable
 @Parcelize
 data class TokenUsage(
     val promptTokens: Int = 0,
@@ -65,6 +73,7 @@ data class TokenUsage(
     val totalTokens: Int = 0
 ) : Parcelable
 
+@Serializable
 @Parcelize
 data class Chat(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -86,6 +95,7 @@ data class Chat(
     val memoryEnabled: Boolean = false
 ) : Parcelable
 
+@Serializable
 @Parcelize
 data class Agent(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -104,6 +114,7 @@ data class Agent(
     val createdAt: Long = System.currentTimeMillis()
 ) : Parcelable
 
+@Serializable
 enum class AgentTool {
     CALCULATOR,
     WEB_SEARCH,

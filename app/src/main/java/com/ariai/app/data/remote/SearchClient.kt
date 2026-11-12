@@ -24,6 +24,7 @@ class SearchClient(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(45, TimeUnit.SECONDS)
         .build(),
     /** Injectable only to keep provider protocol tests local; production uses the official endpoints. */
     private val endpointOverrides: Map<SearchProviderType, String> = emptyMap()

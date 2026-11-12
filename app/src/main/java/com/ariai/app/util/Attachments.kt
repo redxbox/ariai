@@ -2,7 +2,6 @@ package com.ariai.app.util
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
@@ -23,9 +22,12 @@ import java.io.Writer
 import java.util.zip.ZipInputStream
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 
-private const val MAX_IMAGE_EDGE = 1280
+private const val MAX_IMAGE_EDGE = 1024
 private const val MAX_TEXT_CHARS = 60_000
 private const val MAX_VIDEO_BYTES = 12L * 1024 * 1024
 private const val MAX_PDF_BYTES = 20L * 1024 * 1024
@@ -53,7 +55,10 @@ sealed interface ReadResult {
  * Reads a file picked by the user. Images are scaled down and WebP-encoded to keep
  * requests small; text-like files are returned as text to inline into the prompt.
  */
-fun readAttachment(context: Context, uri: Uri, extractedDocumentText: String? = null): ReadResult {
+suspend fun readAttachment(context: Context, uri: Uri, extractedDocumentText: String? = null): ReadResult =
+    withContext(Dispatchers.IO) { readAttachmentOnIo(context, uri, extractedDocumentText) }
+
+private fun readAttachmentOnIo(context: Context, uri: Uri, extractedDocumentText: String?): ReadResult {
     val resolver = context.contentResolver
     val mime = resolver.getType(uri) ?: "application/octet-stream"
     val name = attachmentDisplayName(context, uri) ?: "file"
@@ -61,7 +66,12 @@ fun readAttachment(context: Context, uri: Uri, extractedDocumentText: String? = 
         when {
             mime.startsWith("image/") -> {
                 val bitmap = decodeScaled(context, uri) ?: return ReadResult.Error(tx("Could not read this image."))
-                ReadResult.Ok(imageAttachment(bitmap, name))
+                val attachment = try {
+                    imageAttachment(bitmap, name)
+                } finally {
+                    bitmap.recycle()
+                }
+                ReadResult.Ok(attachment)
             }
             mime == "application/pdf" || name.substringAfterLast('.', "").equals("pdf", ignoreCase = true) -> {
                 val text = extractedDocumentText ?: extractPdfText(context, uri)
@@ -135,6 +145,8 @@ fun readAttachment(context: Context, uri: Uri, extractedDocumentText: String? = 
         }
     } catch (e: AttachmentReadException) {
         ReadResult.Error(tx(e.message ?: "Could not read this document."))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
     } catch (e: Exception) {
         ReadResult.Error(tx("Could not read this file."))
     }
@@ -485,8 +497,14 @@ private class LimitedTextWriter(private val maxChars: Int) : Writer() {
 }
 
 /** Wraps a bitmap from the camera preview as an image attachment. */
-fun bitmapAttachment(bitmap: Bitmap, name: String = "camera.webp"): Attachment =
-    imageAttachment(scaleDown(bitmap), name)
+fun bitmapAttachment(bitmap: Bitmap, name: String = "camera.webp"): Attachment {
+    val scaled = scaleDown(bitmap)
+    return try {
+        imageAttachment(scaled, name)
+    } finally {
+        if (scaled !== bitmap) scaled.recycle()
+    }
+}
 
 private fun imageAttachment(bitmap: Bitmap, name: String): Attachment {
     val out = ByteArrayOutputStream()
@@ -501,17 +519,8 @@ private fun imageAttachment(bitmap: Bitmap, name: String): Attachment {
     )
 }
 
-private fun decodeScaled(context: Context, uri: Uri): Bitmap? {
-    val resolver = context.contentResolver
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sample = 1
-    while (bounds.outWidth / sample > MAX_IMAGE_EDGE * 2 || bounds.outHeight / sample > MAX_IMAGE_EDGE * 2) sample *= 2
-    val options = BitmapFactory.Options().apply { inSampleSize = sample }
-    val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
-    return scaleDown(decoded)
-}
+private fun decodeScaled(context: Context, uri: Uri): Bitmap? =
+    decodeSampledBitmapFromUriBlocking(context, uri, maxDimension = MAX_IMAGE_EDGE)
 
 private fun scaleDown(bitmap: Bitmap): Bitmap {
     val longest = maxOf(bitmap.width, bitmap.height)

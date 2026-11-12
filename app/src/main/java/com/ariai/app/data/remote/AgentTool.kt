@@ -3,6 +3,7 @@ package com.ariai.app.data.remote
 import com.ariai.app.data.models.TokenUsage
 import com.ariai.app.data.models.ToolCall
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.yield
 import org.json.JSONObject
 
 /** A model-visible function and the local action that actually performs it. */
@@ -11,16 +12,35 @@ data class ChatFunctionTool(
     val description: String,
     val parameters: JSONObject,
     val progressLabel: String = name,
+    /** Overrides the agent loop's default timeout for tools with different latency profiles. */
+    val timeoutMs: Long? = null,
     val execute: suspend (JSONObject) -> String
 )
 
-enum class ToolExecutionPhase { RUNNING, COMPLETED, FAILED, CANCELLED }
+sealed interface ChatGenerationState {
+    data object Idle : ChatGenerationState
+    data object Streaming : ChatGenerationState
+    data class ToolCalling(val toolName: String) : ChatGenerationState
+    data class ToolExecuting(val toolName: String) : ChatGenerationState
+    data object ToolCompleted : ChatGenerationState
+}
+
+enum class ToolExecutionPhase {
+    CALLING,
+    RUNNING,
+    COMPLETED,
+    FAILED,
+    CANCELLED;
+
+    val isActive: Boolean get() = this == CALLING || this == RUNNING
+}
 
 data class ToolExecutionUpdate(
     val callId: String,
     val label: String,
     val phase: ToolExecutionPhase,
-    val elapsedMs: Long = 0L
+    val elapsedMs: Long = 0L,
+    val toolName: String = label
 )
 
 /** One provider response step. Tool calls are executed by [AgentLoop], never by the model itself. */
@@ -36,7 +56,8 @@ class AgentLoop(
     private val maxCallsPerStep: Int = 16,
     private val maxTotalToolCalls: Int = 24,
     private val maxCharsPerToolResult: Int = 8_000,
-    private val maxTotalToolChars: Int = 20_000
+    private val maxTotalToolChars: Int = 20_000,
+    private val toolTimeoutMs: Long = DEFAULT_TOOL_TIMEOUT_MS
 ) {
     init {
         require(maxSteps > 0)
@@ -44,6 +65,7 @@ class AgentLoop(
         require(maxTotalToolCalls > 0)
         require(maxCharsPerToolResult > 0)
         require(maxTotalToolChars >= 0)
+        require(toolTimeoutMs > 0)
     }
 
     suspend fun run(
@@ -103,6 +125,7 @@ class AgentLoop(
     ): String {
         require(tools.map { it.name }.distinct().size == tools.size) { "Tool names must be unique" }
         require(tools.all { it.name.matches(Regex("^[A-Za-z0-9_-]{1,64}$")) }) { "Tool names must be valid identifiers" }
+        require(tools.all { it.timeoutMs == null || it.timeoutMs > 0L }) { "Tool timeouts must be positive" }
         val history = initialMessages.toMutableList()
         val originalUserText = history.lastOrNull { it.role == com.ariai.app.data.models.MessageRole.USER }?.content.orEmpty()
         val acknowledgementWasRequested = isAcknowledgementRequest(originalUserText)
@@ -156,13 +179,42 @@ class AgentLoop(
                         val startNanos = System.nanoTime()
                         reportToolProgress(
                             onToolProgress,
-                            ToolExecutionUpdate(progressId, tool.progressLabel, ToolExecutionPhase.RUNNING)
+                            ToolExecutionUpdate(
+                                progressId,
+                                tool.progressLabel,
+                                ToolExecutionPhase.CALLING,
+                                toolName = tool.name
+                            )
                         )
+                        yield()
+                        reportToolProgress(
+                            onToolProgress,
+                            ToolExecutionUpdate(
+                                progressId,
+                                tool.progressLabel,
+                                ToolExecutionPhase.RUNNING,
+                                toolName = tool.name
+                            )
+                        )
+                        val effectiveTimeoutMs = tool.timeoutMs ?: toolTimeoutMs
                         var phase = ToolExecutionPhase.COMPLETED
                         val result = try {
                             require(call.arguments.length <= MAX_TOOL_ARGUMENT_CHARS) { "Tool arguments are too large" }
                             val args = call.arguments.takeIf { it.isNotBlank() }?.let { JSONObject(it) } ?: JSONObject()
-                            tool.execute(args)
+                            val timedResult = kotlinx.coroutines.withTimeoutOrNull(effectiveTimeoutMs) {
+                                tool.execute(args)
+                            }
+                            if (timedResult == null) {
+                                phase = ToolExecutionPhase.FAILED
+                                val timeout = if (effectiveTimeoutMs % 1_000L == 0L) {
+                                    "${effectiveTimeoutMs / 1_000L} seconds"
+                                } else {
+                                    "$effectiveTimeoutMs milliseconds"
+                                }
+                                "Tool '${call.name}' timed out after $timeout."
+                            } else {
+                                timedResult
+                            }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (error: Exception) {
@@ -170,7 +222,16 @@ class AgentLoop(
                             "Tool '${call.name}' failed: ${error.message?.take(500) ?: error.javaClass.simpleName}"
                         }
                         val elapsedMs = ((System.nanoTime() - startNanos) / 1_000_000L).coerceAtLeast(0L)
-                        reportToolProgress(onToolProgress, ToolExecutionUpdate(progressId, tool.progressLabel, phase, elapsedMs))
+                        reportToolProgress(
+                            onToolProgress,
+                            ToolExecutionUpdate(
+                                progressId,
+                                tool.progressLabel,
+                                phase,
+                                elapsedMs,
+                                toolName = tool.name
+                            )
+                        )
                         result
                     }
                 }
@@ -220,6 +281,7 @@ class AgentLoop(
 
     private companion object {
         const val MAX_TOOL_ARGUMENT_CHARS = 4_000
+        const val DEFAULT_TOOL_TIMEOUT_MS = 60_000L
     }
 
     private fun isAcknowledgementOnly(text: String): Boolean {

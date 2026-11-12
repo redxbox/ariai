@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,7 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.LayoutDirection
@@ -28,6 +31,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+private val SettingsMintBrush = Brush.horizontalGradient(
+    colors = listOf(AriMenuMintStart, AriMenuMintEnd)
+)
+private val SettingsBlueBrush = Brush.horizontalGradient(
+    colors = listOf(AriMenuBlueStart, AriMenuBlueEnd)
+)
 
 // Simple clean settings - only essential options
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,16 +72,21 @@ fun SimpleSettingsScreen(
                 )
             }
         ) { padding ->
+            val listState = rememberLazyListState()
+            ClearFocusOnScroll(listState)
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Keep pages/cards neutral; use the two sampled gradients only as small category badges.
                 item {
                     SimpleGroup(title = tx("General")) {
                         SimpleRow(
                             icon = Icons.Default.Settings,
-                            tint = AriAccent,
+                            tint = AriMenuInk,
+                            iconBrush = SettingsMintBrush,
                             title = tx("Preferences"),
                             subtitle = tx("Appearance, language and chat settings"),
                             onClick = onPreferencesClick
@@ -80,22 +95,30 @@ fun SimpleSettingsScreen(
                 }
 
                 item {
+                    // Blue marks service/model navigation as one coherent menu group.
                     SimpleGroup(title = tx("Models & services")) {
-                        SimpleRow(icon = Icons.Default.Star, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Default model"), subtitle = defaultModelName, onClick = onDefaultModelClick)
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Storage, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Providers"), subtitle = tx("OpenAI, Gemini, Claude and more"), onClick = onProvidersClick)
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Search, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Search service"), subtitle = tx("Web search for answers"), onClick = onSearchServiceClick)
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Settings, tint = com.ariai.app.ui.theme.AriAccent, title = tx("MCP servers"), subtitle = tx("Connect remote MCP tools"), onClick = onMcpClick)
+                        SimpleRow(icon = Icons.Default.Star, tint = AriMenuInk, iconBrush = SettingsBlueBrush, title = tx("Default model"), subtitle = defaultModelName, onClick = onDefaultModelClick)
+                        HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
+                        SimpleRow(icon = Icons.Default.Storage, tint = AriMenuInk, iconBrush = SettingsBlueBrush, title = tx("Providers"), subtitle = tx("OpenAI, Gemini, Claude and more"), onClick = onProvidersClick)
+                        HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
+                        SimpleRow(icon = Icons.Default.Search, tint = AriMenuInk, iconBrush = SettingsBlueBrush, title = tx("Search service"), subtitle = tx("Web search for answers"), onClick = onSearchServiceClick)
+                        HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
+                        SimpleRow(icon = Icons.Default.Settings, tint = AriMenuInk, iconBrush = SettingsBlueBrush, title = tx("MCP servers"), subtitle = tx("Connect remote MCP tools"), onClick = onMcpClick)
                     }
                 }
 
                 item {
                     SimpleGroup(title = tx("Data")) {
-                        SimpleRow(icon = Icons.Default.Storage, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Data & storage"), subtitle = tx("Export list, storage overview"), onClick = onStorageClick)
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
-                        SimpleRow(icon = Icons.Default.Delete, tint = com.ariai.app.ui.theme.AriAccent, title = tx("Delete all chats"), subtitle = tx("Remove every conversation"), onClick = onClearAll)
+                        SimpleRow(icon = Icons.Default.Storage, tint = AriMenuInk, iconBrush = SettingsMintBrush, title = tx("Data & storage"), subtitle = tx("Export list, storage overview"), onClick = onStorageClick)
+                        HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
+                        SimpleRow(
+                            icon = Icons.Default.Delete,
+                            tint = AriError,
+                            iconBackground = AriErrorSoft,
+                            title = tx("Delete all chats"),
+                            subtitle = tx("Remove every conversation"),
+                            onClick = onClearAll
+                        )
                     }
                 }
 
@@ -103,15 +126,17 @@ fun SimpleSettingsScreen(
                     SimpleGroup(title = tx("About")) {
                         SimpleRow(
                             icon = Icons.Default.Info,
-                            tint = com.ariai.app.ui.theme.AriAccent,
+                            tint = AriMenuInk,
+                            iconBrush = SettingsBlueBrush,
                             title = tx("About AriAI"),
                             subtitle = "${tx("Version")} ${BuildConfig.VERSION_NAME}",
                             onClick = onAboutClick
                         )
-                        HorizontalDivider(color = AriInk.copy(alpha = 0.06f))
+                        HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
                         SimpleRow(
                             icon = Icons.Default.Policy,
-                            tint = com.ariai.app.ui.theme.AriAccent,
+                            tint = AriMenuInk,
+                            iconBrush = SettingsBlueBrush,
                             title = tx("Privacy policy"),
                             subtitle = tx("How AriAI handles your data"),
                             onClick = onPrivacyPolicyClick
@@ -128,8 +153,8 @@ fun SimpleSettingsScreen(
 @Composable
 fun SimpleGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AriInk.copy(alpha = 0.5f), modifier = Modifier.padding(start = 4.dp))
-        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = AriCard), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AriMuted, modifier = Modifier.padding(start = 4.dp))
+        Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AriCard), elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 content()
             }
@@ -138,15 +163,27 @@ fun SimpleGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-fun SimpleRow(icon: ImageVector, title: String, subtitle: String, tint: Color? = null, onClick: () -> Unit) {
+fun SimpleRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    tint: Color? = null,
+    iconBackground: Color = AriTint,
+    iconBrush: Brush? = null,
+    onClick: () -> Unit
+) {
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Row(modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(AriTint), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint ?: AriInk.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
+        Box(
+            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
+                .background(iconBrush ?: SolidColor(iconBackground)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = tint ?: AriInk.copy(alpha = 0.65f), modifier = Modifier.size(19.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp, color = AriInk, fontWeight = FontWeight.Medium)
-            Text(subtitle, fontSize = 11.sp, color = AriInk.copy(alpha = 0.5f))
+            Text(title, fontSize = 15.sp, color = AriInk, fontWeight = FontWeight.Medium)
+            Text(subtitle, fontSize = 12.sp, color = AriMuted)
         }
         Icon(
             Icons.Default.ChevronRight,

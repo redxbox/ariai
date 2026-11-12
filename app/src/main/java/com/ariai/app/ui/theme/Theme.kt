@@ -17,14 +17,17 @@ import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
     primary = AriAccentLight,
-    onPrimary = Color(0xFF1B2743),
-    primaryContainer = Color(0xFF324472),
-    onPrimaryContainer = Color(0xFFDCEBFF),
-    secondary = AriAccentLight,
-    onSecondary = Color(0xFF1B2743),
-    secondaryContainer = Color(0xFF324472),
-    onSecondaryContainer = Color(0xFFDCEBFF),
-    tertiary = AriAccentLight,
+    onPrimary = Color(0xFF073E42),
+    primaryContainer = Color(0xFF17484D),
+    onPrimaryContainer = Color(0xFFD2ECE7),
+    secondary = Color(0xFFA6D9C7),
+    onSecondary = Color(0xFF123C32),
+    secondaryContainer = Color(0xFF244A40),
+    onSecondaryContainer = Color(0xFFD7EEE5),
+    tertiary = Color(0xFFB5DBA8),
+    onTertiary = Color(0xFF233B1D),
+    tertiaryContainer = Color(0xFF354D2E),
+    onTertiaryContainer = Color(0xFFD0E8C6),
     background = DarkAriPalette.paper,
     surface = DarkAriPalette.card,
     surfaceVariant = DarkAriPalette.tint,
@@ -41,11 +44,14 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = Color.White,
     primaryContainer = AriAccentSoft,
     onPrimaryContainer = AriAccentDark,
-    secondary = AriAccent,
+    secondary = AriAccentGreen,
     onSecondary = Color.White,
-    secondaryContainer = AriAccentSoft,
-    onSecondaryContainer = AriAccentDark,
-    tertiary = AriAccent,
+    secondaryContainer = AriAccentGreenSoft,
+    onSecondaryContainer = AriAccentGreen,
+    tertiary = AriAccentGreen,
+    onTertiary = Color.White,
+    tertiaryContainer = AriAccentGreenSoft,
+    onTertiaryContainer = AriAccentGreen,
     background = LightAriPalette.paper,
     surface = LightAriPalette.card,
     surfaceVariant = LightAriPalette.tint,
@@ -81,7 +87,7 @@ fun AriAiTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
-    // Dynamic accents remain user-controlled, while AriAI keeps its lavender paper/card contrast.
+    // Dynamic accents remain user-controlled; AriAI keeps neutral paper and mint-tinted surfaces.
     val colorScheme = baseScheme.copy(
         background = palette.paper,
         surface = palette.card,

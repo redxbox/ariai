@@ -52,6 +52,27 @@ class ChatRetryTest {
     }
 
     @Test
+    fun `retry availability is precomputed from message parents in one pass`() {
+        val history = listOf(
+            ChatMessage(id = "u1", chatId = "c", role = MessageRole.USER, content = "first"),
+            ChatMessage(id = "a1", chatId = "c", role = MessageRole.ASSISTANT, content = "answer"),
+            ChatMessage(
+                id = "error",
+                chatId = "c",
+                role = MessageRole.ASSISTANT,
+                content = "failed",
+                status = MessageStatus.ERROR,
+                parentId = "u1"
+            ),
+            ChatMessage(id = "u2", chatId = "c", role = MessageRole.USER, content = "second"),
+            ChatMessage(id = "a2", chatId = "c", role = MessageRole.ASSISTANT, content = "answer"),
+            ChatMessage(id = "s1", chatId = "c", role = MessageRole.SYSTEM, content = "summary")
+        )
+
+        assertEquals(listOf(false, true, true, false, true, false), retryableAssistantMessageFlags(history))
+    }
+
+    @Test
     fun `unknown retry request returns no context`() {
         assertTrue(messagesThroughUserTurn(emptyList(), "missing").isEmpty())
     }

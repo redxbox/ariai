@@ -2,10 +2,9 @@ package com.ariai.app.ui.screens
 
 import com.ariai.app.util.tx
 import com.ariai.app.util.QRCodeUtil
+import com.ariai.app.util.decodeSampledBitmapFromUri
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -44,7 +43,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -56,9 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Dispatchers
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import com.ariai.app.data.models.AIModel
 import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
@@ -166,12 +163,8 @@ fun NewProvidersScreen(
     ) { padding ->
         val listState = rememberLazyListState()
         // The search field keeps pulling the list back under the keyboard while
-        // scrolling (bring-into-view). Clear focus as soon as a scroll starts.
-        val listFocusManager = LocalFocusManager.current
-        LaunchedEffect(listState) {
-            snapshotFlow { listState.isScrollInProgress }
-                .collect { scrolling -> if (scrolling) listFocusManager.clearFocus() }
-        }
+        // scrolling; dropping focus on the user's own vertical drag keeps it in place.
+        ClearFocusOnScroll(listState)
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
@@ -265,16 +258,18 @@ fun NewProvidersScreen(
     }
 
     if (showAddProvider && fetchModelsForAdd != null && saveProviderForAdd != null) {
+        val addProviderSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val addProviderSheetFix = rememberSheetScrollFix(addProviderSheetState)
         ModalBottomSheet(
             onDismissRequest = {
                 showAddProvider = false
                 addProviderPreset = null
             },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState = addProviderSheetState,
             containerColor = AriPaper,
             contentColor = AriInk
         ) {
-            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.90f)) {
+            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.90f).nestedScroll(addProviderSheetFix)) {
                 AddProviderScreen(
                     presetType = addProviderPreset?.type,
                     presetLabelKey = addProviderPreset?.labelKey,
@@ -600,8 +595,12 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
             isReadingQr = true
             qrMessage = null
             scope.launch {
-                val qrText = withContext(Dispatchers.IO) {
-                    runCatching { decodeQrFromImage(context, uri) }.getOrNull()
+                val qrText = try {
+                    decodeQrFromImage(context, uri)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
                 }
                 val provider = qrText?.let(::providerFromJson)
                 isReadingQr = false
@@ -773,21 +772,8 @@ private fun ImportProviderDialog(onImport: (Provider) -> Unit, onDismiss: () -> 
     }
 }
 
-private fun decodeQrFromImage(context: Context, uri: Uri): String? {
-    val resolver = context.contentResolver
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    val boundsStream = resolver.openInputStream(uri) ?: return null
-    boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
-    val maxDimension = maxOf(bounds.outWidth, bounds.outHeight)
-    if (maxDimension <= 0) return null
-
-    var sampleSize = 1
-    while (maxDimension / sampleSize > 2048) sampleSize *= 2
-    val options = BitmapFactory.Options().apply {
-        inSampleSize = sampleSize
-        inPreferredConfig = Bitmap.Config.RGB_565
-    }
-    val bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
+private suspend fun decodeQrFromImage(context: Context, uri: Uri): String? {
+    val bitmap = decodeSampledBitmapFromUri(context, uri, maxDimension = 1024) ?: return null
     return try {
         QRCodeUtil.decodeQRCode(bitmap)
     } finally {

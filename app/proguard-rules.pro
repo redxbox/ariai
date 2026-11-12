@@ -12,12 +12,7 @@
 -keep class * extends androidx.room.RoomDatabase
 -dontwarn androidx.room.paging.**
 
-# Serialization
--keepattributes *Annotation*, InnerClasses
--dontwarn kotlinx.serialization.**
-
-# Coil
--keep class coil.** { *; }
+# kotlinx.serialization is not a dependency (JSON is org.json), so no rules are needed for it.
 
 # PdfBox's optional JP2 decoder is not needed for PDF text extraction.
 -dontwarn com.gemalto.jp2.**

@@ -1,45 +1,33 @@
 package com.ariai.app.data.local
 
 import androidx.room.*
-import com.ariai.app.data.models.*
 import kotlinx.coroutines.flow.Flow
 
 // Type converters
 class Converters {
+    // Custom headers are stored as a JSON object. Earlier builds used a fragile
+    // "key:::value" joined by "|||"; [toStringMap] still understands that format so
+    // configurations saved by older installs keep working.
     @TypeConverter
-    fun fromProviderType(type: ProviderType): String = type.name
+    fun fromStringMap(map: Map<String, String>): String =
+        org.json.JSONObject().apply { map.forEach { (key, value) -> put(key, value) } }.toString()
 
     @TypeConverter
-    fun toProviderType(name: String): ProviderType = ProviderType.valueOf(name)
-
-    @TypeConverter
-    fun fromRole(role: MessageRole): String = role.name
-
-    @TypeConverter
-    fun toRole(name: String): MessageRole = MessageRole.valueOf(name)
-
-    @TypeConverter
-    fun fromStatus(status: MessageStatus): String = status.name
-
-    @TypeConverter
-    fun toStatus(name: String): MessageStatus = MessageStatus.valueOf(name)
-
-    @TypeConverter
-    fun fromStringList(list: List<String>): String = list.joinToString("|||")
-
-    @TypeConverter
-    fun toStringList(data: String): List<String> = if (data.isEmpty()) emptyList() else data.split("|||")
-
-    @TypeConverter
-    fun fromStringMap(map: Map<String, String>): String = 
-        map.entries.joinToString("|||") { "${it.key}:::${it.value}" }
-
-    @TypeConverter
-    fun toStringMap(data: String): Map<String, String> = 
-        if (data.isEmpty()) emptyMap() else data.split("|||").associate {
-            val parts = it.split(":::", limit = 2)
-            parts[0] to (parts.getOrNull(1) ?: "")
+    fun toStringMap(data: String): Map<String, String> {
+        if (data.isEmpty()) return emptyMap()
+        return runCatching {
+            val json = org.json.JSONObject(data)
+            json.keys().asSequence().associateWith { json.getString(it) }
+        }.getOrElse {
+            // Legacy format from before JSON storage.
+            buildMap {
+                data.split("|||").forEach { entry ->
+                    val idx = entry.indexOf(":::")
+                    if (idx > 0) put(entry.substring(0, idx), entry.substring(idx + 3))
+                }
+            }
         }
+    }
 }
 
 @Entity(tableName = "providers")
@@ -275,7 +263,7 @@ interface AgentDao {
 @Database(
     entities = [ProviderEntity::class, ChatEntity::class, MessageEntity::class, AgentEntity::class],
     version = 9,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {

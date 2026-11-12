@@ -46,12 +46,49 @@ DYNAMIC_KEYS = {
     "The OAuth server is temporarily unavailable. Try again later.",
 }
 
+ERROR_MAPPER = SOURCE / "com/ariai/app/data/remote/ErrorMapper.kt"
+
+def error_mapper_dynamic_keys():
+    """Keys ErrorMapper passes through tx() by variable, invisible to the tx("...") scan.
+
+    ErrorMapper is where provider errors become user-facing text, so its
+    messageKey/hintKey pairs and SAFE_* composite lists must all have Persian entries.
+    """
+    try:
+        text = ERROR_MAPPER.read_text(encoding="utf-8")
+    except OSError:
+        print("::warning title=Translation check::ErrorMapper.kt not found; skipping dynamic error keys")
+        return set()
+
+    keys = set()
+    for message_key, hint_key in re.findall(
+        r'MappedProviderError\(\s*\n?\s*"((?:\\.|[^"\\])*)"\s*,\s*\n?\s*"((?:\\.|[^"\\])*)"',
+        text,
+    ):
+        keys.add(message_key)
+        keys.add(hint_key)
+
+    def list_block_strings(marker):
+        block_start = text.find(marker)
+        if block_start == -1:
+            return []
+        block_end = text.find("\n    )", block_start)
+        if block_end == -1:
+            block_end = len(text)
+        return re.findall(r'"((?:\\.|[^"\\])*)"', text[block_start:block_end])
+
+    keys.update(list_block_strings("SAFE_LOCAL_MESSAGES ="))
+    keys.update(list_block_strings("SAFE_LOCAL_COMPOSITE_MESSAGES ="))
+    return keys
+
+ERROR_MAPPER_KEYS = error_mapper_dynamic_keys()
+
 source_text = "\n".join(
     path.read_text(encoding="utf-8")
     for path in SOURCE.rglob("*.kt")
     if path != FA_STRINGS
 )
-required = set(TX_CALL.findall(source_text)) | DYNAMIC_KEYS
+required = set(TX_CALL.findall(source_text)) | DYNAMIC_KEYS | ERROR_MAPPER_KEYS
 translation_text = FA_STRINGS.read_text(encoding="utf-8")
 entries = MAP_KEY.findall(translation_text)
 translated = set(entries)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -305,7 +306,10 @@ private fun ProviderPickerPane(
         modifier = modifier.testTag("model-picker-provider-dock")
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
+            val dockListState = rememberLazyListState()
+            ClearFocusOnScroll(dockListState)
             LazyColumn(
+                state = dockListState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -542,7 +546,10 @@ private fun ModelDetailsPane(
                 ConnectionStatus(result, modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp))
             }
 
+            val modelListScrollState = rememberLazyListState()
+            ClearFocusOnScroll(modelListScrollState)
             LazyColumn(
+                state = modelListScrollState,
                 modifier = Modifier.weight(1f).fillMaxWidth().testTag("model-picker-model-list"),
                 contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)

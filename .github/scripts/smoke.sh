@@ -130,6 +130,21 @@ tap() {
   sleep 0.8
 }
 
+tap_last() {
+  local label="$1"
+  local output
+  if ! output="$(python3 .github/scripts/ui_tap.py --last "$label" 2>&1)"; then
+    echo "$output"
+    local detail="${output//$'\n'/ | }"
+    echo "::error title=Last UI target missing::${label}; ${detail:0:1200}"
+    FAILED=1
+    capture_failure "$label"
+    return 1
+  fi
+  echo "$output"
+  sleep 0.8
+}
+
 tap_exact() {
   local label="$1"
   local output
@@ -598,12 +613,25 @@ expect_text "Add MCP server"
 shot 20-mcp-add-form
 tap "Name"
 type_text "ArenaSmokeServer"
-# Keep focus inside the form: Back can dismiss this sheet even when the emulator IME is slow.
 tap "Server URL"
 type_text "https://example.org/mcp"
 tap "SSE"
 shot 21-mcp-sse-selected
-tap "Save"
+# Save sits below the emulator IME. Check that the keyboard is actually shown before Back,
+# so a slow IME cannot turn this into a dismiss of the draggable sheet itself.
+ime_state="$(adb shell dumpsys input_method)"
+if grep -q 'mInputShown=true' <<<"$ime_state"; then
+  echo "Hiding the visible software keyboard before saving the MCP server."
+  back
+else
+  echo "Software keyboard already hidden; leaving the MCP form untouched."
+fi
+expect_text "Add MCP server"
+if python3 .github/scripts/ui_tap.py --assert --exact "Save" >/dev/null 2>&1; then
+  tap_exact "Save"
+else
+  tap_scroll "Save"
+fi
 expect_text "ArenaSmokeServer"
 expect_text "Disabled"
 shot 22-mcp-server-added
@@ -635,10 +663,10 @@ end_step
 step "Navigation drawer and provider screens"
 tap "Open menu"
 expect_text "Search conversations"
-expect_text "Providers"
-expect_text "Tools"
-tap "Tools"
+expect_text "Agents & prompts"
+expect_text "Search"
 expect_text "MCP"
+expect_text "Providers"
 expect_text "Settings"
 expect_text "About"
 expect_text "Workspace"
@@ -674,7 +702,6 @@ type_text "no-match-arena-smoke"
 hide_keyboard
 expect_text "No matches"
 shot 25-drawer-search-no-matches
-tap "Tools"
 tap "MCP"
 expect_text "Model Context Protocol"
 shot 25-mcp-from-drawer
@@ -708,8 +735,8 @@ for provider in OpenAI Anthropic Ollama Custom Gemini; do
   expect_text "Base URL"
   expect_text "API key"
   if [[ "$provider" == "Gemini" ]]; then
-    # Typing into the form should not leave the fixed actions floating over the editor.
-    tap "API key"
+    # Focus the API-key field rather than the same-labeled Authentication chip; actions hide under the IME.
+    tap_last "API key"
     expect_absent_text "Save"
     expect_absent_text "Test"
     shot 29-gemini-form-with-keyboard
@@ -776,7 +803,6 @@ end_step
 
 step "Search tool and service settings for Gemini and Anthropic"
 tap "Open menu"
-tap "Tools"
 tap "Search"
 expect_text "Ask AriAI with web search"
 expect_text "Choose a chat model before searching."
