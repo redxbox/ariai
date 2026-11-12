@@ -17,7 +17,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.content
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -50,6 +49,15 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 private const val DEFAULT_MCP_TOOL_CALL_TIMEOUT_MS = 120_000L
+
+private fun cursorParams(cursor: String?): JsonObject = buildJsonObject {
+    cursor?.let { put("cursor", it) }
+}
+
+private fun toolCallParams(name: String, arguments: JSONObject): JsonObject {
+    val payload = McpToolCallParams(name = name, arguments = arguments.toKotlinJsonObject())
+    return appJson.encodeToJsonElement(McpToolCallParams.serializer(), payload).jsonObject
+}
 
 /** A discovered MCP tool. Its original name is retained for the JSON-RPC tools/call request. */
 @Serializable
@@ -387,15 +395,6 @@ class MCPClient(
         if (server.authType == McpAuthType.CUSTOM_HEADER) {
             require(isValidMcpHeaderName(server.authHeaderName)) { "Enter a valid HTTP header name." }
         }
-    }
-
-    private fun cursorParams(cursor: String?): JsonObject = buildJsonObject {
-        cursor?.let { put("cursor", it) }
-    }
-
-    private fun toolCallParams(name: String, arguments: JSONObject): JsonObject {
-        val payload = McpToolCallParams(name = name, arguments = arguments.toKotlinJsonObject())
-        return appJson.encodeToJsonElement(McpToolCallParams.serializer(), payload).jsonObject
     }
 
     private interface MCPProtocolSession : Closeable {
