@@ -3,9 +3,13 @@ package com.ariai.app.data.remote
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
 import com.ariai.app.data.models.ToolCall
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,16 +47,22 @@ class AgentLoopTest {
         assertEquals("The search ran; MCP was unavailable.", answer)
         assertEquals(
             listOf(
+                ToolExecutionPhase.CALLING,
                 ToolExecutionPhase.RUNNING,
                 ToolExecutionPhase.COMPLETED,
+                ToolExecutionPhase.CALLING,
                 ToolExecutionPhase.RUNNING,
                 ToolExecutionPhase.FAILED
             ),
             updates.map { it.phase }
         )
-        assertEquals(listOf("search-1:1", "search-1:1", "mcp-1:2", "mcp-1:2"), updates.map { it.callId })
+        assertEquals(
+            listOf("search-1:1", "search-1:1", "search-1:1", "mcp-1:2", "mcp-1:2", "mcp-1:2"),
+            updates.map { it.callId }
+        )
+        assertEquals(listOf("search_web", "search_web", "search_web", "mcp_echo", "mcp_echo", "mcp_echo"), updates.map { it.toolName })
         assertEquals("Calling MCP", updates.last().label)
-        assertTrue(updates[1].elapsedMs >= 0L)
+        assertTrue(updates[2].elapsedMs >= 0L)
     }
 
     @Test
@@ -260,6 +270,88 @@ class AgentLoopTest {
 
         assertEquals("Please attach the file.", answer)
         assertEquals(listOf(1), cleared)
+    }
+
+    @Test
+    fun `per-tool timeout can extend the agent default`() = runBlocking {
+        var requestCount = 0
+        val answer = AgentLoop(toolTimeoutMs = 30L).run(
+            initialMessages = listOf(ChatMessage(chatId = "chat", role = MessageRole.USER, content = "Run the slower tool")),
+            tools = listOf(ChatFunctionTool(
+                name = "slow_tool",
+                description = "Slow but valid",
+                parameters = JSONObject(),
+                timeoutMs = 1_000L
+            ) {
+                delay(100L)
+                "completed"
+            })
+        ) { history, _, _ ->
+            requestCount++
+            if (requestCount == 1) {
+                AgentStep("", listOf(ToolCall("slow-1", "slow_tool", "{}")))
+            } else {
+                assertTrue(history.any { it.role == MessageRole.TOOL && it.content == "completed" })
+                AgentStep("The slow tool completed.", emptyList())
+            }
+        }
+
+        assertEquals("The slow tool completed.", answer)
+    }
+
+    @Test
+    fun `times out a stalled tool and continues with its bounded failure result`() = runBlocking {
+        val updates = mutableListOf<ToolExecutionUpdate>()
+        var toolCompleted = false
+        var requestCount = 0
+        val answer = AgentLoop(toolTimeoutMs = 30L).run(
+            initialMessages = listOf(ChatMessage(chatId = "chat", role = MessageRole.USER, content = "Run the slow tool")),
+            tools = listOf(ChatFunctionTool("slow_tool", "Slow", JSONObject()) {
+                delay(500L)
+                toolCompleted = true
+                "late result"
+            }),
+            onToolProgress = { updates += it }
+        ) { history, _, _ ->
+            requestCount++
+            if (requestCount == 1) {
+                AgentStep("", listOf(ToolCall("slow-1", "slow_tool", "{}")))
+            } else {
+                assertTrue(history.any { it.role == MessageRole.TOOL && it.content.contains("timed out") })
+                AgentStep("The slow tool timed out safely.", emptyList())
+            }
+        }
+
+        assertEquals("The slow tool timed out safely.", answer)
+        assertFalse(toolCompleted)
+        assertEquals(
+            listOf(ToolExecutionPhase.CALLING, ToolExecutionPhase.RUNNING, ToolExecutionPhase.FAILED),
+            updates.map { it.phase }
+        )
+    }
+
+    @Test
+    fun `parent cancellation propagates through tool execution`() {
+        val updates = mutableListOf<ToolExecutionUpdate>()
+        var wasCancelled = false
+
+        try {
+            runBlocking {
+                withTimeout(1_000L) {
+                    AgentLoop(toolTimeoutMs = 5_000L).run(
+                        initialMessages = listOf(ChatMessage(chatId = "chat", role = MessageRole.USER, content = "Cancel the tool")),
+                        tools = listOf(ChatFunctionTool("slow_tool", "Slow", JSONObject()) { delay(5_000L); "done" }),
+                        onToolProgress = { updates += it }
+                    ) { _, _, _ -> AgentStep("", listOf(ToolCall("slow-1", "slow_tool", "{}"))) }
+                }
+            }
+        } catch (_: CancellationException) {
+            wasCancelled = true
+        }
+
+        assertTrue(wasCancelled)
+        assertTrue(updates.any { it.phase == ToolExecutionPhase.RUNNING })
+        assertFalse(updates.any { it.phase == ToolExecutionPhase.COMPLETED })
     }
 
 }

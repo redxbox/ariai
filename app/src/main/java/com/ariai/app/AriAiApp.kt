@@ -14,6 +14,7 @@ import com.ariai.app.data.repository.WorkspaceRepository
 class AriAiApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        AppCrashHandler.install(this)
         com.ariai.app.data.local.ImageStore.init(filesDir)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             repository.migrateProviderKeysToEncrypted()

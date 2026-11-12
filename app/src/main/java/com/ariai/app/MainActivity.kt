@@ -3,6 +3,8 @@ package com.ariai.app
 import com.ariai.app.ui.theme.*
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -39,6 +41,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.ariai.app.ui.components.CrashReportNotice
 import com.ariai.app.ui.drawer.AppDrawerContent
 import com.ariai.app.ui.screens.*
 import com.ariai.app.ui.theme.AriAiTheme
@@ -50,7 +53,9 @@ import com.ariai.app.data.remote.OAuthAuthorizationLauncher
 import com.ariai.app.data.models.SearchMode
 import com.ariai.app.util.UiLang
 import com.ariai.app.util.tx
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val PRIVACY_POLICY_URL = "https://github.com/redxbox/ariai/blob/main/PRIVACY_POLICY.md"
 
@@ -115,6 +120,39 @@ fun AppRoot(viewModel: AppViewModel) {
     val isProtectedSettingsRoute = isSensitiveSettingsRoute(currentRoute)
     val snackbarHostState = remember { SnackbarHostState() }
     var showAbout by remember { mutableStateOf(false) }
+    var crashReport by remember { mutableStateOf<String?>(null) }
+    var crashReportDismissed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(context) {
+        crashReport = withContext(Dispatchers.IO) {
+            AppCrashHandler.readReport(context.applicationContext.filesDir)
+        }
+    }
+
+    fun copyCrashReport() {
+        val report = crashReport ?: return
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        if (clipboard == null) {
+            scope.launch { snackbarHostState.showSnackbar(tx("Could not access the clipboard.")) }
+            return
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText(tx("Crash report"), report))
+        scope.launch { snackbarHostState.showSnackbar(tx("Crash report copied to clipboard.")) }
+    }
+
+    fun deleteCrashReport() {
+        val filesDirectory = context.applicationContext.filesDir
+        scope.launch {
+            val removed = withContext(Dispatchers.IO) { AppCrashHandler.clearReport(filesDirectory) }
+            if (removed) {
+                crashReport = null
+                crashReportDismissed = false
+                snackbarHostState.showSnackbar(tx("Crash report deleted."))
+            } else {
+                snackbarHostState.showSnackbar(tx("Could not delete the crash report."))
+            }
+        }
+    }
 
     fun beginOAuth(ownerType: String, ownerId: String, resourceUri: String, config: OAuth2Config) {
         val activity = context.findActivity()
@@ -167,6 +205,7 @@ fun AppRoot(viewModel: AppViewModel) {
     val isSending by viewModel.isSending.collectAsStateWithLifecycle()
     val streamingContent by viewModel.streamingContent.collectAsStateWithLifecycle()
     val toolExecutionUpdates by viewModel.toolExecutionUpdates.collectAsStateWithLifecycle()
+    val generationState by viewModel.generationState.collectAsStateWithLifecycle()
     val generatedMediaBytes by viewModel.generatedMediaBytes.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
@@ -363,10 +402,18 @@ fun AppRoot(viewModel: AppViewModel) {
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = startRoute,
-                modifier = Modifier.padding(padding),
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                crashReport?.takeIf { !crashReportDismissed }?.let {
+                    CrashReportNotice(
+                        onCopyReport = ::copyCrashReport,
+                        onDeleteReport = ::deleteCrashReport,
+                        onDismiss = { crashReportDismissed = true }
+                    )
+                }
+                NavHost(
+                    navController = navController,
+                    startDestination = startRoute,
+                    modifier = Modifier.weight(1f),
                 enterTransition = {
                     fadeIn(tween(220)) + slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { it / 6 }
                 },
@@ -431,6 +478,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         isSending = isSending,
                         currentStreamingContent = streamingContent,
                         toolExecutionUpdates = toolExecutionUpdates,
+                        generationState = generationState,
                         selectedModel = modelOverrides[chatId]?.second ?: currentChat?.modelId,
                         selectedProviderId = modelOverrides[chatId]?.first ?: currentChat?.providerId,
                         providers = providers,
@@ -707,6 +755,7 @@ fun AppRoot(viewModel: AppViewModel) {
                         }
                     )
                 }
+            }
             }
         }
     }

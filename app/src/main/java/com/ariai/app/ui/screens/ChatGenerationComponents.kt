@@ -40,7 +40,7 @@ private val Muted: Color @Composable @ReadOnlyComposable get() = AriMuted
 
 @Composable
 internal fun ToolExecutionTimeline(updates: List<ToolExecutionUpdate>) {
-    val finished = updates.filter { it.phase != ToolExecutionPhase.RUNNING }
+    val finished = updates.filterNot { it.phase.isActive }
     if (finished.isEmpty()) return
     val visible = finished.takeLast(3)
     Column(
@@ -62,13 +62,14 @@ internal fun ToolExecutionTimeline(updates: List<ToolExecutionUpdate>) {
                 } else label
                 ToolExecutionPhase.FAILED -> "$label · ${tx("Failed")}"
                 ToolExecutionPhase.CANCELLED -> "$label · ${tx("Stopped")}"
-                ToolExecutionPhase.RUNNING -> label
+                ToolExecutionPhase.CALLING -> "$label · ${tx("Calling tool")}"
+                ToolExecutionPhase.RUNNING -> "$label · ${tx("Executing")}"
             }
             val icon = when (update.phase) {
                 ToolExecutionPhase.COMPLETED -> Icons.Default.Check
                 ToolExecutionPhase.FAILED -> Icons.Default.ErrorOutline
                 ToolExecutionPhase.CANCELLED -> Icons.Default.Stop
-                ToolExecutionPhase.RUNNING -> Icons.Default.MoreHoriz
+                ToolExecutionPhase.CALLING, ToolExecutionPhase.RUNNING -> Icons.Default.MoreHoriz
             }
             Row(
                 modifier = Modifier.testTag("chat-tool-execution-step"),
@@ -195,7 +196,8 @@ private fun GenerationWorkStep(update: ToolExecutionUpdate) {
         }
         ToolExecutionPhase.FAILED -> "$label · ${tx("Failed")}"
         ToolExecutionPhase.CANCELLED -> "$label · ${tx("Stopped")}"
-        ToolExecutionPhase.RUNNING -> label
+        ToolExecutionPhase.CALLING -> "$label · ${tx("Calling tool")}"
+        ToolExecutionPhase.RUNNING -> "$label · ${tx("Executing")}"
     }
     Row(
         modifier = Modifier.testTag("chat-tool-execution-step"),
@@ -203,7 +205,7 @@ private fun GenerationWorkStep(update: ToolExecutionUpdate) {
         horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         when (update.phase) {
-            ToolExecutionPhase.RUNNING -> CircularProgressIndicator(
+            ToolExecutionPhase.CALLING, ToolExecutionPhase.RUNNING -> CircularProgressIndicator(
                 modifier = Modifier.size(12.dp),
                 strokeWidth = 1.5.dp,
                 color = Accent
@@ -229,7 +231,7 @@ private fun GenerationWorkStep(update: ToolExecutionUpdate) {
         }
         Text(
             statusText,
-            color = if (update.phase == ToolExecutionPhase.RUNNING) Ink else Muted,
+            color = if (update.phase.isActive) Ink else Muted,
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

@@ -30,12 +30,15 @@ import com.ariai.app.data.models.AttachmentType
 import com.ariai.app.ui.components.ReplyContent
 import com.ariai.app.ui.theme.*
 import com.ariai.app.util.tx
+import com.ariai.app.util.decodeSampledBitmapFromBytesBlocking
+import com.ariai.app.util.decodeSampledBitmapFromPathBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private val Accent: Color @Composable @ReadOnlyComposable get() = AriAccent
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
 private val Muted: Color @Composable @ReadOnlyComposable get() = AriMuted
+private const val MAX_ATTACHMENT_PREVIEW_BASE64_CHARS = 12 * 1024 * 1024
 
 @Composable
 internal fun PendingChip(attachment: Attachment, onRemove: () -> Unit) {
@@ -114,15 +117,15 @@ private fun AttachmentThumb(attachment: Attachment) {
     ) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
                 val uri = attachment.uri
-                if (uri != null && java.io.File(uri).exists()) {
-                    android.graphics.BitmapFactory.decodeFile(uri, options)
-                } else {
-                    attachment.base64Data?.let {
-                        val bytes = android.util.Base64.decode(it, android.util.Base64.DEFAULT)
-                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                when {
+                    uri != null && java.io.File(uri).exists() ->
+                        decodeSampledBitmapFromPathBlocking(uri, maxDimension = 512)
+                    attachment.base64Data != null && attachment.base64Data.length <= MAX_ATTACHMENT_PREVIEW_BASE64_CHARS -> {
+                        val bytes = android.util.Base64.decode(attachment.base64Data, android.util.Base64.DEFAULT)
+                        decodeSampledBitmapFromBytesBlocking(bytes, maxDimension = 512)
                     }
+                    else -> null
                 }
             }.getOrNull()?.asImageBitmap()
         }

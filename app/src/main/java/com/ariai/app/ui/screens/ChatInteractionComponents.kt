@@ -115,15 +115,27 @@ internal fun ListeningIndicator() {
     }
 }
 
-private val appearedKeys = HashSet<String>()
+private const val MAX_TRACKED_APPEARED_KEYS = 1_024
+private val appearedKeys = java.util.LinkedHashMap<String, Unit>(128, 0.75f, true)
+
+private fun hasAppeared(key: String): Boolean = synchronized(appearedKeys) {
+    appearedKeys.containsKey(key)
+}
+
+private fun markAppeared(key: String) = synchronized(appearedKeys) {
+    appearedKeys[key] = Unit
+    while (appearedKeys.size > MAX_TRACKED_APPEARED_KEYS) {
+        appearedKeys.remove(appearedKeys.keys.iterator().next())
+    }
+}
 
 /** Fades and slides each message in once when it first appears. */
 @Composable
 internal fun AppearIn(key: String, content: @Composable () -> Unit) {
     // Items already shown once skip the entrance animation (LazyColumn recreates items on scroll).
-    var visible by remember(key) { mutableStateOf(appearedKeys.contains(key)) }
+    var visible by remember(key) { mutableStateOf(hasAppeared(key)) }
     LaunchedEffect(key) {
-        appearedKeys.add(key)
+        markAppeared(key)
         visible = true
     }
     AnimatedVisibility(

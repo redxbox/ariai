@@ -2,7 +2,10 @@ package com.ariai.app.data.models
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
+@Serializable
 enum class ProviderType {
     OPENAI,
     GEMINI,
@@ -12,22 +15,26 @@ enum class ProviderType {
     CUSTOM
 }
 
+@Serializable
 enum class ProviderAuthType {
     API_KEY,
     OAUTH2
 }
 
+@Serializable
 @Parcelize
 data class Provider(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
     val type: ProviderType = ProviderType.OPENAI_COMPATIBLE,
     val baseUrl: String,
-    val apiKey: String,
-    val models: List<AIModel> = emptyList(),
+    /** Credentials stay in the encrypted persistence layer and are never emitted by JSON serialization. */
+    @Transient val apiKey: String = "",
+    /** Model settings are serialized through the encrypted repository codec, never this public DTO. */
+    @Transient val models: List<AIModel> = emptyList(),
     val enabled: Boolean = true,
-    val customHeaders: Map<String, String> = emptyMap(),
-    val customBody: String? = null,
+    @Transient val customHeaders: Map<String, String> = emptyMap(),
+    @Transient val customBody: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     /** True when encrypted key data exists but Android Keystore could not unlock it. */
     val apiKeyNeedsReentry: Boolean = false,
@@ -35,11 +42,12 @@ data class Provider(
     val providerConfigNeedsReentry: Boolean = false,
     val authType: ProviderAuthType = ProviderAuthType.API_KEY,
     val oauthConfig: OAuth2Config? = null,
-    /** Encrypted in Room; this decrypted AuthState JSON exists only in memory. */
-    val oauthStateJson: String? = null,
+    /** Decrypted OAuth AuthState exists only in memory and is never emitted by JSON serialization. */
+    @Transient val oauthStateJson: String? = null,
     val oauthStateNeedsReentry: Boolean = false
 ) : Parcelable
 
+@Serializable
 @Parcelize
 data class AIModel(
     val id: String,
@@ -52,10 +60,10 @@ data class AIModel(
     val isCustom: Boolean = false,
     /** Gemini built-in tools: "google_search", "url_context". */
     val builtInTools: List<String> = emptyList(),
-    /** Extra HTTP headers sent only for this model. */
-    val headers: Map<String, String> = emptyMap(),
-    /** Extra JSON merged into the request body for this model. */
-    val customBody: String? = null,
+    /** Extra HTTP headers are serialized by the encrypted provider-model repository codec only. */
+    @Transient val headers: Map<String, String> = emptyMap(),
+    /** Extra JSON is serialized by the encrypted provider-model repository codec only. */
+    @Transient val customBody: String? = null,
     /** Model returns video (from provider metadata). */
     val supportsVideoGen: Boolean = false,
     /** Model returns audio (speech or music). */

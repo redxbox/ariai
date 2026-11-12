@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.parcelize")
     id("com.google.devtools.ksp")
     id("androidx.room")
@@ -155,8 +156,10 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("net.openid:appauth:0.11.1")
     
-    // JSON
-    implementation("org.json:json:20231013")
+    // Type-safe JSON for protocol envelopes and persisted provider/chat models.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    // Android supplies org.json at runtime; this provides its real implementation to JVM unit tests.
+    testImplementation("org.json:json:20231013")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

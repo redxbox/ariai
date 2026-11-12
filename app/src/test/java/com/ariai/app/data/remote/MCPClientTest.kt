@@ -457,6 +457,31 @@ class MCPClientTest {
     }
 
     @Test
+    fun mcpToolCallsUseTheirLongerTimeoutWithoutExtendingHandshakeTimeouts() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(jsonResponse(jsonRpcResponse(1, initializeResult())))
+        server.enqueue(MockResponse().setResponseCode(202))
+        server.enqueue(jsonResponse(jsonRpcResponse(2, toolsResult())))
+        server.enqueue(
+            jsonResponse(jsonRpcResponse(3, toolResult("slow MCP result")))
+                .setBodyDelay(750, java.util.concurrent.TimeUnit.MILLISECONDS)
+        )
+        server.start()
+        val client = MCPClient(requestTimeoutMs = 500L, toolCallTimeoutMs = 2_000L)
+        var connection: MCPConnection? = null
+        try {
+            val connected = client.connect(serverConfig(server, McpTransport.STREAMABLE_HTTP))
+            connection = connected
+            val agentTool = connected.asChatFunctionTools().single()
+            assertEquals(2_000L, agentTool.timeoutMs)
+            assertTrue(connected.callTool("echo", JSONObject()).contains("slow MCP result"))
+        } finally {
+            connection?.close()
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun requestTimeoutIsBounded() = runBlocking {
         val server = MockWebServer()
         server.enqueue(

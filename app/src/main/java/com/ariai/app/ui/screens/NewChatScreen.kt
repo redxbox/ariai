@@ -6,6 +6,8 @@ import com.ariai.app.util.UiLang
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import com.ariai.app.ui.theme.*
+import com.ariai.app.ui.components.MenuIconBadge
+import com.ariai.app.ui.components.MenuIconTone
 
 import android.content.ClipData
 import android.content.ContentValues
@@ -59,8 +61,8 @@ import com.ariai.app.data.models.Provider
 import com.ariai.app.data.models.ProviderType
 import com.ariai.app.data.models.ReasoningLevel
 import com.ariai.app.data.models.SearchMode
+import com.ariai.app.data.remote.ChatGenerationState
 import com.ariai.app.data.remote.ConnectionResult
-import com.ariai.app.data.remote.ToolExecutionPhase
 import com.ariai.app.data.remote.ToolExecutionUpdate
 import com.ariai.app.util.ReadResult
 import com.ariai.app.util.bitmapAttachment
@@ -82,6 +84,7 @@ fun NewChatScreen(
     isSending: Boolean = false,
     currentStreamingContent: String,
     toolExecutionUpdates: List<ToolExecutionUpdate> = emptyList(),
+    generationState: ChatGenerationState = ChatGenerationState.Idle,
     selectedModel: String?,
     selectedProviderId: String? = chat?.providerId,
     providers: List<Provider> = emptyList(),
@@ -341,11 +344,17 @@ fun NewChatScreen(
     val selectedModelIsVideoOnly = selectedModelCapabilities?.let { it.supportsVideoGen && !it.outputsText } == true
     val selectedModelIsAudioOnly = selectedModelCapabilities?.let { it.supportsAudioGen && !it.outputsText } == true
     val hasStreamingText = currentStreamingContent.isNotBlank()
+    val retryableAssistantMessages = remember(messages) { retryableAssistantMessageFlags(messages) }
     val generationActive = isSending || isStreaming
     val showWaitingStatus = generationActive && !hasStreamingText
-    val activeToolUpdate = toolExecutionUpdates.lastOrNull { it.phase == ToolExecutionPhase.RUNNING }
+    val activeToolUpdate = toolExecutionUpdates.lastOrNull { it.phase.isActive }
+    val toolStateLabel = when (val state = generationState) {
+        is ChatGenerationState.ToolCalling -> "${tx(activeToolUpdate?.label ?: state.toolName)} · ${tx("Calling tool")}"
+        is ChatGenerationState.ToolExecuting -> "${tx(activeToolUpdate?.label ?: state.toolName)} · ${tx("Executing")}"
+        else -> activeToolUpdate?.let { tx(it.label) }
+    }
     val waitingStatus = when {
-        activeToolUpdate != null -> tx(activeToolUpdate.label)
+        toolStateLabel != null -> toolStateLabel
         chatMode == ChatMode.IMAGE || selectedModelIsImageOnly -> tx("Preparing image generation")
         chatMode == ChatMode.VIDEO || selectedModelIsVideoOnly -> tx("Preparing video generation")
         chatMode == ChatMode.AUDIO || selectedModelIsAudioOnly -> tx("Preparing audio generation")
@@ -571,11 +580,9 @@ fun NewChatScreen(
                         showNote(tx("Could not read this document."))
                         continue
                     }
-                    withContext(Dispatchers.IO) {
-                        readAttachment(context, uri, extractedText.getOrThrow())
-                    }
+                    readAttachment(context, uri, extractedText.getOrThrow())
                 } else {
-                    withContext(Dispatchers.IO) { readAttachment(context, uri) }
+                    readAttachment(context, uri)
                 }
                 when (result) {
                     is ReadResult.Ok -> pending = pending + result.attachment
@@ -853,7 +860,7 @@ fun NewChatScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(if (checkingConnection) tx("Checking…") else tx("Check connection")) },
-                                    leadingIcon = { Icon(Icons.Default.NetworkCheck, contentDescription = null) },
+                                    leadingIcon = { MenuIconBadge(Icons.Default.NetworkCheck, MenuIconTone.Blue, badgeSize = 30.dp, iconSize = 16.dp) },
                                     enabled = requestedProvider?.enabled == true && !checkingConnection,
                                     onClick = {
                                         showTopMenu = false
@@ -880,12 +887,12 @@ fun NewChatScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(tx("Quick parameters")) },
-                                    leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                                    leadingIcon = { MenuIconBadge(Icons.Default.Tune, MenuIconTone.Mint, badgeSize = 30.dp, iconSize = 16.dp) },
                                     onClick = { showTopMenu = false; showQuickParameters = true }
                                 )
                                 DropdownMenuItem(
                                     text = { Text(tx("Rename chat")) },
-                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    leadingIcon = { MenuIconBadge(Icons.Default.Edit, MenuIconTone.Blue, badgeSize = 30.dp, iconSize = 16.dp) },
                                     onClick = {
                                         showTopMenu = false
                                         startRenamingChat()
@@ -893,7 +900,7 @@ fun NewChatScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(tx("Copy conversation")) },
-                                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                                    leadingIcon = { MenuIconBadge(Icons.Default.ContentCopy, MenuIconTone.Mint, badgeSize = 30.dp, iconSize = 16.dp) },
                                     onClick = {
                                         showTopMenu = false
                                         copyToClipboard(messages.filter { it.role != MessageRole.SYSTEM }.joinToString("\n\n") { it.content })
@@ -901,7 +908,7 @@ fun NewChatScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(tx("Image chat")) },
-                                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = AriAccent) },
+                                    leadingIcon = { MenuIconBadge(Icons.Default.Image, MenuIconTone.Blue, badgeSize = 30.dp, iconSize = 16.dp) },
                                     onClick = {
                                         showTopMenu = false
                                         if (imageGenerationAvailable) onNewImageChat()
@@ -910,7 +917,7 @@ fun NewChatScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(tx("Compress history")) },
-                                    leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                                    leadingIcon = { MenuIconBadge(Icons.Default.Archive, MenuIconTone.Mint, badgeSize = 30.dp, iconSize = 16.dp) },
                                     onClick = {
                                         showTopMenu = false
                                         onCompressHistory { showNote(it) }
@@ -1001,13 +1008,7 @@ fun NewChatScreen(
                     items(count = messages.size, key = { i -> messages[i].id }) { i ->
                         val m = messages[i]
                         val isError = m.status == MessageStatus.ERROR
-                        val retryUserId = if (isError) m.parentId else null
-                        val associatedUserId = retryUserId ?: messages.take(i)
-                            .lastOrNull { it.role == MessageRole.USER }
-                            ?.id
-                        val canRetry = m.role == MessageRole.ASSISTANT && associatedUserId?.let { userId ->
-                            messages.any { it.id == userId && it.role == MessageRole.USER }
-                        } == true
+                        val canRetry = retryableAssistantMessages[i]
                         when (m.role) {
                             MessageRole.SYSTEM -> AppearIn(m.id) { CompressedNotice() }
                             MessageRole.USER -> AppearIn(m.id) { UserBubble(m.content, m.attachments, fontSize) }

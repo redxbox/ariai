@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Chat
 import com.ariai.app.ui.components.ConfirmDeleteChatDialog
+import com.ariai.app.ui.components.MenuIconBadge
+import com.ariai.app.ui.components.MenuIconTone
 import java.text.SimpleDateFormat
 import java.util.*
 import com.ariai.app.util.ChatDateBucket
@@ -83,6 +85,16 @@ fun ChatListScreen(
             } else {
                 val listState = rememberLazyListState()
                 ClearFocusOnScroll(listState)
+                val filtered = remember(chats, searchQuery) {
+                    if (searchQuery.isBlank()) chats else chats.filter {
+                        it.title.contains(searchQuery, ignoreCase = true)
+                    }
+                }
+                val groups = remember(filtered) {
+                    filtered
+                        .sortedWith(compareByDescending<Chat> { it.isPinned }.thenByDescending { it.updatedAt })
+                        .groupBy { chat -> if (chat.isPinned) ChatDateBucket.PINNED else chatDateBucket(chat.updatedAt) }
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(padding),
@@ -107,11 +119,6 @@ fun ChatListScreen(
                             singleLine = true
                         )
                     }
-
-                    val filtered = if (searchQuery.isBlank()) chats else chats.filter { it.title.contains(searchQuery, ignoreCase = true) }
-                    val groups = filtered
-                        .sortedWith(compareByDescending<Chat> { it.isPinned }.thenByDescending { it.updatedAt })
-                        .groupBy { chat -> if (chat.isPinned) ChatDateBucket.PINNED else chatDateBucket(chat.updatedAt) }
 
                     groups.forEach { (bucket, bucketChats) ->
                         item(key = "history:${bucket.name}") {
@@ -165,8 +172,8 @@ fun CleanChatItem(chat: Chat, onClick: () -> Unit, onDelete: () -> Unit, onPin: 
                     onDismissRequest = { showMenu = false },
                     modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape))
                 ) {
-                    DropdownMenuItem(text = { Text(tx("Pin")) }, onClick = { showMenu = false; onPin() }, leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) })
-                    DropdownMenuItem(text = { Text(tx("Delete")) }, onClick = { showMenu = false; confirmDelete = true }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) })
+                    DropdownMenuItem(text = { Text(tx("Pin")) }, onClick = { showMenu = false; onPin() }, leadingIcon = { MenuIconBadge(Icons.Default.Star, MenuIconTone.Mint, badgeSize = 30.dp, iconSize = 16.dp) })
+                    DropdownMenuItem(text = { Text(tx("Delete")) }, onClick = { showMenu = false; confirmDelete = true }, leadingIcon = { MenuIconBadge(Icons.Default.Delete, MenuIconTone.Danger, badgeSize = 30.dp, iconSize = 16.dp) })
                 }
             }
         }
@@ -194,4 +201,3 @@ fun formatTimeClean(timestamp: Long): String {
         else -> SimpleDateFormat("MMM d", locale).format(Date(timestamp))
     }
 }
-

@@ -43,8 +43,11 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.Provider
 import com.ariai.app.ui.components.ConfirmDeleteChatDialog
+import com.ariai.app.ui.components.MenuIconBadge
+import com.ariai.app.ui.components.MenuIconTone
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
+private val DrawerBlueBrush = Brush.horizontalGradient(listOf(AriMenuBlueStart, AriMenuBlueEnd))
 
 private sealed interface DrawerRow {
     data class Header(val id: String, val label: String) : DrawerRow
@@ -73,6 +76,11 @@ fun ColumnScope.AppDrawerContent(
     var query by remember { mutableStateOf("") }
     // Use the sampled mint for the main drawer action, keeping text dark for legibility.
     val drawerAccent = AriMenuMintStart
+    val folderNames = remember(chats) {
+        chats.mapNotNull { it.folder?.trim()?.takeIf(String::isNotEmpty) }
+            .distinctBy { it.lowercase() }
+            .sortedBy(String::lowercase)
+    }
 
     val rows: List<DrawerRow> = remember(chats, query, UiLang.code) {
         // Older databases may contain malformed chat rows. They must never produce a `chat/` route.
@@ -85,19 +93,19 @@ fun ColumnScope.AppDrawerContent(
             pinned.forEach { out += DrawerRow.ChatRow(it) }
         }
         val rest = filtered.filterNot { it.isPinned }.sortedByDescending { it.updatedAt }
-        val folders = rest.mapNotNull { it.folder?.trim()?.takeIf(String::isNotEmpty) }
-            .distinctBy { it.lowercase() }
-            .sortedBy(String::lowercase)
-        folders.forEach { folder ->
-            val group = rest.filter { it.folder?.trim().equals(folder, ignoreCase = true) }
-            if (group.isNotEmpty()) {
-                out += DrawerRow.Header("header:folder:$folder", folder)
-                group.forEach { out += DrawerRow.ChatRow(it) }
-            }
+        val chatsByFolder = rest.filter { !it.folder.isNullOrBlank() }
+            .groupBy { it.folder?.trim().orEmpty().lowercase() }
+        val folderLabels = chatsByFolder.mapValues { (_, group) -> group.first().folder?.trim().orEmpty() }
+        folderLabels.keys.sorted().forEach { folderKey ->
+            val folder = folderLabels.getValue(folderKey)
+            val group = chatsByFolder.getValue(folderKey)
+            out += DrawerRow.Header("header:folder:$folder", folder)
+            group.forEach { out += DrawerRow.ChatRow(it) }
         }
-        val unfiled = rest.filter { it.folder.isNullOrBlank() }
+        val unfiledByBucket = rest.filter { it.folder.isNullOrBlank() }
+            .groupBy { chatDateBucket(it.updatedAt) }
         ChatDateBucket.values().filter { it != ChatDateBucket.PINNED }.forEach { bucket ->
-            val group = unfiled.filter { chatDateBucket(it.updatedAt) == bucket }
+            val group = unfiledByBucket[bucket].orEmpty()
             if (group.isNotEmpty()) {
                 out += DrawerRow.Header("header:${bucket.name.lowercase()}", tx(bucket.labelKey))
                 group.forEach { out += DrawerRow.ChatRow(it) }
@@ -118,7 +126,7 @@ fun ColumnScope.AppDrawerContent(
                 .background(Brush.linearGradient(listOf(AriMenuMintStart, AriMenuBlueStart))),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = AriMenuInk, modifier = Modifier.size(21.dp))
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text("AriAI", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp)
@@ -148,12 +156,19 @@ fun ColumnScope.AppDrawerContent(
         onValueChange = { query = it },
         singleLine = true,
         placeholder = { Text(tx("Search conversations"), color = AriMuted, fontSize = 14.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriMuted, modifier = Modifier.size(18.dp)) },
+        leadingIcon = {
+            Box(
+                Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(DrawerBlueBrush),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+            }
+        },
         textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start, textDirection = TextDirection.ContentOrLtr),
         shape = RoundedCornerShape(17.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = AriTint,
-            unfocusedContainerColor = AriTint,
+            focusedContainerColor = AriPaper,
+            unfocusedContainerColor = AriPaper,
             focusedBorderColor = AriLine.copy(alpha = 0.78f),
             unfocusedBorderColor = AriLine.copy(alpha = 0.62f)
         ),
@@ -196,9 +211,7 @@ fun ColumnScope.AppDrawerContent(
                     onClick = { onChatClick(row.chat) },
                     onPin = { onPinChat(row.chat) },
                     onDelete = { onDeleteChat(row.chat) },
-                    folderNames = chats.mapNotNull { it.folder?.trim()?.takeIf(String::isNotEmpty) }
-                        .distinctBy { it.lowercase() }
-                        .sortedBy(String::lowercase),
+                    folderNames = folderNames,
                     onSetFolder = { folder -> onSetChatFolder(row.chat, folder) }
                 )
             }
@@ -210,7 +223,8 @@ fun ColumnScope.AppDrawerContent(
     // Local profile and active provider: no cloud account is implied.
     Surface(
         shape = RoundedCornerShape(18.dp),
-        color = AriTint,
+        color = AriPaper,
+        border = BorderStroke(1.dp, AriLine.copy(alpha = 0.72f)),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
             .clickable { onNavigate("workspace") }
     ) {
@@ -239,17 +253,18 @@ fun ColumnScope.AppDrawerContent(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
-        FooterAction(Icons.Default.FolderOpen, tx("Workspace"), currentRoute == "workspace") { onNavigate("workspace") }
-        FooterAction(Icons.Default.Person, tx("Agents & prompts"), currentRoute == "agents") { onNavigate("agents") }
-        FooterAction(Icons.Default.Search, tx("Search"), currentRoute == "search") { onNavigate("search") }
-        FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }
-        FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }
+        FooterAction(Icons.Default.FolderOpen, tx("Workspace"), currentRoute == "workspace", MenuIconTone.Mint) { onNavigate("workspace") }
+        FooterAction(Icons.Default.Person, tx("Agents & prompts"), currentRoute == "agents", MenuIconTone.Mint) { onNavigate("agents") }
+        FooterAction(Icons.Default.Search, tx("Search"), currentRoute == "search", MenuIconTone.Blue) { onNavigate("search") }
+        FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp", MenuIconTone.Blue) { onNavigate("mcp") }
+        FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers", MenuIconTone.Blue) { onNavigate("providers") }
         FooterAction(
             Icons.Default.Settings,
             tx("Settings"),
-            currentRoute in setOf("settings", "preferences", "default_model", "search_service", "storage")
+            currentRoute in setOf("settings", "preferences", "default_model", "search_service", "storage"),
+            MenuIconTone.Mint
         ) { onNavigate("settings") }
-        FooterAction(Icons.Default.Info, tx("About"), false, onAbout)
+        FooterAction(Icons.Default.Info, tx("About"), false, MenuIconTone.Blue, onAbout)
     }
     Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
 }
@@ -273,7 +288,7 @@ private fun ChatRowItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) AriTint.copy(alpha = 0.78f) else Color.Transparent)
+            .background(if (selected) AriMenuBlueStart.copy(alpha = 0.12f) else Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { if (selected) stateDescription = tx("Current chat") }
             .heightIn(min = 48.dp)
@@ -310,17 +325,17 @@ private fun ChatRowItem(
             ) {
                 DropdownMenuItem(
                     text = { Text(if (chat.isPinned) tx("Unpin") else tx("Pin")) },
-                    leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) },
+                    leadingIcon = { MenuIconBadge(Icons.Default.Star, MenuIconTone.Mint, badgeSize = 30.dp, iconSize = 16.dp) },
                     onClick = { menu = false; onPin() }
                 )
                 DropdownMenuItem(
                     text = { Text(tx("Move to folder")) },
-                    leadingIcon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
+                    leadingIcon = { MenuIconBadge(Icons.Default.FolderOpen, MenuIconTone.Blue, badgeSize = 30.dp, iconSize = 16.dp) },
                     onClick = { menu = false; folderName = chat.folder.orEmpty(); showFolderDialog = true }
                 )
                 DropdownMenuItem(
                     text = { Text(tx("Delete")) },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                    leadingIcon = { MenuIconBadge(Icons.Default.Delete, MenuIconTone.Danger, badgeSize = 30.dp, iconSize = 16.dp) },
                     onClick = { menu = false; confirmDelete = true }
                 )
             }
@@ -381,22 +396,23 @@ private fun ChatRowItem(
 }
 
 @Composable
-private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+private fun FooterAction(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    iconTone: MenuIconTone,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .background(if (selected) AriTint else Color.Transparent)
+            .background(if (selected) AriMenuBlueStart.copy(alpha = 0.10f) else Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = 48.dp)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (selected) AriMenuBlueStart else AriMuted,
-            modifier = Modifier.size(21.dp)
-        )
+        MenuIconBadge(icon, iconTone, badgeSize = 34.dp, iconSize = 18.dp)
         Text(
             label,
             fontSize = 14.sp,

@@ -5,6 +5,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
 
+private const val PUBLIC_URL_TOOL_TIMEOUT_MS = 150_000L
+
 object DefaultAgentTools {
     fun calculator(): ChatFunctionTool = ChatFunctionTool(
         name = "calculate",
@@ -54,7 +56,8 @@ object DefaultAgentTools {
                 properties = JSONObject().put("url", stringProperty("One of the exact URLs supplied by the user")),
                 required = listOf("url")
             ),
-            progressLabel = "Reading page"
+            progressLabel = "Reading page",
+            timeoutMs = PUBLIC_URL_TOOL_TIMEOUT_MS
         ) { args ->
             val requested = args.optString("url").trim().trimEnd('.', ',', ';', ')', ']', '،', '؛')
             val uri = runCatching { URI(requested) }.getOrElse { throw IllegalArgumentException("Invalid URL") }

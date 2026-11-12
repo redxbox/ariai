@@ -1,6 +1,7 @@
 package com.ariai.app.data.remote
 
 import com.ariai.app.data.models.*
+import com.ariai.app.data.serialization.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,6 +10,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.content
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.isString
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import okhttp3.*
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
@@ -784,17 +799,20 @@ class AIClient(
         }
 
         val url = "${provider.baseUrl.trimEnd('/')}/images/generations"
-        val jsonBody = JSONObject().apply {
-            put("model", request.model)
-            put("prompt", request.prompt)
-            put("n", request.n.coerceIn(1, 4))
-            put("size", request.size)
-            if (request.quality.isNotBlank()) put("quality", request.quality)
-            if (request.style != null) put("style", request.style)
-        }
+        val jsonBody = providerRequestBody(
+            OpenAiImageGenerationRequest(
+                model = request.model,
+                prompt = request.prompt,
+                n = request.n.coerceIn(1, 4),
+                size = request.size,
+                quality = request.quality.takeIf { it.isNotBlank() },
+                style = request.style
+            ),
+            OpenAiImageGenerationRequest.serializer()
+        )
         val httpRequest = Request.Builder()
             .url(url)
-            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+            .post(jsonBody)
             .addProviderHeaders(provider, request.model)
             .build()
 
@@ -831,15 +849,20 @@ class AIClient(
                 else -> "1:1"
             }
         } else "1:1"
-        val body = JSONObject()
-            .put("instances", JSONArray().put(JSONObject().put("prompt", request.prompt)))
-            .put("parameters", JSONObject()
-                .put("sampleCount", request.n.coerceIn(1, 4))
-                .put("aspectRatio", ratio))
+        val body = providerRequestBody(
+            ImagenPredictRequest(
+                instances = listOf(ImagenInstance(prompt = request.prompt)),
+                parameters = ImagenParameters(
+                    sampleCount = request.n.coerceIn(1, 4),
+                    aspectRatio = ratio
+                )
+            ),
+            ImagenPredictRequest.serializer()
+        )
         val url = "${provider.baseUrl.trimEnd('/')}/models/${request.model}:predict"
         val httpRequest = Request.Builder()
             .url(url)
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .post(body)
             .addProviderHeaders(provider, request.model)
             .build()
         return client.executeCancellable(httpRequest).use { response ->
@@ -911,14 +934,17 @@ class AIClient(
 
     private suspend fun generateImageViaChat(provider: Provider, request: ImageGenRequest): ImageGenResponse {
         val url = "${provider.baseUrl.trimEnd('/')}/chat/completions"
-        val body = JSONObject().apply {
-            put("model", request.model)
-            put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", request.prompt)))
-            put("modalities", JSONArray().put("image").put("text"))
-        }
+        val body = providerRequestBody(
+            OpenAiChatRequest(
+                model = request.model,
+                messages = listOf(OpenAiChatMessage(role = "user", content = JsonPrimitive(request.prompt))),
+                modalities = listOf("image", "text")
+            ),
+            OpenAiChatRequest.serializer()
+        )
         val httpRequest = Request.Builder()
             .url(url)
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .post(body)
             .addProviderHeaders(provider, request.model)
             .build()
         return client.executeCancellable(httpRequest).use { response ->
@@ -1152,251 +1178,306 @@ class AIClient(
         functionTools: List<ChatFunctionTool> = emptyList(),
         allowUrlContext: Boolean = true
     ): RequestBody {
-        val json = JSONObject()
         val lastMessage = messages.lastOrNull()
-
-        when (provider.type) {
+        val requestJson = when (provider.type) {
             ProviderType.GEMINI -> {
-                val contents = JSONArray()
-                messages.forEach { msg ->
-                    if (msg.role == MessageRole.SYSTEM) return@forEach
-                    val parts = JSONArray()
-                    if (msg.role == MessageRole.TOOL) {
-                        val response = JSONObject().put("result", msg.content)
-                        val functionResponse = JSONObject()
-                            .put("name", msg.toolName.orEmpty())
-                            .put("response", response)
-                        msg.toolCallId?.takeIf { it.isNotBlank() }?.let { functionResponse.put("id", it) }
-                        parts.put(JSONObject().put("functionResponse", functionResponse))
-                    } else {
-                        var text = msg.promptText(gemini = true)
-                        if (searchContext != null && msg == lastMessage && msg.role == MessageRole.USER) {
-                            text = "Web search results:\n$searchContext\n\nUser question: $text\n\nAnswer using the search results when relevant."
-                        }
-                        if (text.isNotBlank()) parts.put(JSONObject().put("text", text))
-                        msg.imageParts().forEach { img ->
-                            parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", img.mimeType).put("data", img.base64Data)))
-                        }
-                        msg.videoParts().forEach { vid ->
-                            parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", vid.mimeType).put("data", vid.base64Data)))
-                        }
-                        msg.toolCalls.forEach { call ->
-                            val functionCall = JSONObject()
-                                .put("name", call.name)
-                                .put("args", call.arguments.asJsonObject())
-                            if (call.id.isNotBlank()) functionCall.put("id", call.id)
-                            parts.put(JSONObject().put("functionCall", functionCall))
+                val contents = messages.mapNotNull { message ->
+                    if (message.role == MessageRole.SYSTEM) return@mapNotNull null
+                    val parts = buildList {
+                        if (message.role == MessageRole.TOOL) {
+                            val response = buildJsonObject { put("result", message.content) }
+                            add(
+                                GeminiPart(
+                                    functionResponse = GeminiFunctionResponse(
+                                        name = message.toolName.orEmpty(),
+                                        response = response,
+                                        id = message.toolCallId?.takeIf { it.isNotBlank() }
+                                    )
+                                )
+                            )
+                        } else {
+                            var text = message.promptText(gemini = true)
+                            if (searchContext != null && message == lastMessage && message.role == MessageRole.USER) {
+                                text = "Web search results:\n$searchContext\n\nUser question: $text\n\nAnswer using the search results when relevant."
+                            }
+                            if (text.isNotBlank()) add(GeminiPart(text = text))
+                            message.imageParts().forEach { image ->
+                                add(GeminiPart(inlineData = GeminiInlineData(image.mimeType, image.base64Data.orEmpty())))
+                            }
+                            message.videoParts().forEach { video ->
+                                add(GeminiPart(inlineData = GeminiInlineData(video.mimeType, video.base64Data.orEmpty())))
+                            }
+                            message.toolCalls.forEach { call ->
+                                add(
+                                    GeminiPart(
+                                        functionCall = GeminiFunctionCall(
+                                            name = call.name,
+                                            args = call.arguments.asJsonObject(),
+                                            id = call.id.takeIf { it.isNotBlank() }
+                                        )
+                                    )
+                                )
+                            }
                         }
                     }
-                    if (parts.length() == 0) return@forEach
-                    contents.put(JSONObject().apply {
-                        put("role", if (msg.role == MessageRole.USER || msg.role == MessageRole.TOOL) "user" else "model")
-                        put("parts", parts)
-                    })
+                    if (parts.isEmpty()) null
+                    else GeminiContent(
+                        role = if (message.role == MessageRole.USER || message.role == MessageRole.TOOL) "user" else "model",
+                        parts = parts
+                    )
                 }
-                json.put("contents", contents)
-                if (systemPrompt != null) {
-                    json.put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", systemPrompt))))
-                }
-                json.put("generationConfig", JSONObject().apply {
-                    put("temperature", temperature.coerceIn(0f, 2f).toDouble())
-                    put("topP", topP.coerceIn(0f, 1f).toDouble())
-                    reasoning.geminiBudget?.takeIf { it > 0 }?.let { put("thinkingConfig", JSONObject().put("thinkingBudget", it)) }
-                })
                 val nativeTools = modelTools(provider, modelId)
                     .filterNot { it == "url_context" && !allowUrlContext }
                     .toMutableList()
                 if (nativeSearch && !nativeTools.contains("google_search")) nativeTools.add("google_search")
-                val toolsJson = JSONArray().apply {
-                    nativeTools.forEach { put(JSONObject().put(it, JSONObject())) }
-                    if (functionTools.isNotEmpty()) {
-                        put(JSONObject().put("functionDeclarations", JSONArray().apply {
-                            functionTools.forEach { tool ->
-                                put(JSONObject()
-                                    .put("name", tool.name)
-                                    .put("description", tool.description)
-                                    .put("parameters", tool.parameters.toGeminiSchema()))
-                            }
-                        }))
+                val tools = buildList {
+                    nativeTools.forEach { name ->
+                        when (name) {
+                            "google_search" -> add(GeminiTool(googleSearch = buildJsonObject {}))
+                            "url_context" -> add(GeminiTool(urlContext = buildJsonObject {}))
+                        }
                     }
-                }
-                if (toolsJson.length() > 0) json.put("tools", toolsJson)
+                    if (functionTools.isNotEmpty()) {
+                        add(
+                            GeminiTool(
+                                functionDeclarations = functionTools.map { tool ->
+                                    GeminiFunctionDeclaration(
+                                        name = tool.name,
+                                        description = tool.description,
+                                        parameters = tool.parameters.toKotlinJsonObject().toGeminiSchema()
+                                    )
+                                }
+                            )
+                        )
+                    }
+                }.takeIf { it.isNotEmpty() }
+                GeminiGenerateContentRequest(
+                    contents = contents,
+                    systemInstruction = systemPrompt?.let {
+                        GeminiSystemInstruction(parts = listOf(GeminiPart(text = it)))
+                    },
+                    generationConfig = GeminiGenerationConfig(
+                        temperature = temperature.coerceIn(0f, 2f).toDouble(),
+                        topP = topP.coerceIn(0f, 1f).toDouble(),
+                        thinkingConfig = reasoning.geminiBudget?.takeIf { it > 0 }?.let(::GeminiThinkingConfig)
+                    ),
+                    tools = tools
+                ).toProviderJsonObject(GeminiGenerateContentRequest.serializer())
             }
+
             ProviderType.ANTHROPIC -> {
                 val budget = reasoning.budgetTokens
-                json.put("model", if (modelId.isNotBlank()) modelId else "claude-3-5-sonnet-20241022")
                 val thinking = budget != null && budget > 0
-                json.put("max_tokens", if (thinking) budget!! + 4096 else 4096)
-                json.put("stream", isStream)
-                val anthropicTools = JSONArray()
-                if (nativeSearch) {
-                    anthropicTools.put(JSONObject().put("type", "web_search_20250305").put("name", "web_search"))
-                }
-                functionTools.forEach { tool ->
-                    anthropicTools.put(JSONObject()
-                        .put("name", tool.name)
-                        .put("description", tool.description)
-                        .put("input_schema", tool.parameters))
-                }
-                if (anthropicTools.length() > 0) json.put("tools", anthropicTools)
-                if (thinking) {
-                    // Extended thinking requires temperature 1 (the API default), so it is omitted here.
-                    json.put("thinking", JSONObject().put("type", "enabled").put("budget_tokens", budget))
-                } else {
-                    json.put("temperature", temperature.toDouble().coerceIn(0.0, 1.0))
-                    json.put("top_p", topP.toDouble().coerceIn(0.0, 1.0))
-                }
+                val anthropicTools = buildList {
+                    if (nativeSearch) add(AnthropicTool(type = "web_search_20250305", name = "web_search"))
+                    functionTools.forEach { tool ->
+                        add(
+                            AnthropicTool(
+                                name = tool.name,
+                                description = tool.description,
+                                inputSchema = tool.parameters.toKotlinJsonObject()
+                            )
+                        )
+                    }
+                }.takeIf { it.isNotEmpty() }
                 val systemText = listOfNotNull(
                     systemPrompt,
                     searchContext?.let { "You have access to web search results:\n$it\nUse them to answer accurately with citations." }
-                ).joinToString("\n\n")
-                if (systemText.isNotBlank()) json.put("system", systemText)
-                val msgs = JSONArray()
-                var pendingToolResults = JSONArray()
+                ).joinToString("\n\n").takeIf { it.isNotBlank() }
+                val anthropicMessages = mutableListOf<AnthropicMessage>()
+                var pendingToolResults = mutableListOf<AnthropicContentBlock>()
                 fun flushToolResults() {
-                    if (pendingToolResults.length() == 0) return
-                    msgs.put(JSONObject().put("role", "user").put("content", pendingToolResults))
-                    pendingToolResults = JSONArray()
+                    if (pendingToolResults.isEmpty()) return
+                    anthropicMessages.add(AnthropicMessage(role = "user", content = pendingToolResults))
+                    pendingToolResults = mutableListOf()
                 }
-                messages.filter { it.role != MessageRole.SYSTEM }.forEach { m ->
-                    if (m.role == MessageRole.TOOL) {
-                        pendingToolResults.put(JSONObject()
-                            .put("type", "tool_result")
-                            .put("tool_use_id", m.toolCallId.orEmpty())
-                            .put("content", m.content))
+                messages.filter { it.role != MessageRole.SYSTEM }.forEach { message ->
+                    if (message.role == MessageRole.TOOL) {
+                        pendingToolResults.add(
+                            AnthropicContentBlock(
+                                type = "tool_result",
+                                toolUseId = message.toolCallId.orEmpty(),
+                                content = message.content
+                            )
+                        )
                         return@forEach
                     }
                     flushToolResults()
-                    val content = JSONArray()
-                    m.imageParts().forEach { img ->
-                        content.put(JSONObject().put("type", "image").put("source", JSONObject()
-                            .put("type", "base64").put("media_type", img.mimeType).put("data", img.base64Data)))
+                    val content = buildList {
+                        message.imageParts().forEach { image ->
+                            add(
+                                AnthropicContentBlock(
+                                    type = "image",
+                                    source = AnthropicImageSource(
+                                        type = "base64",
+                                        mediaType = image.mimeType,
+                                        data = image.base64Data.orEmpty()
+                                    )
+                                )
+                            )
+                        }
+                        val text = message.promptText()
+                        if (text.isNotBlank()) add(AnthropicContentBlock(type = "text", text = text))
+                        message.toolCalls.forEach { call ->
+                            add(
+                                AnthropicContentBlock(
+                                    type = "tool_use",
+                                    id = call.id,
+                                    name = call.name,
+                                    input = call.arguments.asJsonObject()
+                                )
+                            )
+                        }
                     }
-                    val text = m.promptText()
-                    if (text.isNotBlank()) content.put(JSONObject().put("type", "text").put("text", text))
-                    m.toolCalls.forEach { call ->
-                        content.put(JSONObject()
-                            .put("type", "tool_use")
-                            .put("id", call.id)
-                            .put("name", call.name)
-                            .put("input", call.arguments.asJsonObject()))
-                    }
-                    if (content.length() == 0) return@forEach
-                    msgs.put(JSONObject().apply {
-                        put("role", if (m.role == MessageRole.USER) "user" else "assistant")
-                        put("content", content)
-                    })
+                    if (content.isEmpty()) return@forEach
+                    anthropicMessages.add(
+                        AnthropicMessage(
+                            role = if (message.role == MessageRole.USER) "user" else "assistant",
+                            content = content
+                        )
+                    )
                 }
                 flushToolResults()
-                json.put("messages", msgs)
+                AnthropicMessagesRequest(
+                    model = modelId.ifBlank { "claude-3-5-sonnet-20241022" },
+                    maxTokens = if (thinking) budget!! + 4096 else 4096,
+                    stream = isStream,
+                    tools = anthropicTools,
+                    thinking = if (thinking) AnthropicThinking(type = "enabled", budgetTokens = budget!!) else null,
+                    temperature = if (thinking) null else temperature.toDouble().coerceIn(0.0, 1.0),
+                    topP = if (thinking) null else topP.toDouble().coerceIn(0.0, 1.0),
+                    system = systemText,
+                    messages = anthropicMessages
+                ).toProviderJsonObject(AnthropicMessagesRequest.serializer())
             }
+
             else -> {
-                val actualModel = if (modelId.isBlank()) "gpt-4o-mini" else modelId
-
-                json.put("model", actualModel)
-                json.put("temperature", temperature.toDouble().coerceIn(0.0, 2.0))
-                json.put("top_p", topP.toDouble().coerceIn(0.0, 1.0))
-                json.put("stream", isStream)
+                val actualModel = modelId.ifBlank { "gpt-4o-mini" }
+                val openAiMessages = buildList {
+                    if (systemPrompt != null && systemPrompt.isNotBlank()) {
+                        add(OpenAiChatMessage(role = "system", content = JsonPrimitive(systemPrompt)))
+                    }
+                    if (searchContext != null) {
+                        add(
+                            OpenAiChatMessage(
+                                role = "system",
+                                content = JsonPrimitive("You have access to web search results:\n$searchContext\nUse them to answer accurately with citations.")
+                            )
+                        )
+                    }
+                    messages.forEach { message ->
+                        if (message.role == MessageRole.SYSTEM && systemPrompt != null) return@forEach
+                        if (message.role == MessageRole.TOOL) {
+                            add(
+                                OpenAiChatMessage(
+                                    role = "tool",
+                                    content = JsonPrimitive(message.content),
+                                    toolCallId = message.toolCallId.orEmpty(),
+                                    name = message.toolName?.takeIf { it.isNotBlank() }
+                                )
+                            )
+                            return@forEach
+                        }
+                        val text = message.promptText()
+                        val images = message.imageParts()
+                        if (text.isBlank() && images.isEmpty() && message.toolCalls.isEmpty()) return@forEach
+                        val content: JsonElement = when {
+                            message.role == MessageRole.USER && images.isNotEmpty() -> buildJsonArray {
+                                add(OpenAiTextContentPart(text = text).toProviderJsonElement(OpenAiTextContentPart.serializer()))
+                                images.forEach { image ->
+                                    add(
+                                        OpenAiImageContentPart(
+                                            imageUrl = OpenAiImageUrl("data:${image.mimeType};base64,${image.base64Data.orEmpty()}")
+                                        ).toProviderJsonElement(OpenAiImageContentPart.serializer())
+                                    )
+                                }
+                            }
+                            message.role == MessageRole.ASSISTANT && text.isBlank() && message.toolCalls.isNotEmpty() -> JsonNull
+                            else -> JsonPrimitive(text)
+                        }
+                        val role = when (message.role) {
+                            MessageRole.USER -> "user"
+                            MessageRole.ASSISTANT -> "assistant"
+                            MessageRole.SYSTEM -> "system"
+                            MessageRole.TOOL -> "tool"
+                        }
+                        val calls = message.toolCalls.map { call ->
+                            OpenAiToolCall(
+                                id = call.id,
+                                function = OpenAiToolCallFunction(name = call.name, arguments = call.arguments)
+                            )
+                        }.takeIf { it.isNotEmpty() }
+                        add(OpenAiChatMessage(role = role, content = content, toolCalls = calls))
+                    }
+                }
                 val endpointHost = runCatching { java.net.URI(provider.baseUrl).host }.getOrNull()
-                if (isStream && provider.type == ProviderType.OPENAI && endpointHost.equals("api.openai.com", ignoreCase = true)) {
-                    json.put("stream_options", JSONObject().put("include_usage", true))
-                }
-                reasoning.effort?.let { json.put("reasoning_effort", it) }
-                if (nativeSearch && provider.baseUrl.contains("openrouter.ai")) {
-                    json.put("plugins", JSONArray().put(JSONObject().put("id", "web")))
-                }
-                if (functionTools.isNotEmpty()) {
-                    json.put("tools", JSONArray().apply {
-                        functionTools.forEach { tool ->
-                            put(JSONObject()
-                                .put("type", "function")
-                                .put("function", JSONObject()
-                                    .put("name", tool.name)
-                                    .put("description", tool.description)
-                                    .put("parameters", tool.parameters)))
-                        }
-                    })
-                    json.put("tool_choice", "auto")
-                }
-
-                val msgs = JSONArray()
-                if (systemPrompt != null && systemPrompt.isNotBlank()) {
-                    msgs.put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", systemPrompt)
-                    })
-                }
-                if (searchContext != null) {
-                    msgs.put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", "You have access to web search results:\n$searchContext\nUse them to answer accurately with citations.")
-                    })
-                }
-                messages.forEach { m ->
-                    if (m.role == MessageRole.SYSTEM && systemPrompt != null) return@forEach
-                    if (m.role == MessageRole.TOOL) {
-                        msgs.put(JSONObject().apply {
-                            put("role", "tool")
-                            put("tool_call_id", m.toolCallId.orEmpty())
-                            m.toolName?.takeIf { it.isNotBlank() }?.let { put("name", it) }
-                            put("content", m.content)
-                        })
-                        return@forEach
-                    }
-                    val text = m.promptText()
-                    val images = m.imageParts()
-                    if (text.isBlank() && images.isEmpty() && m.toolCalls.isEmpty()) return@forEach
-                    val content: Any = if (m.role == MessageRole.USER && images.isNotEmpty()) {
-                        JSONArray().apply {
-                            put(JSONObject().put("type", "text").put("text", text))
-                            images.forEach { img ->
-                                put(JSONObject().put("type", "image_url").put("image_url",
-                                    JSONObject().put("url", "data:${img.mimeType};base64,${img.base64Data}")))
-                            }
-                        }
-                    } else if (m.role == MessageRole.ASSISTANT && text.isBlank() && m.toolCalls.isNotEmpty()) {
-                        JSONObject.NULL
-                    } else {
-                        text
-                    }
-                    val role = when (m.role) {
-                        MessageRole.USER -> "user"
-                        MessageRole.ASSISTANT -> "assistant"
-                        MessageRole.SYSTEM -> "system"
-                        MessageRole.TOOL -> "tool"
-                    }
-                    val message = JSONObject().put("role", role).put("content", content)
-                    if (m.toolCalls.isNotEmpty()) {
-                        message.put("tool_calls", JSONArray().apply {
-                            m.toolCalls.forEach { call ->
-                                put(JSONObject()
-                                    .put("id", call.id)
-                                    .put("type", "function")
-                                    .put("function", JSONObject()
-                                        .put("name", call.name)
-                                        .put("arguments", call.arguments)))
-                            }
-                        })
-                    }
-                    msgs.put(message)
-                }
-                json.put("messages", msgs)
+                val tools = functionTools.map { tool ->
+                    OpenAiTool(
+                        function = OpenAiFunctionDefinition(
+                            name = tool.name,
+                            description = tool.description,
+                            parameters = tool.parameters.toKotlinJsonObject()
+                        )
+                    )
+                }.takeIf { it.isNotEmpty() }
+                OpenAiChatRequest(
+                    model = actualModel,
+                    messages = openAiMessages,
+                    temperature = temperature.toDouble().coerceIn(0.0, 2.0),
+                    topP = topP.toDouble().coerceIn(0.0, 1.0),
+                    stream = isStream,
+                    streamOptions = if (isStream && provider.type == ProviderType.OPENAI && endpointHost.equals("api.openai.com", ignoreCase = true)) {
+                        OpenAiStreamOptions(includeUsage = true)
+                    } else null,
+                    reasoningEffort = reasoning.effort,
+                    plugins = if (nativeSearch && provider.baseUrl.contains("openrouter.ai")) listOf(OpenAiPlugin(id = "web")) else null,
+                    tools = tools,
+                    toolChoice = if (functionTools.isNotEmpty()) "auto" else null
+                ).toProviderJsonObject(OpenAiChatRequest.serializer())
             }
         }
-
         val modelBody = provider.models.find { it.id == modelId }?.customBody
+        val mergedRequest = requestJson.toMutableMap()
         listOfNotNull(provider.customBody, modelBody).forEach { custom ->
             try {
-                val customJson = JSONObject(custom)
-                customJson.keys().forEach { key ->
+                val customJson = appJson.parseToJsonElement(custom).jsonObject
+                customJson.forEach { (key, value) ->
                     if (key != "model" && key != "messages" && key != "stream" && !(key == "tools" && functionTools.isNotEmpty())) {
-                        json.put(key, customJson.get(key))
+                        mergedRequest[key] = value
                     }
                 }
-            } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+            } catch (error: Exception) {
+                com.ariai.app.util.AppLog.warn(error)
+            }
         }
+        return providerRequestBody(JsonObject(mergedRequest), JsonObject.serializer())
+    }
 
-        return json.toString().toRequestBody("application/json".toMediaType())
+    private fun <T> T.toProviderJsonObject(serializer: KSerializer<T>): JsonObject =
+        appJson.encodeToJsonElement(serializer, this).jsonObject
+
+    private fun <T> T.toProviderJsonElement(serializer: KSerializer<T>): JsonElement =
+        appJson.encodeToJsonElement(serializer, this)
+
+    private fun <T> providerRequestBody(value: T, serializer: KSerializer<T>): RequestBody =
+        appJson.encodeToString(serializer, value).toRequestBody("application/json".toMediaType())
+
+    private fun JsonObject.toGeminiSchema(): JsonObject = buildJsonObject {
+        this@toGeminiSchema.forEach { (key, value) ->
+            if (key != "additionalProperties") put(key, value.toGeminiSchemaValue(key))
+        }
+    }
+
+    private fun JsonElement.toGeminiSchemaValue(propertyName: String? = null): JsonElement = when (this) {
+        is JsonObject -> toGeminiSchema()
+        is JsonArray -> JsonArray(map { it.toGeminiSchemaValue() })
+        is JsonPrimitive -> if (propertyName == "type" && isString) JsonPrimitive(content.uppercase()) else this
+    }
+
+    private fun String.asJsonObject(): JsonObject = runCatching {
+        appJson.parseToJsonElement(this).jsonObject
+    }.getOrElse {
+        buildJsonObject {}
     }
 
     private fun hasUnexecutedToolCalls(json: JSONObject, providerType: ProviderType): Boolean = when (providerType) {
@@ -1543,31 +1624,6 @@ class AIClient(
         }
     }
 
-    private fun JSONObject.toGeminiSchema(): JSONObject {
-        val output = JSONObject()
-        val keys = keys()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            if (key == "additionalProperties") continue
-            val value = get(key)
-            val converted = when {
-                key == "type" && value is String -> value.uppercase()
-                value is JSONObject -> value.toGeminiSchema()
-                value is JSONArray -> JSONArray().apply {
-                    for (index in 0 until value.length()) {
-                        val item = value.get(index)
-                        put(if (item is JSONObject) item.toGeminiSchema() else item)
-                    }
-                }
-                else -> value
-            }
-            output.put(key, converted)
-        }
-        return output
-    }
-
-    private fun String.asJsonObject(): JSONObject = runCatching { JSONObject(this) }.getOrElse { JSONObject() }
-
     private fun responseText(value: Any?): String = when (value) {
         is String -> value
         is JSONArray -> buildString {
@@ -1623,8 +1679,10 @@ class AIClient(
             val voice = if (isMusic) "" else "&voice=alloy"
             Request.Builder().url("$origin/audio/$encodedPrompt?model=$encodedModel$voice").get()
         } else {
-            val body = JSONObject().put("model", modelId).put("input", prompt).put("voice", "alloy")
-                .toString().toRequestBody("application/json".toMediaType())
+            val body = providerRequestBody(
+                OpenAiAudioSpeechRequest(model = modelId, input = prompt, voice = "alloy"),
+                OpenAiAudioSpeechRequest.serializer()
+            )
             Request.Builder().url("$base/audio/speech").post(body)
         }
         request.addProviderHeaders(provider, modelId)
@@ -1639,9 +1697,10 @@ class AIClient(
         val base = provider.baseUrl.trim().trimEnd('/')
         suspend fun keyed(b: Request.Builder): Request.Builder = b.addProviderHeaders(provider, modelId)
         onProgress("Sending request")
-        val body = JSONObject()
-            .put("instances", JSONArray().put(JSONObject().put("prompt", prompt)))
-            .toString().toRequestBody("application/json".toMediaType())
+        val body = providerRequestBody(
+            VeoPredictRequest(instances = listOf(VeoInstance(prompt = prompt))),
+            VeoPredictRequest.serializer()
+        )
         val opName = client.executeCancellable(keyed(Request.Builder().url("$base/models/$modelId:predictLongRunning").post(body)).build()).use { r ->
             val text = r.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES).orEmpty()
             if (!r.isSuccessful) throw IllegalStateException("Video submit failed: ${r.code} ${text.take(160)}")
@@ -1722,8 +1781,10 @@ class AIClient(
             return@withContext generateVeo(provider, modelId, prompt, onProgress)
         }
         onProgress("Sending request")
-        val submitBody = JSONObject().put("model", modelId).put("prompt", prompt)
-            .toString().toRequestBody("application/json".toMediaType())
+        val submitBody = providerRequestBody(
+            VideoGenerationRequest(model = modelId, prompt = prompt),
+            VideoGenerationRequest.serializer()
+        )
         val jobId = client.executeCancellable(auth(Request.Builder().url("$base/videos").post(submitBody)).build()).use { r ->
             val text = r.body?.readUtf8AtMost(HttpBodyLimits.JSON_BYTES).orEmpty()
             if (!r.isSuccessful) throw IllegalStateException("Video submit failed: ${r.code} ${text.take(160)}")

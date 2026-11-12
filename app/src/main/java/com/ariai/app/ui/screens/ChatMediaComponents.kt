@@ -1,7 +1,8 @@
 package com.ariai.app.ui.screens
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.ariai.app.util.decodeSampledBitmapFromBytes
+import com.ariai.app.util.decodeSampledBitmapFromPath
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
 import android.graphics.PorterDuff
@@ -43,17 +44,12 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 private val remoteImageFetcher by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { PublicUrlFetcher() }
-private const val MAX_REMOTE_IMAGE_SIDE = 2_048
-private const val MAX_REMOTE_IMAGE_PIXELS = 100_000_000L
 
 /** Shows a generated image. Decoding runs off the main thread and is downsampled to save memory. */
 @Composable
 internal fun GeneratedImageView(path: String) {
     val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = path) {
-        value = withContext(Dispatchers.IO) {
-            val options = BitmapFactory.Options().apply { inSampleSize = 2 }
-            BitmapFactory.decodeFile(path, options)?.asImageBitmap()
-        }
+        value = decodeSampledBitmapFromPath(path, maxDimension = 1024)?.asImageBitmap()
     }
     var full by remember { mutableStateOf(false) }
     bitmap?.let { bmp ->
@@ -96,7 +92,7 @@ internal fun EditImageDialog(
     val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
     val sourceBitmap by produceState<Bitmap?>(initialValue = null, key1 = source.imagePath) {
-        value = withContext(Dispatchers.IO) { source.imagePath?.let { BitmapFactory.decodeFile(it) } }
+        value = source.imagePath?.let { decodeSampledBitmapFromPath(it, maxDimension = 1024) }
     }
     val preview = sourceBitmap?.asImageBitmap()
     DisposableEffect(sourceBitmap) {
@@ -444,20 +440,8 @@ internal fun extractImageUrls(text: String): List<String> =
 
 internal fun stripImageUrls(text: String): String = ImageLinkRegex.replace(text, "").trim()
 
-private fun decodeRemoteImage(bytes: ByteArray): ImageBitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    val width = bounds.outWidth
-    val height = bounds.outHeight
-    if (width <= 0 || height <= 0 || width.toLong() * height.toLong() > MAX_REMOTE_IMAGE_PIXELS) return null
-
-    var sampleSize = 1
-    while (width / sampleSize > MAX_REMOTE_IMAGE_SIDE || height / sampleSize > MAX_REMOTE_IMAGE_SIDE) {
-        sampleSize *= 2
-    }
-    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
-}
+private suspend fun decodeRemoteImage(bytes: ByteArray): ImageBitmap? =
+    decodeSampledBitmapFromBytes(bytes, maxDimension = 1024)?.asImageBitmap()
 
 /** Safely downloads a bounded public image off the main thread and shows a downsampled preview. */
 @Composable

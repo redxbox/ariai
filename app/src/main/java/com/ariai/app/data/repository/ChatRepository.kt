@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.collect
 
 sealed interface AgentChatEvent {
+    data object ModelStepStarted : AgentChatEvent
     data class TextDelta(val text: String) : AgentChatEvent
     data object ClearTextPreview : AgentChatEvent
     data object CommitTextPreview : AgentChatEvent
@@ -192,26 +193,34 @@ class ChatRepository(
     }
 
     // Messages
-    fun getMessages(chatId: String): Flow<List<ChatMessage>> = 
+    fun getMessages(chatId: String): Flow<List<ChatMessage>> =
         db.messageDao().getMessagesForChat(chatId)
             .map { list ->
                 try {
-                    list.map { it.toModel() }.sortedBy { it.timestamp }
+                    // The DAO already orders by timestamp; keep mapping off the UI dispatcher.
+                    list.map { it.toModel() }
                 } catch (e: Exception) {
                     com.ariai.app.util.AppLog.warn(e, "messages parse failed")
                     emptyList()
                 }
             }
             .catch { e ->
-            com.ariai.app.util.AppLog.warn(e, "list flow failed")
-            emit(emptyList())
-        }
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                com.ariai.app.util.AppLog.warn(e, "list flow failed")
+                emit(emptyList())
+            }
+            .flowOn(Dispatchers.IO)
 
-    suspend fun getMessagesSync(chatId: String): List<ChatMessage> = try {
-        db.messageDao().getMessagesForChatSync(chatId).map { it.toModel() }.sortedBy { it.timestamp }
-    } catch (e: Exception) {
-        com.ariai.app.util.AppLog.warn(e, "messages sync read")
-        emptyList()
+    suspend fun getMessagesSync(chatId: String): List<ChatMessage> = withContext(Dispatchers.IO) {
+        try {
+            // The DAO already orders by timestamp; mapping and attachment parsing can be O(history size).
+            db.messageDao().getMessagesForChatSync(chatId).map { it.toModel() }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "messages sync read")
+            emptyList()
+        }
     }
 
     suspend fun getMessageById(id: String): ChatMessage? = try {
@@ -441,6 +450,7 @@ class ChatRepository(
             var receivedDelta = false
             var completedStep: com.ariai.app.data.remote.AgentStep? = null
             try {
+                send(AgentChatEvent.ModelStepStarted)
                 aiClient.chatCompletionStepStream(
                     provider = provider,
                     messages = stepMessages,

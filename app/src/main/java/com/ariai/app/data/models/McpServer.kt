@@ -1,15 +1,20 @@
 package com.ariai.app.data.models
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
 
 /** MCP transports supported by AriAI's remote-client implementation. */
+@Serializable
 enum class McpTransport(val label: String) {
     SSE("SSE (legacy)"),
     STREAMABLE_HTTP("Streamable HTTP")
 }
 
+@Serializable
 enum class McpAuthType {
     NONE,
     BEARER,
@@ -21,6 +26,7 @@ enum class McpAuthType {
  * A remote MCP server configuration. [authSecret] exists only in memory; PreferencesManager
  * stores it separately after Android-Keystore encryption and McpServerCodec never serializes it.
  */
+@Serializable
 data class McpServerItem(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
@@ -30,11 +36,12 @@ data class McpServerItem(
     val authType: McpAuthType = McpAuthType.NONE,
     val authHeaderName: String = "X-API-Key",
     /** Static credentials or encrypted OAuth AuthState JSON, hydrated only in memory. */
-    val authSecret: String? = null,
-    val allowedToolNames: Set<String> = emptySet(),
+    @Transient val authSecret: String? = null,
+    @SerialName("allowedTools") val allowedToolNames: Set<String> = emptySet(),
+
     val oauthConfig: OAuth2Config? = null,
     /** In-memory command used to clear an otherwise preserved encrypted secret during edits. */
-    val clearAuthSecret: Boolean = false
+    @Transient val clearAuthSecret: Boolean = false
 )
 
 /** Small, version-tolerant codec for non-secret MCP server metadata. */
