@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.collect
 
 sealed interface AgentChatEvent {
+    data object ModelStepStarted : AgentChatEvent
     data class TextDelta(val text: String) : AgentChatEvent
     data object ClearTextPreview : AgentChatEvent
     data object CommitTextPreview : AgentChatEvent
@@ -35,10 +36,14 @@ class ChatRepository(
             try {
                 list.map { it.toModel() }
             } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "row parse failed")
                 emptyList()
             }
         }
-        .catch { emit(emptyList()) }
+        .catch { e ->
+            com.ariai.app.util.AppLog.warn(e, "list flow failed")
+            emit(emptyList())
+        }
 
     /** Asks the provider's API which models it supports. Throws on failure. */
     suspend fun fetchModels(provider: Provider): List<AIModel> = aiClient.listModels(provider)
@@ -46,6 +51,7 @@ class ChatRepository(
     suspend fun getProviderById(id: String): Provider? = try {
         db.providerDao().getProviderById(id)?.toModel()
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "provider row")
         null
     }
 
@@ -124,6 +130,15 @@ class ChatRepository(
     private fun encryptLegacyValue(value: String): String =
         if (value.isBlank() || value.startsWith("enc1:")) value else com.ariai.app.util.KeyVault.encrypt(value)
 
+    /** Chats whose messages contain [text]. Used by the drawer search. */
+    suspend fun chatIdsContaining(text: String): Set<String> = try {
+        val escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        db.messageDao().chatIdsContaining(escaped).toSet()
+    } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "chat search")
+        emptySet()
+    }
+
     suspend fun deleteProvider(id: String) {
         try {
             db.providerDao().deleteById(id)
@@ -147,11 +162,15 @@ class ChatRepository(
                 }
             }.sortedByDescending { it.updatedAt }
         }
-        .catch { emit(emptyList()) }
+        .catch { e ->
+            com.ariai.app.util.AppLog.warn(e, "list flow failed")
+            emit(emptyList())
+        }
 
     suspend fun getChatById(id: String): Chat? = try {
         db.chatDao().getChatById(id)?.toModel()
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "chat row")
         null
     }
 
@@ -183,26 +202,40 @@ class ChatRepository(
     }
 
     // Messages
-    fun getMessages(chatId: String): Flow<List<ChatMessage>> = 
+    fun getMessages(chatId: String): Flow<List<ChatMessage>> =
         db.messageDao().getMessagesForChat(chatId)
             .map { list ->
                 try {
-                    list.map { it.toModel() }.sortedBy { it.timestamp }
+                    // The DAO already orders by timestamp; keep mapping off the UI dispatcher.
+                    list.map { it.toModel() }
                 } catch (e: Exception) {
+                    com.ariai.app.util.AppLog.warn(e, "messages parse failed")
                     emptyList()
                 }
             }
-            .catch { emit(emptyList()) }
+            .catch { e ->
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                com.ariai.app.util.AppLog.warn(e, "list flow failed")
+                emit(emptyList())
+            }
+            .flowOn(Dispatchers.IO)
 
-    suspend fun getMessagesSync(chatId: String): List<ChatMessage> = try {
-        db.messageDao().getMessagesForChatSync(chatId).map { it.toModel() }.sortedBy { it.timestamp }
-    } catch (e: Exception) {
-        emptyList()
+    suspend fun getMessagesSync(chatId: String): List<ChatMessage> = withContext(Dispatchers.IO) {
+        try {
+            // The DAO already orders by timestamp; mapping and attachment parsing can be O(history size).
+            db.messageDao().getMessagesForChatSync(chatId).map { it.toModel() }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "messages sync read")
+            emptyList()
+        }
     }
 
     suspend fun getMessageById(id: String): ChatMessage? = try {
         db.messageDao().getMessageById(id)?.toModel()
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "message row")
         null
     }
 
@@ -312,10 +345,14 @@ class ChatRepository(
                     list.map { it.toModel() }
                 }
             } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "agents parse; using built-ins")
                 getBuiltInAgents()
             }
         }
-        .catch { emit(getBuiltInAgents()) }
+        .catch { e ->
+            com.ariai.app.util.AppLog.warn(e, "agents flow failed")
+            emit(getBuiltInAgents())
+        }
 
     suspend fun saveAgent(agent: Agent) {
         try {
@@ -422,6 +459,7 @@ class ChatRepository(
             var receivedDelta = false
             var completedStep: com.ariai.app.data.remote.AgentStep? = null
             try {
+                send(AgentChatEvent.ModelStepStarted)
                 aiClient.chatCompletionStepStream(
                     provider = provider,
                     messages = stepMessages,
@@ -584,7 +622,10 @@ class ChatRepository(
             (customHeaders.startsWith("enc1:") && decryptedHeaders == null) ||
                 (customBody?.startsWith("enc1:") == true && decryptedBody == null) ||
                 (modelsJson.startsWith("enc1:") && decryptedModels == null)
-        val providerType = try { ProviderType.valueOf(type) } catch (e: Exception) { ProviderType.OPENAI_COMPATIBLE }
+        val providerType = try { ProviderType.valueOf(type) } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "provider type")
+            ProviderType.OPENAI_COMPATIBLE
+        }
         val safeModelsJson = decryptedModels ?: if (modelsJson.startsWith("enc1:")) "[]" else modelsJson
         return try {
             Provider(
@@ -594,7 +635,10 @@ class ChatRepository(
                 baseUrl = baseUrl,
                 apiKey = decryptedKey.orEmpty(),
                 enabled = enabled,
-                customHeaders = try { Converters().toStringMap(decryptedHeaders.orEmpty()) } catch (e: Exception) { emptyMap() },
+                customHeaders = try { Converters().toStringMap(decryptedHeaders.orEmpty()) } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "custom headers parse")
+                emptyMap()
+            },
                 customBody = decryptedBody,
                 createdAt = createdAt,
                 apiKeyNeedsReentry = apiKeyNeedsReentry,
@@ -609,6 +653,7 @@ class ChatRepository(
                 }
             )
         } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "provider toModel")
             Provider(
                 id = id,
                 name = name.ifBlank { "Unknown" },
@@ -629,7 +674,7 @@ class ChatRepository(
         apiKey = com.ariai.app.util.KeyVault.encrypt(apiKey),
         enabled = enabled,
         customHeaders = com.ariai.app.util.KeyVault.encrypt(
-            try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { "" }
+            try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e, "custom headers serialize"); "" }
         ),
         customBody = customBody?.let(com.ariai.app.util.KeyVault::encrypt),
         createdAt = createdAt,
@@ -700,6 +745,7 @@ class ChatRepository(
             val bytes = java.io.File(uri).readBytes()
             copy(base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
         } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "attachment hydrate")
             this
         }
     }
@@ -718,6 +764,7 @@ class ChatRepository(
             )
         }
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "attachments parse")
         emptyList()
     }
 
@@ -755,6 +802,7 @@ class ChatRepository(
                 .takeIf { it.promptTokens > 0 || it.completionTokens > 0 || it.totalTokens > 0 }
         )
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "message toModel")
         ChatMessage(id = id, chatId = chatId, role = MessageRole.USER, content = content, timestamp = timestamp)
     }
 

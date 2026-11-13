@@ -76,7 +76,8 @@ class PublicUrlFetcher {
             true
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "PublicUrlFetcher.kt")
             false
         }
     }

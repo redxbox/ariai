@@ -56,6 +56,15 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug --stacktrace 2>&1 | tee build.log
 
+      - name: Verify exported Room schema is committed
+        if: success()
+        run: |
+          if [ -n "$(git status --short --untracked-files=all -- app/schemas)" ]; then
+            git status --short --untracked-files=all -- app/schemas
+            echo "::error title=Room schema snapshot out of date::Commit the generated schema under app/schemas."
+            exit 1
+          fi
+
       - name: Report Android validation errors
         if: failure()
         run: |
@@ -135,6 +144,7 @@ jobs:
             release-lint.log
             release-build.log
             app/build/reports/
+            app/schemas/
           if-no-files-found: ignore
           retention-days: 7
 

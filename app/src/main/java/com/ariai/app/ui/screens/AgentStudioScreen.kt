@@ -20,6 +20,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -81,6 +83,8 @@ import com.ariai.app.data.models.Provider
 import com.ariai.app.ui.theme.AriAccent
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriInk
+import com.ariai.app.ui.theme.ClearFocusOnScroll
+import com.ariai.app.ui.theme.rememberSheetScrollFix
 import com.ariai.app.ui.theme.AriMuted
 import com.ariai.app.ui.theme.AriPaper
 import com.ariai.app.ui.theme.AriTint
@@ -125,7 +129,10 @@ fun AgentStudioScreen(
             )
         }
     ) { padding ->
+        val agentListState = rememberLazyListState()
+        ClearFocusOnScroll(agentListState)
         LazyColumn(
+            state = agentListState,
             modifier = Modifier.fillMaxSize().padding(padding).navigationBarsPadding(),
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -271,6 +278,7 @@ private fun AgentEditorSheet(
     var modelMenu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetFix = rememberSheetScrollFix(sheetState)
     val enabledProviders = providers.filter { it.enabled }
     val selectedProvider = enabledProviders.firstOrNull { it.id == providerId }
     val modelChoices = if (selectedProvider == null) enabledProviders.flatMap { provider -> provider.models.map { model -> provider to model } }
@@ -280,10 +288,12 @@ private fun AgentEditorSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = AriCard, contentColor = AriInk) {
         Box(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 760.dp).navigationBarsPadding().imePadding()
+            modifier = Modifier.fillMaxWidth().nestedScroll(sheetFix).heightIn(max = 760.dp).navigationBarsPadding().imePadding()
         ) {
+            val editorScrollState = rememberScrollState()
+            ClearFocusOnScroll(editorScrollState)
             Column(
-                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                modifier = Modifier.fillMaxWidth().verticalScroll(editorScrollState)
                     .padding(horizontal = 20.dp, vertical = 8.dp).padding(bottom = 76.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {

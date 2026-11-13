@@ -79,6 +79,9 @@ jobs:
         path: app/build/outputs/apk/debug/app-debug.apk
         retention-days: 7
 
+    - name: Compile instrumented tests (runs after the APK is uploaded)
+      run: ./gradlew :app:compileDebugAndroidTest --stacktrace
+
   lint:
     runs-on: ubuntu-latest
     steps:

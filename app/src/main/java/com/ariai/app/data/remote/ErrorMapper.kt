@@ -152,12 +152,10 @@ object ErrorMapper {
         "Could not save the generated audio",
         "Could not save the generated video",
         "Image editing is not supported for Gemini providers yet.",
-        "The selected web search service needs an API key. Add one in Web Search settings.",
         "This provider has no built-in search, and the selected local service needs an API key.",
         "This model is marked as not supporting tool calling, which is required for the selected search mode.",
         "Web search is not enabled for this agent. Enable it in Agents & prompts or turn search off.",
         "Could not save the reply. Please try again.",
-        "Could not save your message. Please try again.",
-        "No video model found. Fetch the models of a provider that has one."
+        "Could not save your message. Please try again."
     )
 }

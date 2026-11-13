@@ -2,8 +2,10 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.parcelize")
-    id("org.jetbrains.kotlin.kapt")
+    id("com.google.devtools.ksp")
+    id("androidx.room")
 }
 
 val releaseKeystorePath = System.getenv("ARIAI_RELEASE_KEYSTORE_FILE")
@@ -60,6 +62,11 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            // Debug/testing builds target handheld devices only: package just arm64-v8a to keep the APK small.
+            // Release builds stay universal (all ABIs) until the pre-release artifact is produced.
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
         }
     }
     compileOptions {
@@ -84,6 +91,11 @@ android {
     }
 }
 
+room {
+    // Keep versioned Room schemas available as the migration baseline.
+    schemaDirectory("$projectDir/schemas")
+}
+
 dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("net.sf.kxml:kxml2:2.3.0")
@@ -93,7 +105,6 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-compose:1.8.2")
     
     // Compose BOM
@@ -118,7 +129,7 @@ dependencies {
     // Room
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
-    kapt("androidx.room:room-compiler:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
     
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
@@ -145,8 +156,10 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("net.openid:appauth:0.11.1")
     
-    // JSON
-    implementation("org.json:json:20231013")
+    // Type-safe JSON for protocol envelopes and persisted provider/chat models.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    // Android supplies org.json at runtime; this provides its real implementation to JVM unit tests.
+    testImplementation("org.json:json:20231013")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

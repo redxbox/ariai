@@ -36,7 +36,8 @@ internal suspend fun userResearchTargets(
             isSafePublicUrl(url)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "UserResearchTargets.kt")
             false
         }
         if (isSafe) urls += url

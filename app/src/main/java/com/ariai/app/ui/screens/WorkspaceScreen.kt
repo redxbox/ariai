@@ -138,7 +138,8 @@ fun WorkspaceScreen(
                     exportNotice = tx("Workspace ZIP exported.")
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    com.ariai.app.util.AppLog.warn(e, "WorkspaceScreen.kt")
                     exportNotice = tx("Could not export the workspace ZIP.")
                 }
             }

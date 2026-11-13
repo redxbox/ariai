@@ -1,11 +1,11 @@
 package com.ariai.app.ui.components
 
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
-import com.ariai.app.ui.theme.AriAccent
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.paperPopupModifier
 import com.ariai.app.ui.theme.paperPopupShape
@@ -26,7 +26,7 @@ fun ConfirmDeleteChatDialog(
         text = { Text(tx("This conversation will be removed from this device.")) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(tx("Delete"), color = AriAccent)
+                Text(tx("Delete"), color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {

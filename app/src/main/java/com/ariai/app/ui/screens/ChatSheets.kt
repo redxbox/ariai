@@ -5,6 +5,8 @@ import com.ariai.app.util.tx
 import androidx.compose.runtime.ReadOnlyComposable
 
 import com.ariai.app.ui.theme.*
+import com.ariai.app.ui.components.MenuIconBadge
+import com.ariai.app.ui.components.MenuIconTone
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -67,11 +69,13 @@ fun AttachmentSheet(
         shape = paperSheetShape(40.dp),
         showOutline = false
     ) {
+        val sheetScrollState = rememberScrollState()
+        ClearFocusOnScroll(sheetScrollState)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 520.dp, max = 700.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(sheetScrollState)
                 .padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
@@ -277,10 +281,12 @@ fun SearchSheet(
         shape = paperSheetShape(30.dp),
         showOutline = false
     ) {
+        val sheetScrollState = rememberScrollState()
+        ClearFocusOnScroll(sheetScrollState)
         Column(
             modifier = Modifier.fillMaxWidth()
                 .heightIn(max = 520.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(sheetScrollState)
                 .animateContentSize()
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp),
@@ -309,7 +315,7 @@ fun SearchSheet(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(AriTint).padding(4.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(AriPaper).padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 SearchModeTab(
@@ -492,7 +498,7 @@ private fun LocalSearchProviderPicker(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false },
                         modifier = Modifier.background(AriCard, menuShape)
-                            .then(paperPopupModifier(menuShape, 8.dp))
+                            .then(paperPopupModifier(menuShape))
                             .testTag("search-provider-menu")
                     ) {
                         listOf("brave", "bing").forEach { provider ->
@@ -501,7 +507,7 @@ private fun LocalSearchProviderPicker(
                                 text = { Text(tx(if (provider == "bing") "Bing" else "Brave"), fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },
                                 leadingIcon = { SearchServiceMark(provider, 28.dp) },
                                 trailingIcon = if (isSelected) {
-                                    { Icon(Icons.Default.Check, contentDescription = tx("Selected"), tint = Accent, modifier = Modifier.size(18.dp)) }
+                                    { MenuIconBadge(Icons.Default.Check, MenuIconTone.Blue, badgeSize = 28.dp, iconSize = 15.dp) }
                                 } else null,
                                 modifier = Modifier.testTag("search-provider-option-$provider"),
                                 onClick = {

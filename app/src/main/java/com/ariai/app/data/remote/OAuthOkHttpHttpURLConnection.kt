@@ -177,7 +177,8 @@ internal class OAuthOkHttpHttpURLConnection(
         return try {
             connect()
             response
-        } catch (_: IOException) {
+        } catch (e: IOException) {
+            com.ariai.app.util.AppLog.warn(e, "OAuthOkHttpHttpURLConnection.kt")
             null
         }
     }

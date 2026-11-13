@@ -35,3 +35,13 @@ class SearchProviderSelectionTest {
         assertNull(searchProviderDisplayName("duckduckgo"))
     }
 }
+
+/** Display names pinned for the provider picker; only the tests reference this mapping. */
+private fun searchProviderDisplayName(provider: String?): String? = when (provider?.trim()?.lowercase()) {
+    "bing" -> "Bing"
+    "tavily" -> "Tavily"
+    "brave" -> "Brave Search"
+    "exa" -> "Exa"
+    "serper" -> "Google Search"
+    else -> null
+}

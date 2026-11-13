@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +36,8 @@ import com.ariai.app.ui.theme.AriAccent
 import com.ariai.app.ui.theme.AriCard
 import com.ariai.app.ui.theme.AriInk
 import com.ariai.app.ui.theme.AriMuted
+import com.ariai.app.ui.theme.ClearFocusOnScroll
+import com.ariai.app.ui.theme.rememberSheetScrollFix
 import com.ariai.app.util.tx
 
 /** Per-conversation generation controls; only saved values affect later requests. */
@@ -51,6 +54,7 @@ fun QuickParametersSheet(
     var topPValue by remember(topP) { mutableFloatStateOf(topP.coerceIn(0f, 1f)) }
     var promptValue by remember(systemPrompt) { mutableStateOf(systemPrompt.orEmpty()) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetFix = rememberSheetScrollFix(sheetState)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -58,8 +62,10 @@ fun QuickParametersSheet(
         containerColor = AriCard,
         contentColor = AriInk
     ) {
+        val sheetScrollState = rememberScrollState()
+        ClearFocusOnScroll(sheetScrollState)
         Column(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().nestedScroll(sheetFix).navigationBarsPadding().imePadding().verticalScroll(sheetScrollState).padding(horizontal = 22.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(tx("Quick parameters"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)

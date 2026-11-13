@@ -2,6 +2,8 @@ package com.ariai.app.ui.drawer
 
 import com.ariai.app.util.UiLang
 import com.ariai.app.util.tx
+import com.ariai.app.util.ChatDateBucket
+import com.ariai.app.util.chatDateBucket
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -26,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -40,33 +43,11 @@ import androidx.compose.ui.unit.sp
 import com.ariai.app.data.models.Chat
 import com.ariai.app.data.models.Provider
 import com.ariai.app.ui.components.ConfirmDeleteChatDialog
-import java.util.Calendar
-
+import com.ariai.app.ui.components.MenuIconBadge
+import com.ariai.app.ui.components.MenuIconTone
 
 private val Ink: Color @Composable @ReadOnlyComposable get() = AriInk
-private enum class DayBucket(val labelKey: String) {
-    PINNED("Pinned"), TODAY("Today"), YESTERDAY("Yesterday"), PREVIOUS_7_DAYS("Previous 7 days"), EARLIER("Earlier");
-
-    val label: String get() = tx(labelKey)
-}
-
-private fun bucketOf(timestamp: Long, now: Long = System.currentTimeMillis()): DayBucket {
-    val todayStart = Calendar.getInstance().apply {
-        timeInMillis = now
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
-    val yesterdayStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
-    val previousWeekStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }
-    return when {
-        timestamp >= todayStart.timeInMillis -> DayBucket.TODAY
-        timestamp >= yesterdayStart.timeInMillis -> DayBucket.YESTERDAY
-        timestamp >= previousWeekStart.timeInMillis -> DayBucket.PREVIOUS_7_DAYS
-        else -> DayBucket.EARLIER
-    }
-}
+private val DrawerBlueBrush = Brush.horizontalGradient(listOf(AriMenuBlueStart, AriMenuBlueEnd))
 
 private sealed interface DrawerRow {
     data class Header(val id: String, val label: String) : DrawerRow
@@ -90,39 +71,46 @@ fun ColumnScope.AppDrawerContent(
     onDeleteChat: (Chat) -> Unit,
     onSetChatFolder: (Chat, String?) -> Unit,
     onNavigate: (String) -> Unit,
-    onAbout: () -> Unit
+    onAbout: () -> Unit,
+    contentMatchIds: Set<String> = emptySet(),
+    onSearchTextChange: (String) -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
-    val isToolsRoute = currentRoute == "search" || currentRoute == "mcp"
-    val drawerAccent = MaterialTheme.colorScheme.primary
-    var toolsExpanded by remember(currentRoute) { mutableStateOf(isToolsRoute) }
+    androidx.compose.runtime.LaunchedEffect(query) { onSearchTextChange(query) }
+    // Use the sampled mint for the main drawer action, keeping text dark for legibility.
+    val drawerAccent = AriMenuMintStart
+    val folderNames = remember(chats) {
+        chats.mapNotNull { it.folder?.trim()?.takeIf(String::isNotEmpty) }
+            .distinctBy { it.lowercase() }
+            .sortedBy(String::lowercase)
+    }
 
-    val rows: List<DrawerRow> = remember(chats, query, UiLang.code) {
+    val rows: List<DrawerRow> = remember(chats, query, contentMatchIds, UiLang.code) {
         // Older databases may contain malformed chat rows. They must never produce a `chat/` route.
         val validChats = chats.filter { it.id.isNotBlank() }
-        val filtered = if (query.isBlank()) validChats else validChats.filter { it.title.contains(query, ignoreCase = true) }
+        val filtered = if (query.isBlank()) validChats else validChats.filter { it.title.contains(query, ignoreCase = true) || it.id in contentMatchIds }
         val out = mutableListOf<DrawerRow>()
         val pinned = filtered.filter { it.isPinned }
         if (pinned.isNotEmpty()) {
-            out += DrawerRow.Header("header:pinned", DayBucket.PINNED.label)
+            out += DrawerRow.Header("header:pinned", tx(ChatDateBucket.PINNED.labelKey))
             pinned.forEach { out += DrawerRow.ChatRow(it) }
         }
         val rest = filtered.filterNot { it.isPinned }.sortedByDescending { it.updatedAt }
-        val folders = rest.mapNotNull { it.folder?.trim()?.takeIf(String::isNotEmpty) }
-            .distinctBy { it.lowercase() }
-            .sortedBy(String::lowercase)
-        folders.forEach { folder ->
-            val group = rest.filter { it.folder?.trim().equals(folder, ignoreCase = true) }
-            if (group.isNotEmpty()) {
-                out += DrawerRow.Header("header:folder:$folder", folder)
-                group.forEach { out += DrawerRow.ChatRow(it) }
-            }
+        val chatsByFolder = rest.filter { !it.folder.isNullOrBlank() }
+            .groupBy { it.folder?.trim().orEmpty().lowercase() }
+        val folderLabels = chatsByFolder.mapValues { (_, group) -> group.first().folder?.trim().orEmpty() }
+        folderLabels.keys.sorted().forEach { folderKey ->
+            val folder = folderLabels.getValue(folderKey)
+            val group = chatsByFolder.getValue(folderKey)
+            out += DrawerRow.Header("header:folder:$folder", folder)
+            group.forEach { out += DrawerRow.ChatRow(it) }
         }
-        val unfiled = rest.filter { it.folder.isNullOrBlank() }
-        DayBucket.values().filter { it != DayBucket.PINNED }.forEach { bucket ->
-            val group = unfiled.filter { bucketOf(it.updatedAt) == bucket }
+        val unfiledByBucket = rest.filter { it.folder.isNullOrBlank() }
+            .groupBy { chatDateBucket(it.updatedAt) }
+        ChatDateBucket.values().filter { it != ChatDateBucket.PINNED }.forEach { bucket ->
+            val group = unfiledByBucket[bucket].orEmpty()
             if (group.isNotEmpty()) {
-                out += DrawerRow.Header("header:${bucket.name.lowercase()}", bucket.label)
+                out += DrawerRow.Header("header:${bucket.name.lowercase()}", tx(bucket.labelKey))
                 group.forEach { out += DrawerRow.ChatRow(it) }
             }
         }
@@ -137,10 +125,11 @@ fun ColumnScope.AppDrawerContent(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
-            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(15.dp)).background(AriTint),
+            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(15.dp))
+                .background(Brush.linearGradient(listOf(AriMenuMintStart, AriMenuBlueStart))),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = drawerAccent, modifier = Modifier.size(21.dp))
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text("AriAI", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp)
@@ -153,11 +142,14 @@ fun ColumnScope.AppDrawerContent(
         onClick = onNewChat,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
         shape = RoundedCornerShape(17.dp),
-        border = BorderStroke(1.dp, AriLine.copy(alpha = 0.72f)),
+        border = BorderStroke(1.dp, drawerAccent),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AriTint, contentColor = Ink)
+        colors = ButtonDefaults.buttonColors(
+            containerColor = drawerAccent,
+            contentColor = AriMenuInk
+        )
     ) {
-        Icon(Icons.Default.Add, contentDescription = null, tint = drawerAccent, modifier = Modifier.size(18.dp))
+        Icon(Icons.Default.Add, contentDescription = null, tint = AriMenuInk, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(tx("New chat"), fontWeight = FontWeight.SemiBold)
     }
@@ -167,12 +159,19 @@ fun ColumnScope.AppDrawerContent(
         onValueChange = { query = it },
         singleLine = true,
         placeholder = { Text(tx("Search conversations"), color = AriMuted, fontSize = 14.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriMuted, modifier = Modifier.size(18.dp)) },
+        leadingIcon = {
+            Box(
+                Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(DrawerBlueBrush),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+            }
+        },
         textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start, textDirection = TextDirection.ContentOrLtr),
         shape = RoundedCornerShape(17.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = AriTint,
-            unfocusedContainerColor = AriTint,
+            focusedContainerColor = AriPaper,
+            unfocusedContainerColor = AriPaper,
             focusedBorderColor = AriLine.copy(alpha = 0.78f),
             unfocusedBorderColor = AriLine.copy(alpha = 0.62f)
         ),
@@ -215,9 +214,7 @@ fun ColumnScope.AppDrawerContent(
                     onClick = { onChatClick(row.chat) },
                     onPin = { onPinChat(row.chat) },
                     onDelete = { onDeleteChat(row.chat) },
-                    folderNames = chats.mapNotNull { it.folder?.trim()?.takeIf(String::isNotEmpty) }
-                        .distinctBy { it.lowercase() }
-                        .sortedBy(String::lowercase),
+                    folderNames = folderNames,
                     onSetFolder = { folder -> onSetChatFolder(row.chat, folder) }
                 )
             }
@@ -229,7 +226,8 @@ fun ColumnScope.AppDrawerContent(
     // Local profile and active provider: no cloud account is implied.
     Surface(
         shape = RoundedCornerShape(18.dp),
-        color = AriTint,
+        color = AriPaper,
+        border = BorderStroke(1.dp, AriLine.copy(alpha = 0.72f)),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
             .clickable { onNavigate("workspace") }
     ) {
@@ -258,51 +256,18 @@ fun ColumnScope.AppDrawerContent(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
-        FooterAction(Icons.Default.FolderOpen, tx("Workspace"), currentRoute == "workspace") { onNavigate("workspace") }
-        FooterAction(Icons.Default.Person, tx("Agents & prompts"), currentRoute == "agents") { onNavigate("agents") }
-        FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers") { onNavigate("providers") }
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(if (isToolsRoute) AriTint else Color.Transparent)
-                .semantics { stateDescription = if (toolsExpanded) tx("Expanded") else tx("Collapsed") }
-                .clickable(role = Role.Button) { toolsExpanded = !toolsExpanded }
-                .heightIn(min = 48.dp)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Icon(
-                Icons.Default.Extension,
-                contentDescription = null,
-                tint = if (isToolsRoute) MaterialTheme.colorScheme.primary else AriMuted,
-                modifier = Modifier.size(21.dp)
-            )
-            Text(
-                tx("Tools"),
-                fontSize = 14.sp,
-                color = Ink,
-                fontWeight = if (isToolsRoute) FontWeight.SemiBold else FontWeight.Normal
-            )
-            Spacer(Modifier.weight(1f))
-            Icon(
-                if (toolsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint = AriMuted,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        if (toolsExpanded) {
-            Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                FooterAction(Icons.Default.Search, tx("Search"), currentRoute == "search") { onNavigate("search") }
-                FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp") { onNavigate("mcp") }
-            }
-        }
+        FooterAction(Icons.Default.FolderOpen, tx("Workspace"), currentRoute == "workspace", MenuIconTone.Mint) { onNavigate("workspace") }
+        FooterAction(Icons.Default.Person, tx("Agents & prompts"), currentRoute == "agents", MenuIconTone.Mint) { onNavigate("agents") }
+        FooterAction(Icons.Default.Search, tx("Search"), currentRoute == "search", MenuIconTone.Blue) { onNavigate("search") }
+        FooterAction(Icons.Default.Extension, "MCP", currentRoute == "mcp", MenuIconTone.Blue) { onNavigate("mcp") }
+        FooterAction(Icons.Default.Storage, tx("Providers"), currentRoute == "providers", MenuIconTone.Blue) { onNavigate("providers") }
         FooterAction(
             Icons.Default.Settings,
             tx("Settings"),
-            currentRoute in setOf("settings", "preferences", "default_model", "search_service", "storage")
+            currentRoute in setOf("settings", "preferences", "default_model", "search_service", "storage"),
+            MenuIconTone.Mint
         ) { onNavigate("settings") }
-        FooterAction(Icons.Default.Info, tx("About"), false, onAbout)
+        FooterAction(Icons.Default.Info, tx("About"), false, MenuIconTone.Blue, onAbout)
     }
     Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
 }
@@ -326,7 +291,7 @@ private fun ChatRowItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) AriTint.copy(alpha = 0.78f) else Color.Transparent)
+            .background(if (selected) AriMenuBlueStart.copy(alpha = 0.12f) else Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { if (selected) stateDescription = tx("Current chat") }
             .heightIn(min = 48.dp)
@@ -335,7 +300,7 @@ private fun ChatRowItem(
     ) {
         if (selected) {
             // A small brand-coloured marker keeps the open chat easy to find without a bright row fill.
-            Box(Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+            Box(Modifier.size(6.dp).clip(CircleShape).background(AriMenuBlueStart))
             Spacer(Modifier.width(8.dp))
         }
         if (chat.isPinned) {
@@ -355,25 +320,25 @@ private fun ChatRowItem(
             IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Default.MoreVert, contentDescription = tx("Chat options"), tint = Ink.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
             }
-            val menuShape = paperPopupShape(16.dp, 12.dp)
+            val menuShape = paperPopupShape(16.dp)
             DropdownMenu(
                 expanded = menu,
                 onDismissRequest = { menu = false },
-                modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape, 12.dp))
+                modifier = Modifier.background(AriCard, menuShape).then(paperPopupModifier(menuShape))
             ) {
                 DropdownMenuItem(
                     text = { Text(if (chat.isPinned) tx("Unpin") else tx("Pin")) },
-                    leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) },
+                    leadingIcon = { MenuIconBadge(Icons.Default.Star, MenuIconTone.Mint, badgeSize = 30.dp, iconSize = 16.dp) },
                     onClick = { menu = false; onPin() }
                 )
                 DropdownMenuItem(
                     text = { Text(tx("Move to folder")) },
-                    leadingIcon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
+                    leadingIcon = { MenuIconBadge(Icons.Default.FolderOpen, MenuIconTone.Blue, badgeSize = 30.dp, iconSize = 16.dp) },
                     onClick = { menu = false; folderName = chat.folder.orEmpty(); showFolderDialog = true }
                 )
                 DropdownMenuItem(
                     text = { Text(tx("Delete")) },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                    leadingIcon = { MenuIconBadge(Icons.Default.Delete, MenuIconTone.Danger, badgeSize = 30.dp, iconSize = 16.dp) },
                     onClick = { menu = false; confirmDelete = true }
                 )
             }
@@ -434,22 +399,23 @@ private fun ChatRowItem(
 }
 
 @Composable
-private fun FooterAction(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+private fun FooterAction(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    iconTone: MenuIconTone,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .background(if (selected) AriTint else Color.Transparent)
+            .background(if (selected) AriMenuBlueStart.copy(alpha = 0.10f) else Color.Transparent)
             .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = 48.dp)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else AriMuted,
-            modifier = Modifier.size(21.dp)
-        )
+        MenuIconBadge(icon, iconTone, badgeSize = 34.dp, iconSize = 18.dp)
         Text(
             label,
             fontSize = 14.sp,

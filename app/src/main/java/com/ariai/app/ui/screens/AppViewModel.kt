@@ -9,6 +9,7 @@ import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.supportsNativeSearch
 import com.ariai.app.data.remote.looksLikeVideoModel
 import com.ariai.app.data.remote.ChatFunctionTool
+import com.ariai.app.data.remote.ChatGenerationState
 import com.ariai.app.data.remote.ToolExecutionPhase
 import com.ariai.app.data.remote.ToolExecutionUpdate
 import com.ariai.app.data.remote.DefaultAgentTools
@@ -28,6 +29,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
@@ -105,6 +107,20 @@ class AppViewModel(
     val defaultModelId = prefs.defaultModelFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val streamResponse = prefs.streamResponseFlow.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val biometricLockEnabled = prefs.biometricLockEnabledFlow.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val drawerSearchText = MutableStateFlow("")
+
+    /** Chats whose messages match the drawer search. Titles are matched in the drawer itself. */
+    val drawerContentMatches: StateFlow<Set<String>> = drawerSearchText
+        .debounce(250)
+        .flatMapLatest { text ->
+            flow { emit(if (text.length < 2) emptySet<String>() else repository.chatIdsContaining(text)) }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet<String>())
+
+    fun setDrawerSearchText(text: String) {
+        drawerSearchText.value = text.trim()
+    }
+
     val fontSize = prefs.fontSizeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 15)
     val reasoningLevel = prefs.reasoningLevelFlow.map { ReasoningLevel.fromName(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ReasoningLevel.OFF)
@@ -184,12 +200,14 @@ class AppViewModel(
     val messages = _messages.asStateFlow()
 
     private val _isStreaming = MutableStateFlow(false)
+    private val _generationState = MutableStateFlow<ChatGenerationState>(ChatGenerationState.Idle)
+    val generationState = _generationState.asStateFlow()
     private val _isSending = MutableStateFlow(false)
     val isSending = _isSending.asStateFlow()
     private val _toolExecutionUpdates = MutableStateFlow<List<ToolExecutionUpdate>>(emptyList())
     val toolExecutionUpdates = _toolExecutionUpdates.asStateFlow()
     private var sendPending = false
-    private val RECENT_MESSAGES_FOR_MODEL = 20
+    private val RECENT_MESSAGES_FOR_MODEL = 10
     private var sendJob: Job? = null
     private var sendGeneration = 0L
     private var historyCompressionJob: Job? = null
@@ -199,6 +217,7 @@ class AppViewModel(
 
     private fun launchSendJob(block: suspend (Long) -> Unit) {
         _toolExecutionUpdates.value = emptyList()
+        _generationState.value = ChatGenerationState.Idle
         val generation = ++sendGeneration
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) { block(generation) }
         sendJob = job
@@ -220,9 +239,10 @@ class AppViewModel(
         _isSending.value = false
         _isStreaming.value = false
         _streamingContent.value = ""
+        _generationState.value = ChatGenerationState.Idle
         _toolExecutionUpdates.update { updates ->
             updates.map { update ->
-                if (update.phase == ToolExecutionPhase.RUNNING) update.copy(phase = ToolExecutionPhase.CANCELLED) else update
+                if (update.phase.isActive) update.copy(phase = ToolExecutionPhase.CANCELLED) else update
             }
         }
         job.cancel()
@@ -234,6 +254,7 @@ class AppViewModel(
         historyCompressionJob = null
         _isStreaming.value = false
         _streamingContent.value = ""
+        _generationState.value = ChatGenerationState.Idle
         job.cancel()
     }
 
@@ -647,33 +668,11 @@ class AppViewModel(
         }
     }
 
+    /** Newest turns that fit the model's budget (see [recentMessagesForModel]). */
+    private fun recentForModel(history: List<ChatMessage>, contextWindow: Int): List<ChatMessage> =
+        recentMessagesForModel(history, contextWindow, RECENT_MESSAGES_FOR_MODEL, MAX_MEDIA_BYTES_PER_REQUEST)
+
     /** Summary of older turns (if any) and the messages that still go to the model. */
-    /** Keeps the newest turns within a conservative estimate of the selected model's context. */
-    private fun recentForModel(history: List<ChatMessage>, contextWindow: Int): List<ChatMessage> {
-        val tokenBudget = ((contextWindow.takeIf { it > 0 } ?: 8192) * 3L / 4L).coerceAtLeast(1024L)
-        val mediaByteBudget = MAX_MEDIA_BYTES_PER_REQUEST
-        var used = 0L
-        var usedMediaBytes = 0L
-        val newestFirst = mutableListOf<ChatMessage>()
-        for (message in history.takeLast(RECENT_MESSAGES_FOR_MODEL).asReversed()) {
-            val estimate = estimateMessageTokens(message)
-            val messageMediaBytes = message.attachments.sumOf { it.estimatedBytes() }
-            if (newestFirst.isNotEmpty() &&
-                (used + estimate > tokenBudget || usedMediaBytes + messageMediaBytes > mediaByteBudget)
-            ) break
-            newestFirst += message
-            used += estimate
-            usedMediaBytes += messageMediaBytes
-        }
-        // Most providers expect the conversation to start with a user message.
-        return newestFirst.asReversed().dropWhile { it.role != MessageRole.USER }
-    }
-
-    private fun Attachment.estimatedBytes(): Long =
-        base64Data?.length?.toLong()?.times(3L)?.div(4L)
-            ?: uri?.let { runCatching { java.io.File(it).length() }.getOrDefault(0L) }
-            ?: 0L
-
     private fun activeContext(all: List<ChatMessage>): Pair<String?, List<ChatMessage>> {
         val idx = all.indexOfLast { it.role == MessageRole.SYSTEM }
         val summary = if (idx >= 0) all[idx].content else null
@@ -802,6 +801,7 @@ class AppViewModel(
         val providerId = chatId?.let { _modelOverrides.value[it]?.first } ?: chat?.providerId
         resolveEnabledProvider(providers.value, providerId)
     } catch (e: Exception) {
+        com.ariai.app.util.AppLog.warn(e, "resolve provider")
         null
     }
 
@@ -958,18 +958,27 @@ class AppViewModel(
         if (sendGeneration != generation) return
         _isStreaming.value = streaming
         _streamingContent.value = content
+        _generationState.value = if (streaming) ChatGenerationState.Streaming else ChatGenerationState.Idle
     }
 
     private fun setSendStreamingContent(generation: Long, content: String) {
-        if (sendGeneration == generation) _streamingContent.value = content
+        if (sendGeneration != generation) return
+        _streamingContent.value = content
+        if (_isStreaming.value && content.isNotEmpty()) _generationState.value = ChatGenerationState.Streaming
     }
-
 
     private fun publishToolExecutionUpdate(chatId: String, generation: Long, update: ToolExecutionUpdate) {
         if (sendGeneration != generation || _currentChatId.value != chatId) return
         _toolExecutionUpdates.update { updates ->
             val index = updates.indexOfFirst { it.callId == update.callId }
             if (index < 0) updates + update else updates.toMutableList().also { it[index] = update }
+        }
+        _generationState.value = when (update.phase) {
+            ToolExecutionPhase.CALLING -> ChatGenerationState.ToolCalling(update.toolName)
+            ToolExecutionPhase.RUNNING -> ChatGenerationState.ToolExecuting(update.toolName)
+            ToolExecutionPhase.COMPLETED -> ChatGenerationState.ToolCompleted
+            ToolExecutionPhase.FAILED -> if (_isSending.value) ChatGenerationState.Streaming else ChatGenerationState.Idle
+            ToolExecutionPhase.CANCELLED -> ChatGenerationState.Idle
         }
     }
 
@@ -1387,13 +1396,19 @@ class AppViewModel(
                                 }
                                 val connectionProgressId = "mcp-connection:${server.id}"
                                 val connectionStartedAt = System.nanoTime()
-                                publishToolExecutionUpdate(
-                                    chatId,
-                                    generation,
-                                    ToolExecutionUpdate(connectionProgressId, "Connecting to MCP", ToolExecutionPhase.RUNNING)
-                                )
                                 var requestServer = server
                                 try {
+                                    publishToolExecutionUpdate(
+                                        chatId,
+                                        generation,
+                                        ToolExecutionUpdate(connectionProgressId, "Connecting to MCP", ToolExecutionPhase.CALLING)
+                                    )
+                                    yield()
+                                    publishToolExecutionUpdate(
+                                        chatId,
+                                        generation,
+                                        ToolExecutionUpdate(connectionProgressId, "Connecting to MCP", ToolExecutionPhase.RUNNING)
+                                    )
                                     requestServer = serverForMcpRequest(server)
                                     val connection = mcpClient.connect(requestServer)
                                     mcpConnectionsForTurn += connection
@@ -1418,6 +1433,21 @@ class AppViewModel(
                                         ))
                                     }
                                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                    val connectionElapsedMs = ((System.nanoTime() - connectionStartedAt) / 1_000_000L).coerceAtLeast(0L)
+                                    publishToolExecutionUpdate(
+                                        chatId,
+                                        generation,
+                                        ToolExecutionUpdate(
+                                            connectionProgressId,
+                                            "Connecting to MCP",
+                                            ToolExecutionPhase.CANCELLED,
+                                            connectionElapsedMs
+                                        )
+                                    )
+                                    _mcpServerRuntime.update { states ->
+                                        val state = states[server.id] ?: McpServerRuntimeState()
+                                        states + (server.id to state.copy(isConnecting = false))
+                                    }
                                     throw cancelled
                                 } catch (failure: Exception) {
                                     val connectionElapsedMs = ((System.nanoTime() - connectionStartedAt) / 1_000_000L).coerceAtLeast(0L)
@@ -1516,6 +1546,11 @@ class AppViewModel(
                             onUsage = recordUsage
                         ).collect { event ->
                             when (event) {
+                                AgentChatEvent.ModelStepStarted -> {
+                                    if (sendGeneration == generation && _currentChatId.value == chatId) {
+                                        _generationState.value = ChatGenerationState.Streaming
+                                    }
+                                }
                                 is AgentChatEvent.TextDelta -> {
                                     streamedPreview += event.text
                                     val now = System.currentTimeMillis()

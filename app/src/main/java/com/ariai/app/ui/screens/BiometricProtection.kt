@@ -78,7 +78,8 @@ internal suspend fun authenticateSensitiveSettings(activity: FragmentActivity): 
                 infoBuilder.setNegativeButtonText(tx("Cancel"))
             }
             prompt.authenticate(infoBuilder.build())
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            com.ariai.app.util.AppLog.warn(e, "BiometricProtection.kt")
             finish(false)
         }
     }

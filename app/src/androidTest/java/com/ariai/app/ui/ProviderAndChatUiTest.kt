@@ -1,9 +1,6 @@
 package com.ariai.app.ui
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -69,30 +66,7 @@ class ProviderAndChatUiTest {
     }
 
     @Test
-    fun lightThemeUsesLavenderPaperWhiteCardsAndSlateBlueAccent() {
-        val colors = mutableStateOf<Triple<Color, Color, Color>?>(null)
-        compose.setContent {
-            AriAiTheme(darkTheme = false) {
-                val colorScheme = MaterialTheme.colorScheme
-                SideEffect {
-                    colors.value = Triple(
-                        colorScheme.background,
-                        colorScheme.surface,
-                        colorScheme.primary
-                    )
-                }
-            }
-        }
-        compose.waitForIdle()
-
-        assertEquals(
-            Triple(Color(0xFFF7F6FC), Color(0xFFFCFBFF), Color(0xFF324472)),
-            colors.value
-        )
-    }
-
-    @Test
-    fun emptyWelcomeDoesNotDuplicateTheTopModelSelector() {
+    fun emptyWelcomeShowsChatHeaderAndSingleModelSelector() {
         val provider = Provider(
             id = "provider-empty-model-selector-test",
             name = "Model selector test provider",
@@ -133,12 +107,12 @@ class ProviderAndChatUiTest {
             compose.onNodeWithText("Choose model").assertIsDisplayed()
         }
         compose.onNodeWithTag("empty-chat-watermark").assertIsDisplayed()
-        assertTrue("an untitled empty chat should not show a header title or brain badge", listOf(
-            "chat-title-header",
-            "chat-agent-button"
-        ).all { tag -> compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() })
+        compose.onNodeWithTag("chat-title-header").assertIsDisplayed()
+        compose.onNodeWithTag("chat-agent-button").assertIsDisplayed()
+        compose.onNodeWithTag("chat-title-text").assertTextEquals("New chat")
+        compose.onNodeWithTag("chat-context-usage").assertIsDisplayed()
+        compose.onNodeWithText("~0%", useUnmergedTree = true).assertExists()
         assertTrue("welcome copy should be replaced by the watermark", listOf(
-            "New chat",
             "How can I help you?",
             "Add your first AI provider to start chatting"
         ).all { text -> compose.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty() })

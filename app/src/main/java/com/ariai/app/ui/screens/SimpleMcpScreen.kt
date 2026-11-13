@@ -412,8 +412,10 @@ private fun AddMcpServerSheet(
         shape = paperSheetShape(28.dp),
         skipPartiallyExpanded = true
     ) {
+        val sheetScrollState = rememberScrollState()
+        ClearFocusOnScroll(sheetScrollState)
         Column(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 760.dp).verticalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxWidth().heightIn(max = 760.dp).verticalScroll(sheetScrollState)
                 .imePadding().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(13.dp)
         ) {

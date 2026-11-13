@@ -1,5 +1,6 @@
 package com.ariai.app.ui.screens
 
+import com.ariai.app.data.models.Attachment
 import com.ariai.app.data.models.AttachmentType
 import com.ariai.app.data.models.ChatMessage
 import com.ariai.app.data.models.MessageRole
@@ -47,3 +48,34 @@ internal fun summaryMarkerTimestamp(all: List<ChatMessage>, firstRetained: ChatM
     if (gap <= 1L) return null
     return lower + gap / 2L
 }
+
+/** Newest turns that fit the request budget, at most [maxMessages] and [maxMediaBytes] of attached media. */
+internal fun recentMessagesForModel(
+    history: List<ChatMessage>,
+    contextWindow: Int,
+    maxMessages: Int,
+    maxMediaBytes: Long
+): List<ChatMessage> {
+    val tokenBudget = ((contextWindow.takeIf { it > 0 } ?: 8192) * 3L / 4L).coerceAtLeast(1024L)
+    var used = 0L
+    var usedMediaBytes = 0L
+    val newestFirst = mutableListOf<ChatMessage>()
+    for (message in history.takeLast(maxMessages).asReversed()) {
+        val estimate = estimateMessageTokens(message)
+        val messageMediaBytes = message.attachments.sumOf { it.estimatedBytes() }
+        if (newestFirst.isNotEmpty() &&
+            (used + estimate > tokenBudget || usedMediaBytes + messageMediaBytes > maxMediaBytes)
+        ) break
+        newestFirst += message
+        used += estimate
+        usedMediaBytes += messageMediaBytes
+    }
+    // Most providers expect the conversation to start with a user message.
+    return newestFirst.asReversed().dropWhile { it.role != MessageRole.USER }
+}
+
+/** Approximate bytes this attachment adds to a request: its base64 payload, or the size of a local file. */
+internal fun Attachment.estimatedBytes(): Long =
+    base64Data?.length?.toLong()?.times(3L)?.div(4L)
+        ?: uri?.let { runCatching { java.io.File(it).length() }.getOrDefault(0L) }
+        ?: 0L

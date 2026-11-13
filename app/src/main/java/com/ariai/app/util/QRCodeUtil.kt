@@ -3,6 +3,8 @@ package com.ariai.app.util
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import com.ariai.app.data.models.Provider
+import com.ariai.app.data.models.providerFromJson
+import com.ariai.app.data.models.providerToJson as serializeProviderTransfer
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -10,39 +12,12 @@ import com.google.zxing.MultiFormatReader
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeWriter
-import org.json.JSONObject
 
 object QRCodeUtil {
-    fun providerToJson(provider: Provider): String {
-        return JSONObject().apply {
-            put("name", provider.name)
-            put("type", provider.type.name)
-            put("baseUrl", provider.baseUrl)
-            put("apiKey", provider.apiKey)
-            put("customHeaders", JSONObject(provider.customHeaders))
-        }.toString()
-    }
+    /** The explicit transfer representation is typed; ordinary Provider serialization omits credentials. */
+    fun providerToJson(provider: Provider): String = serializeProviderTransfer(provider)
 
-    fun jsonToProvider(jsonStr: String): Provider? {
-        return try {
-            val json = JSONObject(jsonStr)
-            Provider(
-                name = json.getString("name"),
-                type = com.ariai.app.data.models.ProviderType.valueOf(json.getString("type")),
-                baseUrl = json.getString("baseUrl"),
-                apiKey = json.getString("apiKey"),
-                customHeaders = json.optJSONObject("customHeaders")?.let { obj ->
-                    val map = mutableMapOf<String, String>()
-                    obj.keys().forEach { key ->
-                        map[key] = obj.getString(key)
-                    }
-                    map
-                } ?: emptyMap()
-            )
-        } catch (e: Exception) {
-            null
-        }
-    }
+    fun jsonToProvider(jsonStr: String): Provider? = providerFromJson(jsonStr)
 
     /** Decodes a QR code from an image bitmap, trying common camera/gallery rotations. */
     fun decodeQRCode(bitmap: Bitmap): String? {
@@ -69,7 +44,8 @@ object QRCodeUtil {
                 val source = RGBLuminanceSource(candidate.width, candidate.height, pixels)
                 val result = MultiFormatReader().decode(BinaryBitmap(HybridBinarizer(source)), hints)
                 return result.text
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                com.ariai.app.util.AppLog.warn(e, "QRCodeUtil.kt")
                 // The image may be rotated or may not contain a QR code; try the next orientation.
             } finally {
                 if (candidate !== bitmap) candidate.recycle()
