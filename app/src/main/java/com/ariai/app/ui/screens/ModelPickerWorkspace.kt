@@ -53,14 +53,14 @@ import com.ariai.app.util.tx
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-private const val OTHER_MODELS_KEY = "other-models"
+internal const val OTHER_MODELS_KEY = "other-models"
 
-private data class PickerModelEntry(
+internal data class PickerModelEntry(
     val provider: Provider,
     val model: AIModel
 )
 
-private data class PickerModelGroup(
+internal data class PickerModelGroup(
     val key: String,
     val title: String,
     val entries: List<PickerModelEntry>
