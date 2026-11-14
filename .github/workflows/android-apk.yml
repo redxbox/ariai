@@ -156,3 +156,14 @@ jobs:
             echo 'Download the **ariai-debug-apk** artifact from this workflow run, unzip it, and install `app-debug.apk` on your Android device.'
             echo 'Android may ask you to allow installation from your browser or file manager.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Compile instrumented tests (after the APK is uploaded)
+        run: |
+          set +e
+          ./gradlew :app:compileDebugAndroidTest --stacktrace > androidtest-compile.log 2>&1
+          rc=$?
+          # Surface each compiler error as an annotation so it can be read without the raw log.
+          grep -E "^e: " androidtest-compile.log | head -80 | while IFS= read -r line; do
+            echo "::error title=androidTest compile::$(echo "$line" | cut -c1-500)"
+          done
+          exit $rc
