@@ -1,6 +1,6 @@
 # Offline OCR notices
 
-AriAI bundles the following open-source components for Persian/English on-device PDF OCR:
+AriAi bundles the following open-source components for Persian/English on-device PDF OCR:
 
 - **Tesseract4Android 4.9.0** by Adaptech s.r.o. and contributors, distributed via JitPack (<https://github.com/adaptech-cz/Tesseract4Android>): Apache License 2.0.
 - **Tesseract OCR 5.5.1**: Apache License 2.0.
