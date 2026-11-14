@@ -160,7 +160,7 @@ jobs:
       - name: Compile instrumented tests (after the APK is uploaded)
         run: |
           set +e
-          ./gradlew :app:compileDebugAndroidTest --stacktrace > androidtest-compile.log 2>&1
+          ./gradlew :app:compileDebugAndroidTestKotlin --stacktrace > androidtest-compile.log 2>&1
           rc=$?
           # Surface each compiler error as an annotation so it can be read without the raw log.
           grep -E -A2 "^e: |What went wrong|Execution failed|Could not|Caused by|error:|FAILURE" androidtest-compile.log \
