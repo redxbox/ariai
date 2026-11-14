@@ -58,7 +58,7 @@ fun looksLikeAudioModel(id: String): Boolean = audioModelName.containsMatchIn(id
 /**
  * Some relays only accept requests from known clients. AgentRouter rejects the default OkHttp
  * User-Agent with 401 even when the key is valid. The MIA Router model-catalog probe succeeds
- * with AriAI's explicit identity, so keep in-app requests consistent with that probe. Other hosts
+ * with AriAi's explicit identity, so keep in-app requests consistent with that probe. Other hosts
  * retain OkHttp's default identity.
  */
 internal fun applyProviderClientIdentity(request: Request): Request {
@@ -67,7 +67,7 @@ internal fun applyProviderClientIdentity(request: Request): Request {
         host == "agentrouter.org" || host.endsWith(".agentrouter.org") ->
             request.newBuilder().header("User-Agent", "opencode/1.18.31 (android; okhttp)").build()
         host == "miarouter.online" || host.endsWith(".miarouter.online") -> {
-            val builder = request.newBuilder().header("User-Agent", "AriAI-Android")
+            val builder = request.newBuilder().header("User-Agent", "AriAi-Android")
             if (request.method == "GET" && request.header("Accept") == null) {
                 builder.header("Accept", "application/json")
             }
@@ -137,7 +137,7 @@ internal sealed interface AgentStepStreamEvent {
     data class Completed(val step: AgentStep) : AgentStepStreamEvent
 }
 
-/** Accumulates the three provider streaming dialects used by AriAI. */
+/** Accumulates the three provider streaming dialects used by AriAi. */
 internal class AgentStepStreamAccumulator(private val providerType: ProviderType) {
     private data class ToolCallBuilder(
         val id: StringBuilder = StringBuilder(),

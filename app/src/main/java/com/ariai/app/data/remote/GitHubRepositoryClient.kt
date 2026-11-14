@@ -186,7 +186,7 @@ class GitHubRepositoryClient {
             .url(url)
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "AriAI-Android")
+            .header("User-Agent", "AriAi-Android")
             .get()
             .build()
         return executeCancellable(request).use { response ->

@@ -132,7 +132,7 @@ fun ColumnScope.AppDrawerContent(
             Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text("AriAI", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+            Text("AriAi", color = Ink, fontWeight = FontWeight.Bold, fontSize = 19.sp)
             Text(tx("Your AI, your way"), color = AriMuted, fontSize = 11.sp)
         }
         Box(Modifier.size(8.dp).clip(CircleShape).background(AriMuted.copy(alpha = 0.55f)))

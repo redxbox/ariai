@@ -68,7 +68,7 @@ class ChatConfigurationPersistenceTest {
                 temperature = 0.4f,
                 topP = 0.8f,
                 tools = listOf(AgentTool.CALCULATOR, AgentTool.WEB_SEARCH),
-                promptVariables = mapOf("project" to "AriAI"),
+                promptVariables = mapOf("project" to "AriAi"),
                 examples = listOf("Review this screen", "Suggest accessibility fixes")
             )
             repository.saveAgent(agent)

@@ -188,7 +188,7 @@ private fun providerMarkKind(type: ProviderType?, name: String?): ProviderMarkKi
     }
 }
 
-/** A small, original neural-brain mark with connected binary-style nodes for AriAI. */
+/** A small, original neural-brain mark with connected binary-style nodes for AriAi. */
 @Composable
 fun AriBinaryBrainMark(
     modifier: Modifier = Modifier,

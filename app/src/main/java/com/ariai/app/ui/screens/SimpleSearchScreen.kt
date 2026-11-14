@@ -91,7 +91,7 @@ fun SimpleSearchScreen(
                         value = query,
                         onValueChange = { query = it },
                         enabled = canSearch,
-                        placeholder = { Text(tx("Ask AriAI with web search"), color = AriInk.copy(alpha = 0.4f)) },
+                        placeholder = { Text(tx("Ask AriAi with web search"), color = AriInk.copy(alpha = 0.4f)) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AriInk.copy(alpha = 0.4f)) },
                         textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Start, textDirection = TextDirection.ContentOrLtr),
                         trailingIcon = {

@@ -152,7 +152,7 @@ jobs:
         if: success()
         run: |
           {
-            echo '## Install AriAI'
+            echo '## Install AriAi'
             echo 'Download the **ariai-debug-apk** artifact from this workflow run, unzip it, and install `app-debug.apk` on your Android device.'
             echo 'Android may ask you to allow installation from your browser or file manager.'
           } >> "$GITHUB_STEP_SUMMARY"

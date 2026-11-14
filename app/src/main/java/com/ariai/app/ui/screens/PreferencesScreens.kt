@@ -120,7 +120,7 @@ fun PreferencesScreen(
                         HorizontalDivider(color = AriLine.copy(alpha = 0.65f))
                         SwitchRow(
                             title = tx("Dynamic colors"),
-                            subtitle = tx("Use colors from your wallpaper while keeping AriAI's paper surfaces."),
+                            subtitle = tx("Use colors from your wallpaper while keeping AriAi's paper surfaces."),
                             checked = dynamicColor,
                             onChange = onDynamicColorChange
                         )

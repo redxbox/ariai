@@ -7,7 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
 
-/** MCP transports supported by AriAI's remote-client implementation. */
+/** MCP transports supported by AriAi's remote-client implementation. */
 @Serializable
 enum class McpTransport(val label: String) {
     SSE("SSE (legacy)"),

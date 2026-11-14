@@ -23,14 +23,14 @@ class SearchClientTest {
         val client = clientFor(server, SearchProviderType.TAVILY, "/tavily")
 
         val response = runBlocking {
-            client.search("AriAI search", SearchProvider(name = "Tavily", type = SearchProviderType.TAVILY, apiKey = "tavily-secret"))
+            client.search("AriAi search", SearchProvider(name = "Tavily", type = SearchProviderType.TAVILY, apiKey = "tavily-secret"))
         }
         val request = server.takeRequest()
         val body = JSONObject(request.body.readUtf8())
 
         assertEquals("POST", request.method)
         assertEquals("/tavily", request.requestUrl?.encodedPath)
-        assertEquals("AriAI search", body.getString("query"))
+        assertEquals("AriAi search", body.getString("query"))
         assertEquals("tavily-secret", body.getString("api_key"))
         assertEquals("A result", response.results.single().title)
         assertEquals("https://example.test/a", response.results.single().url)

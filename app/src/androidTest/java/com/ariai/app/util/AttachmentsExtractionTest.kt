@@ -39,13 +39,13 @@ class AttachmentsExtractionTest {
                     stream.beginText()
                     stream.setFont(PDType1Font.HELVETICA, 12f)
                     stream.newLineAtOffset(72f, 720f)
-                    stream.showText("AriAI PDF extraction")
+                    stream.showText("AriAi PDF extraction")
                     stream.endText()
                 }
                 document.save(pdf)
             }
 
-            assertEquals("AriAI PDF extraction", extractPdfTextFromFile(context, pdf))
+            assertEquals("AriAi PDF extraction", extractPdfTextFromFile(context, pdf))
         } finally {
             pdf.delete()
         }

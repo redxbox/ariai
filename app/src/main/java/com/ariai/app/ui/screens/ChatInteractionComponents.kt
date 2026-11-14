@@ -172,7 +172,7 @@ internal fun FullScreenMessageEditor(
                 TextField(
                     value = text,
                     onValueChange = onTextChange,
-                    placeholder = { Text(tx("Message AriAI"), color = Muted) },
+                    placeholder = { Text(tx("Message AriAi"), color = Muted) },
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,

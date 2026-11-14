@@ -4,8 +4,8 @@ import android.util.Log
 
 /** Records errors that are safe to ignore for the user, so they stay visible to developers. */
 object AppLog {
-    fun warn(e: Throwable, where: String = "AriAI") {
+    fun warn(e: Throwable, where: String = "AriAi") {
         // Logging must never fail the caller (unit tests run without Android's Log implementation).
-        runCatching { Log.w("AriAI", where, e) }
+        runCatching { Log.w("AriAi", where, e) }
     }
 }

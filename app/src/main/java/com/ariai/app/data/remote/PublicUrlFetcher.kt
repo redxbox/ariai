@@ -88,7 +88,7 @@ class PublicUrlFetcher {
         repeat(MAX_REDIRECTS + 1) { redirectCount ->
             val request = Request.Builder()
                 .url(current.toASCIIString())
-                .header("User-Agent", "AriAI/1.0 (image preview)")
+                .header("User-Agent", "AriAi/1.0 (image preview)")
                 .header("Accept", "image/png,image/jpeg,image/webp,image/gif")
                 .get()
                 .build()
@@ -123,7 +123,7 @@ class PublicUrlFetcher {
         repeat(MAX_REDIRECTS + 1) { redirectCount ->
             val request = Request.Builder()
                 .url(current.toASCIIString())
-                .header("User-Agent", "AriAI/1.0 (public URL reader)")
+                .header("User-Agent", "AriAi/1.0 (public URL reader)")
                 .header("Accept", "text/html,text/plain,application/json,application/xml,text/markdown;q=0.9,*/*;q=0.2")
                 .get()
                 .build()

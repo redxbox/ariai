@@ -66,7 +66,7 @@ live_wait_for_composer() {
   local timeout_seconds="${1:-30}"
   local deadline=$((SECONDS + timeout_seconds))
   while (( SECONDS < deadline )); do
-    if live_assert "Message AriAI" || live_assert "How can I help you?"; then
+    if live_assert "Message AriAi" || live_assert "How can I help you?"; then
       echo "Reached live-test chat composer."
       return 0
     fi
@@ -77,8 +77,8 @@ live_wait_for_composer() {
 }
 
 live_tap_composer() {
-  if live_assert "Message AriAI"; then
-    live_tap "Message AriAI"
+  if live_assert "Message AriAi"; then
+    live_tap "Message AriAi"
   elif live_assert "How can I help you?"; then
     live_tap "How can I help you?"
   else
@@ -229,7 +229,7 @@ request = urllib.request.Request(
     headers={
         "Accept": "application/json",
         "Authorization": "Bearer " + key,
-        "User-Agent": "AriAI-Android",
+        "User-Agent": "AriAi-Android",
     },
 )
 try:
@@ -386,7 +386,7 @@ printf 'Testing model discovery at %s (credential value hidden).\n' "$BASE_URL"
 adb_quiet shell am force-stop "$PKG"
 adb_quiet shell pm clear "$PKG"
 adb_quiet shell am start -W -n "$PKG/.MainActivity"
-live_wait_for_text "Message AriAI" 120
+live_wait_for_text "Message AriAi" 120
 
 live_tap "Open menu"
 live_tap "Providers"

@@ -31,7 +31,7 @@ data class OAuth2Config(
         if (!isValidOAuth2Endpoint(value.authorizationEndpoint)) return "The authorization endpoint must be HTTPS and cannot contain credentials, query parameters, or fragments."
         if (!isValidOAuth2Endpoint(value.tokenEndpoint)) return "The token endpoint must be HTTPS and cannot contain credentials, query parameters, or fragments."
         if (value.scopes.length > MAX_SCOPES_LENGTH || value.scopes.any { it.code < 0x20 }) return "OAuth scopes are too long or contain invalid characters."
-        if (value.redirectUri != DEFAULT_REDIRECT_URI) return "Use AriAI's registered redirect URI: $DEFAULT_REDIRECT_URI"
+        if (value.redirectUri != DEFAULT_REDIRECT_URI) return "Use AriAi's registered redirect URI: $DEFAULT_REDIRECT_URI"
         return null
     }
 

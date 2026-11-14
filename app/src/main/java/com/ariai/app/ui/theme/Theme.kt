@@ -63,7 +63,7 @@ private val LightColorScheme = lightColorScheme(
     error = AriError
 )
 
-// A softer, more continuous corner rhythm for AriAI's main surfaces and controls.
+// A softer, more continuous corner rhythm for AriAi's main surfaces and controls.
 private val AriShapes = Shapes(
     extraSmall = RoundedCornerShape(10.dp),
     small = RoundedCornerShape(16.dp),
@@ -87,7 +87,7 @@ fun AriAiTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
-    // Dynamic accents remain user-controlled; AriAI keeps neutral paper and mint-tinted surfaces.
+    // Dynamic accents remain user-controlled; AriAi keeps neutral paper and mint-tinted surfaces.
     val colorScheme = baseScheme.copy(
         background = palette.paper,
         surface = palette.card,

@@ -336,7 +336,7 @@ class MCPClient(
                 put("protocolVersion", MCP_PROTOCOL_VERSION)
                 put("capabilities", buildJsonObject {})
                 put("clientInfo", buildJsonObject {
-                    put("name", "AriAI")
+                    put("name", "AriAi")
                     put("version", CLIENT_VERSION)
                 })
             })

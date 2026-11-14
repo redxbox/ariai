@@ -176,7 +176,7 @@ fun WorkspaceScreen(
                         notice = ""
                         showGenerateDialog = true
                     }) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = tx("Generate with AriAI"), tint = AriInk)
+                        Icon(Icons.Default.AutoAwesome, contentDescription = tx("Generate with AriAi"), tint = AriInk)
                     }
                     IconButton(onClick = { newFileName = ""; notice = ""; showCreateDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = tx("New file"), tint = AriInk)
@@ -190,7 +190,7 @@ fun WorkspaceScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                tx("Files stay in AriAI's private on-device workspace."),
+                tx("Files stay in AriAi's private on-device workspace."),
                 color = AriMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 2.dp)
@@ -565,7 +565,7 @@ private fun starterContent(name: String): String = when (name.substringAfterLast
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AriAI workspace</title>
+  <title>AriAi workspace</title>
   <style>body { font: 16px sans-serif; padding: 2rem; }</style>
 </head>
 <body>

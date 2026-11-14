@@ -125,7 +125,7 @@ internal fun ChatComposerBar(
                         placeholder = {
                             Text(
                                 activeAgent?.name?.takeIf { it.isNotBlank() }?.let { "${tx("Message")} $it" }
-                                    ?: tx("Message AriAI"),
+                                    ?: tx("Message AriAi"),
                                 color = Muted
                             )
                         },

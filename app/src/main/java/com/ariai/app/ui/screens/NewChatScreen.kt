@@ -523,7 +523,7 @@ fun NewChatScreen(
                     val values = ContentValues().apply {
                         put(MediaStore.Images.Media.DISPLAY_NAME, "ariai_${System.currentTimeMillis()}.$extension")
                         put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AriAI")
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AriAi")
                     }
                     val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                         ?: throw java.io.IOException("Could not create image in MediaStore")
@@ -542,7 +542,7 @@ fun NewChatScreen(
             } catch (e: Exception) {
                 Result.failure(e)
             }
-            result.onSuccess { showNote(tx("Saved to Pictures/AriAI")) }
+            result.onSuccess { showNote(tx("Saved to Pictures/AriAi")) }
                 .onFailure { showNote(tx("Save failed")) }
         }
     }

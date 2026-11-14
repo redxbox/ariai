@@ -38,7 +38,7 @@ internal class AppCrashHandler(
             val temporaryFile = File(parent, "${reportFile.name}.tmp")
             FileOutputStream(temporaryFile).bufferedWriter(StandardCharsets.UTF_8).use { writer ->
                 val header = buildString {
-                    appendLine("AriAI crash report")
+                    appendLine("AriAi crash report")
                     appendLine("Time: ${System.currentTimeMillis()}")
                     appendLine("Thread: ${thread.name.take(MAX_THREAD_NAME_CHARS)}")
                     appendLine()

@@ -16,7 +16,7 @@ class AIClientIdentityTest {
 
         val identified = applyProviderClientIdentity(request)
 
-        assertEquals("AriAI-Android", identified.header("User-Agent"))
+        assertEquals("AriAi-Android", identified.header("User-Agent"))
         assertEquals("application/json", identified.header("Accept"))
     }
 
@@ -30,7 +30,7 @@ class AIClientIdentityTest {
 
         val identified = applyProviderClientIdentity(request)
 
-        assertEquals("AriAI-Android", identified.header("User-Agent"))
+        assertEquals("AriAi-Android", identified.header("User-Agent"))
         assertEquals("text/event-stream, application/json", identified.header("Accept"))
     }
 

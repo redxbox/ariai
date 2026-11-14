@@ -60,7 +60,7 @@ internal fun EmptyChatWelcome(
         ) {
             if (activeAgent == null) {
                 Text(
-                    text = "AriAI",
+                    text = "AriAi",
                     modifier = Modifier.testTag("empty-chat-watermark"),
                     color = Ink.copy(alpha = 0.16f),
                     fontWeight = FontWeight.Medium,

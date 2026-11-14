@@ -128,7 +128,7 @@ fun SimpleSettingsScreen(
                             icon = Icons.Default.Info,
                             tint = AriMenuInk,
                             iconBrush = SettingsBlueBrush,
-                            title = tx("About AriAI"),
+                            title = tx("About AriAi"),
                             subtitle = "${tx("Version")} ${BuildConfig.VERSION_NAME}",
                             onClick = onAboutClick
                         )
@@ -138,7 +138,7 @@ fun SimpleSettingsScreen(
                             tint = AriMenuInk,
                             iconBrush = SettingsBlueBrush,
                             title = tx("Privacy policy"),
-                            subtitle = tx("How AriAI handles your data"),
+                            subtitle = tx("How AriAi handles your data"),
                             onClick = onPrivacyPolicyClick
                         )
                     }

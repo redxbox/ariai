@@ -769,7 +769,7 @@ fun AppRoot(viewModel: AppViewModel) {
             modifier = paperPopupModifier(aboutShape),
             shape = aboutShape,
             containerColor = AriCard,
-            title = { Text(tx("About AriAI"), color = AriInk, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) },
+            title = { Text(tx("About AriAi"), color = AriInk, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) },
             text = { Text("${tx("Version")} ${BuildConfig.VERSION_NAME}", color = AriMuted) },
             confirmButton = {
                 TextButton(onClick = { showAbout = false }) { Text(tx("Close")) }

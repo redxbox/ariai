@@ -142,7 +142,7 @@ object ErrorMapper {
         "Empty response from API",
         "The provider returned no text response",
         "The provider returned neither a reply nor a tool call",
-        "The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search.",
+        "The provider requested a tool call that AriAi cannot execute yet. Disable custom tools or use built-in search.",
         "No image returned",
         "The model returned no image",
         "No image data returned",

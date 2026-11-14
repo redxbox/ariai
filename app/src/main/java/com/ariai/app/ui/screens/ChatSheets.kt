@@ -306,7 +306,7 @@ fun SearchSheet(
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(tx("Web search"), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
                     Text(
-                        tx("Choose how AriAI searches for your next answer."),
+                        tx("Choose how AriAi searches for your next answer."),
                         fontSize = 12.sp,
                         color = Ink.copy(alpha = 0.58f),
                         lineHeight = 16.sp

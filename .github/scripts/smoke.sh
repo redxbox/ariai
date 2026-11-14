@@ -105,7 +105,7 @@ tap() {
     local activity
     activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
     if [[ "$activity" == *NexusLauncherActivity* ]]; then
-      echo "::warning title=AriAI foreground recovery::The launcher covered AriAI before the attachment action; bringing the app back and retrying."
+      echo "::warning title=AriAi foreground recovery::The launcher covered AriAi before the attachment action; bringing the app back and retrying."
       if adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
         | tee -a "$OUT/relaunch-before-attachment.txt"; then
         if wait_for_main_activity "Choose model" 8 25; then
@@ -237,7 +237,7 @@ dismiss_external_picker() {
   local activity
   local attempt
   # Prefer the picker's own Cancel button, then fall back to Back. The Photo Picker can
-  # remain in AriAI's task after it visually returns, so stop its activity package before
+  # remain in AriAi's task after it visually returns, so stop its activity package before
   # continuing; otherwise a later external intent can uncover the stale picker screen.
   if python3 .github/scripts/ui_tap.py --exact "Cancel" >/dev/null 2>&1; then
     echo "::notice title=External picker cancellation::Tapped Cancel in the platform picker."
@@ -249,33 +249,33 @@ dismiss_external_picker() {
 
   for attempt in 1 2 3 4; do
     if wait_for_main_activity "$return_label" 8 12; then
-      echo "::notice title=External picker return::AriAI stayed foreground; expected screen: ${return_label}."
+      echo "::notice title=External picker return::AriAi stayed foreground; expected screen: ${return_label}."
       return 0
     fi
     if (( attempt == 4 )); then break; fi
     activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-    echo "::warning title=External picker recovery::Attempt ${attempt}/3; foreground is ${activity:0:300}. Restoring AriAI."
+    echo "::warning title=External picker recovery::Attempt ${attempt}/3; foreground is ${activity:0:300}. Restoring AriAi."
     stop_photo_picker
     adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
     sleep 1
     if ! adb shell am start -W --activity-clear-top --activity-single-top -n "$PKG/.MainActivity" \
       | tee -a "$OUT/return-from-external-picker.txt"; then
-      echo "::warning title=External picker recovery::AriAI relaunch command failed on attempt ${attempt}."
+      echo "::warning title=External picker recovery::AriAi relaunch command failed on attempt ${attempt}."
     fi
     sleep 2
   done
 
-  echo "::warning title=External picker recovery::AriAI did not retain foreground after three recovery attempts; restarting its task."
+  echo "::warning title=External picker recovery::AriAi did not retain foreground after three recovery attempts; restarting its task."
   if ! restart_ariai_task; then
     activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-    echo "::error title=External picker return::Could not restart AriAI after the platform picker; expected '${return_label}', foreground: ${activity:0:400}."
+    echo "::error title=External picker return::Could not restart AriAi after the platform picker; expected '${return_label}', foreground: ${activity:0:400}."
     capture_failure "$return_label"
     return 1
   fi
 
   if [[ "$return_label" == "Import provider" ]]; then
     if ! wait_for_main_activity "Choose model" 8 20; then
-      echo "::error title=External picker return::AriAI did not return to chat after restarting for '${return_label}'."
+      echo "::error title=External picker return::AriAi did not return to chat after restarting for '${return_label}'."
       capture_failure "$return_label"
       return 1
     fi
@@ -286,7 +286,7 @@ dismiss_external_picker() {
     wait_for_text "Paste a provider as JSON" 20
   elif ! wait_for_main_activity "$return_label" 8 20; then
     activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity=' || true)"
-    echo "::error title=External picker return::AriAI did not regain stable foreground after a clean task restart; foreground: ${activity:0:400}."
+    echo "::error title=External picker return::AriAi did not regain stable foreground after a clean task restart; foreground: ${activity:0:400}."
     capture_failure "$return_label"
     return 1
   fi
@@ -309,12 +309,12 @@ return_to_chat_after_external() {
 
   activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
   if [[ "$activity" == *NexusLauncherActivity* ]]; then
-    echo "::warning title=External intent return::$origin did not return directly to AriAI; reopening the app to continue the walkthrough. Foreground: ${activity:0:400}"
+    echo "::warning title=External intent return::$origin did not return directly to AriAi; reopening the app to continue the walkthrough. Foreground: ${activity:0:400}"
     adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/relaunch-after-${origin}.txt"
   else
-    echo "::warning title=External intent return::$origin left AriAI's activity unstable; restarting the app task. Foreground: ${activity:0:400}"
+    echo "::warning title=External intent return::$origin left AriAi's activity unstable; restarting the app task. Foreground: ${activity:0:400}"
     if ! restart_ariai_task; then
-      echo "::error title=External intent return::Could not restart AriAI after $origin."
+      echo "::error title=External intent return::Could not restart AriAi after $origin."
       capture_failure "$origin"
       return 1
     fi
@@ -322,7 +322,7 @@ return_to_chat_after_external() {
 
   if ! wait_for_main_activity "Choose model" 8 25; then
     activity="$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
-    echo "::error title=External intent return::AriAI did not regain stable foreground after $origin; foreground: ${activity:0:400}."
+    echo "::error title=External intent return::AriAi did not regain stable foreground after $origin; foreground: ${activity:0:400}."
     capture_failure "$origin"
     return 1
   fi
@@ -374,7 +374,7 @@ wait_for_text() {
   local launcher_stalls=0
   while (( SECONDS < deadline )); do
     if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1; then
-      # Don't accept a one-frame transition: Android can briefly show AriAI before a
+      # Don't accept a one-frame transition: Android can briefly show AriAi before a
       # Pixel Launcher ANR dialog covers it again during emulator startup.
       sleep 1
       if python3 .github/scripts/ui_tap.py --assert "$label" >/dev/null 2>&1 && \
@@ -393,7 +393,7 @@ wait_for_text() {
         echo "::warning title=Emulator startup::Pixel Launcher stalled; asking Android to wait (attempt ${launcher_stalls}/2)."
         python3 .github/scripts/ui_tap.py "Wait" >/dev/null 2>&1 || true
       else
-        echo "::warning title=Emulator startup recovery::Pixel Launcher stayed unresponsive; closing its ANR dialog and relaunching AriAI."
+        echo "::warning title=Emulator startup recovery::Pixel Launcher stayed unresponsive; closing its ANR dialog and relaunching AriAi."
         python3 .github/scripts/ui_tap.py "Close app" >/dev/null 2>&1 || true
         sleep 3
         adb shell am force-stop com.google.android.apps.nexuslauncher >/dev/null 2>&1 || true
@@ -424,7 +424,7 @@ final_process_check() {
     FAILED=1
   fi
   if ! adb shell pidof "$PKG" >/dev/null; then
-    echo "::error title=App stopped::AriAI is not running at the end of the walkthrough."
+    echo "::error title=App stopped::AriAi is not running at the end of the walkthrough."
     FAILED=1
   fi
   printf 'result failed=%s steps=%s\n' "$FAILED" "$STEP_NO"
@@ -461,7 +461,7 @@ shot 00-app-home
 wait_for_text "Choose model" 30
 
 step "Chat home and model picker"
-expect_text "AriAI"
+expect_text "AriAi"
 expect_text "Send"
 shot 01-chat-home
 # The compact, unframed model selector is centered below the chat top bar, clear of the composer.
@@ -472,13 +472,13 @@ back
 end_step
 
 step "Providerless chat state and rename dialog"
-tap "Message AriAI"
-type_text "AriAISmoke"
+tap "Message AriAi"
+type_text "AriAiSmoke"
 hide_keyboard
-expect_text "AriAI"
+expect_text "AriAi"
 expect_absent_text "How can I help you?"
 expect_absent_text "Add your first AI provider to start chatting"
-expect_text "AriAISmoke"
+expect_text "AriAiSmoke"
 expect_absent_text "No provider configured"
 shot 02a-providerless-chat
 tap "More"
@@ -674,7 +674,7 @@ shot 25-navigation-drawer
 tap "Workspace"
 expect_text "No project files yet."
 expect_text "Console"
-tap "Generate with AriAI"
+tap "Generate with AriAi"
 expect_text "Generate code"
 expect_text "Uses the selected default AI provider and model."
 tap "Describe what to build or change"
@@ -690,7 +690,7 @@ back
 expect_text "Choose model"
 tap "Open menu"
 tap "About"
-expect_text "About AriAI"
+expect_text "About AriAi"
 expect_text "Version"
 expect_text "Close"
 shot 25-drawer-about
@@ -804,7 +804,7 @@ end_step
 step "Search tool and service settings for Gemini and Anthropic"
 tap "Open menu"
 tap "Search"
-expect_text "Ask AriAI with web search"
+expect_text "Ask AriAi with web search"
 expect_text "Choose a chat model before searching."
 expect_text "Configure search"
 shot 39-search-tool
@@ -911,9 +911,9 @@ else
 fi
 
 back
-expect_text "About AriAI"
-tap_exact "About AriAI"
-wait_for_text "About AriAI" 8
+expect_text "About AriAi"
+tap_exact "About AriAi"
+wait_for_text "About AriAi" 8
 expect_text "Version"
 shot 54-settings-about
 back
@@ -923,7 +923,7 @@ expect_text "Choose model"
 # Start a clean conversation after the intentional missing-provider error at the beginning.
 tap "Open menu"
 tap "New chat"
-expect_text "AriAI"
+expect_text "AriAi"
 shot 56-new-chat-from-drawer
 end_step
 

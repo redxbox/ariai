@@ -28,7 +28,7 @@ class AppCrashHandlerTest {
 
             val report = AppCrashHandler.readReport(directory)
             assertNotNull(report)
-            assertTrue(report!!.contains("AriAI crash report"))
+            assertTrue(report!!.contains("AriAi crash report"))
             assertTrue(report.contains("failing-worker"))
             assertTrue(report.contains("crash-marker"))
             assertTrue(report.length <= AppCrashHandler.MAX_REPORT_CHARS)

@@ -453,7 +453,7 @@ fun AddProviderScreen(
                             }
                         } else {
                             Text(
-                                tx("Uses OAuth 2.0 Authorization Code with PKCE for native public clients. AriAI never stores a client secret."),
+                                tx("Uses OAuth 2.0 Authorization Code with PKCE for native public clients. AriAi never stores a client secret."),
                                 fontSize = 12.sp,
                                 color = AriInk.copy(alpha = 0.62f)
                             )

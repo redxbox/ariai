@@ -69,7 +69,7 @@ class AIClient(
         val key = when (provider.authType) {
             ProviderAuthType.API_KEY -> provider.apiKey.trim()
             ProviderAuthType.OAUTH2 -> (oauthSessionManager
-                ?: throw IOException(tx("OAuth is unavailable. Restart AriAI and try again.")))
+                ?: throw IOException(tx("OAuth is unavailable. Restart AriAi and try again.")))
                 .providerAccessToken(provider)
         }
         if (provider.authType == ProviderAuthType.OAUTH2) {
@@ -163,7 +163,7 @@ class AIClient(
                             }
                             reportUsage(json)
                             if (hasUnexecutedToolCalls(json, provider.type)) {
-                                producer.close(IOException("The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search."))
+                                producer.close(IOException("The provider requested a tool call that AriAi cannot execute yet. Disable custom tools or use built-in search."))
                                 eventSource.cancel()
                                 return
                             }
@@ -267,7 +267,7 @@ class AIClient(
                                 throw IOException(error)
                             }
                             if (hasUnexecutedToolCalls(json, provider.type)) {
-                                throw IOException("The provider requested a tool call that AriAI cannot execute yet. Disable custom tools or use built-in search.")
+                                throw IOException("The provider requested a tool call that AriAi cannot execute yet. Disable custom tools or use built-in search.")
                             }
                             val text = when (provider.type) {
                                 ProviderType.GEMINI -> parseGeminiResponse(json)

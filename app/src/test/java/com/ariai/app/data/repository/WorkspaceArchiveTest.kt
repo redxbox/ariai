@@ -15,7 +15,7 @@ class WorkspaceArchiveTest {
         WorkspaceArchive.writeZip(
             listOf(
                 WorkspaceFile(name = "index.html", content = "<h1>Hello</h1>", updatedAt = 0L),
-                WorkspaceFile(name = "notes.txt", content = "سلام AriAI", updatedAt = 0L)
+                WorkspaceFile(name = "notes.txt", content = "سلام AriAi", updatedAt = 0L)
             ),
             output
         )
@@ -30,7 +30,7 @@ class WorkspaceArchiveTest {
             }
         }
 
-        assertEquals(mapOf("index.html" to "<h1>Hello</h1>", "notes.txt" to "سلام AriAI"), entries)
+        assertEquals(mapOf("index.html" to "<h1>Hello</h1>", "notes.txt" to "سلام AriAi"), entries)
     }
 
     @Test

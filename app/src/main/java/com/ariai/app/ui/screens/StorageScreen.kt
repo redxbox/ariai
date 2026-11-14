@@ -117,7 +117,7 @@ fun StorageScreen(
                     shadowElevation = 0.dp,
                     modifier = Modifier.fillMaxWidth().clickable {
                         val text = buildString {
-                            appendLine(tx("AriAI chat list"))
+                            appendLine(tx("AriAi chat list"))
                             appendLine("Exported: ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())}")
                             appendLine()
                             chats.sortedByDescending { it.updatedAt }.forEach {

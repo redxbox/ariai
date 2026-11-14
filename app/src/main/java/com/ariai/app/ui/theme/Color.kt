@@ -2,7 +2,7 @@ package com.ariai.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Deep teal is AriAI's primary action color; mint and coral are reserved for soft states.
+// Deep teal is AriAi's primary action color; mint and coral are reserved for soft states.
 val AriAccent = Color(0xFF0E6470)
 val AriAccentLight = Color(0xFF9DD8D0)
 val AriAccentDark = Color(0xFF094B53)
