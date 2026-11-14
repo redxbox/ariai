@@ -163,7 +163,8 @@ jobs:
           ./gradlew :app:compileDebugAndroidTest --stacktrace > androidtest-compile.log 2>&1
           rc=$?
           # Surface each compiler error as an annotation so it can be read without the raw log.
-          grep -E "^e: " androidtest-compile.log | head -80 | while IFS= read -r line; do
-            echo "::error title=androidTest compile::$(echo "$line" | cut -c1-500)"
+          grep -E -A2 "^e: |What went wrong|Execution failed|Could not|Caused by|error:|FAILURE" androidtest-compile.log \
+            | grep -v "^--$" | head -120 | while IFS= read -r line; do
+            [ -n "$line" ] && echo "::error title=androidTest compile::$(echo "$line" | cut -c1-500)"
           done
           exit $rc
