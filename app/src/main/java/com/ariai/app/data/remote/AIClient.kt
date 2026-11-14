@@ -729,11 +729,15 @@ class AIClient(
                     if (looksLikeAudioModel(name)) continue
                     // Image models are the ones that offer the "predict" method (Imagen), not by name.
                     val methods = m.optJSONArray("supportedGenerationMethods")
-                    val imageGen = (0 until (methods?.length() ?: 0)).any { methods?.optString(it) == "predict" }
-                    if (looksLikeVideoModel(name)) {
+                    val methodNames = (0 until (methods?.length() ?: 0)).mapNotNull { methods?.optString(it) }.toSet()
+                    // Method names come from the API: generateContent = chat/multimodal text, predict = Imagen,
+                    // predictLongRunning = Veo. Name heuristics are only a fallback when the API omits them.
+                    val imageGen = "predict" in methodNames
+                    val videoGen = "predictLongRunning" in methodNames || (methodNames.isEmpty() && looksLikeVideoModel(name))
+                    val chatModel = "generateContent" in methodNames && !looksLikeAudioModel(name)
+                    if (videoGen) {
                         models.add(AIModel(name, name, provider.id, false, false, false, 0, supportsVideoGen = true, outputsText = false))
-                    } else if (name.contains("gemini") || imageGen) {
-                        val chatModel = name.contains("gemini")
+                    } else if (chatModel || imageGen) {
                         models.add(
                             AIModel(
                                 id = name,
@@ -756,20 +760,26 @@ class AIClient(
                     val arch = m.optJSONObject("architecture")
                     val inputs = modalityList(arch?.optJSONArray("input_modalities"))
                     val outputs = modalityList(arch?.optJSONArray("output_modalities") ?: m.optJSONArray("output_modalities"))
-                    val videoOut = "video" in outputs || looksLikeVideoModel(id)
-                    val audioOut = ("audio" in outputs || looksLikeAudioModel(id)) && "text" !in outputs
+                    // Capabilities come from the model's own modality lists. Only when the endpoint
+                    // publishes no modality data (plain OpenAI-style /models) do name guesses apply.
+                    val hasMetadata = inputs.isNotEmpty() || outputs.isNotEmpty()
+                    val videoOut = "video" in outputs || (!hasMetadata && looksLikeVideoModel(id))
+                    val audioOut = ("audio" in outputs || (!hasMetadata && looksLikeAudioModel(id))) && "text" !in outputs
+                    val visionIn = if (inputs.isNotEmpty()) "image" in inputs else id.contains("vision") || id.contains("4o")
                     models.add(
                         AIModel(
                             id = id,
                             displayName = id,
                             providerId = provider.id,
-                            supportsVision = if (inputs.isEmpty()) id.contains("vision") || id.contains("4o") else "image" in inputs,
+                            supportsVision = visionIn,
                             supportsFunctionCalling = true,
                             supportsImageGen = "image" in outputs,
                             contextWindow = 128000,
                             supportsVideoGen = videoOut,
                             supportsAudioGen = audioOut,
-                            outputsText = (outputs.isEmpty() || "text" in outputs) && !videoOut && !audioOut
+                            outputsText = (outputs.isEmpty() || "text" in outputs) && !videoOut && !audioOut,
+                            supportsAudioInput = "audio" in inputs,
+                            supportsVideoInput = "video" in inputs
                         )
                     )
                 }

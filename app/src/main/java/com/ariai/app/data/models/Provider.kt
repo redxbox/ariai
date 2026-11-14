@@ -69,7 +69,11 @@ data class AIModel(
     /** Model returns audio (speech or music). */
     val supportsAudioGen: Boolean = false,
     /** Model returns text. False for image-only models. */
-    val outputsText: Boolean = true
+    val outputsText: Boolean = true,
+    /** Model accepts audio input (from provider metadata: input_modalities). */
+    val supportsAudioInput: Boolean = false,
+    /** Model accepts video input (from provider metadata: input_modalities). */
+    val supportsVideoInput: Boolean = false
 ) : Parcelable
 
 fun getDefaultModelsForType(type: ProviderType, providerId: String): List<AIModel> {

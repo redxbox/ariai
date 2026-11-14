@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.supportsNativeSearch
-import com.ariai.app.data.remote.looksLikeVideoModel
 import com.ariai.app.data.remote.ChatFunctionTool
 import com.ariai.app.data.remote.ChatGenerationState
 import com.ariai.app.data.remote.ToolExecutionPhase
@@ -1222,7 +1221,7 @@ class AppViewModel(
                         // Audio-only model selected in text mode: generate audio instead of calling chat.
                         generateAudioReply(chatId, provider, current.id, sentContent, userMessage.id, generation)
                         return@launchSendJob
-                    } else if (current != null && ((current.supportsVideoGen && !current.outputsText) || looksLikeVideoModel(current.id))) {
+                    } else if (current != null && current.supportsVideoGen && !current.outputsText) {
                         // Video-only model selected in text mode: generate a video instead of calling chat.
                         generateVideoReply(chatId, provider, current.id, sentContent, userMessage.id, generation)
                         return@launchSendJob

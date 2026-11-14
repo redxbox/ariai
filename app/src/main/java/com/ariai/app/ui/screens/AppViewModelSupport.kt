@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.ariai.app.data.local.PreferencesManager
 import com.ariai.app.data.models.*
 import com.ariai.app.data.remote.supportsNativeSearch
-import com.ariai.app.data.remote.looksLikeVideoModel
 import com.ariai.app.data.remote.ChatFunctionTool
 import com.ariai.app.data.remote.ChatGenerationState
 import com.ariai.app.data.remote.ToolExecutionPhase

@@ -21,7 +21,9 @@ private data class StoredModel(
     val customBody: String? = null,
     val supportsVideoGen: Boolean = false,
     val outputsText: Boolean = true,
-    val supportsAudioGen: Boolean = false
+    val supportsAudioGen: Boolean = false,
+    val supportsAudioInput: Boolean = false,
+    val supportsVideoInput: Boolean = false
 ) {
     fun toModel(): AIModel? {
         val modelId = id.trim().takeIf(String::isNotBlank) ?: return null
@@ -40,7 +42,9 @@ private data class StoredModel(
             customBody = customBody?.take(MAX_MODEL_CUSTOM_BODY_LENGTH),
             supportsVideoGen = supportsVideoGen,
             outputsText = outputsText,
-            supportsAudioGen = supportsAudioGen
+            supportsAudioGen = supportsAudioGen,
+            supportsAudioInput = supportsAudioInput,
+            supportsVideoInput = supportsVideoInput
         )
     }
 
@@ -60,7 +64,9 @@ private data class StoredModel(
             customBody = model.customBody?.take(MAX_MODEL_CUSTOM_BODY_LENGTH),
             supportsVideoGen = model.supportsVideoGen,
             outputsText = model.outputsText,
-            supportsAudioGen = model.supportsAudioGen
+            supportsAudioGen = model.supportsAudioGen,
+            supportsAudioInput = model.supportsAudioInput,
+            supportsVideoInput = model.supportsVideoInput
         )
     }
 }
