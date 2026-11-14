@@ -261,31 +261,14 @@ fun NewChatScreen(
         showRename = true
     }
     if (showRename) {
-        val dialogShape = paperPopupShape(26.dp)
-        AlertDialog(
-            onDismissRequest = { showRename = false },
-            modifier = paperPopupModifier(dialogShape),
-            shape = dialogShape,
-            containerColor = AriCard,
-            title = { Text(tx("Rename chat")) },
-            text = {
-                OutlinedTextField(
-                    value = renameText,
-                    onValueChange = { renameText = it },
-                    modifier = Modifier.testTag("chat-rename-field"),
-                    singleLine = true,
-                    placeholder = { Text(tx("Chat title")) }
-                )
+        RenameChatDialog(
+            text = renameText,
+            onTextChange = { renameText = it },
+            onSave = {
+                onRenameChat(renameText)
+                showRename = false
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    onRenameChat(renameText)
-                    showRename = false
-                }) { Text(tx("Save")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRename = false }) { Text(tx("Cancel")) }
-            }
+            onDismiss = { showRename = false }
         )
     }
 
@@ -682,26 +665,12 @@ fun NewChatScreen(
         )
     }
     if (showTemplates) {
-        AlertDialog(
-            onDismissRequest = { showTemplates = false },
-            title = { Text(tx("Prompt templates")) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    promptTemplates.forEach { template ->
-                        TextButton(
-                            onClick = {
-                                val text = template.text(UiLang.code)
-                                inputText = if (inputText.isBlank()) text else inputText.trimEnd() + "\n\n" + text
-                                showTemplates = false
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(tx(template.title), modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showTemplates = false }) { Text(tx("Cancel")) } }
+        PromptTemplatesDialog(
+            onDismiss = { showTemplates = false },
+            onPick = { text ->
+                inputText = if (inputText.isBlank()) text else inputText.trimEnd() + "\n\n" + text
+                showTemplates = false
+            }
         )
     }
     if (showQuickParameters) {
@@ -766,33 +735,23 @@ fun NewChatScreen(
         )
     }
     if (showNonGeminiVideoWarning) {
-        AlertDialog(
-            onDismissRequest = {
+        NonGeminiVideoWarningDialog(
+            onDismiss = {
                 showNonGeminiVideoWarning = false
                 pendingVideoUris = emptyList()
             },
-            title = { Text(tx("This provider may not support video")) },
-            text = { Text(tx("Video input is supported by Gemini providers. With the selected provider, the video may be ignored or rejected. Continue anyway?")) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showNonGeminiVideoWarning = false
-                    val selectedVideos = pendingVideoUris
-                    pendingVideoUris = emptyList()
-                    if (selectedVideos.isNotEmpty()) {
-                        readFiles(selectedVideos)
-                    } else {
-                        mediaPickerVideoConfirmed = true
-                        launchPickerAfterSheetCloses {
-                            mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
-                        }
+            onContinue = {
+                showNonGeminiVideoWarning = false
+                val selectedVideos = pendingVideoUris
+                pendingVideoUris = emptyList()
+                if (selectedVideos.isNotEmpty()) {
+                    readFiles(selectedVideos)
+                } else {
+                    mediaPickerVideoConfirmed = true
+                    launchPickerAfterSheetCloses {
+                        mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
                     }
-                }) { Text(tx("Continue")) }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showNonGeminiVideoWarning = false
-                    pendingVideoUris = emptyList()
-                }) { Text(tx("Cancel")) }
+                }
             }
         )
     }
