@@ -392,8 +392,24 @@ live_tap "Open menu"
 live_tap "Providers"
 live_tap "Add provider"
 live_wait_for_text "Add provider" 30
-# The Custom tile sits below the popular presets, so it may need a scroll on the emulator.
-live_tap_scrolling "Custom"
+# The Custom tile sits below the popular presets. ui_tap only scrolls for scrollable containers, which
+# Compose does not always expose, so swipe the page directly. No API key has been entered at this point,
+# so listing the visible labels for diagnosis is safe if the tile still cannot be found.
+live_tap_custom_preset() {
+  local attempt
+  for attempt in 1 2 3 4 5 6; do
+    if python3 .github/scripts/ui_tap.py "Custom" >/dev/null 2>&1; then
+      sleep 0.7
+      return 0
+    fi
+    adb_quiet shell input swipe 540 1600 540 900 350
+    sleep 0.8
+  done
+  echo "::error title=Live provider test::The Custom preset tile was not found after scrolling. Visible labels follow (no credentials are on screen yet)."
+  python3 .github/scripts/ui_tap.py "Custom" 2>&1 >/dev/null | sed 's/^/::notice title=Visible labels::/' || true
+  return 1
+}
+live_tap_custom_preset
 live_tap "Base URL"
 enter_text "$BASE_URL" "provider base URL"
 adb_quiet shell input keyevent KEYCODE_BACK
