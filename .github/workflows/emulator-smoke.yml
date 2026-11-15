@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
+    inputs:
+      live_api_test:
+        description: 'Run the one-shot live provider test with the ARIAI_TEST_API_KEY secret (never logged)'
+        type: boolean
+        default: false
 
 jobs:
   smoke:
@@ -39,8 +44,9 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           # Only expose the API key when a push commit message contains [live-api-test]; ordinary runs get no key.
-          ARIAI_LIVE_API_TEST: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[live-api-test]') }}
-          ARIAI_TEST_API_KEY: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[live-api-test]') && secrets.ARIAI_TEST_API_KEY || '' }}
+          # Manual dispatch with live_api_test=true, or a push whose commit message contains [live-api-test].
+          ARIAI_LIVE_API_TEST: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[live-api-test]')) || (github.event_name == 'workflow_dispatch' && inputs.live_api_test) }}
+          ARIAI_TEST_API_KEY: ${{ ((github.event_name == 'push' && contains(github.event.head_commit.message, '[live-api-test]')) || (github.event_name == 'workflow_dispatch' && inputs.live_api_test)) && secrets.ARIAI_TEST_API_KEY || '' }}
           # User-supplied OpenAI-compatible endpoint for the isolated live model-review run.
           ARIAI_TEST_BASE_URL: https://radoxai.com/v1
         with:
