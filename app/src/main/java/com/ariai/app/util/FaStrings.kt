@@ -91,6 +91,8 @@ internal val faStrings: Map<String, String> = mapOf(
         "This saved chat cannot be opened because its ID is missing." to "این گفت‌وگوی ذخیره‌شده شناسهٔ معتبری ندارد و باز نمی‌شود.",
         "Could not save the reply. Please try again." to "ذخیرهٔ پاسخ انجام نشد. دوباره تلاش کنید.",
         "Video is larger than 12 MB" to "ویدیو بزرگ‌تر از ۱۲ مگابایت است",
+        "Audio is larger than 15 MB" to "فایل صوتی بزرگ‌تر از ۱۵ مگابایت است",
+        "This model cannot listen to audio. Choose a model with audio input, or the audio will be sent as a note only." to "این مدل صوت را نمی‌شنود. مدلی با ورودی صوتی انتخاب کنید، وگرنه صوت فقط به‌صورت یادداشت فرستاده می‌شود.",
         "Photos and videos are not used in video mode yet. Switch to text mode to send them." to "عکس و ویدیو در حالت ویدیو هنوز استفاده نمی‌شوند. برای ارسال آن‌ها به حالت متن برگردید.",
         "Copy code" to "کپی کد",
         "Code" to "کد",

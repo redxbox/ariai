@@ -36,21 +36,47 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
-/** Message text with extracted text-file contents appended. */
-internal fun ChatMessage.promptText(gemini: Boolean = false): String {
+/**
+ * What the selected model accepts, read from the model itself (never from the provider name).
+ * Video falls back to the Gemini default only for rows saved before modality metadata existed.
+ */
+internal data class MediaInputSupport(val video: Boolean, val audio: Boolean)
+
+internal fun mediaInputFor(provider: Provider, modelId: String): MediaInputSupport {
+    val model = provider.models.firstOrNull { it.id == modelId }
+    return MediaInputSupport(
+        video = model?.supportsVideoInput == true || (model == null && provider.type == ProviderType.GEMINI),
+        audio = model?.supportsAudioInput == true
+    )
+}
+
+/** OpenAI-style input_audio accepts only wav and mp3; other formats are sent as a note. */
+internal fun openAiAudioFormat(mimeType: String): String? = when (mimeType.lowercase()) {
+    "audio/wav", "audio/x-wav", "audio/wave" -> "wav"
+    "audio/mpeg", "audio/mp3" -> "mp3"
+    else -> null
+}
+
+/** Message text with extracted text-file contents appended. Media that is not sent gets a note. */
+internal fun ChatMessage.promptText(sendVideo: Boolean = false, sendAudio: (Attachment) -> Boolean = { false }): String {
     val files = attachments.mapNotNull { a -> a.textContent?.let { "\n\n[File: ${a.name}]\n$it" } }
-    // Only Gemini receives video bytes here; other models get a note so they do not guess.
     val imageNotes = attachments
         .filter { it.type == AttachmentType.IMAGE && it.base64Data.isNullOrBlank() }
         .map { "\n\n[Image attached: ${it.name}, but its local file data is unavailable.]" }
     val videoNotes = attachments
-        .filter { it.type == AttachmentType.VIDEO && (!gemini || it.base64Data.isNullOrBlank()) }
+        .filter { it.type == AttachmentType.VIDEO && (!sendVideo || it.base64Data.isNullOrBlank()) }
         .map { "\n\n[Video attached: ${it.name}. This model cannot watch videos.]" }
-    return content + files.joinToString("") + imageNotes.joinToString("") + videoNotes.joinToString("")
+    val audioNotes = attachments
+        .filter { it.type == AttachmentType.AUDIO && (it.base64Data.isNullOrBlank() || !sendAudio(it)) }
+        .map { "\n\n[Audio attached: ${it.name}. This model cannot listen to audio.]" }
+    return content + files.joinToString("") + imageNotes.joinToString("") + videoNotes.joinToString("") + audioNotes.joinToString("")
 }
 
 internal fun ChatMessage.videoParts(): List<Attachment> =
     attachments.filter { it.type == AttachmentType.VIDEO && !it.base64Data.isNullOrBlank() }
+
+internal fun ChatMessage.audioParts(): List<Attachment> =
+    attachments.filter { it.type == AttachmentType.AUDIO && !it.base64Data.isNullOrBlank() }
 
 /** Images that carry base64 data and can be sent to vision models. */
 internal fun ChatMessage.imageParts(): List<Attachment> =

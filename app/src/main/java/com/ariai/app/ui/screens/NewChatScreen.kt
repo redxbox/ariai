@@ -579,6 +579,13 @@ fun NewChatScreen(
     }
 
     fun addFiles(uris: List<Uri>, videoAlreadyConfirmed: Boolean = false) {
+        val hasAudio = uris.any { uri ->
+            runCatching { context.contentResolver.getType(uri)?.startsWith("audio/", ignoreCase = true) == true }
+                .getOrDefault(false)
+        }
+        if (hasAudio && selectedModelCapabilities?.supportsAudioInput != true) {
+            showNote(tx("This model cannot listen to audio. Choose a model with audio input, or the audio will be sent as a note only."))
+        }
         val videoUris = uris.filter { uri ->
             runCatching { context.contentResolver.getType(uri)?.startsWith("video/", ignoreCase = true) == true }
                 .getOrDefault(false)
@@ -713,7 +720,8 @@ fun NewChatScreen(
                         "application/pdf",
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         "image/*",
-                        "video/*"
+                        "video/*",
+                        "audio/*"
                     ))
                 }
             },

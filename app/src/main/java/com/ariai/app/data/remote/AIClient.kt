@@ -747,7 +747,9 @@ class AIClient(
                                 supportsFunctionCalling = chatModel,
                                 supportsImageGen = imageGen,
                                 contextWindow = if (chatModel) 1000000 else 8192,
-                                outputsText = chatModel
+                                outputsText = chatModel,
+                                supportsAudioInput = chatModel,
+                                supportsVideoInput = chatModel
                             )
                         )
                     }
@@ -862,7 +864,8 @@ class AIClient(
 
         return when (provider.type) {
             ProviderType.GEMINI -> {
-                val model = if (modelId.isNotBlank() && !modelId.contains("/")) modelId else "gemini-1.5-flash"
+                val model = modelId.takeIf { it.isNotBlank() && !it.contains("/") }
+                    ?: throw IllegalStateException("No Gemini model is selected")
                 if (forceNonStream) {
                     "$base/models/$model:generateContent"
                 } else {
@@ -891,6 +894,7 @@ class AIClient(
         allowUrlContext: Boolean = true
     ): RequestBody {
         val lastMessage = messages.lastOrNull()
+        val mediaInput = mediaInputFor(provider, modelId)
         val requestJson = when (provider.type) {
             ProviderType.GEMINI -> {
                 val contents = messages.mapNotNull { message ->
@@ -908,7 +912,10 @@ class AIClient(
                                 )
                             )
                         } else {
-                            var text = message.promptText(gemini = true)
+                            var text = message.promptText(
+                                sendVideo = mediaInput.video,
+                                sendAudio = { mediaInput.audio }
+                            )
                             if (searchContext != null && message == lastMessage && message.role == MessageRole.USER) {
                                 text = "Web search results:\n$searchContext\n\nUser question: $text\n\nAnswer using the search results when relevant."
                             }
@@ -916,8 +923,15 @@ class AIClient(
                             message.imageParts().forEach { image ->
                                 add(GeminiPart(inlineData = GeminiInlineData(image.mimeType, image.base64Data.orEmpty())))
                             }
-                            message.videoParts().forEach { video ->
-                                add(GeminiPart(inlineData = GeminiInlineData(video.mimeType, video.base64Data.orEmpty())))
+                            if (mediaInput.video) {
+                                message.videoParts().forEach { video ->
+                                    add(GeminiPart(inlineData = GeminiInlineData(video.mimeType, video.base64Data.orEmpty())))
+                                }
+                            }
+                            if (mediaInput.audio) {
+                                message.audioParts().forEach { audio ->
+                                    add(GeminiPart(inlineData = GeminiInlineData(audio.mimeType, audio.base64Data.orEmpty())))
+                                }
                             }
                             message.toolCalls.forEach { call ->
                                 add(
@@ -1090,17 +1104,29 @@ class AIClient(
                             )
                             return@forEach
                         }
-                        val text = message.promptText()
+                        val audioSendable = { a: Attachment -> mediaInput.audio && openAiAudioFormat(a.mimeType) != null }
+                        val text = message.promptText(sendAudio = audioSendable)
                         val images = message.imageParts()
-                        if (text.isBlank() && images.isEmpty() && message.toolCalls.isEmpty()) return@forEach
+                        val audio = message.audioParts().filter(audioSendable)
+                        if (text.isBlank() && images.isEmpty() && audio.isEmpty() && message.toolCalls.isEmpty()) return@forEach
                         val content: JsonElement = when {
-                            message.role == MessageRole.USER && images.isNotEmpty() -> buildJsonArray {
+                            message.role == MessageRole.USER && (images.isNotEmpty() || audio.isNotEmpty()) -> buildJsonArray {
                                 add(OpenAiTextContentPart(text = text).toProviderJsonElement(OpenAiTextContentPart.serializer()))
                                 images.forEach { image ->
                                     add(
                                         OpenAiImageContentPart(
                                             imageUrl = OpenAiImageUrl("data:${image.mimeType};base64,${image.base64Data.orEmpty()}")
                                         ).toProviderJsonElement(OpenAiImageContentPart.serializer())
+                                    )
+                                }
+                                audio.forEach { clip ->
+                                    add(
+                                        OpenAiInputAudioPart(
+                                            inputAudio = OpenAiInputAudio(
+                                                data = clip.base64Data.orEmpty(),
+                                                format = openAiAudioFormat(clip.mimeType).orEmpty()
+                                            )
+                                        ).toProviderJsonElement(OpenAiInputAudioPart.serializer())
                                     )
                                 }
                             }

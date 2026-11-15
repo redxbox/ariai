@@ -30,6 +30,19 @@ import org.xmlpull.v1.XmlPullParser
 private const val MAX_IMAGE_EDGE = 1024
 private const val MAX_TEXT_CHARS = 60_000
 private const val MAX_VIDEO_BYTES = 12L * 1024 * 1024
+private const val MAX_AUDIO_BYTES = 15L * 1024 * 1024
+private val AUDIO_EXTENSIONS = setOf("mp3", "wav", "m4a", "aac", "ogg", "opus", "flac", "3gp")
+
+private fun audioMimeFor(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+    "mp3" -> "audio/mpeg"
+    "wav" -> "audio/wav"
+    "m4a" -> "audio/mp4"
+    "aac" -> "audio/aac"
+    "ogg", "opus" -> "audio/ogg"
+    "flac" -> "audio/flac"
+    "3gp" -> "audio/3gpp"
+    else -> "application/octet-stream"
+}
 private const val MAX_PDF_BYTES = 20L * 1024 * 1024
 private const val MAX_DOCX_XML_BYTES = 5 * 1024 * 1024
 private const val MAX_DOCX_EXPANDED_BYTES = 40L * 1024 * 1024
@@ -112,6 +125,32 @@ private fun readAttachmentOnIo(context: Context, uri: Uri, extractedDocumentText
                         name = name,
                         mimeType = mime,
                         textContent = text.take(MAX_TEXT_CHARS)
+                    )
+                )
+            }
+            mime.startsWith("audio/") || name.substringAfterLast('.', "").lowercase() in AUDIO_EXTENSIONS -> {
+                val audioMime = if (mime.startsWith("audio/")) mime else audioMimeFor(name)
+                val size = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+                if (size > MAX_AUDIO_BYTES) return ReadResult.Error(tx("Audio is larger than 15 MB"))
+                val bytes = resolver.openInputStream(uri)?.use { input ->
+                    val output = ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    var total = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        if (total > MAX_AUDIO_BYTES) return ReadResult.Error(tx("Audio is larger than 15 MB"))
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: return ReadResult.Error(tx("Could not open this file."))
+                ReadResult.Ok(
+                    Attachment(
+                        type = AttachmentType.AUDIO,
+                        name = name,
+                        mimeType = audioMime,
+                        base64Data = Base64.encodeToString(bytes, Base64.NO_WRAP)
                     )
                 )
             }

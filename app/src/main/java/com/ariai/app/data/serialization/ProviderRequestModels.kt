@@ -46,6 +46,15 @@ internal data class OpenAiImageContentPart(
 internal data class OpenAiImageUrl(val url: String)
 
 @Serializable
+internal data class OpenAiInputAudioPart(
+    val type: String = "input_audio",
+    @SerialName("input_audio") val inputAudio: OpenAiInputAudio
+)
+
+@Serializable
+internal data class OpenAiInputAudio(val data: String, val format: String)
+
+@Serializable
 internal data class OpenAiToolCall(
     val id: String,
     val type: String = "function",
