@@ -46,7 +46,8 @@ private fun audioMimeFor(name: String): String = when (name.substringAfterLast('
 private const val MAX_PDF_BYTES = 20L * 1024 * 1024
 private const val MAX_DOCX_XML_BYTES = 5 * 1024 * 1024
 private const val MAX_DOCX_EXPANDED_BYTES = 40L * 1024 * 1024
-internal const val MAX_PDF_EXTRACT_PAGES = 20
+// Pages are read in order until the character budget is used; this cap only bounds the work on huge files.
+internal const val MAX_PDF_EXTRACT_PAGES = 200
 internal fun pdfPageCountToExtract(pageCount: Int, maximumPages: Int = MAX_PDF_EXTRACT_PAGES): Int =
     pageCount.coerceAtLeast(0).coerceAtMost(maximumPages.coerceAtLeast(0))
 private const val MAX_OCR_PAGES = 20
@@ -331,7 +332,12 @@ internal fun extractPdfTextFromFile(context: Context, pdfFile: File): String {
         }
         val notices = buildString {
             if (ocrUnavailable) append(OCR_UNAVAILABLE_NOTICE)
-            if (truncated) append(TRUNCATION_NOTICE)
+            if (truncated) {
+                append(TRUNCATION_NOTICE)
+                if (pageTexts.size < pdf.numberOfPages) {
+                    append("\n[Read pages 1-${pageTexts.size} of ${pdf.numberOfPages}.]")
+                }
+            }
         }
         return extracted.take((MAX_TEXT_CHARS - notices.length).coerceAtLeast(0)) + notices
     }

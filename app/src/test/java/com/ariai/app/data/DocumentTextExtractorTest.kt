@@ -67,7 +67,7 @@ class DocumentTextExtractorTest {
 
     @Test
     fun pdfPageLimitUsesOnlyTheConfiguredLeadingPages() {
-        assertEquals(20, pdfPageCountToExtract(240))
+        assertEquals(200, pdfPageCountToExtract(240))
         assertEquals(12, pdfPageCountToExtract(240, maximumPages = 12))
         assertEquals(0, pdfPageCountToExtract(-1))
         assertEquals(0, pdfPageCountToExtract(10, maximumPages = -4))

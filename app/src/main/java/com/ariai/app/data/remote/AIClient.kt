@@ -115,9 +115,10 @@ class AIClient(
         return if (stream) callbackFlow {
             val producer = this
             val url = buildChatUrl(provider, modelId)
+            val preparedMessages = prepareMessagesForModel(provider, modelId, messages)
             val body = buildRequestBody(
                 provider = provider,
-                messages = messages,
+                messages = preparedMessages,
                 modelId = modelId,
                 systemPrompt = systemPrompt,
                 temperature = temperature,
@@ -224,11 +225,12 @@ class AIClient(
         allowUrlContext: Boolean,
         reportUsage: (JSONObject) -> Unit
     ): String {
+        val preparedMessages = prepareMessagesForModel(provider, modelId, messages)
         val request = Request.Builder()
             .url(buildChatUrl(provider, modelId, forceNonStream = true))
             .post(buildRequestBody(
                 provider = provider,
-                messages = messages,
+                messages = preparedMessages,
                 modelId = modelId,
                 systemPrompt = systemPrompt,
                 temperature = temperature,
@@ -298,11 +300,12 @@ class AIClient(
         nativeSearch: Boolean = false,
         allowUrlContext: Boolean = true
     ): AgentStep {
+        val preparedMessages = prepareMessagesForModel(provider, modelId, messages)
         val request = Request.Builder()
             .url(buildChatUrl(provider, modelId, forceNonStream = true))
             .post(buildRequestBody(
                 provider = provider,
-                messages = messages,
+                messages = preparedMessages,
                 modelId = modelId,
                 systemPrompt = systemPrompt,
                 temperature = temperature,
@@ -384,11 +387,12 @@ class AIClient(
             val accumulator = AgentStepStreamAccumulator(provider.type)
             val finished = java.util.concurrent.atomic.AtomicBoolean(false)
             val lastReportedUsage = AtomicReference<TokenUsage?>(null)
+            val preparedMessages = prepareMessagesForModel(provider, modelId, messages)
             val request = Request.Builder()
                 .url(buildChatUrl(provider, modelId))
                 .post(buildRequestBody(
                     provider = provider,
-                    messages = messages,
+                    messages = preparedMessages,
                     modelId = modelId,
                     systemPrompt = systemPrompt,
                     temperature = temperature,
