@@ -392,34 +392,16 @@ live_tap "Open menu"
 live_tap "Providers"
 live_tap "Add provider"
 live_wait_for_text "Add provider" 30
-# The add-provider sheet opens on the OpenAI preset. The Custom preset is reached from the preset chip,
-# and its tile can sit below the fold. Swipe and retry, log visible labels if it still cannot be found.
-# No API key has been entered at this point, so the diagnostic listing is safe.
-live_select_custom_preset() {
-  local attempt
-  for attempt in 1 2 3 4 5 6; do
-    if python3 .github/scripts/ui_tap.py "Custom" >/dev/null 2>&1; then
-      sleep 0.7
-      return 0
-    fi
-    if (( attempt == 2 )) && python3 .github/scripts/ui_tap.py "OpenAI ·" >/dev/null 2>&1; then
-      sleep 0.9
-      continue
-    fi
-    adb_quiet shell input swipe 540 1600 540 900 350
-    sleep 0.8
-  done
-  echo "::error title=Live provider test::The Custom preset was not found. Visible labels follow (no credentials are on screen yet)."
-  python3 .github/scripts/ui_tap.py "Custom" 2>&1 >/dev/null | sed 's/^/::notice title=Visible labels::/' || true
-  return 1
-}
-
 # Empty the focused text field before typing; the sheet pre-fills the preset URL.
 clear_focused_field() {
   timeout --signal=TERM --kill-after=5s 90s adb shell 'input keyevent KEYCODE_MOVE_END; i=0; while [ $i -lt 40 ]; do input keyevent KEYCODE_DEL; i=$((i+1)); done' >/dev/null 2>&1 || true
 }
 
-live_select_custom_preset
+# The add-provider sheet opens directly on an editable form (preset OpenAI), so there is no Custom tile.
+# Name the provider "Custom" so the list check below still holds, then set the endpoint.
+live_tap "Name"
+clear_focused_field
+enter_text "Custom" "provider name"
 live_tap "Base URL"
 clear_focused_field
 enter_text "$BASE_URL" "provider base URL"
