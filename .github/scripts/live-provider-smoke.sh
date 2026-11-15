@@ -392,7 +392,8 @@ live_tap "Open menu"
 live_tap "Providers"
 live_tap "Add provider"
 live_wait_for_text "Add provider" 30
-live_tap "Custom"
+# The Custom tile sits below the popular presets, so it may need a scroll on the emulator.
+live_tap_scrolling "Custom"
 live_tap "Base URL"
 enter_text "$BASE_URL" "provider base URL"
 adb_quiet shell input keyevent KEYCODE_BACK
