@@ -99,6 +99,7 @@ internal val faStrings: Map<String, String> = mapOf(
         "Audio input" to "ورودی صوتی",
         "Video input" to "ورودی ویدیو",
         "Capabilities are detected from the provider. Change them only when they are wrong." to "قابلیت‌ها از ارائه‌دهنده خوانده می‌شوند. فقط وقتی اشتباه است تغییرشان دهید.",
+        "This file is binary and cannot be read as text. Choose an image, video, audio, PDF, DOCX, or text file." to "این فایل باینری است و به‌صورت متن خوانده نمی‌شود. تصویر، ویدیو، صوت، PDF، DOCX یا فایل متنی انتخاب کنید.",
         "Audio is larger than 15 MB" to "فایل صوتی بزرگ‌تر از ۱۵ مگابایت است",
         "This model cannot listen to audio. Choose a model with audio input, or the audio will be sent as a note only." to "این مدل صوت را نمی‌شنود. مدلی با ورودی صوتی انتخاب کنید، وگرنه صوت فقط به‌صورت یادداشت فرستاده می‌شود.",
         "Photos and videos are not used in video mode yet. Switch to text mode to send them." to "عکس و ویدیو در حالت ویدیو هنوز استفاده نمی‌شوند. برای ارسال آن‌ها به حالت متن برگردید.",

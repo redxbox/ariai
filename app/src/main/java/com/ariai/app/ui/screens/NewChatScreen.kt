@@ -714,15 +714,8 @@ fun NewChatScreen(
             onCamera = { launchCameraCapture() },
             onFile = {
                 launchPickerAfterSheetCloses {
-                    filePicker.launch(arrayOf(
-                        "text/*",
-                        "application/json",
-                        "application/pdf",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        "image/*",
-                        "video/*",
-                        "audio/*"
-                    ))
+                    // Any file type: unknown types are checked by readAttachment (text is accepted, binary refused).
+                    filePicker.launch(arrayOf("*/*"))
                 }
             },
             onCompress = { onCompressHistory { showNote(it) } },

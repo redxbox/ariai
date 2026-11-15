@@ -59,6 +59,45 @@ private val TEXT_EXTENSIONS = setOf(
     "txt", "md", "json", "csv", "xml", "html", "kt", "java", "py", "js", "ts", "yaml", "yml", "log", "sql", "toml"
 )
 
+/**
+ * Any other file is accepted when it is plain text (code, config, logs, data files whose
+ * MIME type Android reports as octet-stream). Binary files are refused with a clear message.
+ */
+private fun readAsTextIfPossible(
+    resolver: android.content.ContentResolver,
+    uri: Uri,
+    name: String,
+    mime: String
+): ReadResult {
+    val head = resolver.openInputStream(uri)?.use { input ->
+        val buffer = ByteArray(8192)
+        val count = input.read(buffer)
+        if (count <= 0) ByteArray(0) else buffer.copyOf(count)
+    } ?: return ReadResult.Error(tx("Could not open this file."))
+    val binaryMessage = tx("This file is binary and cannot be read as text. Choose an image, video, audio, PDF, DOCX, or text file.")
+    if (head.any { it == 0.toByte() }) return ReadResult.Error(binaryMessage)
+    val text = resolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
+        val result = StringBuilder()
+        val buffer = CharArray(4096)
+        while (result.length < MAX_TEXT_CHARS) {
+            val count = reader.read(buffer, 0, minOf(buffer.size, MAX_TEXT_CHARS - result.length))
+            if (count < 0) break
+            result.append(buffer, 0, count)
+        }
+        result.toString()
+    } ?: return ReadResult.Error(tx("Could not open this file."))
+    // Replacement characters mean the bytes were not UTF-8 text.
+    if (text.isNotEmpty() && text.count { it == '\uFFFD' } * 50 > text.length) return ReadResult.Error(binaryMessage)
+    return ReadResult.Ok(
+        Attachment(
+            type = AttachmentType.TEXT,
+            name = name,
+            mimeType = mime,
+            textContent = text
+        )
+    )
+}
+
 sealed interface ReadResult {
     data class Ok(val attachment: Attachment) : ReadResult
     data class Error(val message: String) : ReadResult
@@ -180,7 +219,7 @@ private fun readAttachmentOnIo(context: Context, uri: Uri, extractedDocumentText
                     )
                 )
             }
-            else -> ReadResult.Error(tx("This file type is not supported yet. Choose an image, video, PDF, DOCX, or text file."))
+            else -> readAsTextIfPossible(resolver, uri, name, mime)
         }
     } catch (e: AttachmentReadException) {
         ReadResult.Error(tx(e.message ?: "Could not read this document."))
