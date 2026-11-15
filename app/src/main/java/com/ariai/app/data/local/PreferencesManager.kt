@@ -48,6 +48,7 @@ class PreferencesManager(
         val AUTO_TITLE = booleanPreferencesKey("auto_title")
         val FONT_SIZE = intPreferencesKey("font_size")
         val FIRST_LAUNCH = booleanPreferencesKey("first_launch")
+        val FIRST_KEY_HANDLED = booleanPreferencesKey("first_key_handled")
         val REASONING_LEVEL = stringPreferencesKey("reasoning_level")
         val SEARCH_MODE = stringPreferencesKey("search_mode")
         val FAVORITE_MODELS = stringSetPreferencesKey("favorite_models")
@@ -267,6 +268,13 @@ class PreferencesManager(
 
     suspend fun setFirstLaunchDone() {
         dataStore.edit { it[FIRST_LAUNCH] = false }
+    }
+
+    /** True once the first API key has been handled (its automatic model pick happened or was skipped). */
+    suspend fun isFirstKeyHandled(): Boolean = dataStore.data.map { it[FIRST_KEY_HANDLED] ?: false }.first()
+
+    suspend fun markFirstKeyHandled() {
+        dataStore.edit { it[FIRST_KEY_HANDLED] = true }
     }
 
     suspend fun setDefaultSelection(providerId: String, modelId: String) {

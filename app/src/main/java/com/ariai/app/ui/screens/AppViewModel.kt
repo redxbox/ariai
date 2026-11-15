@@ -479,7 +479,20 @@ class AppViewModel(
                 fetched
             } else provider.models
             val updatedProvider = provider.copy(models = models)
+            val previousKey = providers.value.firstOrNull { it.id == provider.id }?.apiKey.orEmpty()
+            val otherKeyExists = providers.value.any { it.id != provider.id && it.apiKey.isNotBlank() }
             val saved = repository.saveProvider(updatedProvider)
+            if (saved) {
+                val firstKeyAdded = previousKey.isBlank() && updatedProvider.apiKey.isNotBlank() && !otherKeyExists
+                if (firstKeyAdded && !prefs.isFirstKeyHandled()) {
+                    // Only the very first key picks a model automatically; later choices are never overridden.
+                    pickStartingModel(updatedProvider.models)?.let { prefs.setDefaultSelection(updatedProvider.id, it.id) }
+                    prefs.markFirstKeyHandled()
+                } else if (updatedProvider.apiKey.isNotBlank() && !prefs.isFirstKeyHandled()) {
+                    // Existing installs that already had keys keep their current choice.
+                    prefs.markFirstKeyHandled()
+                }
+            }
             onSaved(updatedProvider.takeIf { saved })
         }
     }
@@ -1847,6 +1860,8 @@ class AppViewModel(
                 val chat = chats.value.find { it.id == chatId } ?: repository.getChatById(chatId)
                 if (chat != null) repository.saveChat(chat.copy(providerId = providerId, modelId = modelId))
             } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+            // The last model the user picked becomes the default for new chats and survives restarts.
+            prefs.setDefaultSelection(providerId, modelId)
         }
     }
 
