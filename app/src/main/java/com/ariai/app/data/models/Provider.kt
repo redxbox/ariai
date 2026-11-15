@@ -73,7 +73,9 @@ data class AIModel(
     /** Model accepts audio input (from provider metadata: input_modalities). */
     val supportsAudioInput: Boolean = false,
     /** Model accepts video input (from provider metadata: input_modalities). */
-    val supportsVideoInput: Boolean = false
+    val supportsVideoInput: Boolean = false,
+    /** The user edited this model's capabilities by hand; API refreshes must not overwrite them. */
+    val capabilityOverridden: Boolean = false
 ) : Parcelable
 
 fun getDefaultModelsForType(type: ProviderType, providerId: String): List<AIModel> {

@@ -23,7 +23,8 @@ private data class StoredModel(
     val outputsText: Boolean = true,
     val supportsAudioGen: Boolean = false,
     val supportsAudioInput: Boolean = false,
-    val supportsVideoInput: Boolean = false
+    val supportsVideoInput: Boolean = false,
+    val capabilityOverridden: Boolean = false
 ) {
     fun toModel(): AIModel? {
         val modelId = id.trim().takeIf(String::isNotBlank) ?: return null
@@ -44,7 +45,8 @@ private data class StoredModel(
             outputsText = outputsText,
             supportsAudioGen = supportsAudioGen,
             supportsAudioInput = supportsAudioInput,
-            supportsVideoInput = supportsVideoInput
+            supportsVideoInput = supportsVideoInput,
+            capabilityOverridden = capabilityOverridden
         )
     }
 
@@ -66,7 +68,8 @@ private data class StoredModel(
             outputsText = model.outputsText,
             supportsAudioGen = model.supportsAudioGen,
             supportsAudioInput = model.supportsAudioInput,
-            supportsVideoInput = model.supportsVideoInput
+            supportsVideoInput = model.supportsVideoInput,
+            capabilityOverridden = model.capabilityOverridden
         )
     }
 }

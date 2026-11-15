@@ -153,6 +153,18 @@ fun AddProviderScreen(
     var showAddModel by remember { mutableStateOf(false) }
     var modelFilter by remember { mutableStateOf("") }
     var modelsExpanded by remember { mutableStateOf(false) }
+    var editingModel by remember { mutableStateOf<AIModel?>(null) }
+    editingModel?.let { model ->
+        ModelCapabilitiesDialog(
+            model = model,
+            onSave = { edited ->
+                models = models.map { if (it.id == edited.id) edited else it }
+                modelsEdited = true
+                editingModel = null
+            },
+            onDismiss = { editingModel = null }
+        )
+    }
     var headers by remember { mutableStateOf(initialProvider?.customHeaders?.map { it.key to it.value }.orEmpty()) }
     var customBody by remember { mutableStateOf(initialProvider?.customBody.orEmpty()) }
     val scope = rememberCoroutineScope()
@@ -643,6 +655,7 @@ fun AddProviderScreen(
                             ModelRow(
                                 model = model,
                                 color = AriInk,
+                                onEdit = { editingModel = model },
                                 onRemove = { models = models.filterNot { it.id == model.id } }
                             )
                         }
@@ -690,7 +703,7 @@ fun AddProviderScreen(
 
 
 @Composable
-private fun ModelRow(model: AIModel, color: Color, onRemove: () -> Unit) {
+private fun ModelRow(model: AIModel, color: Color, onEdit: () -> Unit, onRemove: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -707,6 +720,8 @@ private fun ModelRow(model: AIModel, color: Color, onRemove: () -> Unit) {
             Text(model.id, fontSize = 11.sp, color = AriMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val tags = buildList {
                 if (model.supportsVision) add(Triple(tx("Vision"), AriAccentSoft, AriAccent))
+                if (model.supportsAudioInput) add(Triple(tx("Audio input"), AriAccentSoft, AriAccent))
+                if (model.supportsVideoInput) add(Triple(tx("Video input"), AriAccentSoft, AriAccent))
                 if (model.supportsFunctionCalling) add(Triple(tx("Tools"), AriAccentSoft, AriAccent))
                 if (model.supportsImageGen) add(Triple(tx("Image"), AriTagAmberBg, AriTagAmberFg))
                 if ("google_search" in model.builtInTools) add(Triple(tx("Search"), AriTagAmberBg, AriTagAmberFg))
@@ -717,6 +732,9 @@ private fun ModelRow(model: AIModel, color: Color, onRemove: () -> Unit) {
                     tags.forEach { (label, bg, fg) -> ModelTag(label, bg, fg) }
                 }
             }
+        }
+        IconButton(onClick = onEdit, modifier = Modifier.size(48.dp)) {
+            Icon(Icons.Default.Edit, contentDescription = tx("Edit capabilities"), tint = AriMuted, modifier = Modifier.size(18.dp))
         }
         IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
             Icon(Icons.Default.Close, contentDescription = tx("Remove model"), tint = AriMuted, modifier = Modifier.size(18.dp))
@@ -787,6 +805,22 @@ internal fun mergeFetched(current: List<AIModel>, fetched: List<AIModel>): List<
                 headers = old.headers,
                 customBody = old.customBody,
                 outputsText = old.outputsText && fresh.outputsText
+            )
+        } else if (old.capabilityOverridden) {
+            // The user set these by hand, so the refreshed API data must not undo them.
+            fresh.copy(
+                builtInTools = old.builtInTools,
+                headers = old.headers,
+                customBody = old.customBody,
+                supportsVision = old.supportsVision,
+                supportsFunctionCalling = old.supportsFunctionCalling,
+                supportsImageGen = old.supportsImageGen,
+                supportsVideoGen = old.supportsVideoGen,
+                supportsAudioGen = old.supportsAudioGen,
+                outputsText = old.outputsText,
+                supportsAudioInput = old.supportsAudioInput,
+                supportsVideoInput = old.supportsVideoInput,
+                capabilityOverridden = true
             )
         } else {
             // Capability flags come from the fresh fetch; only request customization is retained.
