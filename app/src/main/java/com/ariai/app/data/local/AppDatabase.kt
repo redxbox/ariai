@@ -242,6 +242,10 @@ interface MessageDao {
     @Query("SELECT * FROM messages")
     suspend fun getAllMessagesSync(): List<MessageEntity>
 
+    /** Only the attachment column: used to size and clear generated media without loading whole messages. */
+    @Query("SELECT attachmentsJson FROM messages")
+    suspend fun getAllAttachmentsJson(): List<String>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity)
 

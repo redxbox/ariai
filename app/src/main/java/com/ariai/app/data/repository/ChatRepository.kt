@@ -35,7 +35,7 @@ class ChatRepository(
         .map { list ->
             try {
                 list.map { it.toModel() }
-            } catch (e: Exception) {
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "row parse failed")
                 emptyList()
             }
@@ -50,7 +50,7 @@ class ChatRepository(
 
     suspend fun getProviderById(id: String): Provider? = try {
         db.providerDao().getProviderById(id)?.toModel()
-    } catch (e: Exception) {
+    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
         com.ariai.app.util.AppLog.warn(e, "provider row")
         null
     }
@@ -93,7 +93,7 @@ class ChatRepository(
     suspend fun migrateProviderKeysToEncrypted() {
         val providers = try {
             db.providerDao().getAllProvidersSync()
-        } catch (e: Exception) {
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
             com.ariai.app.util.AppLog.warn(e, "provider secret migration")
             return
         }
@@ -134,7 +134,7 @@ class ChatRepository(
     suspend fun chatIdsContaining(text: String): Set<String> = try {
         val escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         db.messageDao().chatIdsContaining(escaped).toSet()
-    } catch (e: Exception) {
+    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
         com.ariai.app.util.AppLog.warn(e, "chat search")
         emptySet()
     }
@@ -142,7 +142,7 @@ class ChatRepository(
     suspend fun deleteProvider(id: String) {
         try {
             db.providerDao().deleteById(id)
-        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     // Chats
@@ -169,7 +169,7 @@ class ChatRepository(
 
     suspend fun getChatById(id: String): Chat? = try {
         db.chatDao().getChatById(id)?.toModel()
-    } catch (e: Exception) {
+    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
         com.ariai.app.util.AppLog.warn(e, "chat row")
         null
     }
@@ -196,7 +196,7 @@ class ChatRepository(
                 removedMessages.flatMap { it.storagePaths() }.toSet()
             }
             deleteUnreferencedMedia(removedPaths)
-        } catch (e: Exception) {
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
             com.ariai.app.util.AppLog.warn(e, "deleteChat")
         }
     }
@@ -208,7 +208,7 @@ class ChatRepository(
                 try {
                     // The DAO already orders by timestamp; keep mapping off the UI dispatcher.
                     list.map { it.toModel() }
-                } catch (e: Exception) {
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
                     com.ariai.app.util.AppLog.warn(e, "messages parse failed")
                     emptyList()
                 }
@@ -285,7 +285,7 @@ class ChatRepository(
                 db.chatDao().insertChat(chat.copy(updatedAt = System.currentTimeMillis()))
             }
             true
-        } catch (e: Exception) {
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
             withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
                 createdFiles.forEach { it.delete() }
             }
@@ -303,7 +303,7 @@ class ChatRepository(
                 removed?.storagePaths().orEmpty()
             }
             deleteUnreferencedMedia(removedPaths)
-        } catch (e: Exception) {
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
             com.ariai.app.util.AppLog.warn(e, "deleteMessage")
         }
     }
@@ -318,14 +318,14 @@ class ChatRepository(
     }
 
     suspend fun generatedMediaBytes(): Long = withContext(Dispatchers.IO) {
-        val legacyAttachments = db.messageDao().getAllMessagesSync()
-            .flatMapTo(mutableSetOf()) { parseAttachments(it.attachmentsJson).mapNotNull { a -> a.uri } }
+        val legacyAttachments = db.messageDao().getAllAttachmentsJson()
+            .flatMapTo(mutableSetOf()) { parseAttachments(it).mapNotNull { a -> a.uri } }
         ImageStore.generatedBytes(legacyAttachments)
     }
 
     suspend fun clearGeneratedMedia(): Int = withContext(Dispatchers.IO) {
-        val legacyAttachments = db.messageDao().getAllMessagesSync()
-            .flatMapTo(mutableSetOf()) { parseAttachments(it.attachmentsJson).mapNotNull { a -> a.uri } }
+        val legacyAttachments = db.messageDao().getAllAttachmentsJson()
+            .flatMapTo(mutableSetOf()) { parseAttachments(it).mapNotNull { a -> a.uri } }
         ImageStore.clearGenerated(legacyAttachments)
     }
 
@@ -339,12 +339,12 @@ class ChatRepository(
                         getBuiltInAgents().forEach { agent ->
                             db.agentDao().insertAgent(agent.toEntity())
                         }
-                    } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
                     getBuiltInAgents()
                 } else {
                     list.map { it.toModel() }
                 }
-            } catch (e: Exception) {
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "agents parse; using built-ins")
                 getBuiltInAgents()
             }
@@ -357,13 +357,13 @@ class ChatRepository(
     suspend fun saveAgent(agent: Agent) {
         try {
             db.agentDao().insertAgent(agent.toEntity())
-        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     suspend fun deleteAgent(id: String) {
         try {
             db.agentDao().deleteById(id)
-        } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e) }
     }
 
     // AI Operations - with error handling
@@ -589,7 +589,7 @@ class ChatRepository(
 
     fun formatSearchForLLM(response: SearchResponse) = try {
         searchClient.formatResultsForLLM(response)
-    } catch (e: Exception) {
+    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
         "Search failed: ${e.message}"
     }
 
@@ -622,7 +622,7 @@ class ChatRepository(
             (customHeaders.startsWith("enc1:") && decryptedHeaders == null) ||
                 (customBody?.startsWith("enc1:") == true && decryptedBody == null) ||
                 (modelsJson.startsWith("enc1:") && decryptedModels == null)
-        val providerType = try { ProviderType.valueOf(type) } catch (e: Exception) {
+        val providerType = try { ProviderType.valueOf(type) } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
             com.ariai.app.util.AppLog.warn(e, "provider type")
             ProviderType.OPENAI_COMPATIBLE
         }
@@ -635,7 +635,7 @@ class ChatRepository(
                 baseUrl = baseUrl,
                 apiKey = decryptedKey.orEmpty(),
                 enabled = enabled,
-                customHeaders = try { Converters().toStringMap(decryptedHeaders.orEmpty()) } catch (e: Exception) {
+                customHeaders = try { Converters().toStringMap(decryptedHeaders.orEmpty()) } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
                 com.ariai.app.util.AppLog.warn(e, "custom headers parse")
                 emptyMap()
             },
@@ -652,7 +652,7 @@ class ChatRepository(
                     if (safeModelsJson == "[]") com.ariai.app.data.models.getDefaultModelsForType(providerType, id) else emptyList()
                 }
             )
-        } catch (e: Exception) {
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
             com.ariai.app.util.AppLog.warn(e, "provider toModel")
             Provider(
                 id = id,
@@ -674,7 +674,7 @@ class ChatRepository(
         apiKey = com.ariai.app.util.KeyVault.encrypt(apiKey),
         enabled = enabled,
         customHeaders = com.ariai.app.util.KeyVault.encrypt(
-            try { Converters().fromStringMap(customHeaders) } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e, "custom headers serialize"); "" }
+            try { Converters().fromStringMap(customHeaders) } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) { com.ariai.app.util.AppLog.warn(e, "custom headers serialize"); "" }
         ),
         customBody = customBody?.let(com.ariai.app.util.KeyVault::encrypt),
         createdAt = createdAt,
@@ -744,7 +744,7 @@ class ChatRepository(
         return try {
             val bytes = java.io.File(uri).readBytes()
             copy(base64Data = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
-        } catch (e: Exception) {
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
             com.ariai.app.util.AppLog.warn(e, "attachment hydrate")
             this
         }
@@ -763,7 +763,7 @@ class ChatRepository(
                 textContent = o.optString("textContent").ifBlank { null }
             )
         }
-    } catch (e: Exception) {
+    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
         com.ariai.app.util.AppLog.warn(e, "attachments parse")
         emptyList()
     }
@@ -787,10 +787,10 @@ class ChatRepository(
         ChatMessage(
             id = id,
             chatId = chatId,
-            role = try { MessageRole.valueOf(role) } catch (e: Exception) { MessageRole.USER },
+            role = try { MessageRole.valueOf(role) } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) { MessageRole.USER },
             content = content,
             timestamp = timestamp,
-            status = try { MessageStatus.valueOf(status) } catch (e: Exception) { MessageStatus.SENT },
+            status = try { MessageStatus.valueOf(status) } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) { MessageStatus.SENT },
             modelId = modelId,
             providerId = providerId,
             parentId = parentId,
@@ -801,7 +801,7 @@ class ChatRepository(
             usage = TokenUsage(promptTokens, completionTokens, totalTokens)
                 .takeIf { it.promptTokens > 0 || it.completionTokens > 0 || it.totalTokens > 0 }
         )
-    } catch (e: Exception) {
+    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (e: Exception) {
         com.ariai.app.util.AppLog.warn(e, "message toModel")
         ChatMessage(id = id, chatId = chatId, role = MessageRole.USER, content = content, timestamp = timestamp)
     }

@@ -1263,6 +1263,8 @@ class AppViewModel(
 
                 setSendStreamingState(generation, streaming = true)
                 var fullResponse = ""
+                // Appending to a String per chunk copies the whole reply each time; the buffer appends in place.
+                val responseBuffer = StringBuilder()
                 var streamedPreview = ""
                 val requestModelId = targetModelId ?: "openai"
                 val responseUsage = AtomicReference<TokenUsage?>(null)
@@ -1448,14 +1450,16 @@ class AppViewModel(
                             allowUrlContext = hasUrlContext,
                             onUsage = recordUsage
                         ).collect { chunk ->
-                            fullResponse += chunk
+                            responseBuffer.append(chunk)
                             // Publish at most ~16 times per second; each publish recomposes and re-renders markdown.
                             val now = System.currentTimeMillis()
                             if (now - lastPublishMs >= 60) {
                                 lastPublishMs = now
+                                fullResponse = responseBuffer.toString()
                                 setSendStreamingContent(generation, fullResponse)
                             }
                         }
+                        fullResponse = responseBuffer.toString()
                     } else {
                         repository.agentChatStream(
                             provider = provider,
@@ -1533,7 +1537,8 @@ class AppViewModel(
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     cancellationHandled = true
                     // Stopped by the user: keep the text that has arrived so far as the reply.
-                    val partialResponse = fullResponse + streamedPreview
+                    // The buffer holds every chunk received; fullResponse can lag by one publish interval.
+                    val partialResponse = (responseBuffer.takeIf { it.isNotEmpty() }?.toString() ?: fullResponse) + streamedPreview
                     if (partialResponse.isNotBlank()) {
                         val partial = ChatMessage(
                             chatId = chatId,
