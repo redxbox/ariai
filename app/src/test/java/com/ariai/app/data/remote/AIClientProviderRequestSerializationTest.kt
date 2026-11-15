@@ -141,7 +141,8 @@ class AIClientProviderRequestSerializationTest {
                     id = "gemini-test",
                     displayName = "Gemini test",
                     providerId = "provider",
-                    builtInTools = listOf("google_search", "url_context")
+                    builtInTools = listOf("google_search", "url_context"),
+                    supportsVideoInput = true
                 )
             )
         )
