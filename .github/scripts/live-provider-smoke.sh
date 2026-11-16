@@ -394,7 +394,7 @@ live_tap "Add provider"
 live_wait_for_text "Add provider" 30
 # Empty the focused text field before typing; the sheet pre-fills the preset URL.
 clear_focused_field() {
-  timeout --signal=TERM --kill-after=5s 90s adb shell 'input keyevent KEYCODE_MOVE_END; i=0; while [ $i -lt 40 ]; do input keyevent KEYCODE_DEL; i=$((i+1)); done' >/dev/null 2>&1 || true
+  timeout --signal=TERM --kill-after=5s 90s adb shell 'input keyevent KEYCODE_MOVE_END; i=0; while [ $i -lt 70 ]; do input keyevent KEYCODE_DEL; i=$((i+1)); done' >/dev/null 2>&1 || true
 }
 
 # The add-provider sheet opens directly on an editable form (preset OpenAI), so there is no Custom tile.
@@ -405,6 +405,26 @@ enter_text "Custom" "provider name"
 live_tap "Base URL"
 clear_focused_field
 enter_text "$BASE_URL" "provider base URL"
+# The endpoint is not a credential, so the field value is logged to show exactly what the app will request.
+# Typed before the API key is entered, so no secret can be on screen at this point.
+live_log_base_url_field() {
+  python3 - <<'PY' || true
+import subprocess
+import xml.etree.ElementTree as ET
+subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/base-url.xml"],
+               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+xml = subprocess.run(["adb", "shell", "cat", "/sdcard/base-url.xml"],
+                     capture_output=True, text=True, timeout=30).stdout
+for node in ET.fromstring(xml).iter("node"):
+    value = node.get("text", "")
+    if value.startswith("http") and len(value) < 300:
+        print(value)
+        break
+else:
+    print("(no URL field value found)")
+PY
+}
+echo "::notice title=Base URL in app::$(live_log_base_url_field | tr -d '\r' | head -c 300)"
 adb_quiet shell input keyevent KEYCODE_BACK
 live_tap "API key"
 enter_secret "$API_KEY"
