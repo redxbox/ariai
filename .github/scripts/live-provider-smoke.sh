@@ -128,11 +128,12 @@ enter_secret() {
   local chunk escaped quoted
   # Long API keys can be truncated by one Android input event; send bounded chunks without logging them.
   while [[ -n "$secret" ]]; do
-    chunk="${secret:0:24}"
+    chunk="${secret:0:12}"
     secret="${secret:${#chunk}}"
     escaped="${chunk// /%s}"
     quoted="$(printf '%s' "$escaped" | python3 -c 'import shlex,sys; print(shlex.quote(sys.stdin.read()), end="")')"
     # Never print the command or its args; the API key remains out of logs, artifacts and shell traces.
+    sleep 0.3
     if ! timeout --signal=TERM --kill-after=5s 35s adb shell "input text $quoted" >/dev/null 2>&1; then
       unset secret chunk escaped quoted
       echo "::error title=Live provider test::Could not enter the Actions API key; its value was suppressed."
@@ -427,7 +428,28 @@ PY
 echo "::notice title=Base URL in app::$(live_log_base_url_field | tr -d '\r' | head -c 300)"
 adb_quiet shell input keyevent KEYCODE_BACK
 live_tap "API key"
+# Compare the typed key with the Actions secret without revealing either: length and a SHA-256 prefix only.
+expected_key_length="${#API_KEY}"
+expected_key_fingerprint="$(printf '%s' "$API_KEY" | sha256sum | cut -c1-12)"
 enter_secret "$API_KEY"
+sleep 1
+# Password fields expose masked characters; compare how many the app received.
+python3 - "$expected_key_length" "$expected_key_fingerprint" <<'PY' || true
+import subprocess, sys
+import xml.etree.ElementTree as ET
+expected_length, expected_fingerprint = sys.argv[1], sys.argv[2]
+subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/key-check.xml"],
+               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+xml = subprocess.run(["adb", "shell", "cat", "/sdcard/key-check.xml"],
+                     capture_output=True, text=True, timeout=30).stdout
+for node in ET.fromstring(xml).iter("node"):
+    if node.get("class", "") == "android.widget.EditText" and node.get("password", "false") == "true":
+        value = node.get("text", "")
+        print(f"Key field characters: {len(value)} (expected {expected_length}); fingerprint of secret: {expected_fingerprint}")
+        break
+else:
+    print("Key field not found in the accessibility tree.")
+PY
 unset API_KEY
 adb_quiet shell input keyevent KEYCODE_BACK
 live_tap "Fetch models"
