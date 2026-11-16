@@ -453,6 +453,20 @@ except Exception:
     pass
 PY
 )"
+  # The app's own error text carries the request path; it holds no credential, so it is logged for diagnosis.
+  python3 - <<'PY' || true
+import subprocess
+import xml.etree.ElementTree as ET
+subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/models-error.xml"],
+               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+xml = subprocess.run(["adb", "shell", "cat", "/sdcard/models-error.xml"],
+                     capture_output=True, text=True, timeout=30).stdout
+for node in ET.fromstring(xml).iter("node"):
+    text = node.get("text", "")
+    if "Could not load models" in text or "models" in text.lower() and "HTTP" in text:
+        print(text[:400].replace("\n", " "))
+        break
+PY
   if [[ "$status_code" =~ ^[0-9]{3}$ ]]; then
     echo "::error title=Live provider test::Model discovery returned HTTP $status_code from the configured endpoint."
   else
