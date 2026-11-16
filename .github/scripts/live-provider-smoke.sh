@@ -467,6 +467,8 @@ for node in ET.fromstring(xml).iter("node"):
         print(text[:400].replace("\n", " "))
         break
 PY
+  # App log lines that mention the failing request. Lines that could carry credentials are dropped.
+  adb logcat -d 2>/dev/null | grep -i "ariai\|HTTP\|listModels\|models" | grep -iv "bearer\|authorization\|api.key\|apikey\|x-goog" | tail -12 | cut -c1-300 | sed 's/^/::notice title=App log::/' || true
   if [[ "$status_code" =~ ^[0-9]{3}$ ]]; then
     echo "::error title=Live provider test::Model discovery returned HTTP $status_code from the configured endpoint."
   else
