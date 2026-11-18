@@ -483,11 +483,16 @@ subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/models-error.xml
                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
 xml = subprocess.run(["adb", "shell", "cat", "/sdcard/models-error.xml"],
                      capture_output=True, text=True, timeout=30).stdout
+# Visible labels only; input fields are skipped so the typed key can never appear here.
+seen = []
 for node in ET.fromstring(xml).iter("node"):
-    text = node.get("text", "")
-    if "Could not load models" in text or "models" in text.lower() and "HTTP" in text:
-        print(text[:400].replace("\n", " "))
-        break
+    if node.get("class", "").endswith("EditText"):
+        continue
+    text = node.get("text", "").replace("\n", " ").strip()
+    if text and text not in seen:
+        seen.append(text)
+for text in seen[-40:]:
+    print("Screen label: " + text[:300])
 PY
   # App log lines that mention the failing request. Lines that could carry credentials are dropped.
   adb logcat -d -s AriAi:W AriAi:E 2>/dev/null | grep -iv "bearer\|authorization\|api.key\|apikey\|x-goog" | tail -12 | cut -c1-400 | sed 's/^/::notice title=App log::/' || true
